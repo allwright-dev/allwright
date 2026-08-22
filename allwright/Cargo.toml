@@ -1,0 +1,10 @@
+[package]
+name = "allwright"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.6.6", features = ["derive"] }
+engine-lib = { path = "../engine-lib" }
+tokio = { workspace = true }
+tonic = { workspace = true }
