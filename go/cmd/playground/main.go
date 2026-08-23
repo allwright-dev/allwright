@@ -27,10 +27,6 @@ func main() {
 	clickSelector := flag.String("click-selector", "", "Optional CSS selector to click over BiDi after navigation")
 	flag.Parse()
 
-	if flag.NArg() == 0 {
-		log.Fatalf("expected a subcommand: ping or browser-session")
-	}
-
 	if err := os.Setenv("ALLWRIGHT_SERVER_ADDR", *serverAddr); err != nil {
 		log.Fatalf("set ALLWRIGHT_SERVER_ADDR: %v", err)
 	}
@@ -43,27 +39,12 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	switch flag.Arg(0) {
-	case "ping":
-		runPing(ctx)
-	case "browser-session":
-		runBrowserSession(ctx, browserSessionFlags{
-			serverAddr:    *serverAddr,
-			chromeBinary:  *chromeBinary,
-			navigateURL:   *navigateURL,
-			clickSelector: *clickSelector,
-		})
-	default:
-		log.Fatalf("unsupported subcommand %q", flag.Arg(0))
-	}
-}
-
-func runPing(ctx context.Context) {
-	message, err := allwright.Ping(ctx)
-	if err != nil {
-		log.Fatalf("ping: %v", err)
-	}
-	fmt.Printf("ping response: %s\n", message)
+	runBrowserSession(ctx, browserSessionFlags{
+		serverAddr:    *serverAddr,
+		chromeBinary:  *chromeBinary,
+		navigateURL:   *navigateURL,
+		clickSelector: *clickSelector,
+	})
 }
 
 func runBrowserSession(ctx context.Context, flags browserSessionFlags) {
@@ -119,24 +100,12 @@ func runBrowserSession(ctx context.Context, flags browserSessionFlags) {
 		)
 	}
 
-	tabPong, err := initialTab.Ping(ctx, "go-playground-tab-1")
-	if err != nil {
-		log.Fatalf("ping initial tab: %v", err)
-	}
-	fmt.Printf("[%s] tab session pong: %s\n", initialTab.SessionID(), tabPong)
-
 	waitForEnter("[go-playground] Press Enter to close the browser session and Chrome...")
 
 	if err := initialTab.Close(ctx); err != nil {
 		log.Fatalf("close initial tab: %v", err)
 	}
 	fmt.Printf("[%s] tab session closed\n", initialTab.SessionID())
-
-	pong, err := browser.Ping(ctx, "go-playground")
-	if err != nil {
-		log.Fatalf("ping browser session: %v", err)
-	}
-	fmt.Printf("[%s] session pong: %s\n", browser.SessionID(), pong)
 
 	if err := browser.Close(ctx); err != nil {
 		log.Fatalf("close browser session: %v", err)

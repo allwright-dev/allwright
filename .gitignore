@@ -4,6 +4,11 @@
 # Local Go tool installs used for proto generation
 /go/.bin/
 
+# TypeScript build and install artifacts
+/typescript/node_modules/
+/typescript/dist/
+/typescript/*.tsbuildinfo
+
 # Editor and OS noise
 .DS_Store
 .idea/

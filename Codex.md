@@ -13,11 +13,13 @@ This instruction should be treated as ongoing project policy for all future AI c
 - Top-level repo folders are now split by technology:
   - `rust/`
   - `go/`
+  - `typescript/`
   - `proto/`
 - `rust/allwright`: CLI crate and top-level operator entrypoint
 - `rust/allwright-client`: reusable Rust client crate with a higher-level browser/tab API
 - `rust/playground`: end-to-end client crate for exercising the engine server
 - `go/`: Go module containing generated engine stubs, a reusable Go client, and a Go playground
+- `typescript/`: TypeScript/JavaScript stack folder containing the JS client package and playground
 - `proto/`: shared protobuf and gRPC contract root for all stacks
 - `rust/engine-lib`: owner of all engine code, including the gRPC server
 - `rust/engine-lib` further uses `rust/mobile-lib`, `rust/desktop-lib`, and `rust/web-lib`
@@ -48,8 +50,11 @@ Supporting libraries:
 - The current starter service is `EngineService`.
 - Generated gRPC client code is enabled and currently consumed by `rust/allwright-client` and `rust/playground`.
 - Generated Go proto/gRPC code is checked in under `go/gen/allwright/engine/v1` and consumed by the Go module.
+- The TypeScript stack currently loads `proto/engine/v1/engine.proto` dynamically at runtime rather than checking in generated TS stubs.
 - The public Rust client surface should stay high-level and should not expose raw gRPC connection setup.
 - The public Go client surface should stay high-level and should not expose raw gRPC connection setup.
+- The public TypeScript client surface should stay high-level and should not expose raw grpc-js client setup.
+- Use Bun for local development workflows in the TypeScript stack, but keep the client surface generic for TypeScript/JavaScript consumers.
 - The current RPCs are:
   - `Ping`
   - `BrowserSession` as a bidirectional stream
@@ -82,11 +87,15 @@ Supporting libraries:
 - `rust/playground` is the place for local end-to-end testing against the live engine server.
 - `rust/allwright-client` now hides the engine transport behind a lazy singleton connection and exposes `launch_chrome`, `ping`, `Browser`, and `Tab` methods instead of public tonic setup.
 - The Rust singleton client currently defaults to `http://127.0.0.1:50051`, also respects `ALLWRIGHT_SERVER_ADDR`, and can be redirected in-process with `allwright_client::set_server_addr(...)`.
-- `rust/playground` now exercises the engine through the `allwright-client` crate in `rust/allwright-client`, supports the launch-created initial tab plus additional browser-session tabs, and closes them through the high-level browser/tab API.
+- `rust/playground` now exercises the engine through the `allwright-client` crate in `rust/allwright-client`, supports the launch-created initial tab plus additional browser-session tabs, and closes them through the high-level browser/tab API as a minimal end-to-end test flow.
 - `rust/playground` waits for keyboard confirmation before closing the browser session so browser state can be observed manually.
 - `go/client` now uses package name `allwright`, hides the engine transport behind a lazy singleton connection, and exposes browser/tab methods instead of public gRPC dial APIs.
 - The Go singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`.
-- `go/cmd/playground` is the Go-side smoke-test harness and currently exercises `Ping` plus an initial-tab browser-session flow through that higher-level API.
+- `go/cmd/playground` is the Go-side playground and currently exercises a minimal browser-session test flow directly, without extra ping-style smoke commands.
+- `typescript/src/index.ts` now provides the TypeScript/JavaScript client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch(...)`, `Browser`, and `Page` methods instead of public grpc-js setup.
+- New TypeScript work should prefer the `chromium` / `Browser` / `Page` surface; older compatibility helpers like `launchChrome`, `initialTab()`, `newTab()`, and `navigate()` should be treated as transitional.
+- The TypeScript singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and also supports in-process override with `setServerAddr(...)`.
+- `typescript/src/playground.ts` is the TypeScript-side playground for a minimal browser-session test flow; use Bun for local development runs in this repo and keep it focused on real browser work rather than extra ping-style smoke commands.
 - Regenerating Go stubs currently requires local installation of `protoc-gen-go@v1.36.10` and `protoc-gen-go-grpc@v1.5.1`, then running `protoc` against `proto/engine/v1/engine.proto` with output rooted at `go/`.
 
 ## Current Dependency Hierarchy

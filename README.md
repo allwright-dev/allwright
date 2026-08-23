@@ -10,6 +10,7 @@ The repo is now organized by top-level technology folders:
 
 - `rust/`: Rust workspace crates
 - `go/`: Go module, generated stubs, and Go playground
+- `typescript/`: TypeScript/JavaScript package for the JS stack
 - `proto/`: shared protobuf and gRPC contracts consumed by every stack
 
 Within that layout, the project hierarchy is intentionally split by ownership:
@@ -30,6 +31,7 @@ Supporting platform crates sit under the platform library layer:
 - `rust/allwright-client`: reusable Rust client with a high-level browser/tab API over the engine server
 - `rust/playground`: end-to-end client for exercising the engine gRPC server
 - `go/`: Go module with generated engine stubs, a Go client package, and a Go playground
+- `typescript/`: TypeScript/JavaScript stack folder containing the JS client package and playground
 - `proto/`: shared protobuf contract root
 - `rust/engine-lib`: owner of all engine code and the gRPC server crate
 - `rust/mobile-lib`: mobile support library consumed by `rust/engine-lib`
@@ -54,6 +56,7 @@ The workspace shares a single Tokio dependency through the root `Cargo.toml` and
 - Generated Rust code: built at compile time by `rust/engine-lib/build.rs`
 - Generated gRPC client code: also built at compile time and used by `rust/allwright-client` and `rust/playground`
 - Generated Go proto/gRPC code: checked in under `go/gen/allwright/engine/v1`
+- The TypeScript stack currently loads the shared proto dynamically from `proto/engine/v1/engine.proto` at runtime rather than checking in generated stubs
 
 This is only the base gRPC layout. It is intentionally small so the API can grow from a clear starting point instead of guessing future engine contracts too early.
 
@@ -122,6 +125,16 @@ The public Go-facing API intentionally does not expose raw gRPC connection manag
 - the default server address is `127.0.0.1:50051`
 - `ALLWRIGHT_SERVER_ADDR` can override that address without exposing a public `Dial` API
 - the public Go surface is centered on higher-level browser and tab objects rather than raw proto streams
+
+The public TypeScript/JavaScript-facing API intentionally follows that same model.
+
+- `typescript/` is a single shared stack folder for both TypeScript and JavaScript consumers
+- `typescript/src/index.ts` creates the engine transport lazily as a singleton
+- the default TypeScript client server address is `127.0.0.1:50051`
+- `ALLWRIGHT_SERVER_ADDR` can override that address
+- `setServerAddr(...)` can override it inside the current process
+- the public TypeScript surface is centered on Playwright-like `chromium`, `Browser`, and `Page` objects rather than raw grpc-js streams
+- Bun is the preferred development/runtime tool for working in this repo's TypeScript stack
 
 ## Regenerating Proto Code
 
@@ -252,22 +265,16 @@ Use `rust/playground` as the local end-to-end client for the engine server.
 
 `rust/playground` now uses the public `allwright-client` crate from `rust/allwright-client` rather than talking to tonic streams directly.
 
-Ping the server:
+Run the Rust playground test flow:
 
 ```bash
-cargo run -p playground -- --server-addr http://127.0.0.1:50051 ping
+cargo run -p playground -- --server-addr http://127.0.0.1:50051
 ```
 
-Run a browser-session flow:
+Open a custom number of tabs during the Rust playground flow:
 
 ```bash
-cargo run -p playground -- --server-addr http://127.0.0.1:50051 browser-session
-```
-
-Open a custom number of tabs during the browser-session flow:
-
-```bash
-cargo run -p playground -- --server-addr http://127.0.0.1:50051 --tabs 3 browser-session
+cargo run -p playground -- --server-addr http://127.0.0.1:50051 --tabs 3
 ```
 
 The current browser-session playground flow:
@@ -279,14 +286,8 @@ The current browser-session playground flow:
 - keeps Chrome open until keyboard confirmation
 - closes tabs and the browser through high-level `Tab::close()` and `Browser::close()`
 - optionally sends `ClickElementCommand` on each tab stream
-- sends a session ping
-- prints streamed events returned by the server
 - prints the post-navigation `chromium_bidi_injection` event with real mapper session metadata after `Page.loadEventFired`
-- passes the parent `browser_session_id` when attaching to `TabSession`
-- keeps the opened tabs available for observation until keyboard confirmation
-- closes each opened tab session after keyboard confirmation
 - waits for keyboard input before closing the browser session
-- sends `CloseBrowserSessionCommand` after tab work is complete
 
 The current `CloseBrowserSessionCommand` path also terminates the launched Chrome process for that browser session.
 
@@ -311,29 +312,62 @@ err = browser.Close(ctx)
 
 The transport is hidden behind a singleton runtime. Consumers should not manually dial gRPC from the public API surface.
 
-Run the Go playground ping flow:
+## TypeScript Client
+
+The repo also contains a single shared TypeScript/JavaScript package under `typescript/`.
+
+- Package root: `typescript/`
+- High-level public client entrypoint: `typescript/src/index.ts`
+- Playground entrypoint: `typescript/src/playground.ts`
+- Shared contract source: `proto/engine/v1/engine.proto`
+- Main public browser entrypoint: `chromium.launch(...)`
+
+The intended TypeScript usage is also Playwright-like:
+
+```ts
+import { chromium } from "./src/index.js";
+
+const browser = await chromium.launch({});
+const page = browser.page();
+await page.goto("https://example.com");
+await page.click("a");
+await browser.close();
+```
+
+The current TypeScript client also keeps a few compatibility helpers for the earlier shape, but new work should prefer the `chromium` / `Browser` / `Page` surface.
+
+The transport is hidden behind a singleton runtime. Consumers should not manually construct grpc-js clients from the public API surface.
+
+For local development in this repo, use Bun to install dependencies and run the package:
+
+```bash
+cd typescript
+bun install
+bun run build
+```
+
+Run the TypeScript playground test flow:
+
+```bash
+cd typescript
+bun run src/playground.ts --server-addr 127.0.0.1:50051
+```
+
+Run the Go playground test flow:
 
 ```bash
 cd go
-go run ./cmd/playground --server-addr 127.0.0.1:50051 ping
+go run ./cmd/playground --server-addr 127.0.0.1:50051
 ```
 
-Run the Go playground browser-session flow:
-
-```bash
-cd go
-go run ./cmd/playground --server-addr 127.0.0.1:50051 browser-session
-```
-
-Run the Go playground browser-session flow with an optional BiDi click:
+Run the Go playground flow with an optional BiDi click:
 
 ```bash
 cd go
 go run ./cmd/playground \
   --server-addr 127.0.0.1:50051 \
   --navigate-url https://example.com \
-  --click-selector 'a' \
-  browser-session
+  --click-selector 'a'
 ```
 
 ## Test
@@ -357,6 +391,7 @@ go test ./...
 ├── README.md
 ├── go/
 ├── proto/
+├── typescript/
 └── rust/
     ├── allwright/
     ├── allwright-client/
@@ -378,7 +413,7 @@ go test ./...
 - Expand the gRPC API beyond the starter `Ping` service once engine contracts are designed.
 - Introduce browser and tab session identifiers explicitly in engine events and commands.
 - Expand the current BiDi command surface beyond selector-based click into richer actions, script evaluation, and event subscriptions.
-- Expand the Go playground beyond the current initial-tab smoke test if we want fuller Go-side end-to-end coverage.
+- Expand the Go playground beyond the current initial-tab test flow if we want fuller Go-side end-to-end coverage.
 - Introduce shared async traits and error types owned by `rust/engine-lib`.
 - Grow `rust/playground` into the default end-to-end test harness for engine workflows.
 - Keep `Codex.md` current as the handoff document for future AI sessions.
