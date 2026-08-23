@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::proto;
 use crate::web_lib;
 use tokio::sync::{Mutex, mpsc};
+use tokio::time::{Duration, Instant, sleep};
 use tokio_stream::{Stream, wrappers::ReceiverStream};
 use tonic::{Request, Response, Status, transport::Server};
 
@@ -13,11 +14,16 @@ use proto::engine_service_server::{EngineService, EngineServiceServer};
 use proto::{
     BrowserSessionClosedEvent, BrowserSessionCommand, BrowserSessionErrorEvent,
     BrowserSessionEvent, ChromeLaunchedEvent, ChromiumBidiInjectionEvent, ClickElementCommand,
-    CloseBrowserSessionCommand, CloseTabSessionCommand, ElementClickedEvent, LaunchChromeCommand,
-    NavigateTabCommand, OpenTabCommand, PingRequest, PingResponse, SessionPingCommand,
-    SessionPongEvent, TabNavigatedEvent, TabOpenedEvent, TabSessionAttachedEvent,
-    TabSessionClosedEvent, TabSessionCommand, TabSessionErrorEvent, TabSessionEvent,
-    TabSessionPingCommand, TabSessionPongEvent, browser_session_command::Command as BrowserCommand,
+    CloseBrowserSessionCommand, CloseTabSessionCommand, CommandRetryOptions, CountElementsCommand,
+    ElementClickedEvent, ElementCountedEvent, ElementFilledEvent, ElementFocusedEvent,
+    ElementHoveredEvent, ElementsHighlightedEvent, FillElementCommand, FocusElementCommand,
+    GetInnerTextCommand, GetTextContentCommand, HighlightElementsCommand, HoverElementCommand,
+    InnerTextResolvedEvent, KeyPressedEvent, LaunchChromeCommand, NavigateTabCommand,
+    OpenTabCommand, PingRequest, PingResponse, PressKeyCommand, SelectorWaitSatisfiedEvent,
+    SessionPingCommand, SessionPongEvent, TabNavigatedEvent, TabOpenedEvent,
+    TabSessionAttachedEvent, TabSessionClosedEvent, TabSessionCommand, TabSessionErrorEvent,
+    TabSessionEvent, TabSessionPingCommand, TabSessionPongEvent, TextContentResolvedEvent,
+    WaitForSelectorCommand, browser_session_command::Command as BrowserCommand,
     browser_session_event::Event as BrowserEvent, tab_session_command::Command as TabCommand,
     tab_session_event::Event as TabEvent,
 };
@@ -46,6 +52,8 @@ struct BrowserSessionState {
 struct TabSessionState {
     browser_session_id: String,
     target_id: String,
+    browsing_context_id: Option<String>,
+    current_url: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -72,6 +80,71 @@ struct CommandOutcome {
 struct TabCommandOutcome {
     events: Vec<TabSessionEvent>,
     should_close: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RetryPolicy {
+    timeout: Duration,
+    retry_interval: Duration,
+}
+
+impl RetryPolicy {
+    fn from_proto(
+        options: Option<&CommandRetryOptions>,
+        timeout_ms: u64,
+        retry_interval_ms: u64,
+    ) -> Self {
+        let timeout = options
+            .and_then(|options| options.timeout_ms)
+            .map(u64::from)
+            .unwrap_or(timeout_ms);
+        let retry_interval = options
+            .and_then(|options| options.retry_interval_ms)
+            .map(u64::from)
+            .unwrap_or(retry_interval_ms);
+
+        Self {
+            timeout: Duration::from_millis(timeout.max(1)),
+            retry_interval: Duration::from_millis(retry_interval.max(1)),
+        }
+    }
+}
+
+impl Default for RetryPolicy {
+    fn default() -> Self {
+        Self {
+            timeout: Duration::from_millis(10_000),
+            retry_interval: Duration::from_millis(250),
+        }
+    }
+}
+
+fn command_retry_policy(options: Option<&CommandRetryOptions>) -> RetryPolicy {
+    RetryPolicy::from_proto(options, 10_000, 250)
+}
+
+async fn retry_with_timeout<T, F, Fut>(policy: RetryPolicy, mut operation: F) -> Result<T, String>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T, String>>,
+{
+    let start = Instant::now();
+    let mut last_error = None;
+
+    loop {
+        match operation().await {
+            Ok(value) => return Ok(value),
+            Err(error) => {
+                last_error = Some(error);
+            }
+        }
+
+        if start.elapsed() >= policy.timeout {
+            return Err(last_error.unwrap_or_else(|| "operation timed out".to_string()));
+        }
+
+        sleep(policy.retry_interval).await;
+    }
 }
 
 fn next_browser_session_id() -> String {
@@ -170,16 +243,22 @@ async fn handle_browser_command(
     command: BrowserSessionCommand,
 ) -> Result<CommandOutcome, Status> {
     match command.command {
-        Some(BrowserCommand::LaunchChrome(LaunchChromeCommand { chrome_binary })) => {
+        Some(BrowserCommand::LaunchChrome(LaunchChromeCommand {
+            chrome_binary,
+            retry_options,
+        })) => {
             println!(
                 "[engine-lib][{session_id}] received LaunchChromeCommand with chrome_binary={:?}",
                 chrome_binary
             );
-            let launch =
-                web_lib::open_chrome_window(chrome_binary.as_deref()).map_err(Status::internal)?;
-            let initial_tab = web_lib::discover_initial_tab(&launch.cdp_websocket_url)
-                .await
-                .map_err(Status::internal)?;
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let (launch, initial_tab) = retry_with_timeout(retry_policy, || async {
+                let launch = web_lib::open_chrome_window(chrome_binary.as_deref())?;
+                let initial_tab = web_lib::discover_initial_tab(&launch.cdp_websocket_url).await?;
+                Ok((launch, initial_tab))
+            })
+            .await
+            .map_err(Status::internal)?;
             let initial_tab_session_id = next_tab_session_id();
             state.lock().await.browser_sessions.insert(
                 session_id.to_string(),
@@ -195,6 +274,8 @@ async fn handle_browser_command(
                 TabSessionState {
                     browser_session_id: session_id.to_string(),
                     target_id: initial_tab.target_id,
+                    browsing_context_id: None,
+                    current_url: None,
                 },
             );
 
@@ -212,7 +293,7 @@ async fn handle_browser_command(
                 should_close: false,
             })
         }
-        Some(BrowserCommand::OpenTab(OpenTabCommand {})) => {
+        Some(BrowserCommand::OpenTab(OpenTabCommand { retry_options })) => {
             println!("[engine-lib][{session_id}] received OpenTabCommand");
             let cdp_websocket_url = {
                 let state = state.lock().await;
@@ -247,15 +328,20 @@ async fn handle_browser_command(
                     }
                 }
             };
-            let tab = web_lib::open_chrome_tab(&cdp_websocket_url)
-                .await
-                .map_err(Status::internal)?;
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let tab = retry_with_timeout(retry_policy, || async {
+                web_lib::open_chrome_tab(&cdp_websocket_url).await
+            })
+            .await
+            .map_err(Status::internal)?;
             let tab_session_id = next_tab_session_id();
             state.lock().await.tab_sessions.insert(
                 tab_session_id.clone(),
                 TabSessionState {
                     browser_session_id: session_id.to_string(),
                     target_id: tab.target_id,
+                    browsing_context_id: None,
+                    current_url: None,
                 },
             );
 
@@ -356,7 +442,7 @@ async fn handle_tab_command(
         });
     }
 
-    let (cdp_websocket_url, target_id, existing_bidi_mapper) = {
+    let (cdp_websocket_url, target_id, browsing_context_id, current_url, existing_bidi_mapper) = {
         let state = state.lock().await;
         let browser_session = match state.browser_sessions.get(&browser_session_id) {
             Some(browser_session) => browser_session,
@@ -410,6 +496,8 @@ async fn handle_tab_command(
                 Status::internal("browser session is missing CDP websocket metadata")
             })?,
             tab_session.target_id.clone(),
+            tab_session.browsing_context_id.clone(),
+            tab_session.current_url.clone(),
             browser_session.bidi_mapper.clone(),
         )
     };
@@ -451,19 +539,53 @@ async fn handle_tab_command(
                 should_close: true,
             })
         }
-        Some(TabCommand::Navigate(NavigateTabCommand { url })) => {
+        Some(TabCommand::Navigate(NavigateTabCommand { url, retry_options })) => {
             println!(
                 "[engine-lib][{browser_session_id}/{tab_session_id}] received NavigateTabCommand: {url}"
             );
-            let navigation = web_lib::navigate_chrome_tab(&cdp_websocket_url, &target_id, &url)
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let (navigation, resolved_browsing_context_id, bidi_mapper, created) =
+                retry_with_timeout(retry_policy, || async {
+                    let navigation =
+                        web_lib::navigate_chrome_tab(&cdp_websocket_url, &target_id, &url).await?;
+                    let (bidi_mapper, created) = ensure_browser_bidi_mapper(
+                        Arc::clone(&state),
+                        &browser_session_id,
+                        &cdp_websocket_url,
+                    )
+                    .await
+                    .map_err(|status| status.message().to_string())?;
+                    let (resolved_browsing_context_id, resolved_mapper) =
+                        web_lib::resolve_bidi_context_for_tab(
+                            &cdp_websocket_url,
+                            Some(&bidi_mapper.mapper_target_id),
+                            Some(&navigation.browsing_context_id),
+                            Some(&navigation.url),
+                        )
+                        .await?;
+                    Ok((
+                        navigation,
+                        resolved_browsing_context_id,
+                        BrowserBidiMapperState {
+                            bidi_session_id: bidi_mapper.bidi_session_id.clone(),
+                            mapper_target_id: resolved_mapper.mapper_target_id,
+                            mapper_session_id: resolved_mapper.mapper_session_id,
+                            package_version: resolved_mapper.package_version,
+                        },
+                        created,
+                    ))
+                })
                 .await
                 .map_err(Status::internal)?;
-            let (bidi_mapper, created) = ensure_browser_bidi_mapper(
-                Arc::clone(&state),
-                &browser_session_id,
-                &cdp_websocket_url,
-            )
-            .await?;
+            {
+                let mut state = state.lock().await;
+                let tab_session = state
+                    .tab_sessions
+                    .get_mut(&tab_session_id)
+                    .ok_or_else(|| Status::internal("tab session disappeared during navigation"))?;
+                tab_session.browsing_context_id = Some(resolved_browsing_context_id);
+                tab_session.current_url = Some(navigation.url.clone());
+            }
             let bidi_note = if created {
                 format!(
                     "chromium-bidi mapper injected from pinned chromium-bidi@{} into hidden mapper target after navigation",
@@ -498,42 +620,257 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
-        Some(TabCommand::ClickElement(ClickElementCommand { css_selector })) => {
+        Some(TabCommand::ClickElement(ClickElementCommand {
+            css_selector,
+            retry_options,
+        })) => {
             println!(
                 "[engine-lib][{browser_session_id}/{tab_session_id}] received ClickElementCommand: {css_selector}"
             );
-            let click = web_lib::click_element_via_bidi(
-                &cdp_websocket_url,
-                existing_bidi_mapper
-                    .as_ref()
-                    .map(|bidi_mapper| bidi_mapper.mapper_target_id.as_str()),
-                &target_id,
-                &css_selector,
-            )
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let click = retry_with_timeout(retry_policy, || async {
+                web_lib::click_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+            })
             .await
             .map_err(Status::internal)?;
-            let bidi_mapper = BrowserBidiMapperState {
-                bidi_session_id: existing_bidi_mapper
-                    .as_ref()
-                    .map(|bidi_mapper| bidi_mapper.bidi_session_id.clone())
-                    .unwrap_or_else(next_bidi_session_id),
-                mapper_target_id: click.mapper_target_id.clone(),
-                mapper_session_id: click.mapper_session_id.clone(),
-                package_version: click.package_version.clone(),
-            };
-            update_browser_bidi_mapper(
-                Arc::clone(&state),
-                &browser_session_id,
-                bidi_mapper.clone(),
-            )
-            .await?;
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
                     &tab_session_id,
                     TabEvent::ElementClicked(ElementClickedEvent {
                         css_selector: click.css_selector,
                         note: click.note,
-                        bidi_session_id: bidi_mapper.bidi_session_id,
+                        bidi_session_id: existing_bidi_mapper
+                            .as_ref()
+                            .map(|bidi_mapper| bidi_mapper.bidi_session_id.clone())
+                            .unwrap_or_default(),
+                    }),
+                )],
+                should_close: false,
+            })
+        }
+        Some(TabCommand::CountElements(CountElementsCommand {
+            css_selector,
+            retry_options,
+        })) => {
+            println!(
+                "[engine-lib][{browser_session_id}/{tab_session_id}] received CountElementsCommand: {css_selector}"
+            );
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let count = retry_with_timeout(retry_policy, || async {
+                web_lib::count_elements_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+            })
+            .await
+            .map_err(Status::internal)?;
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &tab_session_id,
+                    TabEvent::ElementCounted(ElementCountedEvent {
+                        css_selector: count.css_selector,
+                        count: count.count,
+                        note: count.note,
+                    }),
+                )],
+                should_close: false,
+            })
+        }
+        Some(TabCommand::HighlightElements(HighlightElementsCommand {
+            css_selector,
+            duration_ms,
+            retry_options,
+        })) => {
+            println!(
+                "[engine-lib][{browser_session_id}/{tab_session_id}] received HighlightElementsCommand: {css_selector}"
+            );
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let highlight = retry_with_timeout(retry_policy, || async {
+                web_lib::highlight_elements_via_cdp(
+                    &cdp_websocket_url,
+                    &target_id,
+                    &css_selector,
+                    duration_ms.unwrap_or(2_000),
+                )
+                .await
+            })
+            .await
+            .map_err(Status::internal)?;
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &tab_session_id,
+                    TabEvent::ElementsHighlighted(ElementsHighlightedEvent {
+                        css_selector: highlight.css_selector,
+                        count: highlight.count,
+                        note: highlight.note,
+                    }),
+                )],
+                should_close: false,
+            })
+        }
+        Some(TabCommand::FocusElement(FocusElementCommand {
+            css_selector,
+            retry_options,
+        })) => {
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let focus = retry_with_timeout(retry_policy, || async {
+                web_lib::focus_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+            })
+            .await
+            .map_err(Status::internal)?;
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &tab_session_id,
+                    TabEvent::ElementFocused(ElementFocusedEvent {
+                        css_selector: focus.css_selector,
+                        note: focus.note,
+                    }),
+                )],
+                should_close: false,
+            })
+        }
+        Some(TabCommand::FillElement(FillElementCommand {
+            css_selector,
+            value,
+            retry_options,
+        })) => {
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let fill = retry_with_timeout(retry_policy, || async {
+                web_lib::fill_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector, &value)
+                    .await
+            })
+            .await
+            .map_err(Status::internal)?;
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &tab_session_id,
+                    TabEvent::ElementFilled(ElementFilledEvent {
+                        css_selector: fill.css_selector,
+                        value: fill.value,
+                        note: fill.note,
+                    }),
+                )],
+                should_close: false,
+            })
+        }
+        Some(TabCommand::HoverElement(HoverElementCommand {
+            css_selector,
+            retry_options,
+        })) => {
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let hover = retry_with_timeout(retry_policy, || async {
+                web_lib::hover_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+            })
+            .await
+            .map_err(Status::internal)?;
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &tab_session_id,
+                    TabEvent::ElementHovered(ElementHoveredEvent {
+                        css_selector: hover.css_selector,
+                        note: hover.note,
+                    }),
+                )],
+                should_close: false,
+            })
+        }
+        Some(TabCommand::PressKey(PressKeyCommand {
+            css_selector,
+            key,
+            text,
+            retry_options,
+        })) => {
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let press = retry_with_timeout(retry_policy, || async {
+                web_lib::press_key_via_cdp(
+                    &cdp_websocket_url,
+                    &target_id,
+                    &css_selector,
+                    &key,
+                    text.as_deref(),
+                )
+                .await
+            })
+            .await
+            .map_err(Status::internal)?;
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &tab_session_id,
+                    TabEvent::KeyPressed(KeyPressedEvent {
+                        css_selector: press.css_selector,
+                        key: press.key,
+                        note: press.note,
+                    }),
+                )],
+                should_close: false,
+            })
+        }
+        Some(TabCommand::GetTextContent(GetTextContentCommand {
+            css_selector,
+            retry_options,
+        })) => {
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let text = retry_with_timeout(retry_policy, || async {
+                web_lib::get_text_content_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
+                    .await
+            })
+            .await
+            .map_err(Status::internal)?;
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &tab_session_id,
+                    TabEvent::TextContentResolved(TextContentResolvedEvent {
+                        css_selector: text.css_selector,
+                        text: text.text,
+                        note: text.note,
+                    }),
+                )],
+                should_close: false,
+            })
+        }
+        Some(TabCommand::GetInnerText(GetInnerTextCommand {
+            css_selector,
+            retry_options,
+        })) => {
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let text = retry_with_timeout(retry_policy, || async {
+                web_lib::get_inner_text_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+            })
+            .await
+            .map_err(Status::internal)?;
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &tab_session_id,
+                    TabEvent::InnerTextResolved(InnerTextResolvedEvent {
+                        css_selector: text.css_selector,
+                        text: text.text,
+                        note: text.note,
+                    }),
+                )],
+                should_close: false,
+            })
+        }
+        Some(TabCommand::WaitForSelector(WaitForSelectorCommand {
+            css_selector,
+            visible,
+            retry_options,
+        })) => {
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let wait = retry_with_timeout(retry_policy, || async {
+                web_lib::wait_for_selector_via_cdp(
+                    &cdp_websocket_url,
+                    &target_id,
+                    &css_selector,
+                    visible.unwrap_or(false),
+                )
+                .await
+            })
+            .await
+            .map_err(Status::internal)?;
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &tab_session_id,
+                    TabEvent::SelectorWaitSatisfied(SelectorWaitSatisfiedEvent {
+                        css_selector: wait.css_selector,
+                        visible: wait.visible,
+                        note: wait.note,
                     }),
                 )],
                 should_close: false,

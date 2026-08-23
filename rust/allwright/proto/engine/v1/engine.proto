@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package allwright.engine.v1;
-option go_package = "allwright-go/gen/allwright/engine/v1;enginev1";
+option go_package = "allwright.dev/gen/allwright/engine/v1;enginev1";
 
 service EngineService {
   rpc Ping(PingRequest) returns (PingResponse);
@@ -24,11 +24,19 @@ message BrowserSessionCommand {
   }
 }
 
-message LaunchChromeCommand {
-  optional string chrome_binary = 1;
+message CommandRetryOptions {
+  optional uint32 timeout_ms = 1;
+  optional uint32 retry_interval_ms = 2;
 }
 
-message OpenTabCommand {}
+message LaunchChromeCommand {
+  optional string chrome_binary = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message OpenTabCommand {
+  optional CommandRetryOptions retry_options = 1;
+}
 
 message SessionPingCommand {
   string message = 1;
@@ -82,6 +90,15 @@ message TabSessionCommand {
     CloseTabSessionCommand close = 4;
     NavigateTabCommand navigate = 5;
     ClickElementCommand click_element = 6;
+    CountElementsCommand count_elements = 7;
+    HighlightElementsCommand highlight_elements = 8;
+    FocusElementCommand focus_element = 9;
+    FillElementCommand fill_element = 10;
+    HoverElementCommand hover_element = 11;
+    PressKeyCommand press_key = 12;
+    GetTextContentCommand get_text_content = 13;
+    GetInnerTextCommand get_inner_text = 14;
+    WaitForSelectorCommand wait_for_selector = 15;
   }
 }
 
@@ -93,10 +110,62 @@ message CloseTabSessionCommand {}
 
 message NavigateTabCommand {
   string url = 1;
+  optional CommandRetryOptions retry_options = 2;
 }
 
 message ClickElementCommand {
   string css_selector = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message CountElementsCommand {
+  string css_selector = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message HighlightElementsCommand {
+  string css_selector = 1;
+  optional uint32 duration_ms = 2;
+  optional CommandRetryOptions retry_options = 3;
+}
+
+message FocusElementCommand {
+  string css_selector = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message FillElementCommand {
+  string css_selector = 1;
+  string value = 2;
+  optional CommandRetryOptions retry_options = 3;
+}
+
+message HoverElementCommand {
+  string css_selector = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message PressKeyCommand {
+  string css_selector = 1;
+  string key = 2;
+  optional string text = 3;
+  optional CommandRetryOptions retry_options = 4;
+}
+
+message GetTextContentCommand {
+  string css_selector = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message GetInnerTextCommand {
+  string css_selector = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message WaitForSelectorCommand {
+  string css_selector = 1;
+  optional bool visible = 2;
+  optional CommandRetryOptions retry_options = 3;
 }
 
 message TabSessionEvent {
@@ -110,6 +179,15 @@ message TabSessionEvent {
     TabNavigatedEvent navigated = 6;
     ChromiumBidiInjectionEvent chromium_bidi_injection = 7;
     ElementClickedEvent element_clicked = 8;
+    ElementCountedEvent element_counted = 9;
+    ElementsHighlightedEvent elements_highlighted = 10;
+    ElementFocusedEvent element_focused = 11;
+    ElementFilledEvent element_filled = 12;
+    ElementHoveredEvent element_hovered = 13;
+    KeyPressedEvent key_pressed = 14;
+    TextContentResolvedEvent text_content_resolved = 15;
+    InnerTextResolvedEvent inner_text_resolved = 16;
+    SelectorWaitSatisfiedEvent selector_wait_satisfied = 17;
   }
 }
 
@@ -146,4 +224,56 @@ message ElementClickedEvent {
   string css_selector = 1;
   string note = 2;
   string bidi_session_id = 3;
+}
+
+message ElementCountedEvent {
+  string css_selector = 1;
+  uint32 count = 2;
+  string note = 3;
+}
+
+message ElementsHighlightedEvent {
+  string css_selector = 1;
+  uint32 count = 2;
+  string note = 3;
+}
+
+message ElementFocusedEvent {
+  string css_selector = 1;
+  string note = 2;
+}
+
+message ElementFilledEvent {
+  string css_selector = 1;
+  string value = 2;
+  string note = 3;
+}
+
+message ElementHoveredEvent {
+  string css_selector = 1;
+  string note = 2;
+}
+
+message KeyPressedEvent {
+  string css_selector = 1;
+  string key = 2;
+  string note = 3;
+}
+
+message TextContentResolvedEvent {
+  string css_selector = 1;
+  string text = 2;
+  string note = 3;
+}
+
+message InnerTextResolvedEvent {
+  string css_selector = 1;
+  string text = 2;
+  string note = 3;
+}
+
+message SelectorWaitSatisfiedEvent {
+  string css_selector = 1;
+  bool visible = 2;
+  string note = 3;
 }

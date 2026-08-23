@@ -8,8 +8,13 @@ use crate::proto::tab_session_command::Command as TabCommand;
 use crate::proto::tab_session_event::Event as TabEvent;
 use crate::proto::{
     BrowserSessionCommand, BrowserSessionEvent, ClickElementCommand, CloseBrowserSessionCommand,
-    CloseTabSessionCommand, LaunchChromeCommand, NavigateTabCommand, OpenTabCommand, PingRequest,
-    SessionPingCommand, TabSessionCommand, TabSessionEvent, TabSessionPingCommand,
+    CloseTabSessionCommand, CommandRetryOptions, CountElementsCommand, ElementCountedEvent,
+    ElementFilledEvent, ElementFocusedEvent, ElementHoveredEvent, ElementsHighlightedEvent,
+    FillElementCommand, FocusElementCommand, GetInnerTextCommand, GetTextContentCommand,
+    HighlightElementsCommand, HoverElementCommand, InnerTextResolvedEvent, KeyPressedEvent,
+    LaunchChromeCommand, NavigateTabCommand, OpenTabCommand, PingRequest, PressKeyCommand,
+    SelectorWaitSatisfiedEvent, SessionPingCommand, TabSessionCommand, TabSessionEvent,
+    TabSessionPingCommand, TextContentResolvedEvent, WaitForSelectorCommand,
 };
 use tokio::sync::{Mutex as AsyncMutex, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
@@ -59,6 +64,12 @@ impl From<tonic::Status> for Error {
 #[derive(Debug, Clone, Default)]
 pub struct LaunchOptions {
     pub chrome_binary: Option<String>,
+    pub timeout_ms: Option<u32>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CommandOptions {
+    pub timeout_ms: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +87,72 @@ pub struct ClickResult {
     pub selector: String,
     pub note: String,
     pub bidi_session_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct CountResult {
+    pub selector: String,
+    pub count: u32,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct HighlightOptions {
+    pub timeout_ms: Option<u32>,
+    pub duration_ms: Option<u32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct HighlightResult {
+    pub selector: String,
+    pub count: u32,
+    pub note: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ElementResult {
+    pub selector: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct FillResult {
+    pub selector: String,
+    pub value: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct PressResult {
+    pub selector: String,
+    pub key: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct TextResult {
+    pub selector: String,
+    pub text: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PressOptions {
+    pub timeout_ms: Option<u32>,
+    pub text: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct WaitForSelectorOptions {
+    pub timeout_ms: Option<u32>,
+    pub visible: Option<bool>,
+}
+
+#[derive(Debug, Clone)]
+pub struct WaitForSelectorResult {
+    pub selector: String,
+    pub visible: bool,
+    pub note: String,
 }
 
 #[derive(Clone)]
@@ -148,6 +225,7 @@ pub async fn launch_chrome(options: LaunchOptions) -> Result<Browser> {
         .send(BrowserSessionCommand {
             command: Some(BrowserCommand::LaunchChrome(LaunchChromeCommand {
                 chrome_binary: options.chrome_binary,
+                retry_options: command_retry_options(options.timeout_ms),
             })),
         })
         .await
@@ -245,6 +323,10 @@ impl Browser {
     }
 
     pub async fn new_tab(&self) -> Result<Tab> {
+        self.new_tab_with_options(CommandOptions::default()).await
+    }
+
+    pub async fn new_tab_with_options(&self, options: CommandOptions) -> Result<Tab> {
         let mut state = self.inner.state.lock().await;
         if state.closed {
             return Err(Error::new(format!(
@@ -256,7 +338,9 @@ impl Browser {
         state
             .command_tx
             .send(BrowserSessionCommand {
-                command: Some(BrowserCommand::OpenTab(OpenTabCommand {})),
+                command: Some(BrowserCommand::OpenTab(OpenTabCommand {
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
             })
             .await
             .map_err(|_| Error::new("failed to send OpenTabCommand to browser session"))?;
@@ -421,6 +505,15 @@ impl Tab {
     }
 
     pub async fn navigate(&self, url: impl Into<String>) -> Result<NavigateResult> {
+        self.navigate_with_options(url, CommandOptions::default())
+            .await
+    }
+
+    pub async fn navigate_with_options(
+        &self,
+        url: impl Into<String>,
+        options: CommandOptions,
+    ) -> Result<NavigateResult> {
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
         if handle.closed {
@@ -435,7 +528,10 @@ impl Tab {
             .send(TabSessionCommand {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
-                command: Some(TabCommand::Navigate(NavigateTabCommand { url: url.into() })),
+                command: Some(TabCommand::Navigate(NavigateTabCommand {
+                    url: url.into(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
             })
             .await
             .map_err(|_| Error::new("failed to send NavigateTabCommand"))?;
@@ -490,6 +586,15 @@ impl Tab {
     }
 
     pub async fn click(&self, css_selector: impl Into<String>) -> Result<ClickResult> {
+        self.click_with_options(css_selector, CommandOptions::default())
+            .await
+    }
+
+    pub async fn click_with_options(
+        &self,
+        css_selector: impl Into<String>,
+        options: CommandOptions,
+    ) -> Result<ClickResult> {
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
         if handle.closed {
@@ -506,6 +611,7 @@ impl Tab {
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::ClickElement(ClickElementCommand {
                     css_selector: css_selector.into(),
+                    retry_options: command_retry_options(options.timeout_ms),
                 })),
             })
             .await
@@ -536,6 +642,553 @@ impl Tab {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "tab session {} closed while waiting for click result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn count(&self, css_selector: impl Into<String>) -> Result<CountResult> {
+        self.count_with_options(css_selector, CommandOptions::default())
+            .await
+    }
+
+    pub async fn count_with_options(
+        &self,
+        css_selector: impl Into<String>,
+        options: CommandOptions,
+    ) -> Result<CountResult> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        if handle.closed {
+            return Err(Error::new(format!(
+                "tab session {} is closed",
+                self.inner.session_id
+            )));
+        }
+
+        handle
+            .command_tx
+            .send(TabSessionCommand {
+                browser_session_id: self.inner.browser_session_id.clone(),
+                tab_session_id: self.inner.session_id.clone(),
+                command: Some(TabCommand::CountElements(CountElementsCommand {
+                    css_selector: css_selector.into(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send CountElementsCommand"))?;
+
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("tab session closed while waiting for count result")
+                })?;
+
+            match event.event {
+                Some(TabEvent::Attached(_)) => {}
+                Some(TabEvent::ElementCounted(counted)) => {
+                    return Ok(count_result_from_event(counted));
+                }
+                Some(TabEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "tab session error while counting elements: {}",
+                        error.message
+                    )));
+                }
+                Some(TabEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "tab session {} closed while waiting for count result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn highlight(&self, css_selector: impl Into<String>) -> Result<HighlightResult> {
+        self.highlight_with_options(css_selector, HighlightOptions::default())
+            .await
+    }
+
+    pub async fn highlight_with_options(
+        &self,
+        css_selector: impl Into<String>,
+        options: HighlightOptions,
+    ) -> Result<HighlightResult> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        if handle.closed {
+            return Err(Error::new(format!(
+                "tab session {} is closed",
+                self.inner.session_id
+            )));
+        }
+
+        handle
+            .command_tx
+            .send(TabSessionCommand {
+                browser_session_id: self.inner.browser_session_id.clone(),
+                tab_session_id: self.inner.session_id.clone(),
+                command: Some(TabCommand::HighlightElements(HighlightElementsCommand {
+                    css_selector: css_selector.into(),
+                    duration_ms: options.duration_ms,
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send HighlightElementsCommand"))?;
+
+        loop {
+            let event = handle.events.message().await?.ok_or_else(|| {
+                Error::new("tab session closed while waiting for highlight result")
+            })?;
+
+            match event.event {
+                Some(TabEvent::Attached(_)) => {}
+                Some(TabEvent::ElementsHighlighted(highlighted)) => {
+                    return Ok(highlight_result_from_event(highlighted));
+                }
+                Some(TabEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "tab session error while highlighting elements: {}",
+                        error.message
+                    )));
+                }
+                Some(TabEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "tab session {} closed while waiting for highlight result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn focus(&self, css_selector: impl Into<String>) -> Result<ElementResult> {
+        self.focus_with_options(css_selector, CommandOptions::default())
+            .await
+    }
+
+    pub async fn focus_with_options(
+        &self,
+        css_selector: impl Into<String>,
+        options: CommandOptions,
+    ) -> Result<ElementResult> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        if handle.closed {
+            return Err(Error::new(format!(
+                "tab session {} is closed",
+                self.inner.session_id
+            )));
+        }
+        handle
+            .command_tx
+            .send(TabSessionCommand {
+                browser_session_id: self.inner.browser_session_id.clone(),
+                tab_session_id: self.inner.session_id.clone(),
+                command: Some(TabCommand::FocusElement(FocusElementCommand {
+                    css_selector: css_selector.into(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send FocusElementCommand"))?;
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("tab session closed while waiting for focus result")
+                })?;
+            match event.event {
+                Some(TabEvent::Attached(_)) => {}
+                Some(TabEvent::ElementFocused(focused)) => {
+                    return Ok(ElementResult {
+                        selector: focused.css_selector,
+                        note: focused.note,
+                    });
+                }
+                Some(TabEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "tab session error while focusing: {}",
+                        error.message
+                    )));
+                }
+                Some(TabEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "tab session {} closed while waiting for focus result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn fill(
+        &self,
+        css_selector: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Result<FillResult> {
+        self.fill_with_options(css_selector, value, CommandOptions::default())
+            .await
+    }
+
+    pub async fn fill_with_options(
+        &self,
+        css_selector: impl Into<String>,
+        value: impl Into<String>,
+        options: CommandOptions,
+    ) -> Result<FillResult> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        if handle.closed {
+            return Err(Error::new(format!(
+                "tab session {} is closed",
+                self.inner.session_id
+            )));
+        }
+        handle
+            .command_tx
+            .send(TabSessionCommand {
+                browser_session_id: self.inner.browser_session_id.clone(),
+                tab_session_id: self.inner.session_id.clone(),
+                command: Some(TabCommand::FillElement(FillElementCommand {
+                    css_selector: css_selector.into(),
+                    value: value.into(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send FillElementCommand"))?;
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("tab session closed while waiting for fill result")
+                })?;
+            match event.event {
+                Some(TabEvent::Attached(_)) => {}
+                Some(TabEvent::ElementFilled(filled)) => {
+                    return Ok(FillResult {
+                        selector: filled.css_selector,
+                        value: filled.value,
+                        note: filled.note,
+                    });
+                }
+                Some(TabEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "tab session error while filling: {}",
+                        error.message
+                    )));
+                }
+                Some(TabEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "tab session {} closed while waiting for fill result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn hover(&self, css_selector: impl Into<String>) -> Result<ElementResult> {
+        self.hover_with_options(css_selector, CommandOptions::default())
+            .await
+    }
+
+    pub async fn hover_with_options(
+        &self,
+        css_selector: impl Into<String>,
+        options: CommandOptions,
+    ) -> Result<ElementResult> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        if handle.closed {
+            return Err(Error::new(format!(
+                "tab session {} is closed",
+                self.inner.session_id
+            )));
+        }
+        handle
+            .command_tx
+            .send(TabSessionCommand {
+                browser_session_id: self.inner.browser_session_id.clone(),
+                tab_session_id: self.inner.session_id.clone(),
+                command: Some(TabCommand::HoverElement(HoverElementCommand {
+                    css_selector: css_selector.into(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send HoverElementCommand"))?;
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("tab session closed while waiting for hover result")
+                })?;
+            match event.event {
+                Some(TabEvent::Attached(_)) => {}
+                Some(TabEvent::ElementHovered(hovered)) => {
+                    return Ok(ElementResult {
+                        selector: hovered.css_selector,
+                        note: hovered.note,
+                    });
+                }
+                Some(TabEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "tab session error while hovering: {}",
+                        error.message
+                    )));
+                }
+                Some(TabEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "tab session {} closed while waiting for hover result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn press(
+        &self,
+        css_selector: impl Into<String>,
+        key: impl Into<String>,
+    ) -> Result<PressResult> {
+        self.press_with_options(css_selector, key, PressOptions::default())
+            .await
+    }
+
+    pub async fn press_with_options(
+        &self,
+        css_selector: impl Into<String>,
+        key: impl Into<String>,
+        options: PressOptions,
+    ) -> Result<PressResult> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        if handle.closed {
+            return Err(Error::new(format!(
+                "tab session {} is closed",
+                self.inner.session_id
+            )));
+        }
+        handle
+            .command_tx
+            .send(TabSessionCommand {
+                browser_session_id: self.inner.browser_session_id.clone(),
+                tab_session_id: self.inner.session_id.clone(),
+                command: Some(TabCommand::PressKey(PressKeyCommand {
+                    css_selector: css_selector.into(),
+                    key: key.into(),
+                    text: options.text,
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send PressKeyCommand"))?;
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("tab session closed while waiting for press result")
+                })?;
+            match event.event {
+                Some(TabEvent::Attached(_)) => {}
+                Some(TabEvent::KeyPressed(pressed)) => {
+                    return Ok(PressResult {
+                        selector: pressed.css_selector,
+                        key: pressed.key,
+                        note: pressed.note,
+                    });
+                }
+                Some(TabEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "tab session error while pressing key: {}",
+                        error.message
+                    )));
+                }
+                Some(TabEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "tab session {} closed while waiting for press result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn text_content(&self, css_selector: impl Into<String>) -> Result<TextResult> {
+        self.text_content_with_options(css_selector, CommandOptions::default())
+            .await
+    }
+
+    pub async fn text_content_with_options(
+        &self,
+        css_selector: impl Into<String>,
+        options: CommandOptions,
+    ) -> Result<TextResult> {
+        self.read_text(css_selector.into(), options, true).await
+    }
+
+    pub async fn inner_text(&self, css_selector: impl Into<String>) -> Result<TextResult> {
+        self.inner_text_with_options(css_selector, CommandOptions::default())
+            .await
+    }
+
+    pub async fn inner_text_with_options(
+        &self,
+        css_selector: impl Into<String>,
+        options: CommandOptions,
+    ) -> Result<TextResult> {
+        self.read_text(css_selector.into(), options, false).await
+    }
+
+    pub async fn wait_for_selector(
+        &self,
+        css_selector: impl Into<String>,
+    ) -> Result<WaitForSelectorResult> {
+        self.wait_for_selector_with_options(css_selector, WaitForSelectorOptions::default())
+            .await
+    }
+
+    pub async fn wait_for_selector_with_options(
+        &self,
+        css_selector: impl Into<String>,
+        options: WaitForSelectorOptions,
+    ) -> Result<WaitForSelectorResult> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        if handle.closed {
+            return Err(Error::new(format!(
+                "tab session {} is closed",
+                self.inner.session_id
+            )));
+        }
+        handle
+            .command_tx
+            .send(TabSessionCommand {
+                browser_session_id: self.inner.browser_session_id.clone(),
+                tab_session_id: self.inner.session_id.clone(),
+                command: Some(TabCommand::WaitForSelector(WaitForSelectorCommand {
+                    css_selector: css_selector.into(),
+                    visible: options.visible,
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send WaitForSelectorCommand"))?;
+        loop {
+            let event = handle
+                .events
+                .message()
+                .await?
+                .ok_or_else(|| Error::new("tab session closed while waiting for selector"))?;
+            match event.event {
+                Some(TabEvent::Attached(_)) => {}
+                Some(TabEvent::SelectorWaitSatisfied(waited)) => {
+                    return Ok(WaitForSelectorResult {
+                        selector: waited.css_selector,
+                        visible: waited.visible,
+                        note: waited.note,
+                    });
+                }
+                Some(TabEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "tab session error while waiting for selector: {}",
+                        error.message
+                    )));
+                }
+                Some(TabEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "tab session {} closed while waiting for selector result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    async fn read_text(
+        &self,
+        css_selector: String,
+        options: CommandOptions,
+        text_content: bool,
+    ) -> Result<TextResult> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        if handle.closed {
+            return Err(Error::new(format!(
+                "tab session {} is closed",
+                self.inner.session_id
+            )));
+        }
+        let command = if text_content {
+            TabCommand::GetTextContent(GetTextContentCommand {
+                css_selector,
+                retry_options: command_retry_options(options.timeout_ms),
+            })
+        } else {
+            TabCommand::GetInnerText(GetInnerTextCommand {
+                css_selector,
+                retry_options: command_retry_options(options.timeout_ms),
+            })
+        };
+        handle
+            .command_tx
+            .send(TabSessionCommand {
+                browser_session_id: self.inner.browser_session_id.clone(),
+                tab_session_id: self.inner.session_id.clone(),
+                command: Some(command),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send text command"))?;
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("tab session closed while waiting for text result")
+                })?;
+            match event.event {
+                Some(TabEvent::Attached(_)) => {}
+                Some(TabEvent::TextContentResolved(text)) => {
+                    return Ok(TextResult {
+                        selector: text.css_selector,
+                        text: text.text,
+                        note: text.note,
+                    });
+                }
+                Some(TabEvent::InnerTextResolved(text)) => {
+                    return Ok(TextResult {
+                        selector: text.css_selector,
+                        text: text.text,
+                        note: text.note,
+                    });
+                }
+                Some(TabEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "tab session error while reading text: {}",
+                        error.message
+                    )));
+                }
+                Some(TabEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "tab session {} closed while waiting for text result",
                         self.inner.session_id
                     )));
                 }
@@ -657,5 +1310,28 @@ fn normalize_server_addr(raw: &str) -> String {
         trimmed.to_string()
     } else {
         format!("http://{trimmed}")
+    }
+}
+
+fn command_retry_options(timeout_ms: Option<u32>) -> Option<CommandRetryOptions> {
+    timeout_ms.map(|timeout_ms| CommandRetryOptions {
+        timeout_ms: Some(timeout_ms),
+        retry_interval_ms: None,
+    })
+}
+
+fn count_result_from_event(event: ElementCountedEvent) -> CountResult {
+    CountResult {
+        selector: event.css_selector,
+        count: event.count,
+        note: event.note,
+    }
+}
+
+fn highlight_result_from_event(event: ElementsHighlightedEvent) -> HighlightResult {
+    HighlightResult {
+        selector: event.css_selector,
+        count: event.count,
+        note: event.note,
     }
 }

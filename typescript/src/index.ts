@@ -17,6 +17,11 @@ let serverAddrOverride: string | null = null;
 
 export interface LaunchOptions {
   chromeBinary?: string;
+  timeoutMs?: number;
+}
+
+export interface CommandOptions {
+  timeoutMs?: number;
 }
 
 export interface NavigateResult {
@@ -32,6 +37,23 @@ export interface ClickResult {
   selector: string;
   note: string;
   bidiSessionId: string;
+}
+
+export interface CountResult {
+  selector: string;
+  count: number;
+  note: string;
+}
+
+export interface HighlightOptions {
+  timeoutMs?: number;
+  durationMs?: number;
+}
+
+export interface HighlightResult {
+  selector: string;
+  count: number;
+  note: string;
 }
 
 export interface BrowserInfo {
@@ -109,16 +131,33 @@ interface TabSessionEvent {
     note?: string;
     bidiSessionId?: string;
   };
+  elementCounted?: {
+    cssSelector?: string;
+    count?: number;
+    note?: string;
+  };
+  elementsHighlighted?: {
+    cssSelector?: string;
+    count?: number;
+    note?: string;
+  };
 }
 
 interface LaunchChromeRequest {
   launchChrome: {
     chromeBinary?: string;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
   };
 }
 
 interface OpenTabRequest {
-  openTab: Record<string, never>;
+  openTab: {
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
 }
 
 interface BrowserPingRequest {
@@ -144,6 +183,9 @@ interface NavigateRequest {
   tabSessionId: string;
   navigate: {
     url: string;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
   };
 }
 
@@ -152,6 +194,32 @@ interface ClickRequest {
   tabSessionId: string;
   clickElement: {
     cssSelector: string;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
+interface CountRequest {
+  browserSessionId: string;
+  tabSessionId: string;
+  countElements: {
+    cssSelector: string;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
+interface HighlightRequest {
+  browserSessionId: string;
+  tabSessionId: string;
+  highlightElements: {
+    cssSelector: string;
+    durationMs?: number;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
   };
 }
 
@@ -167,7 +235,13 @@ type BrowserSessionRequest =
   | BrowserPingRequest
   | CloseBrowserRequest;
 
-type TabSessionRequest = TabPingRequest | NavigateRequest | ClickRequest | CloseTabRequest;
+type TabSessionRequest =
+  | TabPingRequest
+  | NavigateRequest
+  | ClickRequest
+  | CountRequest
+  | HighlightRequest
+  | CloseTabRequest;
 
 type BrowserSessionStream = grpc.ClientDuplexStream<BrowserSessionRequest, BrowserSessionEvent>;
 type PageSessionStream = grpc.ClientDuplexStream<TabSessionRequest, TabSessionEvent>;
@@ -303,10 +377,12 @@ export class Browser {
     return [...this.#pages.values()];
   }
 
-  async newPage(): Promise<Page> {
+  async newPage(options: CommandOptions = {}): Promise<Page> {
     this.#ensureOpen();
     this.#stream.write({
-      openTab: {},
+      openTab: {
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
     });
 
     while (true) {
@@ -375,8 +451,8 @@ export class Browser {
     return this.initialPage();
   }
 
-  async newTab(): Promise<Page> {
-    return this.newPage();
+  async newTab(options: CommandOptions = {}): Promise<Page> {
+    return this.newPage(options);
   }
 
   #createPage(sessionId: string): Page {
@@ -413,7 +489,7 @@ export class Page {
   readonly sessionId: string;
   readonly browserSessionId: string;
 
-  async goto(url: string): Promise<NavigateResult> {
+  async goto(url: string, options: CommandOptions = {}): Promise<NavigateResult> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -421,6 +497,7 @@ export class Page {
       tabSessionId: this.sessionId,
       navigate: {
         url,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });
 
@@ -456,7 +533,7 @@ export class Page {
     }
   }
 
-  async click(selector: string): Promise<ClickResult> {
+  async click(selector: string, options: CommandOptions = {}): Promise<ClickResult> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -464,6 +541,7 @@ export class Page {
       tabSessionId: this.sessionId,
       clickElement: {
         cssSelector: selector,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });
 
@@ -482,6 +560,69 @@ export class Page {
       if (event.closed) {
         handle.closed = true;
         throw new Error(`page session ${this.sessionId} closed while waiting for click result`);
+      }
+    }
+  }
+
+  async count(selector: string, options: CommandOptions = {}): Promise<CountResult> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      browserSessionId: this.browserSessionId,
+      tabSessionId: this.sessionId,
+      countElements: {
+        cssSelector: selector,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.elementCounted) {
+        return {
+          selector: event.elementCounted.cssSelector ?? "",
+          count: event.elementCounted.count ?? 0,
+          note: event.elementCounted.note ?? "",
+        };
+      }
+      if (event.error?.message) {
+        throw new Error(`page session error while counting elements: ${event.error.message}`);
+      }
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`page session ${this.sessionId} closed while waiting for count result`);
+      }
+    }
+  }
+
+  async highlight(selector: string, options: HighlightOptions = {}): Promise<HighlightResult> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      browserSessionId: this.browserSessionId,
+      tabSessionId: this.sessionId,
+      highlightElements: {
+        cssSelector: selector,
+        durationMs: options.durationMs,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.elementsHighlighted) {
+        return {
+          selector: event.elementsHighlighted.cssSelector ?? "",
+          count: event.elementsHighlighted.count ?? 0,
+          note: event.elementsHighlighted.note ?? "",
+        };
+      }
+      if (event.error?.message) {
+        throw new Error(`page session error while highlighting elements: ${event.error.message}`);
+      }
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`page session ${this.sessionId} closed while waiting for highlight result`);
       }
     }
   }
@@ -544,8 +685,8 @@ export class Page {
     };
   }
 
-  async navigate(url: string): Promise<NavigateResult> {
-    return this.goto(url);
+  async navigate(url: string, options: CommandOptions = {}): Promise<NavigateResult> {
+    return this.goto(url, options);
   }
 
   #ensureOpen(handle: PageHandle): void {
@@ -587,6 +728,7 @@ export async function launchChrome(options: LaunchOptions = {}): Promise<Browser
   stream.write({
     launchChrome: {
       chromeBinary: options.chromeBinary,
+      retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
     },
   });
 

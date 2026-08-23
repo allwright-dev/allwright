@@ -215,16 +215,69 @@ func (*BrowserSessionCommand_Ping) isBrowserSessionCommand_Command() {}
 
 func (*BrowserSessionCommand_Close) isBrowserSessionCommand_Command() {}
 
+type CommandRetryOptions struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	TimeoutMs       *uint32                `protobuf:"varint,1,opt,name=timeout_ms,json=timeoutMs,proto3,oneof" json:"timeout_ms,omitempty"`
+	RetryIntervalMs *uint32                `protobuf:"varint,2,opt,name=retry_interval_ms,json=retryIntervalMs,proto3,oneof" json:"retry_interval_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *CommandRetryOptions) Reset() {
+	*x = CommandRetryOptions{}
+	mi := &file_engine_v1_engine_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommandRetryOptions) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommandRetryOptions) ProtoMessage() {}
+
+func (x *CommandRetryOptions) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommandRetryOptions.ProtoReflect.Descriptor instead.
+func (*CommandRetryOptions) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CommandRetryOptions) GetTimeoutMs() uint32 {
+	if x != nil && x.TimeoutMs != nil {
+		return *x.TimeoutMs
+	}
+	return 0
+}
+
+func (x *CommandRetryOptions) GetRetryIntervalMs() uint32 {
+	if x != nil && x.RetryIntervalMs != nil {
+		return *x.RetryIntervalMs
+	}
+	return 0
+}
+
 type LaunchChromeCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ChromeBinary  *string                `protobuf:"bytes,1,opt,name=chrome_binary,json=chromeBinary,proto3,oneof" json:"chrome_binary,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *LaunchChromeCommand) Reset() {
 	*x = LaunchChromeCommand{}
-	mi := &file_engine_v1_engine_proto_msgTypes[3]
+	mi := &file_engine_v1_engine_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -236,7 +289,7 @@ func (x *LaunchChromeCommand) String() string {
 func (*LaunchChromeCommand) ProtoMessage() {}
 
 func (x *LaunchChromeCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[3]
+	mi := &file_engine_v1_engine_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -249,7 +302,7 @@ func (x *LaunchChromeCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LaunchChromeCommand.ProtoReflect.Descriptor instead.
 func (*LaunchChromeCommand) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{3}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *LaunchChromeCommand) GetChromeBinary() string {
@@ -259,15 +312,23 @@ func (x *LaunchChromeCommand) GetChromeBinary() string {
 	return ""
 }
 
+func (x *LaunchChromeCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
 type OpenTabCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,1,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *OpenTabCommand) Reset() {
 	*x = OpenTabCommand{}
-	mi := &file_engine_v1_engine_proto_msgTypes[4]
+	mi := &file_engine_v1_engine_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -279,7 +340,7 @@ func (x *OpenTabCommand) String() string {
 func (*OpenTabCommand) ProtoMessage() {}
 
 func (x *OpenTabCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[4]
+	mi := &file_engine_v1_engine_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -292,7 +353,14 @@ func (x *OpenTabCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenTabCommand.ProtoReflect.Descriptor instead.
 func (*OpenTabCommand) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{4}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *OpenTabCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
 }
 
 type SessionPingCommand struct {
@@ -304,7 +372,7 @@ type SessionPingCommand struct {
 
 func (x *SessionPingCommand) Reset() {
 	*x = SessionPingCommand{}
-	mi := &file_engine_v1_engine_proto_msgTypes[5]
+	mi := &file_engine_v1_engine_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -316,7 +384,7 @@ func (x *SessionPingCommand) String() string {
 func (*SessionPingCommand) ProtoMessage() {}
 
 func (x *SessionPingCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[5]
+	mi := &file_engine_v1_engine_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -329,7 +397,7 @@ func (x *SessionPingCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionPingCommand.ProtoReflect.Descriptor instead.
 func (*SessionPingCommand) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{5}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SessionPingCommand) GetMessage() string {
@@ -347,7 +415,7 @@ type CloseBrowserSessionCommand struct {
 
 func (x *CloseBrowserSessionCommand) Reset() {
 	*x = CloseBrowserSessionCommand{}
-	mi := &file_engine_v1_engine_proto_msgTypes[6]
+	mi := &file_engine_v1_engine_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -359,7 +427,7 @@ func (x *CloseBrowserSessionCommand) String() string {
 func (*CloseBrowserSessionCommand) ProtoMessage() {}
 
 func (x *CloseBrowserSessionCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[6]
+	mi := &file_engine_v1_engine_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -372,7 +440,7 @@ func (x *CloseBrowserSessionCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseBrowserSessionCommand.ProtoReflect.Descriptor instead.
 func (*CloseBrowserSessionCommand) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{6}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{7}
 }
 
 type BrowserSessionEvent struct {
@@ -392,7 +460,7 @@ type BrowserSessionEvent struct {
 
 func (x *BrowserSessionEvent) Reset() {
 	*x = BrowserSessionEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[7]
+	mi := &file_engine_v1_engine_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -404,7 +472,7 @@ func (x *BrowserSessionEvent) String() string {
 func (*BrowserSessionEvent) ProtoMessage() {}
 
 func (x *BrowserSessionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[7]
+	mi := &file_engine_v1_engine_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -417,7 +485,7 @@ func (x *BrowserSessionEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserSessionEvent.ProtoReflect.Descriptor instead.
 func (*BrowserSessionEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{7}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *BrowserSessionEvent) GetSessionId() string {
@@ -526,7 +594,7 @@ type ChromeLaunchedEvent struct {
 
 func (x *ChromeLaunchedEvent) Reset() {
 	*x = ChromeLaunchedEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[8]
+	mi := &file_engine_v1_engine_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -538,7 +606,7 @@ func (x *ChromeLaunchedEvent) String() string {
 func (*ChromeLaunchedEvent) ProtoMessage() {}
 
 func (x *ChromeLaunchedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[8]
+	mi := &file_engine_v1_engine_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -551,7 +619,7 @@ func (x *ChromeLaunchedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChromeLaunchedEvent.ProtoReflect.Descriptor instead.
 func (*ChromeLaunchedEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{8}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ChromeLaunchedEvent) GetBrowser() string {
@@ -599,7 +667,7 @@ type TabOpenedEvent struct {
 
 func (x *TabOpenedEvent) Reset() {
 	*x = TabOpenedEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[9]
+	mi := &file_engine_v1_engine_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -611,7 +679,7 @@ func (x *TabOpenedEvent) String() string {
 func (*TabOpenedEvent) ProtoMessage() {}
 
 func (x *TabOpenedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[9]
+	mi := &file_engine_v1_engine_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -624,7 +692,7 @@ func (x *TabOpenedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TabOpenedEvent.ProtoReflect.Descriptor instead.
 func (*TabOpenedEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{9}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *TabOpenedEvent) GetTabSessionId() string {
@@ -650,7 +718,7 @@ type SessionPongEvent struct {
 
 func (x *SessionPongEvent) Reset() {
 	*x = SessionPongEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[10]
+	mi := &file_engine_v1_engine_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -662,7 +730,7 @@ func (x *SessionPongEvent) String() string {
 func (*SessionPongEvent) ProtoMessage() {}
 
 func (x *SessionPongEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[10]
+	mi := &file_engine_v1_engine_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -675,7 +743,7 @@ func (x *SessionPongEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionPongEvent.ProtoReflect.Descriptor instead.
 func (*SessionPongEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{10}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *SessionPongEvent) GetMessage() string {
@@ -694,7 +762,7 @@ type BrowserSessionClosedEvent struct {
 
 func (x *BrowserSessionClosedEvent) Reset() {
 	*x = BrowserSessionClosedEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[11]
+	mi := &file_engine_v1_engine_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -706,7 +774,7 @@ func (x *BrowserSessionClosedEvent) String() string {
 func (*BrowserSessionClosedEvent) ProtoMessage() {}
 
 func (x *BrowserSessionClosedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[11]
+	mi := &file_engine_v1_engine_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -719,7 +787,7 @@ func (x *BrowserSessionClosedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserSessionClosedEvent.ProtoReflect.Descriptor instead.
 func (*BrowserSessionClosedEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{11}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *BrowserSessionClosedEvent) GetReason() string {
@@ -738,7 +806,7 @@ type BrowserSessionErrorEvent struct {
 
 func (x *BrowserSessionErrorEvent) Reset() {
 	*x = BrowserSessionErrorEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[12]
+	mi := &file_engine_v1_engine_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -750,7 +818,7 @@ func (x *BrowserSessionErrorEvent) String() string {
 func (*BrowserSessionErrorEvent) ProtoMessage() {}
 
 func (x *BrowserSessionErrorEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[12]
+	mi := &file_engine_v1_engine_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -763,7 +831,7 @@ func (x *BrowserSessionErrorEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserSessionErrorEvent.ProtoReflect.Descriptor instead.
 func (*BrowserSessionErrorEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{12}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *BrowserSessionErrorEvent) GetMessage() string {
@@ -783,6 +851,15 @@ type TabSessionCommand struct {
 	//	*TabSessionCommand_Close
 	//	*TabSessionCommand_Navigate
 	//	*TabSessionCommand_ClickElement
+	//	*TabSessionCommand_CountElements
+	//	*TabSessionCommand_HighlightElements
+	//	*TabSessionCommand_FocusElement
+	//	*TabSessionCommand_FillElement
+	//	*TabSessionCommand_HoverElement
+	//	*TabSessionCommand_PressKey
+	//	*TabSessionCommand_GetTextContent
+	//	*TabSessionCommand_GetInnerText
+	//	*TabSessionCommand_WaitForSelector
 	Command       isTabSessionCommand_Command `protobuf_oneof:"command"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -790,7 +867,7 @@ type TabSessionCommand struct {
 
 func (x *TabSessionCommand) Reset() {
 	*x = TabSessionCommand{}
-	mi := &file_engine_v1_engine_proto_msgTypes[13]
+	mi := &file_engine_v1_engine_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -802,7 +879,7 @@ func (x *TabSessionCommand) String() string {
 func (*TabSessionCommand) ProtoMessage() {}
 
 func (x *TabSessionCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[13]
+	mi := &file_engine_v1_engine_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -815,7 +892,7 @@ func (x *TabSessionCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TabSessionCommand.ProtoReflect.Descriptor instead.
 func (*TabSessionCommand) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{13}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *TabSessionCommand) GetBrowserSessionId() string {
@@ -875,6 +952,87 @@ func (x *TabSessionCommand) GetClickElement() *ClickElementCommand {
 	return nil
 }
 
+func (x *TabSessionCommand) GetCountElements() *CountElementsCommand {
+	if x != nil {
+		if x, ok := x.Command.(*TabSessionCommand_CountElements); ok {
+			return x.CountElements
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionCommand) GetHighlightElements() *HighlightElementsCommand {
+	if x != nil {
+		if x, ok := x.Command.(*TabSessionCommand_HighlightElements); ok {
+			return x.HighlightElements
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionCommand) GetFocusElement() *FocusElementCommand {
+	if x != nil {
+		if x, ok := x.Command.(*TabSessionCommand_FocusElement); ok {
+			return x.FocusElement
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionCommand) GetFillElement() *FillElementCommand {
+	if x != nil {
+		if x, ok := x.Command.(*TabSessionCommand_FillElement); ok {
+			return x.FillElement
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionCommand) GetHoverElement() *HoverElementCommand {
+	if x != nil {
+		if x, ok := x.Command.(*TabSessionCommand_HoverElement); ok {
+			return x.HoverElement
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionCommand) GetPressKey() *PressKeyCommand {
+	if x != nil {
+		if x, ok := x.Command.(*TabSessionCommand_PressKey); ok {
+			return x.PressKey
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionCommand) GetGetTextContent() *GetTextContentCommand {
+	if x != nil {
+		if x, ok := x.Command.(*TabSessionCommand_GetTextContent); ok {
+			return x.GetTextContent
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionCommand) GetGetInnerText() *GetInnerTextCommand {
+	if x != nil {
+		if x, ok := x.Command.(*TabSessionCommand_GetInnerText); ok {
+			return x.GetInnerText
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionCommand) GetWaitForSelector() *WaitForSelectorCommand {
+	if x != nil {
+		if x, ok := x.Command.(*TabSessionCommand_WaitForSelector); ok {
+			return x.WaitForSelector
+		}
+	}
+	return nil
+}
+
 type isTabSessionCommand_Command interface {
 	isTabSessionCommand_Command()
 }
@@ -895,6 +1053,42 @@ type TabSessionCommand_ClickElement struct {
 	ClickElement *ClickElementCommand `protobuf:"bytes,6,opt,name=click_element,json=clickElement,proto3,oneof"`
 }
 
+type TabSessionCommand_CountElements struct {
+	CountElements *CountElementsCommand `protobuf:"bytes,7,opt,name=count_elements,json=countElements,proto3,oneof"`
+}
+
+type TabSessionCommand_HighlightElements struct {
+	HighlightElements *HighlightElementsCommand `protobuf:"bytes,8,opt,name=highlight_elements,json=highlightElements,proto3,oneof"`
+}
+
+type TabSessionCommand_FocusElement struct {
+	FocusElement *FocusElementCommand `protobuf:"bytes,9,opt,name=focus_element,json=focusElement,proto3,oneof"`
+}
+
+type TabSessionCommand_FillElement struct {
+	FillElement *FillElementCommand `protobuf:"bytes,10,opt,name=fill_element,json=fillElement,proto3,oneof"`
+}
+
+type TabSessionCommand_HoverElement struct {
+	HoverElement *HoverElementCommand `protobuf:"bytes,11,opt,name=hover_element,json=hoverElement,proto3,oneof"`
+}
+
+type TabSessionCommand_PressKey struct {
+	PressKey *PressKeyCommand `protobuf:"bytes,12,opt,name=press_key,json=pressKey,proto3,oneof"`
+}
+
+type TabSessionCommand_GetTextContent struct {
+	GetTextContent *GetTextContentCommand `protobuf:"bytes,13,opt,name=get_text_content,json=getTextContent,proto3,oneof"`
+}
+
+type TabSessionCommand_GetInnerText struct {
+	GetInnerText *GetInnerTextCommand `protobuf:"bytes,14,opt,name=get_inner_text,json=getInnerText,proto3,oneof"`
+}
+
+type TabSessionCommand_WaitForSelector struct {
+	WaitForSelector *WaitForSelectorCommand `protobuf:"bytes,15,opt,name=wait_for_selector,json=waitForSelector,proto3,oneof"`
+}
+
 func (*TabSessionCommand_Ping) isTabSessionCommand_Command() {}
 
 func (*TabSessionCommand_Close) isTabSessionCommand_Command() {}
@@ -902,6 +1096,24 @@ func (*TabSessionCommand_Close) isTabSessionCommand_Command() {}
 func (*TabSessionCommand_Navigate) isTabSessionCommand_Command() {}
 
 func (*TabSessionCommand_ClickElement) isTabSessionCommand_Command() {}
+
+func (*TabSessionCommand_CountElements) isTabSessionCommand_Command() {}
+
+func (*TabSessionCommand_HighlightElements) isTabSessionCommand_Command() {}
+
+func (*TabSessionCommand_FocusElement) isTabSessionCommand_Command() {}
+
+func (*TabSessionCommand_FillElement) isTabSessionCommand_Command() {}
+
+func (*TabSessionCommand_HoverElement) isTabSessionCommand_Command() {}
+
+func (*TabSessionCommand_PressKey) isTabSessionCommand_Command() {}
+
+func (*TabSessionCommand_GetTextContent) isTabSessionCommand_Command() {}
+
+func (*TabSessionCommand_GetInnerText) isTabSessionCommand_Command() {}
+
+func (*TabSessionCommand_WaitForSelector) isTabSessionCommand_Command() {}
 
 type TabSessionPingCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -912,7 +1124,7 @@ type TabSessionPingCommand struct {
 
 func (x *TabSessionPingCommand) Reset() {
 	*x = TabSessionPingCommand{}
-	mi := &file_engine_v1_engine_proto_msgTypes[14]
+	mi := &file_engine_v1_engine_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -924,7 +1136,7 @@ func (x *TabSessionPingCommand) String() string {
 func (*TabSessionPingCommand) ProtoMessage() {}
 
 func (x *TabSessionPingCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[14]
+	mi := &file_engine_v1_engine_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -937,7 +1149,7 @@ func (x *TabSessionPingCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TabSessionPingCommand.ProtoReflect.Descriptor instead.
 func (*TabSessionPingCommand) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{14}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *TabSessionPingCommand) GetMessage() string {
@@ -955,7 +1167,7 @@ type CloseTabSessionCommand struct {
 
 func (x *CloseTabSessionCommand) Reset() {
 	*x = CloseTabSessionCommand{}
-	mi := &file_engine_v1_engine_proto_msgTypes[15]
+	mi := &file_engine_v1_engine_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -967,7 +1179,7 @@ func (x *CloseTabSessionCommand) String() string {
 func (*CloseTabSessionCommand) ProtoMessage() {}
 
 func (x *CloseTabSessionCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[15]
+	mi := &file_engine_v1_engine_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -980,19 +1192,20 @@ func (x *CloseTabSessionCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseTabSessionCommand.ProtoReflect.Descriptor instead.
 func (*CloseTabSessionCommand) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{15}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{16}
 }
 
 type NavigateTabCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *NavigateTabCommand) Reset() {
 	*x = NavigateTabCommand{}
-	mi := &file_engine_v1_engine_proto_msgTypes[16]
+	mi := &file_engine_v1_engine_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1004,7 +1217,7 @@ func (x *NavigateTabCommand) String() string {
 func (*NavigateTabCommand) ProtoMessage() {}
 
 func (x *NavigateTabCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[16]
+	mi := &file_engine_v1_engine_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1017,7 +1230,7 @@ func (x *NavigateTabCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NavigateTabCommand.ProtoReflect.Descriptor instead.
 func (*NavigateTabCommand) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{16}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *NavigateTabCommand) GetUrl() string {
@@ -1027,16 +1240,24 @@ func (x *NavigateTabCommand) GetUrl() string {
 	return ""
 }
 
+func (x *NavigateTabCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
 type ClickElementCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ClickElementCommand) Reset() {
 	*x = ClickElementCommand{}
-	mi := &file_engine_v1_engine_proto_msgTypes[17]
+	mi := &file_engine_v1_engine_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1048,7 +1269,7 @@ func (x *ClickElementCommand) String() string {
 func (*ClickElementCommand) ProtoMessage() {}
 
 func (x *ClickElementCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[17]
+	mi := &file_engine_v1_engine_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1061,7 +1282,7 @@ func (x *ClickElementCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClickElementCommand.ProtoReflect.Descriptor instead.
 func (*ClickElementCommand) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{17}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ClickElementCommand) GetCssSelector() string {
@@ -1069,6 +1290,521 @@ func (x *ClickElementCommand) GetCssSelector() string {
 		return x.CssSelector
 	}
 	return ""
+}
+
+func (x *ClickElementCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type CountElementsCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CountElementsCommand) Reset() {
+	*x = CountElementsCommand{}
+	mi := &file_engine_v1_engine_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CountElementsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CountElementsCommand) ProtoMessage() {}
+
+func (x *CountElementsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CountElementsCommand.ProtoReflect.Descriptor instead.
+func (*CountElementsCommand) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *CountElementsCommand) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *CountElementsCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type HighlightElementsCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	DurationMs    *uint32                `protobuf:"varint,2,opt,name=duration_ms,json=durationMs,proto3,oneof" json:"duration_ms,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,3,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HighlightElementsCommand) Reset() {
+	*x = HighlightElementsCommand{}
+	mi := &file_engine_v1_engine_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HighlightElementsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HighlightElementsCommand) ProtoMessage() {}
+
+func (x *HighlightElementsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HighlightElementsCommand.ProtoReflect.Descriptor instead.
+func (*HighlightElementsCommand) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *HighlightElementsCommand) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *HighlightElementsCommand) GetDurationMs() uint32 {
+	if x != nil && x.DurationMs != nil {
+		return *x.DurationMs
+	}
+	return 0
+}
+
+func (x *HighlightElementsCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type FocusElementCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FocusElementCommand) Reset() {
+	*x = FocusElementCommand{}
+	mi := &file_engine_v1_engine_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FocusElementCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FocusElementCommand) ProtoMessage() {}
+
+func (x *FocusElementCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FocusElementCommand.ProtoReflect.Descriptor instead.
+func (*FocusElementCommand) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *FocusElementCommand) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *FocusElementCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type FillElementCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,3,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FillElementCommand) Reset() {
+	*x = FillElementCommand{}
+	mi := &file_engine_v1_engine_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FillElementCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FillElementCommand) ProtoMessage() {}
+
+func (x *FillElementCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FillElementCommand.ProtoReflect.Descriptor instead.
+func (*FillElementCommand) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *FillElementCommand) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *FillElementCommand) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *FillElementCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type HoverElementCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HoverElementCommand) Reset() {
+	*x = HoverElementCommand{}
+	mi := &file_engine_v1_engine_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HoverElementCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HoverElementCommand) ProtoMessage() {}
+
+func (x *HoverElementCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HoverElementCommand.ProtoReflect.Descriptor instead.
+func (*HoverElementCommand) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *HoverElementCommand) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *HoverElementCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type PressKeyCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	Text          *string                `protobuf:"bytes,3,opt,name=text,proto3,oneof" json:"text,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,4,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PressKeyCommand) Reset() {
+	*x = PressKeyCommand{}
+	mi := &file_engine_v1_engine_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PressKeyCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PressKeyCommand) ProtoMessage() {}
+
+func (x *PressKeyCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PressKeyCommand.ProtoReflect.Descriptor instead.
+func (*PressKeyCommand) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *PressKeyCommand) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *PressKeyCommand) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *PressKeyCommand) GetText() string {
+	if x != nil && x.Text != nil {
+		return *x.Text
+	}
+	return ""
+}
+
+func (x *PressKeyCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type GetTextContentCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTextContentCommand) Reset() {
+	*x = GetTextContentCommand{}
+	mi := &file_engine_v1_engine_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTextContentCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTextContentCommand) ProtoMessage() {}
+
+func (x *GetTextContentCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTextContentCommand.ProtoReflect.Descriptor instead.
+func (*GetTextContentCommand) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *GetTextContentCommand) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *GetTextContentCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type GetInnerTextCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetInnerTextCommand) Reset() {
+	*x = GetInnerTextCommand{}
+	mi := &file_engine_v1_engine_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetInnerTextCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetInnerTextCommand) ProtoMessage() {}
+
+func (x *GetInnerTextCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetInnerTextCommand.ProtoReflect.Descriptor instead.
+func (*GetInnerTextCommand) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *GetInnerTextCommand) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *GetInnerTextCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type WaitForSelectorCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	Visible       *bool                  `protobuf:"varint,2,opt,name=visible,proto3,oneof" json:"visible,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,3,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WaitForSelectorCommand) Reset() {
+	*x = WaitForSelectorCommand{}
+	mi := &file_engine_v1_engine_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WaitForSelectorCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WaitForSelectorCommand) ProtoMessage() {}
+
+func (x *WaitForSelectorCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WaitForSelectorCommand.ProtoReflect.Descriptor instead.
+func (*WaitForSelectorCommand) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *WaitForSelectorCommand) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *WaitForSelectorCommand) GetVisible() bool {
+	if x != nil && x.Visible != nil {
+		return *x.Visible
+	}
+	return false
+}
+
+func (x *WaitForSelectorCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
 }
 
 type TabSessionEvent struct {
@@ -1083,6 +1819,15 @@ type TabSessionEvent struct {
 	//	*TabSessionEvent_Navigated
 	//	*TabSessionEvent_ChromiumBidiInjection
 	//	*TabSessionEvent_ElementClicked
+	//	*TabSessionEvent_ElementCounted
+	//	*TabSessionEvent_ElementsHighlighted
+	//	*TabSessionEvent_ElementFocused
+	//	*TabSessionEvent_ElementFilled
+	//	*TabSessionEvent_ElementHovered
+	//	*TabSessionEvent_KeyPressed
+	//	*TabSessionEvent_TextContentResolved
+	//	*TabSessionEvent_InnerTextResolved
+	//	*TabSessionEvent_SelectorWaitSatisfied
 	Event         isTabSessionEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1090,7 +1835,7 @@ type TabSessionEvent struct {
 
 func (x *TabSessionEvent) Reset() {
 	*x = TabSessionEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[18]
+	mi := &file_engine_v1_engine_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1102,7 +1847,7 @@ func (x *TabSessionEvent) String() string {
 func (*TabSessionEvent) ProtoMessage() {}
 
 func (x *TabSessionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[18]
+	mi := &file_engine_v1_engine_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1115,7 +1860,7 @@ func (x *TabSessionEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TabSessionEvent.ProtoReflect.Descriptor instead.
 func (*TabSessionEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{18}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *TabSessionEvent) GetTabSessionId() string {
@@ -1195,6 +1940,87 @@ func (x *TabSessionEvent) GetElementClicked() *ElementClickedEvent {
 	return nil
 }
 
+func (x *TabSessionEvent) GetElementCounted() *ElementCountedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*TabSessionEvent_ElementCounted); ok {
+			return x.ElementCounted
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionEvent) GetElementsHighlighted() *ElementsHighlightedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*TabSessionEvent_ElementsHighlighted); ok {
+			return x.ElementsHighlighted
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionEvent) GetElementFocused() *ElementFocusedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*TabSessionEvent_ElementFocused); ok {
+			return x.ElementFocused
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionEvent) GetElementFilled() *ElementFilledEvent {
+	if x != nil {
+		if x, ok := x.Event.(*TabSessionEvent_ElementFilled); ok {
+			return x.ElementFilled
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionEvent) GetElementHovered() *ElementHoveredEvent {
+	if x != nil {
+		if x, ok := x.Event.(*TabSessionEvent_ElementHovered); ok {
+			return x.ElementHovered
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionEvent) GetKeyPressed() *KeyPressedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*TabSessionEvent_KeyPressed); ok {
+			return x.KeyPressed
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionEvent) GetTextContentResolved() *TextContentResolvedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*TabSessionEvent_TextContentResolved); ok {
+			return x.TextContentResolved
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionEvent) GetInnerTextResolved() *InnerTextResolvedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*TabSessionEvent_InnerTextResolved); ok {
+			return x.InnerTextResolved
+		}
+	}
+	return nil
+}
+
+func (x *TabSessionEvent) GetSelectorWaitSatisfied() *SelectorWaitSatisfiedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*TabSessionEvent_SelectorWaitSatisfied); ok {
+			return x.SelectorWaitSatisfied
+		}
+	}
+	return nil
+}
+
 type isTabSessionEvent_Event interface {
 	isTabSessionEvent_Event()
 }
@@ -1227,6 +2053,42 @@ type TabSessionEvent_ElementClicked struct {
 	ElementClicked *ElementClickedEvent `protobuf:"bytes,8,opt,name=element_clicked,json=elementClicked,proto3,oneof"`
 }
 
+type TabSessionEvent_ElementCounted struct {
+	ElementCounted *ElementCountedEvent `protobuf:"bytes,9,opt,name=element_counted,json=elementCounted,proto3,oneof"`
+}
+
+type TabSessionEvent_ElementsHighlighted struct {
+	ElementsHighlighted *ElementsHighlightedEvent `protobuf:"bytes,10,opt,name=elements_highlighted,json=elementsHighlighted,proto3,oneof"`
+}
+
+type TabSessionEvent_ElementFocused struct {
+	ElementFocused *ElementFocusedEvent `protobuf:"bytes,11,opt,name=element_focused,json=elementFocused,proto3,oneof"`
+}
+
+type TabSessionEvent_ElementFilled struct {
+	ElementFilled *ElementFilledEvent `protobuf:"bytes,12,opt,name=element_filled,json=elementFilled,proto3,oneof"`
+}
+
+type TabSessionEvent_ElementHovered struct {
+	ElementHovered *ElementHoveredEvent `protobuf:"bytes,13,opt,name=element_hovered,json=elementHovered,proto3,oneof"`
+}
+
+type TabSessionEvent_KeyPressed struct {
+	KeyPressed *KeyPressedEvent `protobuf:"bytes,14,opt,name=key_pressed,json=keyPressed,proto3,oneof"`
+}
+
+type TabSessionEvent_TextContentResolved struct {
+	TextContentResolved *TextContentResolvedEvent `protobuf:"bytes,15,opt,name=text_content_resolved,json=textContentResolved,proto3,oneof"`
+}
+
+type TabSessionEvent_InnerTextResolved struct {
+	InnerTextResolved *InnerTextResolvedEvent `protobuf:"bytes,16,opt,name=inner_text_resolved,json=innerTextResolved,proto3,oneof"`
+}
+
+type TabSessionEvent_SelectorWaitSatisfied struct {
+	SelectorWaitSatisfied *SelectorWaitSatisfiedEvent `protobuf:"bytes,17,opt,name=selector_wait_satisfied,json=selectorWaitSatisfied,proto3,oneof"`
+}
+
 func (*TabSessionEvent_Attached) isTabSessionEvent_Event() {}
 
 func (*TabSessionEvent_Pong) isTabSessionEvent_Event() {}
@@ -1241,6 +2103,24 @@ func (*TabSessionEvent_ChromiumBidiInjection) isTabSessionEvent_Event() {}
 
 func (*TabSessionEvent_ElementClicked) isTabSessionEvent_Event() {}
 
+func (*TabSessionEvent_ElementCounted) isTabSessionEvent_Event() {}
+
+func (*TabSessionEvent_ElementsHighlighted) isTabSessionEvent_Event() {}
+
+func (*TabSessionEvent_ElementFocused) isTabSessionEvent_Event() {}
+
+func (*TabSessionEvent_ElementFilled) isTabSessionEvent_Event() {}
+
+func (*TabSessionEvent_ElementHovered) isTabSessionEvent_Event() {}
+
+func (*TabSessionEvent_KeyPressed) isTabSessionEvent_Event() {}
+
+func (*TabSessionEvent_TextContentResolved) isTabSessionEvent_Event() {}
+
+func (*TabSessionEvent_InnerTextResolved) isTabSessionEvent_Event() {}
+
+func (*TabSessionEvent_SelectorWaitSatisfied) isTabSessionEvent_Event() {}
+
 type TabSessionAttachedEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Note          string                 `protobuf:"bytes,1,opt,name=note,proto3" json:"note,omitempty"`
@@ -1250,7 +2130,7 @@ type TabSessionAttachedEvent struct {
 
 func (x *TabSessionAttachedEvent) Reset() {
 	*x = TabSessionAttachedEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[19]
+	mi := &file_engine_v1_engine_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1262,7 +2142,7 @@ func (x *TabSessionAttachedEvent) String() string {
 func (*TabSessionAttachedEvent) ProtoMessage() {}
 
 func (x *TabSessionAttachedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[19]
+	mi := &file_engine_v1_engine_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1275,7 +2155,7 @@ func (x *TabSessionAttachedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TabSessionAttachedEvent.ProtoReflect.Descriptor instead.
 func (*TabSessionAttachedEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{19}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *TabSessionAttachedEvent) GetNote() string {
@@ -1294,7 +2174,7 @@ type TabSessionPongEvent struct {
 
 func (x *TabSessionPongEvent) Reset() {
 	*x = TabSessionPongEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[20]
+	mi := &file_engine_v1_engine_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1306,7 +2186,7 @@ func (x *TabSessionPongEvent) String() string {
 func (*TabSessionPongEvent) ProtoMessage() {}
 
 func (x *TabSessionPongEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[20]
+	mi := &file_engine_v1_engine_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1319,7 +2199,7 @@ func (x *TabSessionPongEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TabSessionPongEvent.ProtoReflect.Descriptor instead.
 func (*TabSessionPongEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{20}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *TabSessionPongEvent) GetMessage() string {
@@ -1338,7 +2218,7 @@ type TabSessionClosedEvent struct {
 
 func (x *TabSessionClosedEvent) Reset() {
 	*x = TabSessionClosedEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[21]
+	mi := &file_engine_v1_engine_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1350,7 +2230,7 @@ func (x *TabSessionClosedEvent) String() string {
 func (*TabSessionClosedEvent) ProtoMessage() {}
 
 func (x *TabSessionClosedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[21]
+	mi := &file_engine_v1_engine_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1363,7 +2243,7 @@ func (x *TabSessionClosedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TabSessionClosedEvent.ProtoReflect.Descriptor instead.
 func (*TabSessionClosedEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{21}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *TabSessionClosedEvent) GetReason() string {
@@ -1382,7 +2262,7 @@ type TabSessionErrorEvent struct {
 
 func (x *TabSessionErrorEvent) Reset() {
 	*x = TabSessionErrorEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[22]
+	mi := &file_engine_v1_engine_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1394,7 +2274,7 @@ func (x *TabSessionErrorEvent) String() string {
 func (*TabSessionErrorEvent) ProtoMessage() {}
 
 func (x *TabSessionErrorEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[22]
+	mi := &file_engine_v1_engine_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1407,7 +2287,7 @@ func (x *TabSessionErrorEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TabSessionErrorEvent.ProtoReflect.Descriptor instead.
 func (*TabSessionErrorEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{22}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *TabSessionErrorEvent) GetMessage() string {
@@ -1427,7 +2307,7 @@ type TabNavigatedEvent struct {
 
 func (x *TabNavigatedEvent) Reset() {
 	*x = TabNavigatedEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[23]
+	mi := &file_engine_v1_engine_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1439,7 +2319,7 @@ func (x *TabNavigatedEvent) String() string {
 func (*TabNavigatedEvent) ProtoMessage() {}
 
 func (x *TabNavigatedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[23]
+	mi := &file_engine_v1_engine_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1452,7 +2332,7 @@ func (x *TabNavigatedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TabNavigatedEvent.ProtoReflect.Descriptor instead.
 func (*TabNavigatedEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{23}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *TabNavigatedEvent) GetUrl() string {
@@ -1482,7 +2362,7 @@ type ChromiumBidiInjectionEvent struct {
 
 func (x *ChromiumBidiInjectionEvent) Reset() {
 	*x = ChromiumBidiInjectionEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[24]
+	mi := &file_engine_v1_engine_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1494,7 +2374,7 @@ func (x *ChromiumBidiInjectionEvent) String() string {
 func (*ChromiumBidiInjectionEvent) ProtoMessage() {}
 
 func (x *ChromiumBidiInjectionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[24]
+	mi := &file_engine_v1_engine_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1507,7 +2387,7 @@ func (x *ChromiumBidiInjectionEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChromiumBidiInjectionEvent.ProtoReflect.Descriptor instead.
 func (*ChromiumBidiInjectionEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{24}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ChromiumBidiInjectionEvent) GetNote() string {
@@ -1556,7 +2436,7 @@ type ElementClickedEvent struct {
 
 func (x *ElementClickedEvent) Reset() {
 	*x = ElementClickedEvent{}
-	mi := &file_engine_v1_engine_proto_msgTypes[25]
+	mi := &file_engine_v1_engine_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1568,7 +2448,7 @@ func (x *ElementClickedEvent) String() string {
 func (*ElementClickedEvent) ProtoMessage() {}
 
 func (x *ElementClickedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_engine_v1_engine_proto_msgTypes[25]
+	mi := &file_engine_v1_engine_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1581,7 +2461,7 @@ func (x *ElementClickedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementClickedEvent.ProtoReflect.Descriptor instead.
 func (*ElementClickedEvent) Descriptor() ([]byte, []int) {
-	return file_engine_v1_engine_proto_rawDescGZIP(), []int{25}
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *ElementClickedEvent) GetCssSelector() string {
@@ -1605,6 +2485,530 @@ func (x *ElementClickedEvent) GetBidiSessionId() string {
 	return ""
 }
 
+type ElementCountedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	Count         uint32                 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ElementCountedEvent) Reset() {
+	*x = ElementCountedEvent{}
+	mi := &file_engine_v1_engine_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ElementCountedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ElementCountedEvent) ProtoMessage() {}
+
+func (x *ElementCountedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ElementCountedEvent.ProtoReflect.Descriptor instead.
+func (*ElementCountedEvent) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ElementCountedEvent) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *ElementCountedEvent) GetCount() uint32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *ElementCountedEvent) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type ElementsHighlightedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	Count         uint32                 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ElementsHighlightedEvent) Reset() {
+	*x = ElementsHighlightedEvent{}
+	mi := &file_engine_v1_engine_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ElementsHighlightedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ElementsHighlightedEvent) ProtoMessage() {}
+
+func (x *ElementsHighlightedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ElementsHighlightedEvent.ProtoReflect.Descriptor instead.
+func (*ElementsHighlightedEvent) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *ElementsHighlightedEvent) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *ElementsHighlightedEvent) GetCount() uint32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *ElementsHighlightedEvent) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type ElementFocusedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	Note          string                 `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ElementFocusedEvent) Reset() {
+	*x = ElementFocusedEvent{}
+	mi := &file_engine_v1_engine_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ElementFocusedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ElementFocusedEvent) ProtoMessage() {}
+
+func (x *ElementFocusedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ElementFocusedEvent.ProtoReflect.Descriptor instead.
+func (*ElementFocusedEvent) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *ElementFocusedEvent) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *ElementFocusedEvent) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type ElementFilledEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ElementFilledEvent) Reset() {
+	*x = ElementFilledEvent{}
+	mi := &file_engine_v1_engine_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ElementFilledEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ElementFilledEvent) ProtoMessage() {}
+
+func (x *ElementFilledEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ElementFilledEvent.ProtoReflect.Descriptor instead.
+func (*ElementFilledEvent) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *ElementFilledEvent) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *ElementFilledEvent) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *ElementFilledEvent) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type ElementHoveredEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	Note          string                 `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ElementHoveredEvent) Reset() {
+	*x = ElementHoveredEvent{}
+	mi := &file_engine_v1_engine_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ElementHoveredEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ElementHoveredEvent) ProtoMessage() {}
+
+func (x *ElementHoveredEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ElementHoveredEvent.ProtoReflect.Descriptor instead.
+func (*ElementHoveredEvent) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *ElementHoveredEvent) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *ElementHoveredEvent) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type KeyPressedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KeyPressedEvent) Reset() {
+	*x = KeyPressedEvent{}
+	mi := &file_engine_v1_engine_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeyPressedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeyPressedEvent) ProtoMessage() {}
+
+func (x *KeyPressedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeyPressedEvent.ProtoReflect.Descriptor instead.
+func (*KeyPressedEvent) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *KeyPressedEvent) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *KeyPressedEvent) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *KeyPressedEvent) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type TextContentResolvedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TextContentResolvedEvent) Reset() {
+	*x = TextContentResolvedEvent{}
+	mi := &file_engine_v1_engine_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TextContentResolvedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TextContentResolvedEvent) ProtoMessage() {}
+
+func (x *TextContentResolvedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TextContentResolvedEvent.ProtoReflect.Descriptor instead.
+func (*TextContentResolvedEvent) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *TextContentResolvedEvent) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *TextContentResolvedEvent) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *TextContentResolvedEvent) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type InnerTextResolvedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InnerTextResolvedEvent) Reset() {
+	*x = InnerTextResolvedEvent{}
+	mi := &file_engine_v1_engine_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InnerTextResolvedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InnerTextResolvedEvent) ProtoMessage() {}
+
+func (x *InnerTextResolvedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InnerTextResolvedEvent.ProtoReflect.Descriptor instead.
+func (*InnerTextResolvedEvent) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *InnerTextResolvedEvent) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *InnerTextResolvedEvent) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *InnerTextResolvedEvent) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type SelectorWaitSatisfiedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	Visible       bool                   `protobuf:"varint,2,opt,name=visible,proto3" json:"visible,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SelectorWaitSatisfiedEvent) Reset() {
+	*x = SelectorWaitSatisfiedEvent{}
+	mi := &file_engine_v1_engine_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SelectorWaitSatisfiedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SelectorWaitSatisfiedEvent) ProtoMessage() {}
+
+func (x *SelectorWaitSatisfiedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_engine_v1_engine_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SelectorWaitSatisfiedEvent.ProtoReflect.Descriptor instead.
+func (*SelectorWaitSatisfiedEvent) Descriptor() ([]byte, []int) {
+	return file_engine_v1_engine_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *SelectorWaitSatisfiedEvent) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *SelectorWaitSatisfiedEvent) GetVisible() bool {
+	if x != nil {
+		return x.Visible
+	}
+	return false
+}
+
+func (x *SelectorWaitSatisfiedEvent) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
 var File_engine_v1_engine_proto protoreflect.FileDescriptor
 
 const file_engine_v1_engine_proto_rawDesc = "" +
@@ -1618,11 +3022,21 @@ const file_engine_v1_engine_proto_rawDesc = "" +
 	"\bopen_tab\x18\x02 \x01(\v2#.allwright.engine.v1.OpenTabCommandH\x00R\aopenTab\x12=\n" +
 	"\x04ping\x18\x03 \x01(\v2'.allwright.engine.v1.SessionPingCommandH\x00R\x04ping\x12G\n" +
 	"\x05close\x18\x04 \x01(\v2/.allwright.engine.v1.CloseBrowserSessionCommandH\x00R\x05closeB\t\n" +
-	"\acommand\"Q\n" +
+	"\acommand\"\x8f\x01\n" +
+	"\x13CommandRetryOptions\x12\"\n" +
+	"\n" +
+	"timeout_ms\x18\x01 \x01(\rH\x00R\ttimeoutMs\x88\x01\x01\x12/\n" +
+	"\x11retry_interval_ms\x18\x02 \x01(\rH\x01R\x0fretryIntervalMs\x88\x01\x01B\r\n" +
+	"\v_timeout_msB\x14\n" +
+	"\x12_retry_interval_ms\"\xb7\x01\n" +
 	"\x13LaunchChromeCommand\x12(\n" +
-	"\rchrome_binary\x18\x01 \x01(\tH\x00R\fchromeBinary\x88\x01\x01B\x10\n" +
-	"\x0e_chrome_binary\"\x10\n" +
-	"\x0eOpenTabCommand\".\n" +
+	"\rchrome_binary\x18\x01 \x01(\tH\x00R\fchromeBinary\x88\x01\x01\x12R\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x01R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_chrome_binaryB\x10\n" +
+	"\x0e_retry_options\"v\n" +
+	"\x0eOpenTabCommand\x12R\n" +
+	"\rretry_options\x18\x01 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\".\n" +
 	"\x12SessionPingCommand\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"\x1c\n" +
 	"\x1aCloseBrowserSessionCommand\"\xa6\x03\n" +
@@ -1650,22 +3064,82 @@ const file_engine_v1_engine_proto_rawDesc = "" +
 	"\x19BrowserSessionClosedEvent\x12\x16\n" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\"4\n" +
 	"\x18BrowserSessionErrorEvent\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\"\x91\x03\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"\xff\b\n" +
 	"\x11TabSessionCommand\x12,\n" +
 	"\x12browser_session_id\x18\x01 \x01(\tR\x10browserSessionId\x12$\n" +
 	"\x0etab_session_id\x18\x02 \x01(\tR\ftabSessionId\x12@\n" +
 	"\x04ping\x18\x03 \x01(\v2*.allwright.engine.v1.TabSessionPingCommandH\x00R\x04ping\x12C\n" +
 	"\x05close\x18\x04 \x01(\v2+.allwright.engine.v1.CloseTabSessionCommandH\x00R\x05close\x12E\n" +
 	"\bnavigate\x18\x05 \x01(\v2'.allwright.engine.v1.NavigateTabCommandH\x00R\bnavigate\x12O\n" +
-	"\rclick_element\x18\x06 \x01(\v2(.allwright.engine.v1.ClickElementCommandH\x00R\fclickElementB\t\n" +
+	"\rclick_element\x18\x06 \x01(\v2(.allwright.engine.v1.ClickElementCommandH\x00R\fclickElement\x12R\n" +
+	"\x0ecount_elements\x18\a \x01(\v2).allwright.engine.v1.CountElementsCommandH\x00R\rcountElements\x12^\n" +
+	"\x12highlight_elements\x18\b \x01(\v2-.allwright.engine.v1.HighlightElementsCommandH\x00R\x11highlightElements\x12O\n" +
+	"\rfocus_element\x18\t \x01(\v2(.allwright.engine.v1.FocusElementCommandH\x00R\ffocusElement\x12L\n" +
+	"\ffill_element\x18\n" +
+	" \x01(\v2'.allwright.engine.v1.FillElementCommandH\x00R\vfillElement\x12O\n" +
+	"\rhover_element\x18\v \x01(\v2(.allwright.engine.v1.HoverElementCommandH\x00R\fhoverElement\x12C\n" +
+	"\tpress_key\x18\f \x01(\v2$.allwright.engine.v1.PressKeyCommandH\x00R\bpressKey\x12V\n" +
+	"\x10get_text_content\x18\r \x01(\v2*.allwright.engine.v1.GetTextContentCommandH\x00R\x0egetTextContent\x12P\n" +
+	"\x0eget_inner_text\x18\x0e \x01(\v2(.allwright.engine.v1.GetInnerTextCommandH\x00R\fgetInnerText\x12Y\n" +
+	"\x11wait_for_selector\x18\x0f \x01(\v2+.allwright.engine.v1.WaitForSelectorCommandH\x00R\x0fwaitForSelectorB\t\n" +
 	"\acommand\"1\n" +
 	"\x15TabSessionPingCommand\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"\x18\n" +
-	"\x16CloseTabSessionCommand\"&\n" +
+	"\x16CloseTabSessionCommand\"\x8c\x01\n" +
 	"\x12NavigateTabCommand\x12\x10\n" +
-	"\x03url\x18\x01 \x01(\tR\x03url\"8\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\x12R\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"\x9e\x01\n" +
 	"\x13ClickElementCommand\x12!\n" +
-	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\"\xdd\x04\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12R\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"\x9f\x01\n" +
+	"\x14CountElementsCommand\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12R\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"\xd9\x01\n" +
+	"\x18HighlightElementsCommand\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12$\n" +
+	"\vduration_ms\x18\x02 \x01(\rH\x00R\n" +
+	"durationMs\x88\x01\x01\x12R\n" +
+	"\rretry_options\x18\x03 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x01R\fretryOptions\x88\x01\x01B\x0e\n" +
+	"\f_duration_msB\x10\n" +
+	"\x0e_retry_options\"\x9e\x01\n" +
+	"\x13FocusElementCommand\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12R\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"\xb3\x01\n" +
+	"\x12FillElementCommand\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\x12R\n" +
+	"\rretry_options\x18\x03 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"\x9e\x01\n" +
+	"\x13HoverElementCommand\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12R\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"\xce\x01\n" +
+	"\x0fPressKeyCommand\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12\x10\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\x12\x17\n" +
+	"\x04text\x18\x03 \x01(\tH\x00R\x04text\x88\x01\x01\x12R\n" +
+	"\rretry_options\x18\x04 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x01R\fretryOptions\x88\x01\x01B\a\n" +
+	"\x05_textB\x10\n" +
+	"\x0e_retry_options\"\xa0\x01\n" +
+	"\x15GetTextContentCommand\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12R\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"\x9e\x01\n" +
+	"\x13GetInnerTextCommand\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12R\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"\xcc\x01\n" +
+	"\x16WaitForSelectorCommand\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12\x1d\n" +
+	"\avisible\x18\x02 \x01(\bH\x00R\avisible\x88\x01\x01\x12R\n" +
+	"\rretry_options\x18\x03 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x01R\fretryOptions\x88\x01\x01B\n" +
+	"\n" +
+	"\b_visibleB\x10\n" +
+	"\x0e_retry_options\"\x8a\v\n" +
 	"\x0fTabSessionEvent\x12$\n" +
 	"\x0etab_session_id\x18\x01 \x01(\tR\ftabSessionId\x12J\n" +
 	"\battached\x18\x02 \x01(\v2,.allwright.engine.v1.TabSessionAttachedEventH\x00R\battached\x12>\n" +
@@ -1674,7 +3148,18 @@ const file_engine_v1_engine_proto_rawDesc = "" +
 	"\x05error\x18\x05 \x01(\v2).allwright.engine.v1.TabSessionErrorEventH\x00R\x05error\x12F\n" +
 	"\tnavigated\x18\x06 \x01(\v2&.allwright.engine.v1.TabNavigatedEventH\x00R\tnavigated\x12i\n" +
 	"\x17chromium_bidi_injection\x18\a \x01(\v2/.allwright.engine.v1.ChromiumBidiInjectionEventH\x00R\x15chromiumBidiInjection\x12S\n" +
-	"\x0felement_clicked\x18\b \x01(\v2(.allwright.engine.v1.ElementClickedEventH\x00R\x0eelementClickedB\a\n" +
+	"\x0felement_clicked\x18\b \x01(\v2(.allwright.engine.v1.ElementClickedEventH\x00R\x0eelementClicked\x12S\n" +
+	"\x0felement_counted\x18\t \x01(\v2(.allwright.engine.v1.ElementCountedEventH\x00R\x0eelementCounted\x12b\n" +
+	"\x14elements_highlighted\x18\n" +
+	" \x01(\v2-.allwright.engine.v1.ElementsHighlightedEventH\x00R\x13elementsHighlighted\x12S\n" +
+	"\x0felement_focused\x18\v \x01(\v2(.allwright.engine.v1.ElementFocusedEventH\x00R\x0eelementFocused\x12P\n" +
+	"\x0eelement_filled\x18\f \x01(\v2'.allwright.engine.v1.ElementFilledEventH\x00R\relementFilled\x12S\n" +
+	"\x0felement_hovered\x18\r \x01(\v2(.allwright.engine.v1.ElementHoveredEventH\x00R\x0eelementHovered\x12G\n" +
+	"\vkey_pressed\x18\x0e \x01(\v2$.allwright.engine.v1.KeyPressedEventH\x00R\n" +
+	"keyPressed\x12c\n" +
+	"\x15text_content_resolved\x18\x0f \x01(\v2-.allwright.engine.v1.TextContentResolvedEventH\x00R\x13textContentResolved\x12]\n" +
+	"\x13inner_text_resolved\x18\x10 \x01(\v2+.allwright.engine.v1.InnerTextResolvedEventH\x00R\x11innerTextResolved\x12i\n" +
+	"\x17selector_wait_satisfied\x18\x11 \x01(\v2/.allwright.engine.v1.SelectorWaitSatisfiedEventH\x00R\x15selectorWaitSatisfiedB\a\n" +
 	"\x05event\"-\n" +
 	"\x17TabSessionAttachedEvent\x12\x12\n" +
 	"\x04note\x18\x01 \x01(\tR\x04note\"/\n" +
@@ -1696,7 +3181,41 @@ const file_engine_v1_engine_proto_rawDesc = "" +
 	"\x13ElementClickedEvent\x12!\n" +
 	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12\x12\n" +
 	"\x04note\x18\x02 \x01(\tR\x04note\x12&\n" +
-	"\x0fbidi_session_id\x18\x03 \x01(\tR\rbidiSessionId2\xa8\x02\n" +
+	"\x0fbidi_session_id\x18\x03 \x01(\tR\rbidiSessionId\"b\n" +
+	"\x13ElementCountedEvent\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12\x14\n" +
+	"\x05count\x18\x02 \x01(\rR\x05count\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"g\n" +
+	"\x18ElementsHighlightedEvent\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12\x14\n" +
+	"\x05count\x18\x02 \x01(\rR\x05count\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"L\n" +
+	"\x13ElementFocusedEvent\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12\x12\n" +
+	"\x04note\x18\x02 \x01(\tR\x04note\"a\n" +
+	"\x12ElementFilledEvent\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"L\n" +
+	"\x13ElementHoveredEvent\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12\x12\n" +
+	"\x04note\x18\x02 \x01(\tR\x04note\"Z\n" +
+	"\x0fKeyPressedEvent\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12\x10\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"e\n" +
+	"\x18TextContentResolvedEvent\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12\x12\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"c\n" +
+	"\x16InnerTextResolvedEvent\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12\x12\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"m\n" +
+	"\x1aSelectorWaitSatisfiedEvent\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12\x18\n" +
+	"\avisible\x18\x02 \x01(\bR\avisible\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note2\xa8\x02\n" +
 	"\rEngineService\x12K\n" +
 	"\x04Ping\x12 .allwright.engine.v1.PingRequest\x1a!.allwright.engine.v1.PingResponse\x12j\n" +
 	"\x0eBrowserSession\x12*.allwright.engine.v1.BrowserSessionCommand\x1a(.allwright.engine.v1.BrowserSessionEvent(\x010\x01\x12^\n" +
@@ -1715,67 +3234,117 @@ func file_engine_v1_engine_proto_rawDescGZIP() []byte {
 	return file_engine_v1_engine_proto_rawDescData
 }
 
-var file_engine_v1_engine_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_engine_v1_engine_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
 var file_engine_v1_engine_proto_goTypes = []any{
 	(*PingRequest)(nil),                // 0: allwright.engine.v1.PingRequest
 	(*PingResponse)(nil),               // 1: allwright.engine.v1.PingResponse
 	(*BrowserSessionCommand)(nil),      // 2: allwright.engine.v1.BrowserSessionCommand
-	(*LaunchChromeCommand)(nil),        // 3: allwright.engine.v1.LaunchChromeCommand
-	(*OpenTabCommand)(nil),             // 4: allwright.engine.v1.OpenTabCommand
-	(*SessionPingCommand)(nil),         // 5: allwright.engine.v1.SessionPingCommand
-	(*CloseBrowserSessionCommand)(nil), // 6: allwright.engine.v1.CloseBrowserSessionCommand
-	(*BrowserSessionEvent)(nil),        // 7: allwright.engine.v1.BrowserSessionEvent
-	(*ChromeLaunchedEvent)(nil),        // 8: allwright.engine.v1.ChromeLaunchedEvent
-	(*TabOpenedEvent)(nil),             // 9: allwright.engine.v1.TabOpenedEvent
-	(*SessionPongEvent)(nil),           // 10: allwright.engine.v1.SessionPongEvent
-	(*BrowserSessionClosedEvent)(nil),  // 11: allwright.engine.v1.BrowserSessionClosedEvent
-	(*BrowserSessionErrorEvent)(nil),   // 12: allwright.engine.v1.BrowserSessionErrorEvent
-	(*TabSessionCommand)(nil),          // 13: allwright.engine.v1.TabSessionCommand
-	(*TabSessionPingCommand)(nil),      // 14: allwright.engine.v1.TabSessionPingCommand
-	(*CloseTabSessionCommand)(nil),     // 15: allwright.engine.v1.CloseTabSessionCommand
-	(*NavigateTabCommand)(nil),         // 16: allwright.engine.v1.NavigateTabCommand
-	(*ClickElementCommand)(nil),        // 17: allwright.engine.v1.ClickElementCommand
-	(*TabSessionEvent)(nil),            // 18: allwright.engine.v1.TabSessionEvent
-	(*TabSessionAttachedEvent)(nil),    // 19: allwright.engine.v1.TabSessionAttachedEvent
-	(*TabSessionPongEvent)(nil),        // 20: allwright.engine.v1.TabSessionPongEvent
-	(*TabSessionClosedEvent)(nil),      // 21: allwright.engine.v1.TabSessionClosedEvent
-	(*TabSessionErrorEvent)(nil),       // 22: allwright.engine.v1.TabSessionErrorEvent
-	(*TabNavigatedEvent)(nil),          // 23: allwright.engine.v1.TabNavigatedEvent
-	(*ChromiumBidiInjectionEvent)(nil), // 24: allwright.engine.v1.ChromiumBidiInjectionEvent
-	(*ElementClickedEvent)(nil),        // 25: allwright.engine.v1.ElementClickedEvent
+	(*CommandRetryOptions)(nil),        // 3: allwright.engine.v1.CommandRetryOptions
+	(*LaunchChromeCommand)(nil),        // 4: allwright.engine.v1.LaunchChromeCommand
+	(*OpenTabCommand)(nil),             // 5: allwright.engine.v1.OpenTabCommand
+	(*SessionPingCommand)(nil),         // 6: allwright.engine.v1.SessionPingCommand
+	(*CloseBrowserSessionCommand)(nil), // 7: allwright.engine.v1.CloseBrowserSessionCommand
+	(*BrowserSessionEvent)(nil),        // 8: allwright.engine.v1.BrowserSessionEvent
+	(*ChromeLaunchedEvent)(nil),        // 9: allwright.engine.v1.ChromeLaunchedEvent
+	(*TabOpenedEvent)(nil),             // 10: allwright.engine.v1.TabOpenedEvent
+	(*SessionPongEvent)(nil),           // 11: allwright.engine.v1.SessionPongEvent
+	(*BrowserSessionClosedEvent)(nil),  // 12: allwright.engine.v1.BrowserSessionClosedEvent
+	(*BrowserSessionErrorEvent)(nil),   // 13: allwright.engine.v1.BrowserSessionErrorEvent
+	(*TabSessionCommand)(nil),          // 14: allwright.engine.v1.TabSessionCommand
+	(*TabSessionPingCommand)(nil),      // 15: allwright.engine.v1.TabSessionPingCommand
+	(*CloseTabSessionCommand)(nil),     // 16: allwright.engine.v1.CloseTabSessionCommand
+	(*NavigateTabCommand)(nil),         // 17: allwright.engine.v1.NavigateTabCommand
+	(*ClickElementCommand)(nil),        // 18: allwright.engine.v1.ClickElementCommand
+	(*CountElementsCommand)(nil),       // 19: allwright.engine.v1.CountElementsCommand
+	(*HighlightElementsCommand)(nil),   // 20: allwright.engine.v1.HighlightElementsCommand
+	(*FocusElementCommand)(nil),        // 21: allwright.engine.v1.FocusElementCommand
+	(*FillElementCommand)(nil),         // 22: allwright.engine.v1.FillElementCommand
+	(*HoverElementCommand)(nil),        // 23: allwright.engine.v1.HoverElementCommand
+	(*PressKeyCommand)(nil),            // 24: allwright.engine.v1.PressKeyCommand
+	(*GetTextContentCommand)(nil),      // 25: allwright.engine.v1.GetTextContentCommand
+	(*GetInnerTextCommand)(nil),        // 26: allwright.engine.v1.GetInnerTextCommand
+	(*WaitForSelectorCommand)(nil),     // 27: allwright.engine.v1.WaitForSelectorCommand
+	(*TabSessionEvent)(nil),            // 28: allwright.engine.v1.TabSessionEvent
+	(*TabSessionAttachedEvent)(nil),    // 29: allwright.engine.v1.TabSessionAttachedEvent
+	(*TabSessionPongEvent)(nil),        // 30: allwright.engine.v1.TabSessionPongEvent
+	(*TabSessionClosedEvent)(nil),      // 31: allwright.engine.v1.TabSessionClosedEvent
+	(*TabSessionErrorEvent)(nil),       // 32: allwright.engine.v1.TabSessionErrorEvent
+	(*TabNavigatedEvent)(nil),          // 33: allwright.engine.v1.TabNavigatedEvent
+	(*ChromiumBidiInjectionEvent)(nil), // 34: allwright.engine.v1.ChromiumBidiInjectionEvent
+	(*ElementClickedEvent)(nil),        // 35: allwright.engine.v1.ElementClickedEvent
+	(*ElementCountedEvent)(nil),        // 36: allwright.engine.v1.ElementCountedEvent
+	(*ElementsHighlightedEvent)(nil),   // 37: allwright.engine.v1.ElementsHighlightedEvent
+	(*ElementFocusedEvent)(nil),        // 38: allwright.engine.v1.ElementFocusedEvent
+	(*ElementFilledEvent)(nil),         // 39: allwright.engine.v1.ElementFilledEvent
+	(*ElementHoveredEvent)(nil),        // 40: allwright.engine.v1.ElementHoveredEvent
+	(*KeyPressedEvent)(nil),            // 41: allwright.engine.v1.KeyPressedEvent
+	(*TextContentResolvedEvent)(nil),   // 42: allwright.engine.v1.TextContentResolvedEvent
+	(*InnerTextResolvedEvent)(nil),     // 43: allwright.engine.v1.InnerTextResolvedEvent
+	(*SelectorWaitSatisfiedEvent)(nil), // 44: allwright.engine.v1.SelectorWaitSatisfiedEvent
 }
 var file_engine_v1_engine_proto_depIdxs = []int32{
-	3,  // 0: allwright.engine.v1.BrowserSessionCommand.launch_chrome:type_name -> allwright.engine.v1.LaunchChromeCommand
-	4,  // 1: allwright.engine.v1.BrowserSessionCommand.open_tab:type_name -> allwright.engine.v1.OpenTabCommand
-	5,  // 2: allwright.engine.v1.BrowserSessionCommand.ping:type_name -> allwright.engine.v1.SessionPingCommand
-	6,  // 3: allwright.engine.v1.BrowserSessionCommand.close:type_name -> allwright.engine.v1.CloseBrowserSessionCommand
-	8,  // 4: allwright.engine.v1.BrowserSessionEvent.chrome_launched:type_name -> allwright.engine.v1.ChromeLaunchedEvent
-	9,  // 5: allwright.engine.v1.BrowserSessionEvent.tab_opened:type_name -> allwright.engine.v1.TabOpenedEvent
-	10, // 6: allwright.engine.v1.BrowserSessionEvent.pong:type_name -> allwright.engine.v1.SessionPongEvent
-	11, // 7: allwright.engine.v1.BrowserSessionEvent.closed:type_name -> allwright.engine.v1.BrowserSessionClosedEvent
-	12, // 8: allwright.engine.v1.BrowserSessionEvent.error:type_name -> allwright.engine.v1.BrowserSessionErrorEvent
-	14, // 9: allwright.engine.v1.TabSessionCommand.ping:type_name -> allwright.engine.v1.TabSessionPingCommand
-	15, // 10: allwright.engine.v1.TabSessionCommand.close:type_name -> allwright.engine.v1.CloseTabSessionCommand
-	16, // 11: allwright.engine.v1.TabSessionCommand.navigate:type_name -> allwright.engine.v1.NavigateTabCommand
-	17, // 12: allwright.engine.v1.TabSessionCommand.click_element:type_name -> allwright.engine.v1.ClickElementCommand
-	19, // 13: allwright.engine.v1.TabSessionEvent.attached:type_name -> allwright.engine.v1.TabSessionAttachedEvent
-	20, // 14: allwright.engine.v1.TabSessionEvent.pong:type_name -> allwright.engine.v1.TabSessionPongEvent
-	21, // 15: allwright.engine.v1.TabSessionEvent.closed:type_name -> allwright.engine.v1.TabSessionClosedEvent
-	22, // 16: allwright.engine.v1.TabSessionEvent.error:type_name -> allwright.engine.v1.TabSessionErrorEvent
-	23, // 17: allwright.engine.v1.TabSessionEvent.navigated:type_name -> allwright.engine.v1.TabNavigatedEvent
-	24, // 18: allwright.engine.v1.TabSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
-	25, // 19: allwright.engine.v1.TabSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
-	0,  // 20: allwright.engine.v1.EngineService.Ping:input_type -> allwright.engine.v1.PingRequest
-	2,  // 21: allwright.engine.v1.EngineService.BrowserSession:input_type -> allwright.engine.v1.BrowserSessionCommand
-	13, // 22: allwright.engine.v1.EngineService.TabSession:input_type -> allwright.engine.v1.TabSessionCommand
-	1,  // 23: allwright.engine.v1.EngineService.Ping:output_type -> allwright.engine.v1.PingResponse
-	7,  // 24: allwright.engine.v1.EngineService.BrowserSession:output_type -> allwright.engine.v1.BrowserSessionEvent
-	18, // 25: allwright.engine.v1.EngineService.TabSession:output_type -> allwright.engine.v1.TabSessionEvent
-	23, // [23:26] is the sub-list for method output_type
-	20, // [20:23] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	4,  // 0: allwright.engine.v1.BrowserSessionCommand.launch_chrome:type_name -> allwright.engine.v1.LaunchChromeCommand
+	5,  // 1: allwright.engine.v1.BrowserSessionCommand.open_tab:type_name -> allwright.engine.v1.OpenTabCommand
+	6,  // 2: allwright.engine.v1.BrowserSessionCommand.ping:type_name -> allwright.engine.v1.SessionPingCommand
+	7,  // 3: allwright.engine.v1.BrowserSessionCommand.close:type_name -> allwright.engine.v1.CloseBrowserSessionCommand
+	3,  // 4: allwright.engine.v1.LaunchChromeCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	3,  // 5: allwright.engine.v1.OpenTabCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	9,  // 6: allwright.engine.v1.BrowserSessionEvent.chrome_launched:type_name -> allwright.engine.v1.ChromeLaunchedEvent
+	10, // 7: allwright.engine.v1.BrowserSessionEvent.tab_opened:type_name -> allwright.engine.v1.TabOpenedEvent
+	11, // 8: allwright.engine.v1.BrowserSessionEvent.pong:type_name -> allwright.engine.v1.SessionPongEvent
+	12, // 9: allwright.engine.v1.BrowserSessionEvent.closed:type_name -> allwright.engine.v1.BrowserSessionClosedEvent
+	13, // 10: allwright.engine.v1.BrowserSessionEvent.error:type_name -> allwright.engine.v1.BrowserSessionErrorEvent
+	15, // 11: allwright.engine.v1.TabSessionCommand.ping:type_name -> allwright.engine.v1.TabSessionPingCommand
+	16, // 12: allwright.engine.v1.TabSessionCommand.close:type_name -> allwright.engine.v1.CloseTabSessionCommand
+	17, // 13: allwright.engine.v1.TabSessionCommand.navigate:type_name -> allwright.engine.v1.NavigateTabCommand
+	18, // 14: allwright.engine.v1.TabSessionCommand.click_element:type_name -> allwright.engine.v1.ClickElementCommand
+	19, // 15: allwright.engine.v1.TabSessionCommand.count_elements:type_name -> allwright.engine.v1.CountElementsCommand
+	20, // 16: allwright.engine.v1.TabSessionCommand.highlight_elements:type_name -> allwright.engine.v1.HighlightElementsCommand
+	21, // 17: allwright.engine.v1.TabSessionCommand.focus_element:type_name -> allwright.engine.v1.FocusElementCommand
+	22, // 18: allwright.engine.v1.TabSessionCommand.fill_element:type_name -> allwright.engine.v1.FillElementCommand
+	23, // 19: allwright.engine.v1.TabSessionCommand.hover_element:type_name -> allwright.engine.v1.HoverElementCommand
+	24, // 20: allwright.engine.v1.TabSessionCommand.press_key:type_name -> allwright.engine.v1.PressKeyCommand
+	25, // 21: allwright.engine.v1.TabSessionCommand.get_text_content:type_name -> allwright.engine.v1.GetTextContentCommand
+	26, // 22: allwright.engine.v1.TabSessionCommand.get_inner_text:type_name -> allwright.engine.v1.GetInnerTextCommand
+	27, // 23: allwright.engine.v1.TabSessionCommand.wait_for_selector:type_name -> allwright.engine.v1.WaitForSelectorCommand
+	3,  // 24: allwright.engine.v1.NavigateTabCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	3,  // 25: allwright.engine.v1.ClickElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	3,  // 26: allwright.engine.v1.CountElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	3,  // 27: allwright.engine.v1.HighlightElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	3,  // 28: allwright.engine.v1.FocusElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	3,  // 29: allwright.engine.v1.FillElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	3,  // 30: allwright.engine.v1.HoverElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	3,  // 31: allwright.engine.v1.PressKeyCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	3,  // 32: allwright.engine.v1.GetTextContentCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	3,  // 33: allwright.engine.v1.GetInnerTextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	3,  // 34: allwright.engine.v1.WaitForSelectorCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	29, // 35: allwright.engine.v1.TabSessionEvent.attached:type_name -> allwright.engine.v1.TabSessionAttachedEvent
+	30, // 36: allwright.engine.v1.TabSessionEvent.pong:type_name -> allwright.engine.v1.TabSessionPongEvent
+	31, // 37: allwright.engine.v1.TabSessionEvent.closed:type_name -> allwright.engine.v1.TabSessionClosedEvent
+	32, // 38: allwright.engine.v1.TabSessionEvent.error:type_name -> allwright.engine.v1.TabSessionErrorEvent
+	33, // 39: allwright.engine.v1.TabSessionEvent.navigated:type_name -> allwright.engine.v1.TabNavigatedEvent
+	34, // 40: allwright.engine.v1.TabSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
+	35, // 41: allwright.engine.v1.TabSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
+	36, // 42: allwright.engine.v1.TabSessionEvent.element_counted:type_name -> allwright.engine.v1.ElementCountedEvent
+	37, // 43: allwright.engine.v1.TabSessionEvent.elements_highlighted:type_name -> allwright.engine.v1.ElementsHighlightedEvent
+	38, // 44: allwright.engine.v1.TabSessionEvent.element_focused:type_name -> allwright.engine.v1.ElementFocusedEvent
+	39, // 45: allwright.engine.v1.TabSessionEvent.element_filled:type_name -> allwright.engine.v1.ElementFilledEvent
+	40, // 46: allwright.engine.v1.TabSessionEvent.element_hovered:type_name -> allwright.engine.v1.ElementHoveredEvent
+	41, // 47: allwright.engine.v1.TabSessionEvent.key_pressed:type_name -> allwright.engine.v1.KeyPressedEvent
+	42, // 48: allwright.engine.v1.TabSessionEvent.text_content_resolved:type_name -> allwright.engine.v1.TextContentResolvedEvent
+	43, // 49: allwright.engine.v1.TabSessionEvent.inner_text_resolved:type_name -> allwright.engine.v1.InnerTextResolvedEvent
+	44, // 50: allwright.engine.v1.TabSessionEvent.selector_wait_satisfied:type_name -> allwright.engine.v1.SelectorWaitSatisfiedEvent
+	0,  // 51: allwright.engine.v1.EngineService.Ping:input_type -> allwright.engine.v1.PingRequest
+	2,  // 52: allwright.engine.v1.EngineService.BrowserSession:input_type -> allwright.engine.v1.BrowserSessionCommand
+	14, // 53: allwright.engine.v1.EngineService.TabSession:input_type -> allwright.engine.v1.TabSessionCommand
+	1,  // 54: allwright.engine.v1.EngineService.Ping:output_type -> allwright.engine.v1.PingResponse
+	8,  // 55: allwright.engine.v1.EngineService.BrowserSession:output_type -> allwright.engine.v1.BrowserSessionEvent
+	28, // 56: allwright.engine.v1.EngineService.TabSession:output_type -> allwright.engine.v1.TabSessionEvent
+	54, // [54:57] is the sub-list for method output_type
+	51, // [51:54] is the sub-list for method input_type
+	51, // [51:51] is the sub-list for extension type_name
+	51, // [51:51] is the sub-list for extension extendee
+	0,  // [0:51] is the sub-list for field type_name
 }
 
 func init() { file_engine_v1_engine_proto_init() }
@@ -1790,20 +3359,42 @@ func file_engine_v1_engine_proto_init() {
 		(*BrowserSessionCommand_Close)(nil),
 	}
 	file_engine_v1_engine_proto_msgTypes[3].OneofWrappers = []any{}
-	file_engine_v1_engine_proto_msgTypes[7].OneofWrappers = []any{
+	file_engine_v1_engine_proto_msgTypes[4].OneofWrappers = []any{}
+	file_engine_v1_engine_proto_msgTypes[5].OneofWrappers = []any{}
+	file_engine_v1_engine_proto_msgTypes[8].OneofWrappers = []any{
 		(*BrowserSessionEvent_ChromeLaunched)(nil),
 		(*BrowserSessionEvent_TabOpened)(nil),
 		(*BrowserSessionEvent_Pong)(nil),
 		(*BrowserSessionEvent_Closed)(nil),
 		(*BrowserSessionEvent_Error)(nil),
 	}
-	file_engine_v1_engine_proto_msgTypes[13].OneofWrappers = []any{
+	file_engine_v1_engine_proto_msgTypes[14].OneofWrappers = []any{
 		(*TabSessionCommand_Ping)(nil),
 		(*TabSessionCommand_Close)(nil),
 		(*TabSessionCommand_Navigate)(nil),
 		(*TabSessionCommand_ClickElement)(nil),
+		(*TabSessionCommand_CountElements)(nil),
+		(*TabSessionCommand_HighlightElements)(nil),
+		(*TabSessionCommand_FocusElement)(nil),
+		(*TabSessionCommand_FillElement)(nil),
+		(*TabSessionCommand_HoverElement)(nil),
+		(*TabSessionCommand_PressKey)(nil),
+		(*TabSessionCommand_GetTextContent)(nil),
+		(*TabSessionCommand_GetInnerText)(nil),
+		(*TabSessionCommand_WaitForSelector)(nil),
 	}
-	file_engine_v1_engine_proto_msgTypes[18].OneofWrappers = []any{
+	file_engine_v1_engine_proto_msgTypes[17].OneofWrappers = []any{}
+	file_engine_v1_engine_proto_msgTypes[18].OneofWrappers = []any{}
+	file_engine_v1_engine_proto_msgTypes[19].OneofWrappers = []any{}
+	file_engine_v1_engine_proto_msgTypes[20].OneofWrappers = []any{}
+	file_engine_v1_engine_proto_msgTypes[21].OneofWrappers = []any{}
+	file_engine_v1_engine_proto_msgTypes[22].OneofWrappers = []any{}
+	file_engine_v1_engine_proto_msgTypes[23].OneofWrappers = []any{}
+	file_engine_v1_engine_proto_msgTypes[24].OneofWrappers = []any{}
+	file_engine_v1_engine_proto_msgTypes[25].OneofWrappers = []any{}
+	file_engine_v1_engine_proto_msgTypes[26].OneofWrappers = []any{}
+	file_engine_v1_engine_proto_msgTypes[27].OneofWrappers = []any{}
+	file_engine_v1_engine_proto_msgTypes[28].OneofWrappers = []any{
 		(*TabSessionEvent_Attached)(nil),
 		(*TabSessionEvent_Pong)(nil),
 		(*TabSessionEvent_Closed)(nil),
@@ -1811,6 +3402,15 @@ func file_engine_v1_engine_proto_init() {
 		(*TabSessionEvent_Navigated)(nil),
 		(*TabSessionEvent_ChromiumBidiInjection)(nil),
 		(*TabSessionEvent_ElementClicked)(nil),
+		(*TabSessionEvent_ElementCounted)(nil),
+		(*TabSessionEvent_ElementsHighlighted)(nil),
+		(*TabSessionEvent_ElementFocused)(nil),
+		(*TabSessionEvent_ElementFilled)(nil),
+		(*TabSessionEvent_ElementHovered)(nil),
+		(*TabSessionEvent_KeyPressed)(nil),
+		(*TabSessionEvent_TextContentResolved)(nil),
+		(*TabSessionEvent_InnerTextResolved)(nil),
+		(*TabSessionEvent_SelectorWaitSatisfied)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1818,7 +3418,7 @@ func file_engine_v1_engine_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_engine_v1_engine_proto_rawDesc), len(file_engine_v1_engine_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   26,
+			NumMessages:   45,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

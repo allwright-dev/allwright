@@ -1,16 +1,16 @@
-#[cfg(feature = "client")]
-mod client;
-#[cfg(feature = "server")]
-#[path = "engine.rs"]
-mod engine_lib;
 #[cfg(feature = "server")]
 #[allow(dead_code)]
 #[path = "platform/android.rs"]
 mod android_lib;
+#[cfg(feature = "client")]
+mod client;
 #[cfg(feature = "server")]
 #[allow(dead_code)]
 #[path = "platform/desktop.rs"]
 mod desktop_lib;
+#[cfg(feature = "server")]
+#[path = "engine.rs"]
+mod engine_lib;
 #[cfg(feature = "server")]
 #[allow(dead_code)]
 #[path = "platform/ios.rs"]

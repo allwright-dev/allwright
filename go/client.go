@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	enginev1 "allwright.dev/gen/allwright/engine/v1"
 
@@ -30,6 +31,11 @@ type runtimeClient struct {
 
 type LaunchOptions struct {
 	ChromeBinary string
+	Timeout      time.Duration
+}
+
+type CommandOptions struct {
+	Timeout time.Duration
 }
 
 type NavigateResult struct {
@@ -45,6 +51,23 @@ type ClickResult struct {
 	Selector      string
 	Note          string
 	BidiSessionID string
+}
+
+type CountResult struct {
+	Selector string
+	Count    uint32
+	Note     string
+}
+
+type HighlightOptions struct {
+	Timeout  time.Duration
+	Duration time.Duration
+}
+
+type HighlightResult struct {
+	Selector string
+	Count    uint32
+	Note     string
 }
 
 type Browser struct {
@@ -111,6 +134,7 @@ func LaunchChrome(ctx context.Context, options LaunchOptions) (*Browser, error) 
 		Command: &enginev1.BrowserSessionCommand_LaunchChrome{
 			LaunchChrome: &enginev1.LaunchChromeCommand{
 				ChromeBinary: optionalString(options.ChromeBinary),
+				RetryOptions: retryOptionsProto(options.Timeout),
 			},
 		},
 	}
@@ -203,6 +227,10 @@ func (b *Browser) InitialTab() *Tab {
 }
 
 func (b *Browser) NewTab(ctx context.Context) (*Tab, error) {
+	return b.NewTabWithOptions(ctx, CommandOptions{})
+}
+
+func (b *Browser) NewTabWithOptions(ctx context.Context, options CommandOptions) (*Tab, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -212,7 +240,9 @@ func (b *Browser) NewTab(ctx context.Context) (*Tab, error) {
 
 	if err := b.stream.Send(&enginev1.BrowserSessionCommand{
 		Command: &enginev1.BrowserSessionCommand_OpenTab{
-			OpenTab: &enginev1.OpenTabCommand{},
+			OpenTab: &enginev1.OpenTabCommand{
+				RetryOptions: retryOptionsProto(options.Timeout),
+			},
 		},
 	}); err != nil {
 		return nil, fmt.Errorf("send OpenTabCommand: %w", err)
@@ -314,6 +344,10 @@ func (t *Tab) SessionID() string {
 }
 
 func (t *Tab) Navigate(ctx context.Context, url string) (*NavigateResult, error) {
+	return t.NavigateWithOptions(ctx, url, CommandOptions{})
+}
+
+func (t *Tab) NavigateWithOptions(ctx context.Context, url string, options CommandOptions) (*NavigateResult, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -329,7 +363,8 @@ func (t *Tab) Navigate(ctx context.Context, url string) (*NavigateResult, error)
 		TabSessionId:     t.sessionID,
 		Command: &enginev1.TabSessionCommand_Navigate{
 			Navigate: &enginev1.NavigateTabCommand{
-				Url: url,
+				Url:          url,
+				RetryOptions: retryOptionsProto(options.Timeout),
 			},
 		},
 	}); err != nil {
@@ -364,6 +399,10 @@ func (t *Tab) Navigate(ctx context.Context, url string) (*NavigateResult, error)
 }
 
 func (t *Tab) Click(ctx context.Context, cssSelector string) (*ClickResult, error) {
+	return t.ClickWithOptions(ctx, cssSelector, CommandOptions{})
+}
+
+func (t *Tab) ClickWithOptions(ctx context.Context, cssSelector string, options CommandOptions) (*ClickResult, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -379,7 +418,8 @@ func (t *Tab) Click(ctx context.Context, cssSelector string) (*ClickResult, erro
 		TabSessionId:     t.sessionID,
 		Command: &enginev1.TabSessionCommand_ClickElement{
 			ClickElement: &enginev1.ClickElementCommand{
-				CssSelector: cssSelector,
+				CssSelector:  cssSelector,
+				RetryOptions: retryOptionsProto(options.Timeout),
 			},
 		},
 	}); err != nil {
@@ -407,6 +447,140 @@ func (t *Tab) Click(ctx context.Context, cssSelector string) (*ClickResult, erro
 			return nil, fmt.Errorf("tab session error while clicking: %s", payload.Error.GetMessage())
 		}
 	}
+}
+
+func (t *Tab) Count(ctx context.Context, cssSelector string) (*CountResult, error) {
+	return t.CountWithOptions(ctx, cssSelector, CommandOptions{})
+}
+
+func (t *Tab) CountWithOptions(ctx context.Context, cssSelector string, options CommandOptions) (*CountResult, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if err := t.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if t.closed {
+		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
+	}
+
+	if err := t.stream.Send(&enginev1.TabSessionCommand{
+		BrowserSessionId: t.browserSessionID,
+		TabSessionId:     t.sessionID,
+		Command: &enginev1.TabSessionCommand_CountElements{
+			CountElements: &enginev1.CountElementsCommand{
+				CssSelector:  cssSelector,
+				RetryOptions: retryOptionsProto(options.Timeout),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send CountElementsCommand: %w", err)
+	}
+
+	for {
+		event, err := t.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive tab session event during count: %w", err)
+		}
+
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.TabSessionEvent_Attached:
+			t.attached = true
+			_ = payload
+		case *enginev1.TabSessionEvent_ElementCounted:
+			return &CountResult{
+				Selector: payload.ElementCounted.GetCssSelector(),
+				Count:    payload.ElementCounted.GetCount(),
+				Note:     payload.ElementCounted.GetNote(),
+			}, nil
+		case *enginev1.TabSessionEvent_Error:
+			return nil, fmt.Errorf("tab session error while counting elements: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func (t *Tab) Highlight(ctx context.Context, cssSelector string) (*HighlightResult, error) {
+	return t.HighlightWithOptions(ctx, cssSelector, HighlightOptions{})
+}
+
+func (t *Tab) HighlightWithOptions(ctx context.Context, cssSelector string, options HighlightOptions) (*HighlightResult, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if err := t.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if t.closed {
+		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
+	}
+
+	if err := t.stream.Send(&enginev1.TabSessionCommand{
+		BrowserSessionId: t.browserSessionID,
+		TabSessionId:     t.sessionID,
+		Command: &enginev1.TabSessionCommand_HighlightElements{
+			HighlightElements: &enginev1.HighlightElementsCommand{
+				CssSelector:  cssSelector,
+				DurationMs:   durationProto(options.Duration),
+				RetryOptions: retryOptionsProto(options.Timeout),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send HighlightElementsCommand: %w", err)
+	}
+
+	for {
+		event, err := t.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive tab session event during highlight: %w", err)
+		}
+
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.TabSessionEvent_Attached:
+			t.attached = true
+			_ = payload
+		case *enginev1.TabSessionEvent_ElementsHighlighted:
+			return &HighlightResult{
+				Selector: payload.ElementsHighlighted.GetCssSelector(),
+				Count:    payload.ElementsHighlighted.GetCount(),
+				Note:     payload.ElementsHighlighted.GetNote(),
+			}, nil
+		case *enginev1.TabSessionEvent_Error:
+			return nil, fmt.Errorf("tab session error while highlighting elements: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func retryOptionsProto(timeout time.Duration) *enginev1.CommandRetryOptions {
+	if timeout <= 0 {
+		return nil
+	}
+
+	timeoutMS := timeout.Milliseconds()
+	if timeoutMS <= 0 {
+		timeoutMS = 1
+	}
+
+	return &enginev1.CommandRetryOptions{
+		TimeoutMs:       optionalUint32(uint32(timeoutMS)),
+		RetryIntervalMs: nil,
+	}
+}
+
+func optionalUint32(value uint32) *uint32 {
+	return &value
+}
+
+func durationProto(value time.Duration) *uint32 {
+	if value <= 0 {
+		return nil
+	}
+
+	durationMS := value.Milliseconds()
+	if durationMS <= 0 {
+		durationMS = 1
+	}
+
+	return optionalUint32(uint32(durationMS))
 }
 
 func (t *Tab) Ping(ctx context.Context, message string) (string, error) {

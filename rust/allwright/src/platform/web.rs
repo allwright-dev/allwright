@@ -32,6 +32,7 @@ pub struct ChromeTabInfo {
 pub struct TabNavigationInfo {
     pub url: String,
     pub note: String,
+    pub browsing_context_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,12 +44,75 @@ pub struct ChromiumBidiMapperInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BidiClickInfo {
+pub struct ClickInfo {
     pub css_selector: String,
     pub note: String,
-    pub package_version: String,
-    pub mapper_target_id: String,
-    pub mapper_session_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ElementCountInfo {
+    pub css_selector: String,
+    pub count: u32,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HighlightElementsInfo {
+    pub css_selector: String,
+    pub count: u32,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FocusInfo {
+    pub css_selector: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FillInfo {
+    pub css_selector: String,
+    pub value: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HoverInfo {
+    pub css_selector: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PressKeyInfo {
+    pub css_selector: String,
+    pub key: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextInfo {
+    pub css_selector: String,
+    pub text: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WaitForSelectorInfo {
+    pub css_selector: String,
+    pub visible: bool,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct DiscoveredElements {
+    count: u32,
+    first_center: Option<ElementCenter>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct ElementCenter {
+    x: f64,
+    y: f64,
 }
 
 const CHROMIUM_BIDI_NPM_VERSION: &str = "17.0.2";
@@ -161,6 +225,10 @@ pub async fn navigate_chrome_tab(
     cdp.send_command("Page.enable", json!({}), Some(&session_id))
         .await?;
     cdp.navigate_and_wait_for_load(&session_id, url).await?;
+    let frame_tree = cdp
+        .send_command("Page.getFrameTree", json!({}), Some(&session_id))
+        .await?;
+    let browsing_context_id = required_string(&frame_tree, "/frameTree/frame/id")?;
     cdp.send_command(
         "Target.detachFromTarget",
         json!({
@@ -173,6 +241,7 @@ pub async fn navigate_chrome_tab(
     Ok(TabNavigationInfo {
         url: url.to_string(),
         note: "navigated Chrome tab via CDP and observed Page.loadEventFired".to_string(),
+        browsing_context_id,
     })
 }
 
@@ -248,52 +317,419 @@ pub async fn inject_chromium_bidi_mapper(
     })
 }
 
-pub async fn click_element_via_bidi(
+pub async fn click_element_via_cdp(
     cdp_websocket_url: &str,
-    existing_mapper_target_id: Option<&str>,
-    context_id: &str,
+    target_id: &str,
     css_selector: &str,
-) -> Result<BidiClickInfo, String> {
+) -> Result<ClickInfo, String> {
     if css_selector.trim().is_empty() {
         return Err("click_element command requires a non-empty css_selector".to_string());
     }
-    if context_id.trim().is_empty() {
-        return Err("click_element command requires a non-empty context_id".to_string());
+
+    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+    let session_id = cdp.prepare_page_target_session(target_id).await?;
+    let discovered =
+        discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, true).await?;
+    let center = discovered.first_center.ok_or_else(|| {
+        format!("element discovery did not return a clickable center for selector {css_selector}")
+    })?;
+    cdp.dispatch_mouse_click(&session_id, center.x, center.y)
+        .await?;
+    cdp.detach_from_target(&session_id).await?;
+
+    Ok(ClickInfo {
+        css_selector: css_selector.to_string(),
+        note: format!("clicked element via CDP mouse events using css selector {css_selector}"),
+    })
+}
+
+pub async fn count_elements_via_cdp(
+    cdp_websocket_url: &str,
+    target_id: &str,
+    css_selector: &str,
+) -> Result<ElementCountInfo, String> {
+    if css_selector.trim().is_empty() {
+        return Err("count_elements command requires a non-empty css_selector".to_string());
     }
 
+    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+    let session_id = cdp.prepare_page_target_session(target_id).await?;
+    let discovered =
+        discover_elements_via_cdp(&mut cdp, &session_id, css_selector, false, false).await?;
+    cdp.detach_from_target(&session_id).await?;
+
+    Ok(ElementCountInfo {
+        css_selector: css_selector.to_string(),
+        count: discovered.count,
+        note: format!(
+            "counted {} element(s) matching css selector {css_selector}",
+            discovered.count
+        ),
+    })
+}
+
+pub async fn highlight_elements_via_cdp(
+    cdp_websocket_url: &str,
+    target_id: &str,
+    css_selector: &str,
+    duration_ms: u32,
+) -> Result<HighlightElementsInfo, String> {
+    if css_selector.trim().is_empty() {
+        return Err("highlight_elements command requires a non-empty css_selector".to_string());
+    }
+
+    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+    let session_id = cdp.prepare_page_target_session(target_id).await?;
+    let discovered =
+        discover_elements_via_cdp(&mut cdp, &session_id, css_selector, false, false).await?;
+
+    let selector_literal = serde_json::to_string(css_selector)
+        .map_err(|error| format!("failed to serialize css selector for highlight: {error}"))?;
+    let duration_ms = duration_ms.max(1);
+    cdp.evaluate_expression(
+        &session_id,
+        &format!(
+            "(() => {{
+                const selector = {selector_literal};
+                const durationMs = {duration_ms};
+                const elements = Array.from(document.querySelectorAll(selector));
+                for (const element of elements) {{
+                    if (!(element instanceof HTMLElement)) {{
+                        continue;
+                    }}
+                    element.scrollIntoView({{ block: 'center', inline: 'center', behavior: 'instant' }});
+                    const priorOutline = element.style.outline;
+                    const priorOutlineOffset = element.style.outlineOffset;
+                    const priorBackgroundColor = element.style.backgroundColor;
+                    element.style.outline = '3px solid #ff5a36';
+                    element.style.outlineOffset = '2px';
+                    element.style.backgroundColor = 'rgba(255, 235, 59, 0.35)';
+                    window.setTimeout(() => {{
+                        element.style.outline = priorOutline;
+                        element.style.outlineOffset = priorOutlineOffset;
+                        element.style.backgroundColor = priorBackgroundColor;
+                    }}, durationMs);
+                }}
+                return elements.length;
+            }})()"
+        ),
+        true,
+    )
+    .await?;
+    cdp.detach_from_target(&session_id).await?;
+
+    Ok(HighlightElementsInfo {
+        css_selector: css_selector.to_string(),
+        count: discovered.count,
+        note: format!(
+            "highlighted {} element(s) matching css selector {css_selector} for {duration_ms}ms",
+            discovered.count
+        ),
+    })
+}
+
+pub async fn focus_element_via_cdp(
+    cdp_websocket_url: &str,
+    target_id: &str,
+    css_selector: &str,
+) -> Result<FocusInfo, String> {
+    require_non_empty_selector("focus_element", css_selector)?;
+    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+    let session_id = cdp.prepare_page_target_session(target_id).await?;
+    discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, true).await?;
+    cdp.detach_from_target(&session_id).await?;
+
+    Ok(FocusInfo {
+        css_selector: css_selector.to_string(),
+        note: format!("focused element matching css selector {css_selector}"),
+    })
+}
+
+pub async fn fill_element_via_cdp(
+    cdp_websocket_url: &str,
+    target_id: &str,
+    css_selector: &str,
+    value: &str,
+) -> Result<FillInfo, String> {
+    require_non_empty_selector("fill_element", css_selector)?;
+    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+    let session_id = cdp.prepare_page_target_session(target_id).await?;
+    discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, true).await?;
+    let selector_literal = json_string_literal(css_selector, "fill selector")?;
+    let value_literal = json_string_literal(value, "fill value")?;
+    cdp.evaluate_expression(
+        &session_id,
+        &format!(
+            "(() => {{
+                const selector = {selector_literal};
+                const value = {value_literal};
+                const element = document.querySelector(selector);
+                if (!element) {{
+                    throw new Error(`No element matches selector: ${{selector}}`);
+                }}
+                if (!(element instanceof HTMLElement)) {{
+                    throw new Error(`Element is not focusable: ${{selector}}`);
+                }}
+                element.focus();
+                if ('value' in element) {{
+                    element.value = value;
+                }} else if (element.isContentEditable) {{
+                    element.textContent = value;
+                }} else {{
+                    throw new Error(`Element does not support fill: ${{selector}}`);
+                }}
+                element.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                element.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                return true;
+            }})()"
+        ),
+        true,
+    )
+    .await?;
+    cdp.detach_from_target(&session_id).await?;
+
+    Ok(FillInfo {
+        css_selector: css_selector.to_string(),
+        value: value.to_string(),
+        note: format!("filled element matching css selector {css_selector}"),
+    })
+}
+
+pub async fn hover_element_via_cdp(
+    cdp_websocket_url: &str,
+    target_id: &str,
+    css_selector: &str,
+) -> Result<HoverInfo, String> {
+    require_non_empty_selector("hover_element", css_selector)?;
+    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+    let session_id = cdp.prepare_page_target_session(target_id).await?;
+    let discovered =
+        discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, false).await?;
+    let center = discovered.first_center.ok_or_else(|| {
+        format!("element discovery did not return a hover center for selector {css_selector}")
+    })?;
+    cdp.dispatch_mouse_move(&session_id, center.x, center.y)
+        .await?;
+    cdp.detach_from_target(&session_id).await?;
+
+    Ok(HoverInfo {
+        css_selector: css_selector.to_string(),
+        note: format!("hovered element matching css selector {css_selector}"),
+    })
+}
+
+pub async fn press_key_via_cdp(
+    cdp_websocket_url: &str,
+    target_id: &str,
+    css_selector: &str,
+    key: &str,
+    text: Option<&str>,
+) -> Result<PressKeyInfo, String> {
+    require_non_empty_selector("press_key", css_selector)?;
+    if key.trim().is_empty() {
+        return Err("press_key command requires a non-empty key".to_string());
+    }
+
+    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+    let session_id = cdp.prepare_page_target_session(target_id).await?;
+    discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, true).await?;
+    cdp.dispatch_key_press(&session_id, key, text).await?;
+    cdp.detach_from_target(&session_id).await?;
+
+    Ok(PressKeyInfo {
+        css_selector: css_selector.to_string(),
+        key: key.to_string(),
+        note: format!("pressed key {key} on element matching css selector {css_selector}"),
+    })
+}
+
+pub async fn get_text_content_via_cdp(
+    cdp_websocket_url: &str,
+    target_id: &str,
+    css_selector: &str,
+) -> Result<TextInfo, String> {
+    get_text_via_cdp(cdp_websocket_url, target_id, css_selector, "textContent")
+        .await
+        .map(|mut info| {
+            info.note = format!("resolved textContent for css selector {css_selector}");
+            info
+        })
+}
+
+pub async fn get_inner_text_via_cdp(
+    cdp_websocket_url: &str,
+    target_id: &str,
+    css_selector: &str,
+) -> Result<TextInfo, String> {
+    get_text_via_cdp(cdp_websocket_url, target_id, css_selector, "innerText")
+        .await
+        .map(|mut info| {
+            info.note = format!("resolved innerText for css selector {css_selector}");
+            info
+        })
+}
+
+pub async fn wait_for_selector_via_cdp(
+    cdp_websocket_url: &str,
+    target_id: &str,
+    css_selector: &str,
+    visible: bool,
+) -> Result<WaitForSelectorInfo, String> {
+    require_non_empty_selector("wait_for_selector", css_selector)?;
+    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+    let session_id = cdp.prepare_page_target_session(target_id).await?;
+    let discovered =
+        discover_elements_via_cdp(&mut cdp, &session_id, css_selector, false, false).await?;
+    let success = if visible {
+        discovered.first_center.is_some()
+    } else {
+        discovered.count > 0
+    };
+    cdp.detach_from_target(&session_id).await?;
+
+    if !success {
+        return Err(if visible {
+            format!("no visible element matches css selector {css_selector}")
+        } else {
+            format!("no element matches css selector {css_selector}")
+        });
+    }
+
+    Ok(WaitForSelectorInfo {
+        css_selector: css_selector.to_string(),
+        visible,
+        note: if visible {
+            format!("visible element matched css selector {css_selector}")
+        } else {
+            format!("element matched css selector {css_selector}")
+        },
+    })
+}
+
+async fn discover_elements_via_cdp(
+    cdp: &mut CdpConnection,
+    session_id: &str,
+    css_selector: &str,
+    require_match: bool,
+    focus_first_match: bool,
+) -> Result<DiscoveredElements, String> {
+    let selector_literal = serde_json::to_string(css_selector)
+        .map_err(|error| format!("failed to serialize css selector for discovery: {error}"))?;
+    let expression = format!(
+        "(() => {{
+            const selector = {selector_literal};
+            const elements = Array.from(document.querySelectorAll(selector));
+            const first = elements[0] ?? null;
+            if (first) {{
+                first.scrollIntoView({{ block: 'center', inline: 'center', behavior: 'instant' }});
+                if ({focus_first_match} && first instanceof HTMLElement) {{
+                    first.focus();
+                }}
+            }}
+            if ({require_match} && !first) {{
+                throw new Error(`No element matches selector: ${{selector}}`);
+            }}
+            if (first && !(first instanceof Element)) {{
+                throw new Error(`Selector did not resolve to a DOM Element: ${{selector}}`);
+            }}
+            const rect = first ? first.getBoundingClientRect() : null;
+            if (first && (!rect.width || !rect.height)) {{
+                throw new Error(`Element matched by selector has zero size: ${{selector}}`);
+            }}
+            return {{
+                count: elements.length,
+                first: rect ? {{
+                    x: rect.left + (rect.width / 2),
+                    y: rect.top + (rect.height / 2)
+                }} : null
+            }};
+        }})()"
+    );
+    let result = cdp
+        .evaluate_expression(session_id, &expression, true)
+        .await?;
+    let count = json_u32(&result, "/result/value/count")?;
+    let first_center = if result.pointer("/result/value/first").is_some()
+        && !result
+            .pointer("/result/value/first")
+            .is_some_and(Value::is_null)
+    {
+        Some(ElementCenter {
+            x: json_f64(&result, "/result/value/first/x")?,
+            y: json_f64(&result, "/result/value/first/y")?,
+        })
+    } else {
+        None
+    };
+
+    Ok(DiscoveredElements {
+        count,
+        first_center,
+    })
+}
+
+async fn get_text_via_cdp(
+    cdp_websocket_url: &str,
+    target_id: &str,
+    css_selector: &str,
+    property: &str,
+) -> Result<TextInfo, String> {
+    require_non_empty_selector("get_text", css_selector)?;
+    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+    let session_id = cdp.prepare_page_target_session(target_id).await?;
+    discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, false).await?;
+    let selector_literal = json_string_literal(css_selector, "text selector")?;
+    let property_literal = json_string_literal(property, "text property")?;
+    let result = cdp
+        .evaluate_expression(
+            &session_id,
+            &format!(
+                "(() => {{
+                    const selector = {selector_literal};
+                    const property = {property_literal};
+                    const element = document.querySelector(selector);
+                    if (!element) {{
+                        throw new Error(`No element matches selector: ${{selector}}`);
+                    }}
+                    const value = element[property];
+                    return typeof value === 'string' ? value : '';
+                }})()"
+            ),
+            true,
+        )
+        .await?;
+    cdp.detach_from_target(&session_id).await?;
+
+    Ok(TextInfo {
+        css_selector: css_selector.to_string(),
+        text: json_string(&result, "/result/value")?,
+        note: String::new(),
+    })
+}
+
+pub async fn resolve_bidi_context_for_tab(
+    cdp_websocket_url: &str,
+    existing_mapper_target_id: Option<&str>,
+    existing_context_id: Option<&str>,
+    current_url: Option<&str>,
+) -> Result<(String, ChromiumBidiMapperInfo), String> {
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let mapper = cdp
         .ensure_chromium_bidi_mapper(existing_mapper_target_id)
         .await?;
-
-    let selector_literal = serde_json::to_string(css_selector)
-        .map_err(|error| format!("failed to serialize css selector for BiDi click: {error}"))?;
-    let expression = format!(
-        "(() => {{ const selector = {selector_literal}; const element = document.querySelector(selector); if (!element) {{ throw new Error(`No element matches selector: ${{selector}}`); }} element.click(); return {{ clicked: true, selector }}; }})()"
-    );
-    let bidi_command = json!({
-        "id": 1,
-        "method": "script.evaluate",
-        "params": {
-            "expression": expression,
-            "target": {
-                "context": context_id,
-            },
-            "awaitPromise": true,
-            "resultOwnership": "none",
-            "userActivation": true,
-        }
-    });
-    cdp.send_bidi_command(&mapper.mapper_session_id, &bidi_command)
+    let context_id = cdp
+        .resolve_bidi_context_id(&mapper.mapper_session_id, existing_context_id, current_url)
         .await?;
 
-    Ok(BidiClickInfo {
-        css_selector: css_selector.to_string(),
-        note: format!("clicked element over WebDriver BiDi using css selector {css_selector}"),
-        package_version: mapper.package_version,
-        mapper_target_id: mapper.mapper_target_id,
-        mapper_session_id: mapper.mapper_session_id,
-    })
+    Ok((
+        context_id,
+        ChromiumBidiMapperInfo {
+            package_version: mapper.package_version,
+            mapper_target_id: mapper.mapper_target_id,
+            mapper_session_id: mapper.mapper_session_id,
+            note: "resolved BiDi browsing context for tab".to_string(),
+        },
+    ))
 }
 
 #[cfg(target_os = "macos")]
@@ -543,6 +979,7 @@ impl CdpConnection {
                 json!({
                     "expression": expression,
                     "awaitPromise": await_promise,
+                    "returnByValue": true,
                 }),
                 Some(session_id),
             )
@@ -555,31 +992,139 @@ impl CdpConnection {
         Ok(result)
     }
 
+    async fn attach_to_target(&mut self, target_id: &str) -> Result<String, String> {
+        let attached = self
+            .send_command(
+                "Target.attachToTarget",
+                json!({
+                    "targetId": target_id,
+                    "flatten": true,
+                }),
+                None,
+            )
+            .await?;
+        required_string(&attached, "/sessionId")
+    }
+
+    async fn prepare_page_target_session(&mut self, target_id: &str) -> Result<String, String> {
+        let session_id = self.attach_to_target(target_id).await?;
+        self.send_command("Runtime.enable", json!({}), Some(&session_id))
+            .await?;
+        self.send_command("Page.enable", json!({}), Some(&session_id))
+            .await?;
+        Ok(session_id)
+    }
+
+    async fn detach_from_target(&mut self, session_id: &str) -> Result<(), String> {
+        self.send_command(
+            "Target.detachFromTarget",
+            json!({
+                "sessionId": session_id,
+            }),
+            None,
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn dispatch_mouse_click(
+        &mut self,
+        session_id: &str,
+        x: f64,
+        y: f64,
+    ) -> Result<(), String> {
+        self.dispatch_mouse_move(session_id, x, y).await?;
+        self.send_command(
+            "Input.dispatchMouseEvent",
+            json!({
+                "type": "mousePressed",
+                "x": x,
+                "y": y,
+                "button": "left",
+                "buttons": 1,
+                "clickCount": 1,
+            }),
+            Some(session_id),
+        )
+        .await?;
+        self.send_command(
+            "Input.dispatchMouseEvent",
+            json!({
+                "type": "mouseReleased",
+                "x": x,
+                "y": y,
+                "button": "left",
+                "buttons": 0,
+                "clickCount": 1,
+            }),
+            Some(session_id),
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn dispatch_mouse_move(
+        &mut self,
+        session_id: &str,
+        x: f64,
+        y: f64,
+    ) -> Result<(), String> {
+        self.send_command(
+            "Input.dispatchMouseEvent",
+            json!({
+                "type": "mouseMoved",
+                "x": x,
+                "y": y,
+                "button": "none",
+                "buttons": 0,
+            }),
+            Some(session_id),
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn dispatch_key_press(
+        &mut self,
+        session_id: &str,
+        key: &str,
+        text: Option<&str>,
+    ) -> Result<(), String> {
+        self.send_command(
+            "Input.dispatchKeyEvent",
+            json!({
+                "type": "keyDown",
+                "key": key,
+                "text": text.unwrap_or(""),
+            }),
+            Some(session_id),
+        )
+        .await?;
+        self.send_command(
+            "Input.dispatchKeyEvent",
+            json!({
+                "type": "keyUp",
+                "key": key,
+                "text": text.unwrap_or(""),
+            }),
+            Some(session_id),
+        )
+        .await?;
+        Ok(())
+    }
+
     async fn ensure_chromium_bidi_mapper(
         &mut self,
         existing_mapper_target_id: Option<&str>,
     ) -> Result<MapperConnectionInfo, String> {
-        let (mapper_target_id, created_target) = match existing_mapper_target_id {
+        let (mut mapper_target_id, mut created_target) = match existing_mapper_target_id {
             Some(existing_mapper_target_id) if !existing_mapper_target_id.trim().is_empty() => {
                 (existing_mapper_target_id.to_string(), false)
             }
-            _ => {
-                let created = self
-                    .send_command(
-                        "Target.createTarget",
-                        json!({
-                            "url": "about:blank#MAPPER_TARGET",
-                            "hidden": true,
-                            "background": true,
-                        }),
-                        None,
-                    )
-                    .await?;
-                (required_string(&created, "/targetId")?, true)
-            }
+            _ => (self.create_bidi_mapper_target().await?, true),
         };
 
-        let attached = self
+        let attached = match self
             .send_command(
                 "Target.attachToTarget",
                 json!({
@@ -588,7 +1133,28 @@ impl CdpConnection {
                 }),
                 None,
             )
-            .await?;
+            .await
+        {
+            Ok(attached) => attached,
+            Err(error)
+                if !created_target
+                    && error.contains("Target.attachToTarget failed")
+                    && error.contains("No target with given id found") =>
+            {
+                mapper_target_id = self.create_bidi_mapper_target().await?;
+                created_target = true;
+                self.send_command(
+                    "Target.attachToTarget",
+                    json!({
+                        "targetId": mapper_target_id,
+                        "flatten": true,
+                    }),
+                    None,
+                )
+                .await?
+            }
+            Err(error) => return Err(error),
+        };
         let mapper_session_id = required_string(&attached, "/sessionId")?;
 
         self.send_command("Runtime.enable", json!({}), Some(&mapper_session_id))
@@ -622,6 +1188,17 @@ impl CdpConnection {
                 true,
             )
             .await?;
+            self.send_bidi_command(
+                &mapper_session_id,
+                &json!({
+                    "id": 1,
+                    "method": "session.new",
+                    "params": {
+                        "capabilities": {}
+                    }
+                }),
+            )
+            .await?;
         }
 
         Ok(MapperConnectionInfo {
@@ -629,6 +1206,21 @@ impl CdpConnection {
             mapper_target_id,
             mapper_session_id,
         })
+    }
+
+    async fn create_bidi_mapper_target(&mut self) -> Result<String, String> {
+        let created = self
+            .send_command(
+                "Target.createTarget",
+                json!({
+                    "url": "about:blank#MAPPER_TARGET",
+                    "hidden": true,
+                    "background": true,
+                }),
+                None,
+            )
+            .await?;
+        required_string(&created, "/targetId")
     }
 
     async fn ensure_runtime_binding(&mut self, session_id: &str, name: &str) -> Result<(), String> {
@@ -761,6 +1353,96 @@ impl CdpConnection {
         }
     }
 
+    async fn resolve_bidi_context_id(
+        &mut self,
+        mapper_session_id: &str,
+        existing_context_id: Option<&str>,
+        current_url: Option<&str>,
+    ) -> Result<String, String> {
+        if let Some(existing_context_id) = existing_context_id {
+            if !existing_context_id.trim().is_empty() {
+                let probe = json!({
+                    "id": 1,
+                    "method": "browsingContext.getTree",
+                    "params": {
+                        "root": existing_context_id,
+                        "maxDepth": 0,
+                    }
+                });
+                match self.send_bidi_command(mapper_session_id, &probe).await {
+                    Ok(_) => return Ok(existing_context_id.to_string()),
+                    Err(error)
+                        if error.contains("no such frame")
+                            || error.contains("Context ")
+                            || error.contains("invalid argument") => {}
+                    Err(error) => return Err(error),
+                }
+            }
+        }
+
+        let target_url = current_url
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+
+        for attempt in 0..20 {
+            let tree = self
+                .send_bidi_command(
+                    mapper_session_id,
+                    &json!({
+                        "id": 2,
+                        "method": "browsingContext.getTree",
+                        "params": {
+                            "maxDepth": 0,
+                        }
+                    }),
+                )
+                .await?;
+            let contexts = tree
+                .pointer("/result/contexts")
+                .and_then(Value::as_array)
+                .ok_or_else(|| {
+                    format!("BiDi browsingContext.getTree returned no contexts: {tree}")
+                })?;
+
+            if let Some(target_url) = target_url.as_deref() {
+                if let Some(context_id) = contexts.iter().find_map(|context| {
+                    let url = context.get("url").and_then(Value::as_str)?;
+                    if url == target_url {
+                        context
+                            .get("context")
+                            .and_then(Value::as_str)
+                            .map(str::to_string)
+                    } else {
+                        None
+                    }
+                }) {
+                    return Ok(context_id);
+                }
+            }
+
+            if let Some(context_id) = contexts
+                .first()
+                .and_then(|context| context.get("context"))
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .map(str::to_string)
+            {
+                return Ok(context_id);
+            }
+
+            if attempt < 19 {
+                sleep(Duration::from_millis(150)).await;
+            } else {
+                return Err(format!(
+                    "BiDi browsingContext.getTree returned no usable context ids after retries: {tree}"
+                ));
+            }
+        }
+
+        Err("BiDi browsing context resolution exhausted retries unexpectedly".to_string())
+    }
+
     async fn navigate_and_wait_for_load(
         &mut self,
         session_id: &str,
@@ -852,4 +1534,56 @@ fn required_string(value: &Value, pointer: &str) -> Result<String, String> {
 
 fn js_single_quote(value: &str) -> String {
     value.replace('\\', "\\\\").replace('\'', "\\'")
+}
+
+fn json_u32(value: &Value, pointer: &str) -> Result<u32, String> {
+    let raw = value
+        .pointer(pointer)
+        .ok_or_else(|| format!("missing JSON value at {pointer}: {value}"))?;
+
+    if let Some(number) = raw.as_u64() {
+        return u32::try_from(number)
+            .map_err(|_| format!("numeric JSON value at {pointer} exceeds u32: {number}"));
+    }
+
+    if let Some(number) = raw.as_i64() {
+        return u32::try_from(number).map_err(|_| {
+            format!("numeric JSON value at {pointer} is out of range for u32: {number}")
+        });
+    }
+
+    Err(format!(
+        "expected numeric JSON value at {pointer}, found {raw}"
+    ))
+}
+
+fn json_f64(value: &Value, pointer: &str) -> Result<f64, String> {
+    let raw = value
+        .pointer(pointer)
+        .ok_or_else(|| format!("missing JSON value at {pointer}: {value}"))?;
+
+    raw.as_f64()
+        .ok_or_else(|| format!("expected numeric JSON value at {pointer}, found {raw}"))
+}
+
+fn json_string(value: &Value, pointer: &str) -> Result<String, String> {
+    value
+        .pointer(pointer)
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| format!("expected string JSON value at {pointer}"))
+}
+
+fn json_string_literal(value: &str, context: &str) -> Result<String, String> {
+    serde_json::to_string(value).map_err(|error| format!("failed to serialize {context}: {error}"))
+}
+
+fn require_non_empty_selector(command_name: &str, css_selector: &str) -> Result<(), String> {
+    if css_selector.trim().is_empty() {
+        Err(format!(
+            "{command_name} command requires a non-empty css_selector"
+        ))
+    } else {
+        Ok(())
+    }
 }

@@ -36,6 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     );
     let browser = launch_chrome(LaunchOptions {
         chrome_binary: args.chrome_binary.clone(),
+        timeout_ms: None,
     })
     .await?;
 
