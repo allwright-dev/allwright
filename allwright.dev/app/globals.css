@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f3efe5;
+  --background-deep: #e8e0cf;
+  --ink: #1d221c;
+  --muted: #5f665b;
+  --line: rgba(29, 34, 28, 0.12);
+  --card: rgba(255, 252, 244, 0.78);
+  --accent: #d86a31;
+  --accent-2: #23695b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: var(--font-display), sans-serif;
+}
+
+h1,
+p,
+strong {
+  margin: 0;
+}
+
+.ambient-left {
+  animation: drift-left 12s ease-in-out infinite;
+}
+
+.ambient-right {
+  animation: drift-right 14s ease-in-out infinite;
+}
+
+.grid-overlay {
+  background-image:
+    linear-gradient(rgba(29, 34, 28, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(29, 34, 28, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.animate-rise {
+  animation: rise 700ms ease-out both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes drift-left {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(28px, 18px, 0);
+  }
+}
+
+@keyframes drift-right {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-24px, -22px, 0);
+  }
+}
