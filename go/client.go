@@ -70,6 +70,45 @@ type HighlightResult struct {
 	Note     string
 }
 
+type ElementResult struct {
+	Selector string
+	Note     string
+}
+
+type FillResult struct {
+	Selector string
+	Value    string
+	Note     string
+}
+
+type PressOptions struct {
+	Timeout time.Duration
+	Text    string
+}
+
+type PressResult struct {
+	Selector string
+	Key      string
+	Note     string
+}
+
+type TextResult struct {
+	Selector string
+	Text     string
+	Note     string
+}
+
+type WaitForSelectorOptions struct {
+	Timeout time.Duration
+	Visible *bool
+}
+
+type WaitForSelectorResult struct {
+	Selector string
+	Visible  bool
+	Note     string
+}
+
 type Browser struct {
 	mu              sync.Mutex
 	runtime         *runtimeClient
@@ -540,6 +579,256 @@ func (t *Tab) Highlight(ctx context.Context, cssSelector string, options ...High
 	}
 }
 
+func (t *Tab) Focus(ctx context.Context, cssSelector string, options ...CommandOptions) (*ElementResult, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if err := t.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if t.closed {
+		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
+	}
+
+	commandOptions := firstCommandOptions(options)
+
+	if err := t.stream.Send(&enginev1.TabSessionCommand{
+		BrowserSessionId: t.browserSessionID,
+		TabSessionId:     t.sessionID,
+		Command: &enginev1.TabSessionCommand_FocusElement{
+			FocusElement: &enginev1.FocusElementCommand{
+				CssSelector:  cssSelector,
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send FocusElementCommand: %w", err)
+	}
+
+	for {
+		event, err := t.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive tab session event during focus: %w", err)
+		}
+
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.TabSessionEvent_Attached:
+			t.attached = true
+			_ = payload
+		case *enginev1.TabSessionEvent_ElementFocused:
+			return &ElementResult{
+				Selector: payload.ElementFocused.GetCssSelector(),
+				Note:     payload.ElementFocused.GetNote(),
+			}, nil
+		case *enginev1.TabSessionEvent_Error:
+			return nil, fmt.Errorf("tab session error while focusing: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func (t *Tab) Fill(ctx context.Context, cssSelector string, value string, options ...CommandOptions) (*FillResult, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if err := t.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if t.closed {
+		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
+	}
+
+	commandOptions := firstCommandOptions(options)
+
+	if err := t.stream.Send(&enginev1.TabSessionCommand{
+		BrowserSessionId: t.browserSessionID,
+		TabSessionId:     t.sessionID,
+		Command: &enginev1.TabSessionCommand_FillElement{
+			FillElement: &enginev1.FillElementCommand{
+				CssSelector:  cssSelector,
+				Value:        value,
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send FillElementCommand: %w", err)
+	}
+
+	for {
+		event, err := t.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive tab session event during fill: %w", err)
+		}
+
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.TabSessionEvent_Attached:
+			t.attached = true
+			_ = payload
+		case *enginev1.TabSessionEvent_ElementFilled:
+			return &FillResult{
+				Selector: payload.ElementFilled.GetCssSelector(),
+				Value:    payload.ElementFilled.GetValue(),
+				Note:     payload.ElementFilled.GetNote(),
+			}, nil
+		case *enginev1.TabSessionEvent_Error:
+			return nil, fmt.Errorf("tab session error while filling: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func (t *Tab) Hover(ctx context.Context, cssSelector string, options ...CommandOptions) (*ElementResult, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if err := t.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if t.closed {
+		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
+	}
+
+	commandOptions := firstCommandOptions(options)
+
+	if err := t.stream.Send(&enginev1.TabSessionCommand{
+		BrowserSessionId: t.browserSessionID,
+		TabSessionId:     t.sessionID,
+		Command: &enginev1.TabSessionCommand_HoverElement{
+			HoverElement: &enginev1.HoverElementCommand{
+				CssSelector:  cssSelector,
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send HoverElementCommand: %w", err)
+	}
+
+	for {
+		event, err := t.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive tab session event during hover: %w", err)
+		}
+
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.TabSessionEvent_Attached:
+			t.attached = true
+			_ = payload
+		case *enginev1.TabSessionEvent_ElementHovered:
+			return &ElementResult{
+				Selector: payload.ElementHovered.GetCssSelector(),
+				Note:     payload.ElementHovered.GetNote(),
+			}, nil
+		case *enginev1.TabSessionEvent_Error:
+			return nil, fmt.Errorf("tab session error while hovering: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func (t *Tab) Press(ctx context.Context, cssSelector string, key string, options ...PressOptions) (*PressResult, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if err := t.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if t.closed {
+		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
+	}
+
+	pressOptions := firstPressOptions(options)
+
+	if err := t.stream.Send(&enginev1.TabSessionCommand{
+		BrowserSessionId: t.browserSessionID,
+		TabSessionId:     t.sessionID,
+		Command: &enginev1.TabSessionCommand_PressKey{
+			PressKey: &enginev1.PressKeyCommand{
+				CssSelector:  cssSelector,
+				Key:          key,
+				Text:         optionalString(pressOptions.Text),
+				RetryOptions: retryOptionsProto(pressOptions.Timeout),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send PressKeyCommand: %w", err)
+	}
+
+	for {
+		event, err := t.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive tab session event during press: %w", err)
+		}
+
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.TabSessionEvent_Attached:
+			t.attached = true
+			_ = payload
+		case *enginev1.TabSessionEvent_KeyPressed:
+			return &PressResult{
+				Selector: payload.KeyPressed.GetCssSelector(),
+				Key:      payload.KeyPressed.GetKey(),
+				Note:     payload.KeyPressed.GetNote(),
+			}, nil
+		case *enginev1.TabSessionEvent_Error:
+			return nil, fmt.Errorf("tab session error while pressing key: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func (t *Tab) TextContent(ctx context.Context, cssSelector string, options ...CommandOptions) (*TextResult, error) {
+	return t.readText(ctx, cssSelector, true, firstCommandOptions(options))
+}
+
+func (t *Tab) InnerText(ctx context.Context, cssSelector string, options ...CommandOptions) (*TextResult, error) {
+	return t.readText(ctx, cssSelector, false, firstCommandOptions(options))
+}
+
+func (t *Tab) WaitForSelector(ctx context.Context, cssSelector string, options ...WaitForSelectorOptions) (*WaitForSelectorResult, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if err := t.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if t.closed {
+		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
+	}
+
+	waitOptions := firstWaitForSelectorOptions(options)
+
+	if err := t.stream.Send(&enginev1.TabSessionCommand{
+		BrowserSessionId: t.browserSessionID,
+		TabSessionId:     t.sessionID,
+		Command: &enginev1.TabSessionCommand_WaitForSelector{
+			WaitForSelector: &enginev1.WaitForSelectorCommand{
+				CssSelector:  cssSelector,
+				Visible:      waitOptions.Visible,
+				RetryOptions: retryOptionsProto(waitOptions.Timeout),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send WaitForSelectorCommand: %w", err)
+	}
+
+	for {
+		event, err := t.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive tab session event during waitForSelector: %w", err)
+		}
+
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.TabSessionEvent_Attached:
+			t.attached = true
+			_ = payload
+		case *enginev1.TabSessionEvent_SelectorWaitSatisfied:
+			return &WaitForSelectorResult{
+				Selector: payload.SelectorWaitSatisfied.GetCssSelector(),
+				Visible:  payload.SelectorWaitSatisfied.GetVisible(),
+				Note:     payload.SelectorWaitSatisfied.GetNote(),
+			}, nil
+		case *enginev1.TabSessionEvent_Error:
+			return nil, fmt.Errorf("tab session error while waiting for selector: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
 func retryOptionsProto(timeout time.Duration) *enginev1.CommandRetryOptions {
 	if timeout <= 0 {
 		return nil
@@ -574,6 +863,20 @@ func firstHighlightOptions(options []HighlightOptions) HighlightOptions {
 	return HighlightOptions{}
 }
 
+func firstPressOptions(options []PressOptions) PressOptions {
+	if len(options) > 0 {
+		return options[0]
+	}
+	return PressOptions{}
+}
+
+func firstWaitForSelectorOptions(options []WaitForSelectorOptions) WaitForSelectorOptions {
+	if len(options) > 0 {
+		return options[0]
+	}
+	return WaitForSelectorOptions{}
+}
+
 func durationProto(value time.Duration) *uint32 {
 	if value <= 0 {
 		return nil
@@ -585,6 +888,74 @@ func durationProto(value time.Duration) *uint32 {
 	}
 
 	return optionalUint32(uint32(durationMS))
+}
+
+func (t *Tab) readText(ctx context.Context, cssSelector string, textContent bool, options CommandOptions) (*TextResult, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if err := t.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if t.closed {
+		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
+	}
+
+	var sendErr error
+	if textContent {
+		sendErr = t.stream.Send(&enginev1.TabSessionCommand{
+			BrowserSessionId: t.browserSessionID,
+			TabSessionId:     t.sessionID,
+			Command: &enginev1.TabSessionCommand_GetTextContent{
+				GetTextContent: &enginev1.GetTextContentCommand{
+					CssSelector:  cssSelector,
+					RetryOptions: retryOptionsProto(options.Timeout),
+				},
+			},
+		})
+	} else {
+		sendErr = t.stream.Send(&enginev1.TabSessionCommand{
+			BrowserSessionId: t.browserSessionID,
+			TabSessionId:     t.sessionID,
+			Command: &enginev1.TabSessionCommand_GetInnerText{
+				GetInnerText: &enginev1.GetInnerTextCommand{
+					CssSelector:  cssSelector,
+					RetryOptions: retryOptionsProto(options.Timeout),
+				},
+			},
+		})
+	}
+
+	if sendErr != nil {
+		return nil, fmt.Errorf("send text command: %w", sendErr)
+	}
+
+	for {
+		event, err := t.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive tab session event during text read: %w", err)
+		}
+
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.TabSessionEvent_Attached:
+			t.attached = true
+			_ = payload
+		case *enginev1.TabSessionEvent_TextContentResolved:
+			return &TextResult{
+				Selector: payload.TextContentResolved.GetCssSelector(),
+				Text:     payload.TextContentResolved.GetText(),
+				Note:     payload.TextContentResolved.GetNote(),
+			}, nil
+		case *enginev1.TabSessionEvent_InnerTextResolved:
+			return &TextResult{
+				Selector: payload.InnerTextResolved.GetCssSelector(),
+				Text:     payload.InnerTextResolved.GetText(),
+				Note:     payload.InnerTextResolved.GetNote(),
+			}, nil
+		case *enginev1.TabSessionEvent_Error:
+			return nil, fmt.Errorf("tab session error while reading text: %s", payload.Error.GetMessage())
+		}
+	}
 }
 
 func (t *Tab) Ping(ctx context.Context, message string) (string, error) {

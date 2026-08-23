@@ -56,6 +56,45 @@ export interface HighlightResult {
   note: string;
 }
 
+export interface ElementResult {
+  selector: string;
+  note: string;
+}
+
+export interface FillResult {
+  selector: string;
+  value: string;
+  note: string;
+}
+
+export interface PressOptions {
+  timeoutMs?: number;
+  text?: string;
+}
+
+export interface PressResult {
+  selector: string;
+  key: string;
+  note: string;
+}
+
+export interface TextResult {
+  selector: string;
+  text: string;
+  note: string;
+}
+
+export interface WaitForSelectorOptions {
+  timeoutMs?: number;
+  visible?: boolean;
+}
+
+export interface WaitForSelectorResult {
+  selector: string;
+  visible: boolean;
+  note: string;
+}
+
 export interface BrowserInfo {
   sessionId: string;
   browserName: string;
@@ -141,6 +180,39 @@ interface TabSessionEvent {
     count?: number;
     note?: string;
   };
+  elementFocused?: {
+    cssSelector?: string;
+    note?: string;
+  };
+  elementFilled?: {
+    cssSelector?: string;
+    value?: string;
+    note?: string;
+  };
+  elementHovered?: {
+    cssSelector?: string;
+    note?: string;
+  };
+  keyPressed?: {
+    cssSelector?: string;
+    key?: string;
+    note?: string;
+  };
+  textContentResolved?: {
+    cssSelector?: string;
+    text?: string;
+    note?: string;
+  };
+  innerTextResolved?: {
+    cssSelector?: string;
+    text?: string;
+    note?: string;
+  };
+  selectorWaitSatisfied?: {
+    cssSelector?: string;
+    visible?: boolean;
+    note?: string;
+  };
 }
 
 interface LaunchChromeRequest {
@@ -223,6 +295,87 @@ interface HighlightRequest {
   };
 }
 
+interface FocusRequest {
+  browserSessionId: string;
+  tabSessionId: string;
+  focusElement: {
+    cssSelector: string;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
+interface FillRequest {
+  browserSessionId: string;
+  tabSessionId: string;
+  fillElement: {
+    cssSelector: string;
+    value: string;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
+interface HoverRequest {
+  browserSessionId: string;
+  tabSessionId: string;
+  hoverElement: {
+    cssSelector: string;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
+interface PressRequest {
+  browserSessionId: string;
+  tabSessionId: string;
+  pressKey: {
+    cssSelector: string;
+    key: string;
+    text?: string;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
+interface TextContentRequest {
+  browserSessionId: string;
+  tabSessionId: string;
+  getTextContent: {
+    cssSelector: string;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
+interface InnerTextRequest {
+  browserSessionId: string;
+  tabSessionId: string;
+  getInnerText: {
+    cssSelector: string;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
+interface WaitForSelectorRequest {
+  browserSessionId: string;
+  tabSessionId: string;
+  waitForSelector: {
+    cssSelector: string;
+    visible?: boolean;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
 interface CloseTabRequest {
   browserSessionId: string;
   tabSessionId: string;
@@ -241,6 +394,13 @@ type TabSessionRequest =
   | ClickRequest
   | CountRequest
   | HighlightRequest
+  | FocusRequest
+  | FillRequest
+  | HoverRequest
+  | PressRequest
+  | TextContentRequest
+  | InnerTextRequest
+  | WaitForSelectorRequest
   | CloseTabRequest;
 
 type BrowserSessionStream = grpc.ClientDuplexStream<BrowserSessionRequest, BrowserSessionEvent>;
@@ -627,6 +787,174 @@ export class Page {
     }
   }
 
+  async focus(selector: string, options: CommandOptions = {}): Promise<ElementResult> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      browserSessionId: this.browserSessionId,
+      tabSessionId: this.sessionId,
+      focusElement: {
+        cssSelector: selector,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.elementFocused) {
+        return {
+          selector: event.elementFocused.cssSelector ?? "",
+          note: event.elementFocused.note ?? "",
+        };
+      }
+      if (event.error?.message) {
+        throw new Error(`page session error while focusing: ${event.error.message}`);
+      }
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`page session ${this.sessionId} closed while waiting for focus result`);
+      }
+    }
+  }
+
+  async fill(selector: string, value: string, options: CommandOptions = {}): Promise<FillResult> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      browserSessionId: this.browserSessionId,
+      tabSessionId: this.sessionId,
+      fillElement: {
+        cssSelector: selector,
+        value,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.elementFilled) {
+        return {
+          selector: event.elementFilled.cssSelector ?? "",
+          value: event.elementFilled.value ?? "",
+          note: event.elementFilled.note ?? "",
+        };
+      }
+      if (event.error?.message) {
+        throw new Error(`page session error while filling: ${event.error.message}`);
+      }
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`page session ${this.sessionId} closed while waiting for fill result`);
+      }
+    }
+  }
+
+  async hover(selector: string, options: CommandOptions = {}): Promise<ElementResult> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      browserSessionId: this.browserSessionId,
+      tabSessionId: this.sessionId,
+      hoverElement: {
+        cssSelector: selector,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.elementHovered) {
+        return {
+          selector: event.elementHovered.cssSelector ?? "",
+          note: event.elementHovered.note ?? "",
+        };
+      }
+      if (event.error?.message) {
+        throw new Error(`page session error while hovering: ${event.error.message}`);
+      }
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`page session ${this.sessionId} closed while waiting for hover result`);
+      }
+    }
+  }
+
+  async press(selector: string, key: string, options: PressOptions = {}): Promise<PressResult> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      browserSessionId: this.browserSessionId,
+      tabSessionId: this.sessionId,
+      pressKey: {
+        cssSelector: selector,
+        key,
+        text: options.text,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.keyPressed) {
+        return {
+          selector: event.keyPressed.cssSelector ?? "",
+          key: event.keyPressed.key ?? "",
+          note: event.keyPressed.note ?? "",
+        };
+      }
+      if (event.error?.message) {
+        throw new Error(`page session error while pressing key: ${event.error.message}`);
+      }
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`page session ${this.sessionId} closed while waiting for press result`);
+      }
+    }
+  }
+
+  async textContent(selector: string, options: CommandOptions = {}): Promise<TextResult> {
+    return this.#readText(selector, options, true);
+  }
+
+  async innerText(selector: string, options: CommandOptions = {}): Promise<TextResult> {
+    return this.#readText(selector, options, false);
+  }
+
+  async waitForSelector(
+    selector: string,
+    options: WaitForSelectorOptions = {},
+  ): Promise<WaitForSelectorResult> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      browserSessionId: this.browserSessionId,
+      tabSessionId: this.sessionId,
+      waitForSelector: {
+        cssSelector: selector,
+        visible: options.visible,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.selectorWaitSatisfied) {
+        return {
+          selector: event.selectorWaitSatisfied.cssSelector ?? "",
+          visible: event.selectorWaitSatisfied.visible ?? false,
+          note: event.selectorWaitSatisfied.note ?? "",
+        };
+      }
+      if (event.error?.message) {
+        throw new Error(`page session error while waiting for selector: ${event.error.message}`);
+      }
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`page session ${this.sessionId} closed while waiting for selector result`);
+      }
+    }
+  }
+
   async close(): Promise<void> {
     const handle = await this.#getHandle();
     if (handle.closed) {
@@ -687,6 +1015,59 @@ export class Page {
 
   async navigate(url: string, options: CommandOptions = {}): Promise<NavigateResult> {
     return this.goto(url, options);
+  }
+
+  async #readText(
+    selector: string,
+    options: CommandOptions,
+    textContent: boolean,
+  ): Promise<TextResult> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write(
+      textContent
+        ? {
+            browserSessionId: this.browserSessionId,
+            tabSessionId: this.sessionId,
+            getTextContent: {
+              cssSelector: selector,
+              retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+            },
+          }
+        : {
+            browserSessionId: this.browserSessionId,
+            tabSessionId: this.sessionId,
+            getInnerText: {
+              cssSelector: selector,
+              retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+            },
+          },
+    );
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.textContentResolved) {
+        return {
+          selector: event.textContentResolved.cssSelector ?? "",
+          text: event.textContentResolved.text ?? "",
+          note: event.textContentResolved.note ?? "",
+        };
+      }
+      if (event.innerTextResolved) {
+        return {
+          selector: event.innerTextResolved.cssSelector ?? "",
+          text: event.innerTextResolved.text ?? "",
+          note: event.innerTextResolved.note ?? "",
+        };
+      }
+      if (event.error?.message) {
+        throw new Error(`page session error while reading text: ${event.error.message}`);
+      }
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`page session ${this.sessionId} closed while waiting for text result`);
+      }
+    }
   }
 
   #ensureOpen(handle: PageHandle): void {
