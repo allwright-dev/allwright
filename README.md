@@ -10,6 +10,9 @@ The repo is now organized by top-level technology folders:
 
 - `rust/`: Rust workspace crates
 - `go/`: Go module, generated stubs, and Go playground
+- `java/`: Java client project that generates gRPC stubs from the shared proto
+- `python/`: Python client package that loads the shared proto dynamically at runtime
+- `allwright.dev/`: Next.js marketing site for the `allwright.dev` domain and Vercel deployment
 - `typescript/`: TypeScript/JavaScript package for the JS stack
 - `proto/`: shared protobuf and gRPC contracts consumed by every stack
 
@@ -31,6 +34,9 @@ Supporting platform crates sit under the platform library layer:
 - `rust/allwright-client`: reusable Rust client with a high-level browser/tab API over the engine server
 - `rust/playground`: end-to-end client for exercising the engine gRPC server
 - `go/`: Go module with generated engine stubs, a Go client package, and a Go playground
+- `java/`: Gradle-based Java client project with generated engine stubs and a high-level browser/page API
+- `python/`: Python client package with dynamic proto loading and a high-level browser/page API
+- `allwright.dev/`: standalone Next.js site for public marketing pages and documentation entrypoints
 - `typescript/`: TypeScript/JavaScript stack folder containing the JS client package and playground
 - `proto/`: shared protobuf contract root
 - `rust/engine-lib`: owner of all engine code and the gRPC server crate
@@ -56,6 +62,8 @@ The workspace shares a single Tokio dependency through the root `Cargo.toml` and
 - Generated Rust code: built at compile time by `rust/engine-lib/build.rs`
 - Generated gRPC client code: also built at compile time and used by `rust/allwright-client` and `rust/playground`
 - Generated Go proto/gRPC code: checked in under `go/gen/allwright/engine/v1`
+- The Java stack generates protobuf and gRPC stubs from `proto/engine/v1/engine.proto` during the Gradle build in `java/`
+- The Python stack loads `proto/engine/v1/engine.proto` dynamically at runtime through `grpcio-tools`
 - The TypeScript stack currently loads the shared proto dynamically from `proto/engine/v1/engine.proto` at runtime rather than checking in generated stubs
 
 This is only the base gRPC layout. It is intentionally small so the API can grow from a clear starting point instead of guessing future engine contracts too early.
@@ -135,6 +143,27 @@ The public TypeScript/JavaScript-facing API intentionally follows that same mode
 - `setServerAddr(...)` can override it inside the current process
 - the public TypeScript surface is centered on Playwright-like `chromium`, `Browser`, and `Page` objects rather than raw grpc-js streams
 - Bun is the preferred development/runtime tool for working in this repo's TypeScript stack
+
+For the standalone `allwright.dev/` Next.js site, Bun is also the preferred local development workflow even though the app is intended for Vercel deployment.
+The site currently targets the stable Next.js 16 line and uses Tailwind CSS v4 via the official PostCSS plugin.
+
+The public Python-facing API follows the same high-level pattern.
+
+- `python/` is a dedicated Python package folder
+- `python/allwright/client.py` creates the engine transport lazily as a singleton
+- the default Python client server address is `127.0.0.1:50051`
+- `ALLWRIGHT_SERVER_ADDR` can override that address
+- `set_server_addr(...)` can override it inside the current process
+- the public Python surface is centered on `chromium`, `Browser`, and `Page` objects rather than raw grpc setup
+
+The public Java-facing API follows that same pattern too.
+
+- `java/` is a dedicated Gradle project for Java consumers
+- `java/src/main/java/dev/allwright/client/Allwright.java` creates the engine transport lazily as a singleton
+- the default Java client server address is `127.0.0.1:50051`
+- `ALLWRIGHT_SERVER_ADDR` can override that address
+- `setServerAddr(...)` can override it inside the current process
+- the public Java surface is centered on `chromium`, `Browser`, and `Page` objects rather than raw gRPC setup
 
 ## Regenerating Proto Code
 

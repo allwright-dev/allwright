@@ -13,12 +13,18 @@ This instruction should be treated as ongoing project policy for all future AI c
 - Top-level repo folders are now split by technology:
   - `rust/`
   - `go/`
+  - `java/`
+  - `python/`
+  - `allwright.dev/`
   - `typescript/`
   - `proto/`
 - `rust/allwright`: CLI crate and top-level operator entrypoint
 - `rust/allwright-client`: reusable Rust client crate with a higher-level browser/tab API
 - `rust/playground`: end-to-end client crate for exercising the engine server
 - `go/`: Go module containing generated engine stubs, a reusable Go client, and a Go playground
+- `java/`: Gradle-based Java client project that generates engine stubs from the shared proto and exposes a high-level browser/page API
+- `python/`: Python client package that loads the shared proto dynamically at runtime and exposes a high-level browser/page API
+- `allwright.dev/`: standalone Next.js site for the purchased `allwright.dev` domain, intended for Vercel deployment and public-facing marketing/docs entrypoints
 - `typescript/`: TypeScript/JavaScript stack folder containing the JS client package and playground
 - `proto/`: shared protobuf and gRPC contract root for all stacks
 - `rust/engine-lib`: owner of all engine code, including the gRPC server
@@ -50,11 +56,17 @@ Supporting libraries:
 - The current starter service is `EngineService`.
 - Generated gRPC client code is enabled and currently consumed by `rust/allwright-client` and `rust/playground`.
 - Generated Go proto/gRPC code is checked in under `go/gen/allwright/engine/v1` and consumed by the Go module.
+- The Java stack generates protobuf and gRPC stubs from `proto/engine/v1/engine.proto` during the Gradle build in `java/`.
+- The Python stack currently loads `proto/engine/v1/engine.proto` dynamically at runtime through `grpcio-tools`.
 - The TypeScript stack currently loads `proto/engine/v1/engine.proto` dynamically at runtime rather than checking in generated TS stubs.
 - The public Rust client surface should stay high-level and should not expose raw gRPC connection setup.
 - The public Go client surface should stay high-level and should not expose raw gRPC connection setup.
+- The public Java client surface should stay high-level and should not expose raw gRPC connection setup.
+- The public Python client surface should stay high-level and should not expose raw gRPC connection setup.
 - The public TypeScript client surface should stay high-level and should not expose raw grpc-js client setup.
 - Use Bun for local development workflows in the TypeScript stack, but keep the client surface generic for TypeScript/JavaScript consumers.
+- Use Bun as the primary local development workflow for `allwright.dev/` as well, while keeping the app deployable as a standard Next.js project on Vercel.
+- `allwright.dev/` should stay on the stable Next.js 16 release line and use Tailwind CSS v4 through the official PostCSS integration unless there is a deliberate migration decision.
 - The current RPCs are:
   - `Ping`
   - `BrowserSession` as a bidirectional stream
@@ -92,6 +104,10 @@ Supporting libraries:
 - `go/client` now uses package name `allwright`, hides the engine transport behind a lazy singleton connection, and exposes browser/tab methods instead of public gRPC dial APIs.
 - The Go singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`.
 - `go/cmd/playground` is the Go-side playground and currently exercises a minimal browser-session test flow directly, without extra ping-style smoke commands.
+- `java/src/main/java/dev/allwright/client/Allwright.java` now provides the Java client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch(...)`, `Browser`, and `Page` methods instead of public gRPC setup.
+- The Java singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and supports in-process override with `Allwright.setServerAddr(...)`.
+- `python/allwright/client.py` now provides the Python client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch()`, `Browser`, and `Page` methods instead of public grpc setup.
+- The Python singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and supports in-process override with `set_server_addr(...)`.
 - `typescript/src/index.ts` now provides the TypeScript/JavaScript client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch(...)`, `Browser`, and `Page` methods instead of public grpc-js setup.
 - New TypeScript work should prefer the `chromium` / `Browser` / `Page` surface; older compatibility helpers like `launchChrome`, `initialTab()`, `newTab()`, and `navigate()` should be treated as transitional.
 - The TypeScript singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and also supports in-process override with `setServerAddr(...)`.

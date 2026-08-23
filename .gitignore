@@ -9,6 +9,36 @@
 /typescript/dist/
 /typescript/*.tsbuildinfo
 
+# Python client artifacts
+/python/.venv/
+/python/venv/
+/python/__pycache__/
+/python/**/*.pyc
+/python/**/*.pyo
+/python/.pytest_cache/
+/python/.mypy_cache/
+/python/.ruff_cache/
+/python/build/
+/python/dist/
+/python/*.egg-info/
+
+# Java client artifacts
+/java/.gradle/
+/java/build/
+/java/out/
+
+# Next.js site artifacts
+/allwright.dev/node_modules/
+/allwright.dev/.next/
+/allwright.dev/.vercel/
+/allwright.dev/out/
+/allwright.dev/*.tsbuildinfo
+/allwright-dev/node_modules/
+/allwright-dev/.next/
+/allwright-dev/.vercel/
+/allwright-dev/out/
+/allwright-dev/*.tsbuildinfo
+
 # Editor and OS noise
 .DS_Store
 .idea/
