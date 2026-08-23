@@ -1,6 +1,6 @@
 fn main() {
-    let proto_root = "../../proto";
-    let engine_proto = "../../proto/engine/v1/engine.proto";
+    let proto_root = "proto";
+    let engine_proto = "proto/engine/v1/engine.proto";
     let protoc = protoc_bin_vendored::protoc_bin_path().expect("failed to resolve protoc");
 
     // Safety: build scripts run in a controlled process before compilation.

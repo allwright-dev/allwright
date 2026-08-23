@@ -1,9 +1,0 @@
-[package]
-name = "mobile-lib"
-version = "0.0.1"
-edition = "2024"
-
-[dependencies]
-android-lib = { path = "../android-lib" }
-ios-lib = { path = "../ios-lib" }
-tokio = { workspace = true }

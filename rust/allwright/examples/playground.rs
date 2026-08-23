@@ -1,4 +1,4 @@
-use allwright_client::{LaunchOptions, launch_chrome, set_server_addr, shutdown};
+use allwright::{LaunchOptions, launch_chrome, set_server_addr, shutdown};
 use clap::Parser;
 use std::io;
 
@@ -24,7 +24,6 @@ struct Args {
     /// Optional CSS selector to click over BiDi after navigation
     #[arg(long)]
     click_selector: Option<String>,
-
 }
 
 #[tokio::main]

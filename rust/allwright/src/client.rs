@@ -1,12 +1,12 @@
 use std::fmt::{Display, Formatter};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use engine_lib::proto::browser_session_command::Command as BrowserCommand;
-use engine_lib::proto::browser_session_event::Event as BrowserEvent;
-use engine_lib::proto::engine_service_client::EngineServiceClient;
-use engine_lib::proto::tab_session_command::Command as TabCommand;
-use engine_lib::proto::tab_session_event::Event as TabEvent;
-use engine_lib::proto::{
+use crate::proto::browser_session_command::Command as BrowserCommand;
+use crate::proto::browser_session_event::Event as BrowserEvent;
+use crate::proto::engine_service_client::EngineServiceClient;
+use crate::proto::tab_session_command::Command as TabCommand;
+use crate::proto::tab_session_event::Event as TabEvent;
+use crate::proto::{
     BrowserSessionCommand, BrowserSessionEvent, ClickElementCommand, CloseBrowserSessionCommand,
     CloseTabSessionCommand, LaunchChromeCommand, NavigateTabCommand, OpenTabCommand, PingRequest,
     SessionPingCommand, TabSessionCommand, TabSessionEvent, TabSessionPingCommand,

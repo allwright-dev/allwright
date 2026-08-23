@@ -51,13 +51,13 @@ cargo run -p allwright -- --listen-addr 127.0.0.1:50051
 Try the Rust playground against the running engine:
 
 ```bash
-cargo run -p playground -- --server-addr http://127.0.0.1:50051
+cargo run -p allwright --example playground -- --server-addr http://127.0.0.1:50051
 ```
 
 Open more tabs during the playground flow:
 
 ```bash
-cargo run -p playground -- --server-addr http://127.0.0.1:50051 --tabs 3
+cargo run -p allwright --example playground -- --server-addr http://127.0.0.1:50051 --tabs 3
 ```
 
 ## What You Can Try Today
@@ -71,7 +71,7 @@ allwright is designed around high-level browser objects rather than asking appli
 Rust example:
 
 ```rust
-let browser = allwright_client::launch_chrome(Default::default()).await?;
+let browser = allwright::launch_chrome(Default::default()).await?;
 let tab = browser.initial_tab()?;
 tab.navigate("https://example.com").await?;
 tab.click("a").await?;
@@ -102,7 +102,7 @@ await browser.close();
 
 ## Repository Guide
 
-- `rust/`: Rust engine, Rust client, and Rust playground
+- `rust/`: Rust crate, engine implementation, and Rust examples
 - `go/`: Go client and Go playground
 - `java/`: Java client project
 - `python/`: Python client package

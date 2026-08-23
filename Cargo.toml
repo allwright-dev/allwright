@@ -2,17 +2,6 @@
 resolver = "3"
 members = [
     "rust/allwright",
-    "rust/allwright-client",
-    "rust/playground",
-    "rust/engine-lib",
-    "rust/mobile-lib",
-    "rust/web-lib",
-    "rust/desktop-lib",
-    "rust/ios-lib",
-    "rust/android-lib",
-    "rust/windows-lib",
-    "rust/macos-lib",
-    "rust/linux-lib"
 ]
 
 [workspace.dependencies]

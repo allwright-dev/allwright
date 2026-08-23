@@ -3,13 +3,11 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::proto;
+use crate::web_lib;
 use tokio::sync::{Mutex, mpsc};
 use tokio_stream::{Stream, wrappers::ReceiverStream};
 use tonic::{Request, Response, Status, transport::Server};
-
-pub mod proto {
-    tonic::include_proto!("allwright.engine.v1");
-}
 
 use proto::engine_service_server::{EngineService, EngineServiceServer};
 use proto::{

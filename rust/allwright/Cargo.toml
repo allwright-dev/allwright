@@ -2,9 +2,42 @@
 name = "allwright"
 version = "0.0.1"
 edition = "2024"
+license = "MIT"
+description = "Driverless browser automation engine with a high-level Rust client and optional CLI."
+repository = "https://github.com/allwright-dev/allwright"
+homepage = "https://allwright.dev"
+readme = "README.md"
+keywords = ["automation", "testing", "browser", "grpc", "bidi"]
+categories = ["development-tools::testing", "command-line-utilities", "api-bindings"]
+
+[features]
+default = ["client"]
+client = []
+server = ["dep:futures-util", "dep:serde_json", "dep:tokio-tungstenite"]
+cli = ["server", "dep:clap"]
+
+[[bin]]
+name = "allwright"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[[example]]
+name = "playground"
+required-features = ["client"]
 
 [dependencies]
-clap = { version = "4.6.6", features = ["derive"] }
-engine-lib = { path = "../engine-lib" }
+clap = { version = "4.6.6", features = ["derive"], optional = true }
+futures-util = { workspace = true, optional = true }
+prost = { workspace = true }
+serde_json = { workspace = true, optional = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-tungstenite = { workspace = true, optional = true }
+
+[build-dependencies]
+protoc-bin-vendored = "3.1.0"
+tonic-build = "0.12.3"
+
+[dev-dependencies]
+clap = { version = "4.6.6", features = ["derive"] }

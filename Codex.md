@@ -11,27 +11,22 @@ This instruction should be treated as ongoing project policy for all future AI c
 ## Project Structure
 
 - Top-level repo folders are now split by technology:
-  - `rust/`
+- `rust/`
   - `go/`
   - `java/`
   - `python/`
   - `allwright-dev/`
   - `typescript/`
   - `proto/`
-- `rust/allwright`: CLI crate and top-level operator entrypoint
-- `rust/allwright-client`: reusable Rust client crate with a higher-level browser/tab API
-- `rust/playground`: end-to-end client crate for exercising the engine server
+- `rust/allwright`: single public Rust crate containing the high-level Rust client API plus the optional CLI/server binary
+- `rust/allwright/examples/`: Rust example programs for exercising the engine server
 - `go/`: Go module containing generated engine stubs, a reusable Go client, and a Go playground
 - `java/`: Gradle-based Java client project that generates engine stubs from the shared proto and exposes a high-level browser/page API
 - `python/`: Python client package that loads the shared proto dynamically at runtime and exposes a high-level browser/page API
 - `allwright-dev/`: standalone Next.js site for the purchased `allwright.dev` domain, intended for Vercel deployment and public-facing marketing/docs entrypoints
 - `typescript/`: TypeScript/JavaScript stack folder containing the JS client package and playground
 - `proto/`: shared protobuf and gRPC contract root for all stacks
-- `rust/engine-lib`: owner of all engine code, including the gRPC server
-- `rust/engine-lib` further uses `rust/mobile-lib`, `rust/desktop-lib`, and `rust/web-lib`
-- `rust/mobile-lib`: mobile support library used by `rust/engine-lib`
-- `rust/desktop-lib`: desktop support library used by `rust/engine-lib`
-- `rust/web-lib`: web support library used by `rust/engine-lib`
+- `rust/allwright` now vendors the current Rust engine/client implementation and the proto/build assets it needs for packaging
 
 Supporting libraries:
 
@@ -47,14 +42,14 @@ Supporting libraries:
 
 - The entire project should remain Tokio async runtime driven.
 - The CLI enters through `#[tokio::main]`.
-- `rust/engine-lib` owns the gRPC server surface.
-- `rust/engine-lib` should remain the only owner of engine behavior and engine-facing contracts.
+- `rust/allwright` now owns the Rust gRPC server surface and public Rust client surface in one package.
+- Engine behavior and engine-facing Rust contracts should stay inside `rust/allwright`.
 - The engine direction is driverless browser automation.
 - Do not introduce ChromeDriver into the primary browser control path.
 - The current gRPC layout lives in top-level `proto/`.
 - The current proto package is `allwright.engine.v1`.
 - The current starter service is `EngineService`.
-- Generated gRPC client code is enabled and currently consumed by `rust/allwright-client` and `rust/playground`.
+- Generated gRPC client code is enabled and currently consumed by `rust/allwright` and its examples.
 - Generated Go proto/gRPC code is checked in under `go/gen/allwright/engine/v1` and consumed by the Go module.
 - The Java stack generates protobuf and gRPC stubs from `proto/engine/v1/engine.proto` during the Gradle build in `java/`.
 - The Python stack currently loads `proto/engine/v1/engine.proto` dynamically at runtime through `grpcio-tools`.
@@ -109,11 +104,10 @@ Supporting libraries:
 - The current implemented BiDi action surface includes selector-based click through `script.evaluate` on the tab browsing context.
 - Chrome launching currently routes through `web-lib`, uses the browser binary directly, and discovers the CDP WebSocket endpoint via `DevToolsActivePort`.
 - Platform crates are support layers, not owners of engine logic.
-- `rust/playground` is the place for local end-to-end testing against the live engine server.
-- `rust/allwright-client` now hides the engine transport behind a lazy singleton connection and exposes `launch_chrome`, `ping`, `Browser`, and `Tab` methods instead of public tonic setup.
-- The Rust singleton client currently defaults to `http://127.0.0.1:50051`, also respects `ALLWRIGHT_SERVER_ADDR`, and can be redirected in-process with `allwright_client::set_server_addr(...)`.
-- `rust/playground` now exercises the engine through the `allwright-client` crate in `rust/allwright-client`, supports the launch-created initial tab plus additional browser-session tabs, and closes them through the high-level browser/tab API as a minimal end-to-end test flow.
-- `rust/playground` waits for keyboard confirmation before closing the browser session so browser state can be observed manually.
+- `rust/allwright` now hides the engine transport behind a lazy singleton connection and exposes `launch_chrome`, `ping`, `Browser`, and `Tab` methods from the same package that also provides the optional CLI/server binary.
+- The Rust singleton client currently defaults to `http://127.0.0.1:50051`, also respects `ALLWRIGHT_SERVER_ADDR`, and can be redirected in-process with `allwright::set_server_addr(...)`.
+- `rust/allwright/examples/playground.rs` now exercises the engine through the `allwright` crate, supports the launch-created initial tab plus additional browser-session tabs, and closes them through the high-level browser/tab API as a minimal end-to-end test flow.
+- The Rust playground example waits for keyboard confirmation before closing the browser session so browser state can be observed manually.
 - `go/client` now uses package name `allwright`, hides the engine transport behind a lazy singleton connection, and exposes browser/tab methods instead of public gRPC dial APIs.
 - The Go singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`.
 - `go/cmd/playground` is the Go-side playground and currently exercises a minimal browser-session test flow directly, without extra ping-style smoke commands.
@@ -136,22 +130,17 @@ proto/
 └── engine/v1/engine.proto
 
 rust/allwright
-└── rust/engine-lib
-    ├── uses rust/mobile-lib
-    │   ├── rust/ios-lib
-    │   └── rust/android-lib
-    ├── uses rust/desktop-lib
-    │   ├── rust/windows-lib
-    │   ├── rust/macos-lib
-    │   └── rust/linux-lib
-    └── uses rust/web-lib
+├── high-level Rust client API
+├── optional CLI/server binary
+├── packaged proto/build assets
+└── internal platform and engine modules
 ```
 
 ## Maintenance Rules
 
 - Keep `README.md` and `Codex.md` aligned.
 - Prefer documenting ownership changes here at the same time as code changes.
-- Do not move engine logic out of `rust/engine-lib`.
+- Do not move engine logic out of `rust/allwright`.
 - Do not collapse platform-specific responsibilities back into `allwright`.
 - Keep async boundaries explicit and Tokio-native.
 - Keep the gRPC contract minimal until requirements are explicitly defined.

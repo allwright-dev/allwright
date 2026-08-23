@@ -13,5 +13,5 @@ struct Args {
 async fn main() -> Result<(), tonic::transport::Error> {
     let args = Args::parse();
     println!("Starting engine gRPC server on {}", args.listen_addr);
-    engine_lib::serve(args.listen_addr).await
+    allwright::serve(args.listen_addr).await
 }

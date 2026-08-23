@@ -53,7 +53,7 @@ pub struct BidiClickInfo {
 
 const CHROMIUM_BIDI_NPM_VERSION: &str = "17.0.2";
 const CHROMIUM_BIDI_MAPPER_BUNDLE: &str =
-    include_str!("../third_party/chromium-bidi/17.0.2/mapperTab.js");
+    include_str!("../../third_party/chromium-bidi/17.0.2/mapperTab.js");
 
 pub fn open_chrome_window(chrome_binary: Option<&str>) -> Result<ChromeLaunchInfo, String> {
     launch_chrome_for_platform(chrome_binary.filter(|value| !value.trim().is_empty()))

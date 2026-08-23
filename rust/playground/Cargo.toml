@@ -1,9 +1,0 @@
-[package]
-name = "playground"
-version = "0.0.1"
-edition = "2024"
-
-[dependencies]
-allwright-client = { path = "../allwright-client" }
-clap = { version = "4.6.6", features = ["derive"] }
-tokio = { workspace = true }
