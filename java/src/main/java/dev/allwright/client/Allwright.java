@@ -1,21 +1,7 @@
 package dev.allwright.client;
 
 import allwright.engine.v1.EngineServiceGrpc;
-import allwright.engine.v1.Engine.BrowserSessionCommand;
-import allwright.engine.v1.Engine.BrowserSessionEvent;
-import allwright.engine.v1.Engine.ChromeLaunchedEvent;
-import allwright.engine.v1.Engine.ClickElementCommand;
-import allwright.engine.v1.Engine.CloseBrowserSessionCommand;
-import allwright.engine.v1.Engine.CloseTabSessionCommand;
-import allwright.engine.v1.Engine.LaunchChromeCommand;
-import allwright.engine.v1.Engine.NavigateTabCommand;
-import allwright.engine.v1.Engine.OpenTabCommand;
-import allwright.engine.v1.Engine.PingRequest;
-import allwright.engine.v1.Engine.SessionPingCommand;
-import allwright.engine.v1.Engine.TabOpenedEvent;
-import allwright.engine.v1.Engine.TabSessionCommand;
-import allwright.engine.v1.Engine.TabSessionEvent;
-import allwright.engine.v1.Engine.TabSessionPingCommand;
+import allwright.engine.v1.Engine.*;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
@@ -53,6 +39,9 @@ public final class Allwright {
         LaunchChromeCommand.Builder launch = LaunchChromeCommand.newBuilder();
         if (options.chromeBinary() != null && !options.chromeBinary().isBlank()) {
             launch.setChromeBinary(options.chromeBinary());
+        }
+        if (options.timeoutMs() != null && options.timeoutMs() > 0) {
+            launch.setRetryOptions(commandRetryOptions(options.timeoutMs()));
         }
 
         stream.send(BrowserSessionCommand.newBuilder().setLaunchChrome(launch).build());
@@ -138,9 +127,37 @@ public final class Allwright {
         }
     }
 
-    public record LaunchOptions(String chromeBinary) {
+    private static CommandRetryOptions commandRetryOptions(Integer timeoutMs) {
+        return CommandRetryOptions.newBuilder().setTimeoutMs(timeoutMs).build();
+    }
+
+    public record LaunchOptions(String chromeBinary, Integer timeoutMs) {
         public LaunchOptions() {
+            this(null, null);
+        }
+    }
+
+    public record CommandOptions(Integer timeoutMs) {
+        public CommandOptions() {
             this(null);
+        }
+    }
+
+    public record HighlightOptions(Integer timeoutMs, Integer durationMs) {
+        public HighlightOptions() {
+            this(null, null);
+        }
+    }
+
+    public record PressOptions(Integer timeoutMs, String text) {
+        public PressOptions() {
+            this(null, null);
+        }
+    }
+
+    public record WaitForSelectorOptions(Integer timeoutMs, Boolean visible) {
+        public WaitForSelectorOptions() {
+            this(null, null);
         }
     }
 
@@ -154,6 +171,20 @@ public final class Allwright {
     ) {}
 
     public record ClickResult(String selector, String note, String bidiSessionId) {}
+
+    public record CountResult(String selector, int count, String note) {}
+
+    public record HighlightResult(String selector, int count, String note) {}
+
+    public record ElementResult(String selector, String note) {}
+
+    public record FillResult(String selector, String value, String note) {}
+
+    public record PressResult(String selector, String key, String note) {}
+
+    public record TextResult(String selector, String text, String note) {}
+
+    public record WaitForSelectorResult(String selector, boolean visible, String note) {}
 
     public static final class BrowserType {
         public Browser launch() {

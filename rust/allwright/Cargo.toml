@@ -1,6 +1,6 @@
 [package]
 name = "allwright"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 license = "MIT"
 description = "Driverless browser automation engine with a high-level Rust client and optional CLI."

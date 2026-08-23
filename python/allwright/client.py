@@ -28,6 +28,30 @@ class AllwrightError(RuntimeError):
 @dataclass(slots=True)
 class LaunchOptions:
     chrome_binary: str | None = None
+    timeout_ms: int | None = None
+
+
+@dataclass(slots=True)
+class CommandOptions:
+    timeout_ms: int | None = None
+
+
+@dataclass(slots=True)
+class HighlightOptions:
+    timeout_ms: int | None = None
+    duration_ms: int | None = None
+
+
+@dataclass(slots=True)
+class PressOptions:
+    timeout_ms: int | None = None
+    text: str | None = None
+
+
+@dataclass(slots=True)
+class WaitForSelectorOptions:
+    timeout_ms: int | None = None
+    visible: bool | None = None
 
 
 @dataclass(slots=True)
@@ -45,6 +69,54 @@ class ClickResult:
     selector: str
     note: str
     bidi_session_id: str
+
+
+@dataclass(slots=True)
+class CountResult:
+    selector: str
+    count: int
+    note: str
+
+
+@dataclass(slots=True)
+class HighlightResult:
+    selector: str
+    count: int
+    note: str
+
+
+@dataclass(slots=True)
+class ElementResult:
+    selector: str
+    note: str
+
+
+@dataclass(slots=True)
+class FillResult:
+    selector: str
+    value: str
+    note: str
+
+
+@dataclass(slots=True)
+class PressResult:
+    selector: str
+    key: str
+    note: str
+
+
+@dataclass(slots=True)
+class TextResult:
+    selector: str
+    text: str
+    note: str
+
+
+@dataclass(slots=True)
+class WaitForSelectorResult:
+    selector: str
+    visible: bool
+    note: str
 
 
 class BrowserType:
@@ -88,12 +160,15 @@ class Browser:
     def pages(self) -> list[Page]:
         return list(self._pages.values())
 
-    def new_page(self) -> Page:
+    def new_page(self, options: CommandOptions | None = None) -> Page:
         with self._lock:
             self._ensure_open()
+            command_options = options or CommandOptions()
             self._stream.send(
                 engine_pb2.BrowserSessionCommand(
-                    open_tab=engine_pb2.OpenTabCommand(),
+                    open_tab=engine_pb2.OpenTabCommand(
+                        retry_options=_retry_options(command_options.timeout_ms),
+                    ),
                 )
             )
 
@@ -113,8 +188,8 @@ class Browser:
                             f"browser session error while opening page: {event.error.message}"
                         )
 
-    def new_tab(self) -> Page:
-        return self.new_page()
+    def new_tab(self, options: CommandOptions | None = None) -> Page:
+        return self.new_page(options)
 
     def ping(self, message: str = "ping") -> str:
         with self._lock:
@@ -180,15 +255,19 @@ class Page:
     def browser_session_id(self) -> str:
         return self._browser_session_id
 
-    def goto(self, url: str) -> NavigateResult:
+    def goto(self, url: str, options: CommandOptions | None = None) -> NavigateResult:
         with self._lock:
             handle = self._ensure_handle()
             self._ensure_open()
+            command_options = options or CommandOptions()
             handle.send(
                 engine_pb2.TabSessionCommand(
                     browser_session_id=self.browser_session_id,
                     tab_session_id=self.session_id,
-                    navigate=engine_pb2.NavigateTabCommand(url=url),
+                    navigate=engine_pb2.NavigateTabCommand(
+                        url=url,
+                        retry_options=_retry_options(command_options.timeout_ms),
+                    ),
                 )
             )
 
@@ -222,18 +301,22 @@ class Page:
                         package_version=injection.package_version,
                     )
 
-    def navigate(self, url: str) -> NavigateResult:
-        return self.goto(url)
+    def navigate(self, url: str, options: CommandOptions | None = None) -> NavigateResult:
+        return self.goto(url, options)
 
-    def click(self, selector: str) -> ClickResult:
+    def click(self, selector: str, options: CommandOptions | None = None) -> ClickResult:
         with self._lock:
             handle = self._ensure_handle()
             self._ensure_open()
+            command_options = options or CommandOptions()
             handle.send(
                 engine_pb2.TabSessionCommand(
                     browser_session_id=self.browser_session_id,
                     tab_session_id=self.session_id,
-                    click_element=engine_pb2.ClickElementCommand(css_selector=selector),
+                    click_element=engine_pb2.ClickElementCommand(
+                        css_selector=selector,
+                        retry_options=_retry_options(command_options.timeout_ms),
+                    ),
                 )
             )
 
@@ -255,6 +338,239 @@ class Page:
                     case "error":
                         raise AllwrightError(
                             f"page session error while clicking: {event.error.message}"
+                        )
+
+    def count(self, selector: str, options: CommandOptions | None = None) -> CountResult:
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            command_options = options or CommandOptions()
+            handle.send(
+                engine_pb2.TabSessionCommand(
+                    browser_session_id=self.browser_session_id,
+                    tab_session_id=self.session_id,
+                    count_elements=engine_pb2.CountElementsCommand(
+                        css_selector=selector,
+                        retry_options=_retry_options(command_options.timeout_ms),
+                    ),
+                )
+            )
+
+            while True:
+                event = handle.recv("receive tab session event while counting elements")
+                match event.WhichOneof("event"):
+                    case "element_counted":
+                        counted = event.element_counted
+                        return CountResult(
+                            selector=counted.css_selector,
+                            count=counted.count,
+                            note=counted.note,
+                        )
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(
+                            f"page session {self.session_id} closed while counting elements"
+                        )
+                    case "error":
+                        raise AllwrightError(
+                            f"page session error while counting elements: {event.error.message}"
+                        )
+
+    def highlight(self, selector: str, options: HighlightOptions | None = None) -> HighlightResult:
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            highlight_options = options or HighlightOptions()
+            handle.send(
+                engine_pb2.TabSessionCommand(
+                    browser_session_id=self.browser_session_id,
+                    tab_session_id=self.session_id,
+                    highlight_elements=engine_pb2.HighlightElementsCommand(
+                        css_selector=selector,
+                        duration_ms=highlight_options.duration_ms,
+                        retry_options=_retry_options(highlight_options.timeout_ms),
+                    ),
+                )
+            )
+
+            while True:
+                event = handle.recv("receive tab session event while highlighting elements")
+                match event.WhichOneof("event"):
+                    case "elements_highlighted":
+                        highlighted = event.elements_highlighted
+                        return HighlightResult(
+                            selector=highlighted.css_selector,
+                            count=highlighted.count,
+                            note=highlighted.note,
+                        )
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(
+                            f"page session {self.session_id} closed while highlighting elements"
+                        )
+                    case "error":
+                        raise AllwrightError(
+                            f"page session error while highlighting elements: {event.error.message}"
+                        )
+
+    def focus(self, selector: str, options: CommandOptions | None = None) -> ElementResult:
+        return self._element_command(
+            action="focusing",
+            event_name="element_focused",
+            command=engine_pb2.TabSessionCommand(
+                browser_session_id=self.browser_session_id,
+                tab_session_id=self.session_id,
+                focus_element=engine_pb2.FocusElementCommand(
+                    css_selector=selector,
+                    retry_options=_retry_options((options or CommandOptions()).timeout_ms),
+                ),
+            ),
+        )
+
+    def hover(self, selector: str, options: CommandOptions | None = None) -> ElementResult:
+        return self._element_command(
+            action="hovering",
+            event_name="element_hovered",
+            command=engine_pb2.TabSessionCommand(
+                browser_session_id=self.browser_session_id,
+                tab_session_id=self.session_id,
+                hover_element=engine_pb2.HoverElementCommand(
+                    css_selector=selector,
+                    retry_options=_retry_options((options or CommandOptions()).timeout_ms),
+                ),
+            ),
+        )
+
+    def fill(
+        self,
+        selector: str,
+        value: str,
+        options: CommandOptions | None = None,
+    ) -> FillResult:
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            command_options = options or CommandOptions()
+            handle.send(
+                engine_pb2.TabSessionCommand(
+                    browser_session_id=self.browser_session_id,
+                    tab_session_id=self.session_id,
+                    fill_element=engine_pb2.FillElementCommand(
+                        css_selector=selector,
+                        value=value,
+                        retry_options=_retry_options(command_options.timeout_ms),
+                    ),
+                )
+            )
+
+            while True:
+                event = handle.recv("receive tab session event while filling")
+                match event.WhichOneof("event"):
+                    case "element_filled":
+                        filled = event.element_filled
+                        return FillResult(
+                            selector=filled.css_selector,
+                            value=filled.value,
+                            note=filled.note,
+                        )
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(
+                            f"page session {self.session_id} closed while filling"
+                        )
+                    case "error":
+                        raise AllwrightError(
+                            f"page session error while filling: {event.error.message}"
+                        )
+
+    def press(
+        self,
+        selector: str,
+        key: str,
+        options: PressOptions | None = None,
+    ) -> PressResult:
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            press_options = options or PressOptions()
+            handle.send(
+                engine_pb2.TabSessionCommand(
+                    browser_session_id=self.browser_session_id,
+                    tab_session_id=self.session_id,
+                    press_key=engine_pb2.PressKeyCommand(
+                        css_selector=selector,
+                        key=key,
+                        text=press_options.text,
+                        retry_options=_retry_options(press_options.timeout_ms),
+                    ),
+                )
+            )
+
+            while True:
+                event = handle.recv("receive tab session event while pressing key")
+                match event.WhichOneof("event"):
+                    case "key_pressed":
+                        pressed = event.key_pressed
+                        return PressResult(
+                            selector=pressed.css_selector,
+                            key=pressed.key,
+                            note=pressed.note,
+                        )
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(
+                            f"page session {self.session_id} closed while pressing key"
+                        )
+                    case "error":
+                        raise AllwrightError(
+                            f"page session error while pressing key: {event.error.message}"
+                        )
+
+    def text_content(self, selector: str, options: CommandOptions | None = None) -> TextResult:
+        return self._read_text(selector, options or CommandOptions(), text_content=True)
+
+    def inner_text(self, selector: str, options: CommandOptions | None = None) -> TextResult:
+        return self._read_text(selector, options or CommandOptions(), text_content=False)
+
+    def wait_for_selector(
+        self,
+        selector: str,
+        options: WaitForSelectorOptions | None = None,
+    ) -> WaitForSelectorResult:
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            wait_options = options or WaitForSelectorOptions()
+            handle.send(
+                engine_pb2.TabSessionCommand(
+                    browser_session_id=self.browser_session_id,
+                    tab_session_id=self.session_id,
+                    wait_for_selector=engine_pb2.WaitForSelectorCommand(
+                        css_selector=selector,
+                        visible=wait_options.visible,
+                        retry_options=_retry_options(wait_options.timeout_ms),
+                    ),
+                )
+            )
+
+            while True:
+                event = handle.recv("receive tab session event while waiting for selector")
+                match event.WhichOneof("event"):
+                    case "selector_wait_satisfied":
+                        satisfied = event.selector_wait_satisfied
+                        return WaitForSelectorResult(
+                            selector=satisfied.css_selector,
+                            visible=satisfied.visible,
+                            note=satisfied.note,
+                        )
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(
+                            f"page session {self.session_id} closed while waiting for selector"
+                        )
+                    case "error":
+                        raise AllwrightError(
+                            f"page session error while waiting for selector: {event.error.message}"
                         )
 
     def ping(self, message: str = "ping") -> str:
@@ -319,6 +635,85 @@ class Page:
         if self._closed:
             raise AllwrightError(f"page session {self.session_id} is closed")
 
+    def _element_command(self, action: str, event_name: str, command: Any) -> ElementResult:
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            handle.send(command)
+
+            while True:
+                event = handle.recv(f"receive tab session event while {action}")
+                match event.WhichOneof("event"):
+                    case name if name == event_name:
+                        payload = getattr(event, event_name)
+                        return ElementResult(selector=payload.css_selector, note=payload.note)
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(
+                            f"page session {self.session_id} closed while {action}"
+                        )
+                    case "error":
+                        raise AllwrightError(
+                            f"page session error while {action}: {event.error.message}"
+                        )
+
+    def _read_text(
+        self,
+        selector: str,
+        options: CommandOptions,
+        *,
+        text_content: bool,
+    ) -> TextResult:
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            if text_content:
+                command = engine_pb2.TabSessionCommand(
+                    browser_session_id=self.browser_session_id,
+                    tab_session_id=self.session_id,
+                    get_text_content=engine_pb2.GetTextContentCommand(
+                        css_selector=selector,
+                        retry_options=_retry_options(options.timeout_ms),
+                    ),
+                )
+            else:
+                command = engine_pb2.TabSessionCommand(
+                    browser_session_id=self.browser_session_id,
+                    tab_session_id=self.session_id,
+                    get_inner_text=engine_pb2.GetInnerTextCommand(
+                        css_selector=selector,
+                        retry_options=_retry_options(options.timeout_ms),
+                    ),
+                )
+            handle.send(command)
+
+            while True:
+                event = handle.recv("receive tab session event while reading text")
+                match event.WhichOneof("event"):
+                    case "text_content_resolved":
+                        resolved = event.text_content_resolved
+                        return TextResult(
+                            selector=resolved.css_selector,
+                            text=resolved.text,
+                            note=resolved.note,
+                        )
+                    case "inner_text_resolved":
+                        resolved = event.inner_text_resolved
+                        return TextResult(
+                            selector=resolved.css_selector,
+                            text=resolved.text,
+                            note=resolved.note,
+                        )
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(
+                            f"page session {self.session_id} closed while reading text"
+                        )
+                    case "error":
+                        raise AllwrightError(
+                            f"page session error while reading text: {event.error.message}"
+                        )
+
 
 class _StreamHandle:
     def __init__(self, stream_factory: Callable[[Iterator[Any]], Iterator[Any]]) -> None:
@@ -376,6 +771,8 @@ def launch_chrome(options: LaunchOptions | None = None) -> Browser:
     command_kwargs: dict[str, Any] = {}
     if launch_options.chrome_binary:
         command_kwargs["chrome_binary"] = launch_options.chrome_binary
+    if launch_options.timeout_ms is not None:
+        command_kwargs["retry_options"] = _retry_options(launch_options.timeout_ms)
 
     stream.send(
         engine_pb2.BrowserSessionCommand(
@@ -443,6 +840,12 @@ def _resolve_server_addr() -> str:
     if value:
         return value
     return DEFAULT_SERVER_ADDR
+
+
+def _retry_options(timeout_ms: int | None) -> Any | None:
+    if timeout_ms is None or timeout_ms <= 0:
+        return None
+    return engine_pb2.CommandRetryOptions(timeout_ms=timeout_ms)
 
 
 chromium = BrowserType()
