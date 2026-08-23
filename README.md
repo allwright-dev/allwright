@@ -55,6 +55,10 @@ The workspace shares a single Tokio dependency through the root `Cargo.toml` and
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
 ## gRPC Layout
 
 - Proto root: `proto/`
