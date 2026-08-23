@@ -28,6 +28,17 @@ export default function Home() {
           tasks, apis, mobile, desktop everything should be handled by single engine.
         </p>
 
+        <div className="mt-8 flex flex-wrap gap-3">
+          <a
+            href="https://github.com/allwright-dev/allwright"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center rounded-full border border-[var(--ink)] px-5 py-3 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-[var(--ink)] hover:text-[var(--background)]"
+          >
+            View GitHub repository
+          </a>
+        </div>
+
         <div
           aria-label="project status"
           className="mt-9 grid gap-4 md:grid-cols-3"
