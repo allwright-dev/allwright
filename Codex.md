@@ -15,7 +15,7 @@ This instruction should be treated as ongoing project policy for all future AI c
   - `go/`
   - `java/`
   - `python/`
-  - `allwright.dev/`
+  - `allwright-dev/`
   - `typescript/`
   - `proto/`
 - `rust/allwright`: CLI crate and top-level operator entrypoint
@@ -24,7 +24,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `go/`: Go module containing generated engine stubs, a reusable Go client, and a Go playground
 - `java/`: Gradle-based Java client project that generates engine stubs from the shared proto and exposes a high-level browser/page API
 - `python/`: Python client package that loads the shared proto dynamically at runtime and exposes a high-level browser/page API
-- `allwright.dev/`: standalone Next.js site for the purchased `allwright.dev` domain, intended for Vercel deployment and public-facing marketing/docs entrypoints
+- `allwright-dev/`: standalone Next.js site for the purchased `allwright.dev` domain, intended for Vercel deployment and public-facing marketing/docs entrypoints
 - `typescript/`: TypeScript/JavaScript stack folder containing the JS client package and playground
 - `proto/`: shared protobuf and gRPC contract root for all stacks
 - `rust/engine-lib`: owner of all engine code, including the gRPC server
@@ -65,8 +65,17 @@ Supporting libraries:
 - The public Python client surface should stay high-level and should not expose raw gRPC connection setup.
 - The public TypeScript client surface should stay high-level and should not expose raw grpc-js client setup.
 - Use Bun for local development workflows in the TypeScript stack, but keep the client surface generic for TypeScript/JavaScript consumers.
-- Use Bun as the primary local development workflow for `allwright.dev/` as well, while keeping the app deployable as a standard Next.js project on Vercel.
-- `allwright.dev/` should stay on the stable Next.js 16 release line and use Tailwind CSS v4 through the official PostCSS integration unless there is a deliberate migration decision.
+- Use Bun as the primary local development workflow for `allwright-dev/`.
+- `allwright-dev/` should stay on the stable Next.js 16 release line and use Tailwind CSS v4 through the official PostCSS integration unless there is a deliberate migration decision.
+- `allwright-dev/` is user-facing marketing/product surface, not developer-facing repo messaging.
+- The core product message for `allwright-dev/` is that allwright is one automation engine for all automation needs.
+- The coming-soon page currently links to the GitHub repository at `https://github.com/qalens/allwright`.
+- All copy on `allwright-dev/` must read as user-facing product messaging (audience, benefits, surfaces covered); it must never describe internal implementation, architecture, or repo/dev workflow details.
+- `allwright-dev/` uses `next-themes` (class strategy on `<html>`, `defaultTheme="system"`) for light/dark mode via `app/theme-provider.tsx` and exposes a toggle through `app/theme-toggle.tsx`.
+- `allwright-dev/app/globals.css` defines the site palette as a green/blue (teal + blue accent) theme with light tokens on `:root` and dark tokens under `.dark`, matching the `next-themes` class strategy.
+- Vercel must use `allwright-dev/` as the project Root Directory for the site deployment.
+- Local Bun development is preferred for `allwright-dev/`, but Vercel builds should use the standard Node/npm Next.js path for stability.
+- The current Vercel workaround exists because Bun 1.3.14 has a known crash path with Next.js 16.3.0 builds on Linux, producing `SIGILL`/segfault failures during or after `next build`.
 - The current RPCs are:
   - `Ping`
   - `BrowserSession` as a bidirectional stream
@@ -108,6 +117,8 @@ Supporting libraries:
 - The Java singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and supports in-process override with `Allwright.setServerAddr(...)`.
 - `python/allwright/client.py` now provides the Python client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch()`, `Browser`, and `Page` methods instead of public grpc setup.
 - The Python singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and supports in-process override with `set_server_addr(...)`.
+- `allwright-dev/package.json` currently keeps Bun as the package manager declaration but uses standard `next dev`, `next build`, and `next start` scripts.
+- `allwright-dev/vercel.json` currently pins Vercel site behavior to the Next.js framework with `npm install` and `npm run build` so deployments avoid the Bun build crash path.
 - `typescript/src/index.ts` now provides the TypeScript/JavaScript client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch(...)`, `Browser`, and `Page` methods instead of public grpc-js setup.
 - New TypeScript work should prefer the `chromium` / `Browser` / `Page` surface; older compatibility helpers like `launchChrome`, `initialTab()`, `newTab()`, and `navigate()` should be treated as transitional.
 - The TypeScript singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and also supports in-process override with `setServerAddr(...)`.

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 
 import "./globals.css";
+import { ThemeProvider } from "./theme-provider";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -15,8 +16,9 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "allwright.dev",
-  description: "Coming soon: driverless browser automation by allwright.",
+  title: "Allwright — one automation engine for everything you test",
+  description:
+    "Allwright brings web, mobile, desktop, and API testing into a single automation engine, so teams stop stitching tools together and start shipping with confidence.",
 };
 
 export default function RootLayout({
@@ -25,9 +27,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${spaceGrotesk.variable} ${ibmPlexMono.variable}`}>
-        {children}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

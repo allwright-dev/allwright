@@ -1,85 +1,183 @@
-const statusItems = [
-  { label: "Vision", value: "One engine for every automation flow" },
-  { label: "Promise", value: "One system instead of a pile of brittle tools" },
-  { label: "Launch", value: "Public release coming soon" },
+import { ThemeToggle } from "./theme-toggle";
+
+const GITHUB_URL = "https://github.com/qalens/allwright";
+
+const surfaces = [
+  {
+    label: "Web",
+    description: "Real browser flows that click, type, and navigate like a person would.",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M3 12h18M12 3c2.4 2.6 3.6 5.7 3.6 9s-1.2 6.4-3.6 9c-2.4-2.6-3.6-5.7-3.6-9S9.6 5.6 12 3Z" />
+      </svg>
+    ),
+  },
+  {
+    label: "Mobile",
+    description: "The same test logic driving native and hybrid apps on real devices.",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <rect x="7" y="2.5" width="10" height="19" rx="2.2" />
+        <path d="M11 18.2h2" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    label: "Desktop",
+    description: "Full application automation for the tools your business runs on.",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <rect x="2.5" y="4" width="19" height="13" rx="1.8" />
+        <path d="M8 21h8M12 17v4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    label: "API",
+    description: "Backend checks that stay in sync with the same flows and data.",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path d="M8 9 4.5 12.5 8 16M16 9l3.5 3.5L16 16M13.5 6.5l-3 11" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+];
+
+const benefits = [
+  {
+    title: "One engine, not a pile of tools",
+    body: "Every surface you test runs on the same engine, so your team learns one system instead of juggling a different framework for every platform.",
+  },
+  {
+    title: "Built for steady, trustworthy runs",
+    body: "Allwright is engineered to behave the way a real user does, so results stay dependable instead of failing on things that were never actually broken.",
+  },
+  {
+    title: "One workflow, every team",
+    body: "Web, mobile, desktop, and API testers describe automation the same way, so knowledge and coverage carry across the whole product.",
+  },
 ];
 
 export default function Home() {
   return (
-    <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(216,106,49,0.22),transparent_34%),radial-gradient(circle_at_85%_20%,rgba(35,105,91,0.2),transparent_26%),linear-gradient(180deg,var(--background)_0%,var(--background-deep)_100%)] px-4 py-8 sm:px-6">
-      <div className="grid-overlay pointer-events-none absolute inset-0 opacity-25" />
-      <div className="ambient-left absolute left-[-8%] top-[8%] h-[22rem] w-[22rem] rounded-full bg-[radial-gradient(circle,rgba(216,106,49,0.28),transparent_68%)] blur-md" />
-      <div className="ambient-right absolute bottom-[2%] right-[-8%] h-[22rem] w-[22rem] rounded-full bg-[radial-gradient(circle,rgba(35,105,91,0.24),transparent_68%)] blur-md" />
+    <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,var(--accent-soft),transparent_38%),radial-gradient(circle_at_85%_15%,var(--accent-2-soft),transparent_32%),linear-gradient(180deg,var(--background)_0%,var(--background-deep)_100%)] px-4 py-6 sm:px-6 sm:py-8">
+      <div className="grid-overlay pointer-events-none absolute inset-0 opacity-40" />
+      <div className="ambient-left absolute left-[-10%] top-[6%] h-[24rem] w-[24rem] rounded-full bg-[radial-gradient(circle,var(--accent-soft),transparent_68%)] blur-md" />
+      <div className="ambient-right absolute bottom-[-4%] right-[-10%] h-[26rem] w-[26rem] rounded-full bg-[radial-gradient(circle,var(--accent-2-soft),transparent_68%)] blur-md" />
 
-      <section className="animate-rise relative w-full max-w-6xl rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-6 shadow-[0_28px_80px_rgba(32,26,17,0.12)] backdrop-blur-xl sm:p-10">
-        <p className="mb-5 font-mono text-[0.82rem] uppercase tracking-[0.18em] text-[var(--accent-2)]">
-          allwright.dev is getting ready
-        </p>
-        <h1 className="max-w-[12ch] text-[clamp(3rem,8vw,6.8rem)] leading-[0.95] font-semibold tracking-[-0.06em] text-[var(--ink)]">
-          One automation engine,
-          <span className="text-[color:rgba(29,34,28,0.72)]">
-            {" "}
-            for everything you need to automate.
-          </span>
-        </h1>
-        <p className="mt-6 max-w-[56ch] text-[clamp(1rem,2.2vw,1.2rem)] leading-7 text-[var(--muted)] sm:leading-8">
-          Allwright is being built around a simple idea: automation should feel
-          unified. Instead of stitching together separate tools for browser
-          tasks, apis, mobile, desktop everything should be handled by single engine.
-        </p>
-
-        <div className="mt-8 flex flex-wrap gap-3">
+      <div className="relative mx-auto flex w-full max-w-6xl items-center justify-between">
+        <span className="font-mono text-[0.95rem] font-medium tracking-[-0.02em] text-[var(--ink)]">
+          allwright
+        </span>
+        <div className="flex items-center gap-3">
           <a
-            href="https://github.com/allwright-dev/allwright"
+            href={GITHUB_URL}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center rounded-full border border-[var(--ink)] px-5 py-3 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-[var(--ink)] hover:text-[var(--background)]"
+            className="hidden items-center rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:border-[var(--accent-2)] sm:inline-flex"
           >
-            View GitHub repository
+            Star on GitHub
+          </a>
+          <ThemeToggle />
+        </div>
+      </div>
+
+      <section className="relative mx-auto mt-10 grid w-full max-w-6xl place-items-center text-center sm:mt-16">
+        <p className="animate-rise mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-1.5 font-mono text-[0.78rem] uppercase tracking-[0.14em] text-[var(--accent-2)]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+          Building in public — coming soon
+        </p>
+
+        <h1 className="animate-rise max-w-[18ch] text-[clamp(2.6rem,7vw,5.6rem)] leading-[1.02] font-semibold tracking-[-0.04em] text-[var(--ink)]">
+          One automation engine{" "}
+          <span className="bg-[linear-gradient(120deg,var(--accent),var(--accent-2))] bg-clip-text text-transparent">
+            for everything you test.
+          </span>
+        </h1>
+
+        <p className="animate-rise-delay mt-6 max-w-[52ch] text-[clamp(1.02rem,2vw,1.25rem)] leading-8 text-[var(--muted)]">
+          Web, mobile, desktop, and API — allwright brings every kind of test
+          automation under one roof, so your team ships with one reliable
+          engine instead of stitching together a different tool for each
+          surface.
+        </p>
+
+        <div className="animate-rise-delay mt-9 flex flex-wrap items-center justify-center gap-3">
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center rounded-full bg-[linear-gradient(120deg,var(--accent),var(--accent-2))] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_var(--accent-soft)] transition hover:-translate-y-0.5"
+          >
+            Follow the project
+          </a>
+          <a
+            href="#surfaces"
+            className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--card)] px-6 py-3 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:border-[var(--accent-2)]"
+          >
+            See what it covers
           </a>
         </div>
+      </section>
 
-        <div
-          aria-label="project status"
-          className="mt-9 grid gap-4 md:grid-cols-3"
-        >
-          {statusItems.map((item) => (
-            <article
-              key={item.label}
-              className="rounded-[1.375rem] border border-[var(--line)] bg-white/55 px-4 py-5"
-            >
-              <p className="mb-2.5 font-mono text-[0.78rem] uppercase tracking-[0.08em] text-[var(--muted)]">
-                {item.label}
+      <section
+        id="surfaces"
+        aria-label="what allwright automates"
+        className="relative mx-auto mt-16 grid w-full max-w-6xl gap-4 sm:mt-20 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        {surfaces.map((surface) => (
+          <article
+            key={surface.label}
+            className="animate-rise-delay rounded-[1.5rem] border border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl transition hover:-translate-y-1 hover:border-[var(--accent-2)]"
+          >
+            <span className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-2)]">
+              {surface.icon}
+            </span>
+            <h2 className="text-lg font-semibold text-[var(--ink)]">
+              {surface.label}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              {surface.description}
+            </p>
+          </article>
+        ))}
+      </section>
+
+      <section
+        aria-label="why allwright"
+        className="relative mx-auto mt-14 w-full max-w-6xl rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl sm:mt-16 sm:p-10"
+      >
+        <p className="mb-8 max-w-[46ch] font-mono text-[0.8rem] uppercase tracking-[0.14em] text-[var(--accent-2)]">
+          Why allwright
+        </p>
+        <div className="grid gap-8 sm:grid-cols-3">
+          {benefits.map((benefit) => (
+            <div key={benefit.title}>
+              <h3 className="text-base font-semibold text-[var(--ink)]">
+                {benefit.title}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
+                {benefit.body}
               </p>
-              <strong className="block text-base leading-6 text-[var(--ink)]">
-                {item.value}
-              </strong>
-            </article>
+            </div>
           ))}
         </div>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[1.375rem] border border-[var(--line)] bg-white/55 px-5 py-5">
-            <span className="mb-2.5 inline-block font-mono text-[0.8rem] uppercase tracking-[0.08em] text-[var(--accent)]">
-              Why allwright
-            </span>
-            <p className="text-[var(--muted)] leading-7">
-              The name says it plainly: one engine designed to make every kind
-              of automation feel all right in one place, instead of scattered
-              across disconnected systems.
-            </p>
-          </div>
-          <div className="rounded-[1.375rem] border border-[var(--line)] bg-white/55 px-5 py-5">
-            <span className="mb-2.5 inline-block font-mono text-[0.8rem] uppercase tracking-[0.08em] text-[var(--accent)]">
-              What is coming
-            </span>
-            <p className="text-[var(--muted)] leading-7">
-              A clearer product story, launch updates, examples, and a public
-              home for the platform are on the way.
-            </p>
-          </div>
-        </div>
       </section>
+
+      <footer className="relative mx-auto mt-14 flex w-full max-w-6xl flex-col items-center gap-3 pb-4 text-center sm:mt-16 sm:flex-row sm:justify-between sm:text-left">
+        <p className="text-sm text-[var(--muted)]">
+          allwright — one engine, all right.
+        </p>
+        <a
+          href={GITHUB_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm font-medium text-[var(--accent-2)] underline-offset-4 hover:underline"
+        >
+          Watch our progress on GitHub
+        </a>
+      </footer>
     </main>
   );
 }

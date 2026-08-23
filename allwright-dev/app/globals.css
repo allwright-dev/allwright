@@ -1,14 +1,29 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f3efe5;
-  --background-deep: #e8e0cf;
-  --ink: #1d221c;
-  --muted: #5f665b;
-  --line: rgba(29, 34, 28, 0.12);
-  --card: rgba(255, 252, 244, 0.78);
-  --accent: #d86a31;
-  --accent-2: #23695b;
+  --background: #eef8f4;
+  --background-deep: #dcf0ea;
+  --ink: #0c2b28;
+  --muted: #4b6864;
+  --line: rgba(12, 43, 40, 0.12);
+  --card: rgba(255, 255, 255, 0.72);
+  --accent: #0e9f8e;
+  --accent-2: #1f6fb2;
+  --accent-soft: rgba(14, 159, 142, 0.16);
+  --accent-2-soft: rgba(31, 111, 178, 0.16);
+}
+
+.dark {
+  --background: #06171a;
+  --background-deep: #030d10;
+  --ink: #eaf7f3;
+  --muted: #9db4b0;
+  --line: rgba(234, 247, 243, 0.12);
+  --card: rgba(16, 41, 45, 0.68);
+  --accent: #34d6b8;
+  --accent-2: #5fa8f5;
+  --accent-soft: rgba(52, 214, 184, 0.16);
+  --accent-2-soft: rgba(95, 168, 245, 0.18);
 }
 
 * {
@@ -17,38 +32,52 @@
 
 html {
   min-height: 100%;
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
   color: var(--ink);
+  background: var(--background);
   font-family: var(--font-display), sans-serif;
+  transition:
+    background-color 300ms ease,
+    color 300ms ease;
 }
 
 h1,
+h2,
 p,
 strong {
   margin: 0;
 }
 
 .ambient-left {
-  animation: drift-left 12s ease-in-out infinite;
+  animation: drift-left 13s ease-in-out infinite;
 }
 
 .ambient-right {
-  animation: drift-right 14s ease-in-out infinite;
+  animation: drift-right 15s ease-in-out infinite;
 }
 
 .grid-overlay {
   background-image:
-    linear-gradient(rgba(29, 34, 28, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(29, 34, 28, 0.03) 1px, transparent 1px);
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
 .animate-rise {
   animation: rise 700ms ease-out both;
+}
+
+.animate-rise-delay {
+  animation: rise 700ms ease-out 120ms both;
 }
 
 @keyframes rise {
