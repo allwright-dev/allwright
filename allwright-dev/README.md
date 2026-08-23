@@ -12,6 +12,8 @@ bun install
 bun run dev
 ```
 
+Local development stays Bun-first, but Vercel deployments use the standard Node/npm build path via `vercel.json` for stability.
+
 ## Deploy
 
 Deploy the `allwright.dev/` folder as a Next.js project on Vercel.
