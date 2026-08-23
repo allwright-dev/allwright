@@ -25,8 +25,7 @@ export default function Home() {
         <p className="mt-6 max-w-[56ch] text-[clamp(1rem,2.2vw,1.2rem)] leading-7 text-[var(--muted)] sm:leading-8">
           Allwright is being built around a simple idea: automation should feel
           unified. Instead of stitching together separate tools for browser
-          tasks, workflows, and repetitive operations, you should be able to
-          rely on one engine that handles it all.
+          tasks, apis, mobile, desktop everything should be handled by single engine.
         </p>
 
         <div
