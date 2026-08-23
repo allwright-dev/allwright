@@ -1,0 +1,10 @@
+[package]
+name = "desktop-lib"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+linux-lib = { path = "../linux-lib" }
+macos-lib = { path = "../macos-lib" }
+tokio = { workspace = true }
+windows-lib = { path = "../windows-lib" }

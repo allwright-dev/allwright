@@ -1,0 +1,10 @@
+[package]
+name = "allwright-client"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+engine-lib = { path = "../engine-lib" }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tonic = { workspace = true }

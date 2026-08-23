@@ -1,0 +1,12 @@
+# Rust build artifacts
+/target/
+
+# Local Go tool installs used for proto generation
+/go/.bin/
+
+# Editor and OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo

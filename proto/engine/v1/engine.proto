@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+package allwright.engine.v1;
+option go_package = "allwright-go/gen/allwright/engine/v1;enginev1";
+
+service EngineService {
+  rpc Ping(PingRequest) returns (PingResponse);
+  rpc BrowserSession(stream BrowserSessionCommand) returns (stream BrowserSessionEvent);
+  rpc TabSession(stream TabSessionCommand) returns (stream TabSessionEvent);
+}
+
+message PingRequest {}
+
+message PingResponse {
+  string message = 1;
+}
+
+message BrowserSessionCommand {
+  oneof command {
+    LaunchChromeCommand launch_chrome = 1;
+    OpenTabCommand open_tab = 2;
+    SessionPingCommand ping = 3;
+    CloseBrowserSessionCommand close = 4;
+  }
+}
+
+message LaunchChromeCommand {
+  optional string chrome_binary = 1;
+}
+
+message OpenTabCommand {}
+
+message SessionPingCommand {
+  string message = 1;
+}
+
+message CloseBrowserSessionCommand {}
+
+message BrowserSessionEvent {
+  string session_id = 1;
+
+  oneof event {
+    ChromeLaunchedEvent chrome_launched = 2;
+    TabOpenedEvent tab_opened = 3;
+    SessionPongEvent pong = 4;
+    BrowserSessionClosedEvent closed = 5;
+    BrowserSessionErrorEvent error = 6;
+  }
+}
+
+message ChromeLaunchedEvent {
+  string browser = 1;
+  string note = 2;
+  string cdp_websocket_url = 3;
+  string user_data_dir = 4;
+  string initial_tab_session_id = 5;
+}
+
+message TabOpenedEvent {
+  string tab_session_id = 1;
+  string note = 2;
+}
+
+message SessionPongEvent {
+  string message = 1;
+}
+
+message BrowserSessionClosedEvent {
+  string reason = 1;
+}
+
+message BrowserSessionErrorEvent {
+  string message = 1;
+}
+
+message TabSessionCommand {
+  string browser_session_id = 1;
+  string tab_session_id = 2;
+
+  oneof command {
+    TabSessionPingCommand ping = 3;
+    CloseTabSessionCommand close = 4;
+    NavigateTabCommand navigate = 5;
+    ClickElementCommand click_element = 6;
+  }
+}
+
+message TabSessionPingCommand {
+  string message = 1;
+}
+
+message CloseTabSessionCommand {}
+
+message NavigateTabCommand {
+  string url = 1;
+}
+
+message ClickElementCommand {
+  string css_selector = 1;
+}
+
+message TabSessionEvent {
+  string tab_session_id = 1;
+
+  oneof event {
+    TabSessionAttachedEvent attached = 2;
+    TabSessionPongEvent pong = 3;
+    TabSessionClosedEvent closed = 4;
+    TabSessionErrorEvent error = 5;
+    TabNavigatedEvent navigated = 6;
+    ChromiumBidiInjectionEvent chromium_bidi_injection = 7;
+    ElementClickedEvent element_clicked = 8;
+  }
+}
+
+message TabSessionAttachedEvent {
+  string note = 1;
+}
+
+message TabSessionPongEvent {
+  string message = 1;
+}
+
+message TabSessionClosedEvent {
+  string reason = 1;
+}
+
+message TabSessionErrorEvent {
+  string message = 1;
+}
+
+message TabNavigatedEvent {
+  string url = 1;
+  string note = 2;
+}
+
+message ChromiumBidiInjectionEvent {
+  string note = 1;
+  string bidi_session_id = 2;
+  string mapper_target_id = 3;
+  string mapper_session_id = 4;
+  string package_version = 5;
+}
+
+message ElementClickedEvent {
+  string css_selector = 1;
+  string note = 2;
+  string bidi_session_id = 3;
+}
