@@ -1,21 +1,44 @@
 # allwright
 
-allwright is a driverless browser automation engine aimed at giving you one automation surface across multiple language stacks.
+allwright is one automation engine for everything you test.
 
-Today, the project centers on a Rust-powered engine with high-level client libraries for Rust, Go, Java, Python, and TypeScript/JavaScript. The goal is a Playwright-like developer experience backed by a browser control path that does not depend on ChromeDriver.
+The long-term direction is a single system that can cover web, mobile, desktop, and API automation without forcing teams to stitch together a different tool for every surface. The project is designed so automation can feel consistent across the whole product, not fragmented by platform.
+
+Right now, allwright is being built in public and the browser automation engine is the first active layer. The current implementation is focused on a driverless Chrome control path backed by CDP and Chromium BiDi, with high-level client libraries for Rust, Go, Java, Python, and TypeScript/JavaScript.
 
 ## Why allwright
 
-- One engine for multiple language ecosystems
+- One engine instead of a pile of disconnected tools
+- One automation model that can eventually span web, mobile, desktop, and API work
 - High-level browser and page APIs instead of raw transport plumbing
-- Driverless Chrome control built around CDP and Chromium BiDi
-- Shared protobuf contracts across clients and engine
+- Driverless browser control built around CDP and Chromium BiDi
+- Shared contracts across the engine and all client stacks
 
 ## Current Status
 
-allwright is under active development. The current flow can launch Chrome, attach to the startup tab, open additional tabs, navigate, and perform basic selector-based click actions through the engine.
+allwright is under active development and not positioned as a finished multi-surface platform yet.
 
-The API and implementation are still evolving, so expect active iteration as the engine grows.
+The current stage is:
+
+- the core product direction is broader than browser automation alone
+- the first shipped implementation work is centered on the browser engine
+- the engine can currently launch Chrome, attach to the startup tab, open additional tabs, navigate, and perform basic selector-based click actions
+- the public API and internal architecture are still evolving as the project grows toward wider surface coverage
+
+If you are evaluating the repo today, the clearest signal is the direction: allwright is aiming to become a unified automation engine, and browser automation is the first concrete step on that path.
+
+## Direction
+
+allwright is being shaped around a simple idea: teams should not need one framework for web, another for mobile, another for desktop, and a separate story for API validation.
+
+The project direction is to make those surfaces feel like one automation system:
+
+- Web: real browser flows that click, type, and navigate like a person would
+- Mobile: the same test logic extended toward native and hybrid apps
+- Desktop: automation for full desktop application workflows
+- API: backend checks that stay aligned with the same user-facing flows and data
+
+That broader direction matters more than the current implementation footprint. The repo may be browser-first today, but the product purpose is cross-surface automation under one roof.
 
 ## Quick Start
 
@@ -36,6 +59,10 @@ Open more tabs during the playground flow:
 ```bash
 cargo run -p playground -- --server-addr http://127.0.0.1:50051 --tabs 3
 ```
+
+## What You Can Try Today
+
+Today’s working path is browser-focused, with a Rust-powered engine and high-level client libraries layered on top.
 
 ## Client Experience
 
@@ -86,6 +113,7 @@ await browser.close();
 ## Development Notes
 
 - The engine currently runs as a gRPC server.
+- The current implementation focus is browser automation, but the product direction is wider.
 - The browser control path is intended to stay driverless.
 - The repo uses shared proto contracts across all supported client stacks.
 - Bun is the preferred local workflow for the TypeScript stack and the `allwright-dev/` site.
