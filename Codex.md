@@ -24,7 +24,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `java/`: Gradle-based Java client project that generates engine stubs from the shared proto and exposes a high-level browser/page API
 - `python/`: Python client package that loads the shared proto dynamically at runtime and exposes a high-level browser/page API
 - `allwright-dev/`: standalone Next.js site for the purchased `allwright.dev` domain, intended for Vercel deployment and public-facing marketing/docs entrypoints
-- `typescript/`: TypeScript/JavaScript stack folder containing the JS client package and playground
+- `typescript/`: TypeScript/JavaScript source folder containing the npm package source and examples
 - `proto/`: shared protobuf and gRPC contract root for all stacks
 - `rust/allwright` now vendors the current Rust engine/client implementation and the proto/build assets it needs for packaging
 
@@ -53,7 +53,7 @@ Supporting libraries:
 - Generated Go proto/gRPC code is checked in under `go/gen/allwright/engine/v1` and consumed by the Go module.
 - The Java stack generates protobuf and gRPC stubs from `proto/engine/v1/engine.proto` during the Gradle build in `java/`.
 - The Python stack currently loads `proto/engine/v1/engine.proto` dynamically at runtime through `grpcio-tools`.
-- The TypeScript stack currently loads `proto/engine/v1/engine.proto` dynamically at runtime rather than checking in generated TS stubs.
+- The TypeScript stack currently loads the shared top-level `proto/engine/v1/engine.proto` dynamically at runtime rather than checking in generated TS stubs.
 - The public Rust client surface should stay high-level and should not expose raw gRPC connection setup.
 - The public Go client surface should stay high-level and should not expose raw gRPC connection setup.
 - The public Java client surface should stay high-level and should not expose raw gRPC connection setup.
@@ -120,7 +120,8 @@ Supporting libraries:
 - `typescript/src/index.ts` now provides the TypeScript/JavaScript client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch(...)`, `Browser`, and `Page` methods instead of public grpc-js setup.
 - New TypeScript work should prefer the `chromium` / `Browser` / `Page` surface; older compatibility helpers like `launchChrome`, `initialTab()`, `newTab()`, and `navigate()` should be treated as transitional.
 - The TypeScript singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and also supports in-process override with `setServerAddr(...)`.
-- `typescript/src/playground.ts` is the TypeScript-side playground for a minimal browser-session test flow; use Bun for local development runs in this repo and keep it focused on real browser work rather than extra ping-style smoke commands.
+- The repo root `package.json` now targets npm publication as `@allwright/core`, packages `typescript/dist/` plus the shared top-level `proto/`, and keeps the playground flow under `typescript/examples/playground.ts`.
+- `typescript/examples/playground.ts` is the TypeScript-side example for a minimal browser-session test flow; use Bun for local development runs in this repo and keep it focused on real browser work rather than extra ping-style smoke commands.
 - Regenerating Go stubs currently requires local installation of `protoc-gen-go@v1.36.10` and `protoc-gen-go-grpc@v1.5.1`, then running `protoc` against `proto/engine/v1/engine.proto` with output rooted at `go/`.
 
 ## Current Dependency Hierarchy

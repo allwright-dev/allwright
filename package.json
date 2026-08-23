@@ -1,0 +1,50 @@
+{
+  "name": "@allwright/core",
+  "version": "0.0.1",
+  "description": "High-level TypeScript client for the allwright automation engine.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/allwright-dev/allwright.git"
+  },
+  "homepage": "https://allwright.dev",
+  "bugs": {
+    "url": "https://github.com/allwright-dev/allwright/issues"
+  },
+  "keywords": [
+    "automation",
+    "browser",
+    "grpc",
+    "testing",
+    "typescript"
+  ],
+  "packageManager": "bun@1.2.20",
+  "main": "./typescript/dist/index.js",
+  "types": "./typescript/dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./typescript/dist/index.d.ts",
+      "import": "./typescript/dist/index.js"
+    }
+  },
+  "files": [
+    "typescript/dist",
+    "proto",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p typescript/tsconfig.json",
+    "example:playground": "bun run typescript/examples/playground.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.14.0",
+    "@grpc/proto-loader": "^0.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.4.0",
+    "typescript": "^5.9.2"
+  }
+}

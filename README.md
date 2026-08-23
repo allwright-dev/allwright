@@ -134,16 +134,14 @@ go run ./examples/playground --server-addr 127.0.0.1:50051
 TypeScript build:
 
 ```bash
-cd typescript
 bun install
-bun run build
+npm run build
 ```
 
 TypeScript playground:
 
 ```bash
-cd typescript
-bun run src/playground.ts --server-addr 127.0.0.1:50051
+bun run typescript/examples/playground.ts --server-addr 127.0.0.1:50051
 ```
 
 ## Testing
