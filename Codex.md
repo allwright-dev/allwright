@@ -20,7 +20,7 @@ This instruction should be treated as ongoing project policy for all future AI c
   - `proto/`
 - `rust/allwright`: single public Rust crate containing the high-level Rust client API plus the optional CLI/server binary
 - `rust/allwright/examples/`: Rust example programs for exercising the engine server
-- `go/`: Go module containing generated engine stubs, a reusable Go client, and a Go playground
+- `go/`: Go module `allwright.dev` containing generated engine stubs, the public Go client package at the module root, and Go examples
 - `java/`: Gradle-based Java client project that generates engine stubs from the shared proto and exposes a high-level browser/page API
 - `python/`: Python client package that loads the shared proto dynamically at runtime and exposes a high-level browser/page API
 - `allwright-dev/`: standalone Next.js site for the purchased `allwright.dev` domain, intended for Vercel deployment and public-facing marketing/docs entrypoints
@@ -108,9 +108,9 @@ Supporting libraries:
 - The Rust singleton client currently defaults to `http://127.0.0.1:50051`, also respects `ALLWRIGHT_SERVER_ADDR`, and can be redirected in-process with `allwright::set_server_addr(...)`.
 - `rust/allwright/examples/playground.rs` now exercises the engine through the `allwright` crate, supports the launch-created initial tab plus additional browser-session tabs, and closes them through the high-level browser/tab API as a minimal end-to-end test flow.
 - The Rust playground example waits for keyboard confirmation before closing the browser session so browser state can be observed manually.
-- `go/client` now uses package name `allwright`, hides the engine transport behind a lazy singleton connection, and exposes browser/tab methods instead of public gRPC dial APIs.
+- `go/` now uses module path `allwright.dev`, exposes package name `allwright` from the module root, and relies on `allwright.dev` vanity import metadata that points Go tooling at the GitHub repository subdirectory `go/`.
 - The Go singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`.
-- `go/cmd/playground` is the Go-side playground and currently exercises a minimal browser-session test flow directly, without extra ping-style smoke commands.
+- `go/examples/playground` is the Go-side example and currently exercises a minimal browser-session test flow directly, without extra ping-style smoke commands.
 - `java/src/main/java/dev/allwright/client/Allwright.java` now provides the Java client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch(...)`, `Browser`, and `Page` methods instead of public gRPC setup.
 - The Java singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and supports in-process override with `Allwright.setServerAddr(...)`.
 - `python/allwright/client.py` now provides the Python client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch()`, `Browser`, and `Page` methods instead of public grpc setup.

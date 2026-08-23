@@ -1,4 +1,4 @@
-module allwright-go
+module allwright.dev
 
 go 1.26.5
 

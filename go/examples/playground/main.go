@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	allwright "allwright-go/client"
+	allwright "allwright.dev"
 )
 
 type browserSessionFlags struct {

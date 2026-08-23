@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	enginev1 "allwright-go/gen/allwright/engine/v1"
+	enginev1 "allwright.dev/gen/allwright/engine/v1"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

@@ -128,7 +128,7 @@ Go playground:
 
 ```bash
 cd go
-go run ./cmd/playground --server-addr 127.0.0.1:50051
+go run ./examples/playground --server-addr 127.0.0.1:50051
 ```
 
 TypeScript build:

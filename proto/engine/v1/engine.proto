@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package allwright.engine.v1;
-option go_package = "allwright-go/gen/allwright/engine/v1;enginev1";
+option go_package = "allwright.dev/gen/allwright/engine/v1;enginev1";
 
 service EngineService {
   rpc Ping(PingRequest) returns (PingResponse);
