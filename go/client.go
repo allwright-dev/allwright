@@ -226,11 +226,7 @@ func (b *Browser) InitialTab() *Tab {
 	return b.initialTab
 }
 
-func (b *Browser) NewTab(ctx context.Context) (*Tab, error) {
-	return b.NewTabWithOptions(ctx, CommandOptions{})
-}
-
-func (b *Browser) NewTabWithOptions(ctx context.Context, options CommandOptions) (*Tab, error) {
+func (b *Browser) NewTab(ctx context.Context, options ...CommandOptions) (*Tab, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -238,10 +234,12 @@ func (b *Browser) NewTabWithOptions(ctx context.Context, options CommandOptions)
 		return nil, fmt.Errorf("browser session %s is closed", b.sessionID)
 	}
 
+	commandOptions := firstCommandOptions(options)
+
 	if err := b.stream.Send(&enginev1.BrowserSessionCommand{
 		Command: &enginev1.BrowserSessionCommand_OpenTab{
 			OpenTab: &enginev1.OpenTabCommand{
-				RetryOptions: retryOptionsProto(options.Timeout),
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
 			},
 		},
 	}); err != nil {
@@ -343,11 +341,7 @@ func (t *Tab) SessionID() string {
 	return t.sessionID
 }
 
-func (t *Tab) Navigate(ctx context.Context, url string) (*NavigateResult, error) {
-	return t.NavigateWithOptions(ctx, url, CommandOptions{})
-}
-
-func (t *Tab) NavigateWithOptions(ctx context.Context, url string, options CommandOptions) (*NavigateResult, error) {
+func (t *Tab) Navigate(ctx context.Context, url string, options ...CommandOptions) (*NavigateResult, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -358,13 +352,15 @@ func (t *Tab) NavigateWithOptions(ctx context.Context, url string, options Comma
 		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
 	}
 
+	commandOptions := firstCommandOptions(options)
+
 	if err := t.stream.Send(&enginev1.TabSessionCommand{
 		BrowserSessionId: t.browserSessionID,
 		TabSessionId:     t.sessionID,
 		Command: &enginev1.TabSessionCommand_Navigate{
 			Navigate: &enginev1.NavigateTabCommand{
 				Url:          url,
-				RetryOptions: retryOptionsProto(options.Timeout),
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
 			},
 		},
 	}); err != nil {
@@ -398,11 +394,7 @@ func (t *Tab) NavigateWithOptions(ctx context.Context, url string, options Comma
 	}
 }
 
-func (t *Tab) Click(ctx context.Context, cssSelector string) (*ClickResult, error) {
-	return t.ClickWithOptions(ctx, cssSelector, CommandOptions{})
-}
-
-func (t *Tab) ClickWithOptions(ctx context.Context, cssSelector string, options CommandOptions) (*ClickResult, error) {
+func (t *Tab) Click(ctx context.Context, cssSelector string, options ...CommandOptions) (*ClickResult, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -413,13 +405,15 @@ func (t *Tab) ClickWithOptions(ctx context.Context, cssSelector string, options 
 		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
 	}
 
+	commandOptions := firstCommandOptions(options)
+
 	if err := t.stream.Send(&enginev1.TabSessionCommand{
 		BrowserSessionId: t.browserSessionID,
 		TabSessionId:     t.sessionID,
 		Command: &enginev1.TabSessionCommand_ClickElement{
 			ClickElement: &enginev1.ClickElementCommand{
 				CssSelector:  cssSelector,
-				RetryOptions: retryOptionsProto(options.Timeout),
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
 			},
 		},
 	}); err != nil {
@@ -449,11 +443,7 @@ func (t *Tab) ClickWithOptions(ctx context.Context, cssSelector string, options 
 	}
 }
 
-func (t *Tab) Count(ctx context.Context, cssSelector string) (*CountResult, error) {
-	return t.CountWithOptions(ctx, cssSelector, CommandOptions{})
-}
-
-func (t *Tab) CountWithOptions(ctx context.Context, cssSelector string, options CommandOptions) (*CountResult, error) {
+func (t *Tab) Count(ctx context.Context, cssSelector string, options ...CommandOptions) (*CountResult, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -464,13 +454,15 @@ func (t *Tab) CountWithOptions(ctx context.Context, cssSelector string, options 
 		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
 	}
 
+	commandOptions := firstCommandOptions(options)
+
 	if err := t.stream.Send(&enginev1.TabSessionCommand{
 		BrowserSessionId: t.browserSessionID,
 		TabSessionId:     t.sessionID,
 		Command: &enginev1.TabSessionCommand_CountElements{
 			CountElements: &enginev1.CountElementsCommand{
 				CssSelector:  cssSelector,
-				RetryOptions: retryOptionsProto(options.Timeout),
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
 			},
 		},
 	}); err != nil {
@@ -499,11 +491,7 @@ func (t *Tab) CountWithOptions(ctx context.Context, cssSelector string, options 
 	}
 }
 
-func (t *Tab) Highlight(ctx context.Context, cssSelector string) (*HighlightResult, error) {
-	return t.HighlightWithOptions(ctx, cssSelector, HighlightOptions{})
-}
-
-func (t *Tab) HighlightWithOptions(ctx context.Context, cssSelector string, options HighlightOptions) (*HighlightResult, error) {
+func (t *Tab) Highlight(ctx context.Context, cssSelector string, options ...HighlightOptions) (*HighlightResult, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -514,14 +502,16 @@ func (t *Tab) HighlightWithOptions(ctx context.Context, cssSelector string, opti
 		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
 	}
 
+	highlightOptions := firstHighlightOptions(options)
+
 	if err := t.stream.Send(&enginev1.TabSessionCommand{
 		BrowserSessionId: t.browserSessionID,
 		TabSessionId:     t.sessionID,
 		Command: &enginev1.TabSessionCommand_HighlightElements{
 			HighlightElements: &enginev1.HighlightElementsCommand{
 				CssSelector:  cssSelector,
-				DurationMs:   durationProto(options.Duration),
-				RetryOptions: retryOptionsProto(options.Timeout),
+				DurationMs:   durationProto(highlightOptions.Duration),
+				RetryOptions: retryOptionsProto(highlightOptions.Timeout),
 			},
 		},
 	}); err != nil {
@@ -568,6 +558,20 @@ func retryOptionsProto(timeout time.Duration) *enginev1.CommandRetryOptions {
 
 func optionalUint32(value uint32) *uint32 {
 	return &value
+}
+
+func firstCommandOptions(options []CommandOptions) CommandOptions {
+	if len(options) > 0 {
+		return options[0]
+	}
+	return CommandOptions{}
+}
+
+func firstHighlightOptions(options []HighlightOptions) HighlightOptions {
+	if len(options) > 0 {
+		return options[0]
+	}
+	return HighlightOptions{}
 }
 
 func durationProto(value time.Duration) *uint32 {
