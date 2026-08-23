@@ -51,6 +51,10 @@ Supporting platform crates sit under the platform library layer:
 
 The workspace shares a single Tokio dependency through the root `Cargo.toml` and uses the multi-thread runtime.
 
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
+
 ## gRPC Layout
 
 - Proto root: `proto/`
