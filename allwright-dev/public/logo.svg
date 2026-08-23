@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="allwrightLogoTitle">
+  <title id="allwrightLogoTitle">Allwright</title>
+  <defs>
+    <linearGradient id="allwrightMarkGradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0e9f8e" />
+      <stop offset="100%" stop-color="#1f6fb2" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="9" fill="url(#allwrightMarkGradient)" />
+  <polygon points="10,6 10,23 13.8,19.6 16.6,25.6 19.4,24.3 16.6,18.1 22,18.1" fill="#ffffff" />
+</svg>

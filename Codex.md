@@ -69,10 +69,14 @@ Supporting libraries:
 - `allwright-dev/` should stay on the stable Next.js 16 release line and use Tailwind CSS v4 through the official PostCSS integration unless there is a deliberate migration decision.
 - `allwright-dev/` is user-facing marketing/product surface, not developer-facing repo messaging.
 - The core product message for `allwright-dev/` is that allwright is one automation engine for all automation needs.
-- The coming-soon page currently links to the GitHub repository at `https://github.com/qalens/allwright`.
+- The GitHub repository was transferred; the canonical remote and all in-repo/site links now point at `https://github.com/allwright-dev/allwright` (previously `qalens/allwright`).
 - All copy on `allwright-dev/` must read as user-facing product messaging (audience, benefits, surfaces covered); it must never describe internal implementation, architecture, or repo/dev workflow details.
 - `allwright-dev/` uses `next-themes` (class strategy on `<html>`, `defaultTheme="system"`) for light/dark mode via `app/theme-provider.tsx` and exposes a toggle through `app/theme-toggle.tsx`.
 - `allwright-dev/app/globals.css` defines the site palette as a green/blue (teal + blue accent) theme with light tokens on `:root` and dark tokens under `.dark`, matching the `next-themes` class strategy.
+- `allwright-dev/app/brand.tsx` is the single source of truth for site/brand constants (`SITE_URL`, `SITE_NAME`, `SITE_TITLE`, `SITE_DESCRIPTION`, `GITHUB_URL`) and the shared logo/social-card JSX; update links (like the GitHub URL) there rather than inlining them per file.
+- The allwright mark is a gradient (teal-to-blue) squircle with a white pointer/cursor glyph, defined once in `allwright-dev/app/brand.tsx` (`LogoMark`) for generated images and standalone as `allwright-dev/public/logo.svg` for static use.
+- Favicon/app-icon/social-preview images are generated at build/request time via Next.js file conventions (`app/icon.tsx`, `app/apple-icon.tsx`, `app/opengraph-image.tsx`, `app/twitter-image.tsx`) using `next/og`'s `ImageResponse`, not static binary assets.
+- `allwright-dev/` also ships `app/manifest.ts`, `app/robots.ts`, and `app/sitemap.ts` (Next.js metadata route conventions) plus full `openGraph`/`twitter`/`robots`/canonical metadata in `app/layout.tsx` and JSON-LD (`SoftwareApplication`) structured data in `app/page.tsx` for SEO and link-preview support.
 - Vercel must use `allwright-dev/` as the project Root Directory for the site deployment.
 - Local Bun development is preferred for `allwright-dev/`, but Vercel builds should use the standard Node/npm Next.js path for stability.
 - The current Vercel workaround exists because Bun 1.3.14 has a known crash path with Next.js 16.3.0 builds on Linux, producing `SIGILL`/segfault failures during or after `next build`.
