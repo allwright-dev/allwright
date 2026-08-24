@@ -24,10 +24,6 @@ jobs:
             target: x86_64-pc-windows-msvc
             archive_ext: zip
             binary_name: allwright.exe
-          - runner: macos-13
-            target: x86_64-apple-darwin
-            archive_ext: tar.gz
-            binary_name: allwright
           - runner: macos-14
             target: aarch64-apple-darwin
             archive_ext: tar.gz
@@ -99,10 +95,6 @@ jobs:
             target: x86_64-pc-windows-msvc
             archive_ext: zip
             binary_name: allwright-surface-web.exe
-          - runner: macos-13
-            target: x86_64-apple-darwin
-            archive_ext: tar.gz
-            binary_name: allwright-surface-web
           - runner: macos-14
             target: aarch64-apple-darwin
             archive_ext: tar.gz
