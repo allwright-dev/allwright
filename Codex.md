@@ -20,9 +20,9 @@ This instruction should be treated as ongoing project policy for all future AI c
   - `proto/`
 - `rust/allwright`: `allwright-core`, the lightweight Rust engine crate containing the high-level Rust client API, the lightweight gRPC server fallback, and the shared plugin catalog
 - `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core`, installs supported plugins, and delegates runtime startup to installed plugin binaries
-- `.github/workflows/release-surface-plugins.yml`: tag-triggered GitHub Actions workflow that builds platform plugin archives and attaches them to GitHub Releases
-- `scripts/install.sh`: Linux/macOS installer script for downloading the published `allwright` CLI release asset
-- `scripts/install.ps1`: Windows PowerShell installer script for downloading the published `allwright` CLI release asset
+- `.github/workflows/release-surface-plugins.yml`: tag-triggered GitHub Actions workflow that syncs crate versions from the tag, builds platform CLI/plugin archives, and attaches them to GitHub Releases
+- `scripts/install.sh`: Linux/macOS installer script for downloading the published `allwright` CLI release asset directly from GitHub without cloning the repo
+- `scripts/install.ps1`: Windows PowerShell installer script for downloading the published `allwright` CLI release asset directly from GitHub without cloning the repo
 - `scripts/sync-version.sh`: helper script that rewrites the workspace and internal crate versions from a provided release version
 - `rust/allwright-plugin-sdk`: shared plugin traits and surface metadata for publishable Rust surface crates
 - `rust/allwright-surface-web`: publishable `web` surface crate that also ships the standalone `allwright-surface-web` runtime binary
@@ -50,15 +50,19 @@ This instruction should be treated as ongoing project policy for all future AI c
 - The entire project should remain Tokio async runtime driven.
 - The CLI enters through `#[tokio::main]`.
 - The Rust workspace publishable crates should be synced from the release tag when GitHub Actions builds a tagged release.
-- Installing the `allwright` package should provide the CLI plus the lightweight core together.
+- Installing `allwright` should mean installing the released CLI binary plus the lightweight core behavior it owns; it should not require Cargo on end-user machines.
 - `rust/allwright` now owns the lightweight Rust fallback gRPC server surface and public Rust client surface in one package.
 - Engine behavior and engine-facing Rust contracts should stay inside `rust/allwright`.
 - allwright should remain a single engine even as the product grows broader capabilities.
 - Surface capabilities should be designed as separately installable plugins such as `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux`, all extending the core engine instead of creating separate engines or unrelated runtimes.
 - The CLI currently installs the `web` plugin by downloading the matching archive from GitHub Releases into the local allwright plugin directory, records it in the local plugin manifest, and delegates `allwright serve` to the installed `allwright-surface-web` binary when present.
+- The CLI install path should be release-asset based, not `cargo install` based.
 - The non-web surface crates should remain visible in the plugin catalog but should stay non-installable until they ship real runtime artifacts.
 - GitHub tag pushes such as `vX.Y.Z` should trigger release automation that syncs crate versions from the tag, builds the current web plugin runtime archives for the supported OS matrix, and uploads them to the matching GitHub Release.
 - GitHub tag pushes such as `vX.Y.Z` should also build and upload the main `allwright` CLI archives so installer scripts can bootstrap core plus CLI without Cargo.
+- The release tag is the source of truth for release versioning; committed Cargo manifest versions may be rewritten during release automation.
+- Unix and Windows installer scripts should prefer common human-owned install directories first and should avoid tool-managed bins such as `pnpm`, `npm`, `yarn`, `cargo`, `volta`, `bun`, and similar package-manager-owned paths.
+- Installer examples in docs should default to direct GitHub script execution (`curl`, `wget`, or PowerShell `irm`) rather than assuming the repo has already been cloned.
 - The engine direction is driverless browser automation.
 - Do not introduce ChromeDriver into the primary browser control path.
 - The current gRPC layout lives in top-level `proto/`.
@@ -173,13 +177,13 @@ rust/allwright-cli
 └── build and upload release archives for installable plugin runtimes
 
 scripts/install.sh
-└── download and install the released `allwright` CLI on Linux/macOS
+└── download and install the released `allwright` CLI on Linux/macOS, preferring common writable bin directories
 
 scripts/install.ps1
-└── download and install the released `allwright` CLI on Windows
+└── download and install the released `allwright` CLI on Windows, preferring common writable install locations
 
 scripts/sync-version.sh
-└── sync workspace and internal crate versions from a release tag version
+└── sync workspace and internal crate versions from a release tag version before release builds
 ```
 
 ## Maintenance Rules
@@ -189,6 +193,8 @@ scripts/sync-version.sh
 - Keep shared engine contracts and client-facing APIs in `rust/allwright`.
 - Keep platform-specific runtime logic out of `rust/allwright`; it belongs in the surface crates.
 - Prefer adding explicit extension points for surface plugins like `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux` over introducing parallel engine implementations.
+- Prefer release downloads and installer scripts for end-user installation paths; do not reintroduce Cargo as the default user install dependency.
+- Keep release versioning tag-driven; if versions need to change, prefer updating the sync/release flow rather than hardcoding new crate versions by hand.
 - Keep async boundaries explicit and Tokio-native.
 - Keep the gRPC contract minimal until requirements are explicitly defined.
 - Preserve the driverless direction when evolving browser and tab session APIs.
