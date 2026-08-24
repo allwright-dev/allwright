@@ -2,7 +2,14 @@
 
 set -euo pipefail
 
-crates=(
+web_crates=(
+  allwright-plugin-sdk
+  allwright-surface-web
+  allwright-core
+  allwright
+)
+
+full_crates=(
   allwright-plugin-sdk
   allwright-surface-mobile
   allwright-surface-desktop
@@ -17,11 +24,23 @@ crates=(
 )
 
 mode="${1:-publish}"
+profile="${2:-web}"
 publish_interval_seconds="${PUBLISH_INTERVAL_SECONDS:-20}"
 
 if [[ "$mode" != "publish" && "$mode" != "dry-run" ]]; then
-  echo "usage: $0 [publish|dry-run]" >&2
+  echo "usage: $0 [publish|dry-run] [web|full]" >&2
   exit 1
+fi
+
+if [[ "$profile" != "web" && "$profile" != "full" ]]; then
+  echo "usage: $0 [publish|dry-run] [web|full]" >&2
+  exit 1
+fi
+
+if [[ "$profile" == "web" ]]; then
+  crates=("${web_crates[@]}")
+else
+  crates=("${full_crates[@]}")
 fi
 
 publish_args=(publish)

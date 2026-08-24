@@ -57,9 +57,37 @@ As the project grows into more surfaces, extensibility should follow a plugin mo
 
 In practice, that means future architecture work should prefer a stable engine core with explicit extension points over splitting web, mobile, desktop, or API support into unrelated executables.
 
+## Plugin Ecosystem
+
+For users, the intended install model is simple:
+
+- install `allwright` once to get the CLI plus the lightweight engine core
+- add only the surface plugins you need, starting with `web`
+- keep one command-line entrypoint and one engine lifecycle, even as more surfaces arrive
+
+Today, the plugin ecosystem looks like this:
+
+- `allwright`: installable CLI package that runs the lightweight core and manages the local plugin manifest
+- `web`: the most ready surface plugin today
+- `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux`: planned surface plugins with publishable crate boundaries, but not yet the primary ready-to-use path
+
+What `plugin install` means today:
+
+- it registers the plugin in the local allwright plugin manifest
+- it makes the desired surface explicit for the local environment
+- full runtime loading of registered plugins is still being completed
+
+So the user-facing direction is already plugin-based, while the runtime side is still catching up to that packaging model.
+
 ## Quick Start
 
-Start the engine:
+Install the CLI:
+
+```bash
+cargo install allwright --features cli
+```
+
+Start the engine core through the CLI:
 
 ```bash
 cargo run -p allwright -- --listen-addr 127.0.0.1:50051
@@ -70,6 +98,14 @@ List or register plugins:
 ```bash
 cargo run -p allwright -- plugin list
 cargo run -p allwright -- plugin install web
+```
+
+If you are using the installed CLI rather than the repo checkout, the same flow is:
+
+```bash
+allwright plugin list
+allwright plugin install web
+allwright serve --listen-addr 127.0.0.1:50051
 ```
 
 Try the Rust playground against the running engine core:
@@ -87,6 +123,12 @@ cargo run -p allwright-core --example playground -- --server-addr http://127.0.0
 ## What You Can Try Today
 
 Today’s working path is browser-focused, with a Rust-powered engine and high-level client libraries layered on top.
+
+The practical path today is:
+
+- use the `allwright` CLI as the installable entrypoint
+- register the `web` plugin
+- use the Rust, Go, Java, Python, or TypeScript clients against the running core
 
 At the moment, the lightweight core and CLI/plugin packaging are ahead of runtime plugin loading. Surface crates and split proto ownership are in place, while dynamic runtime activation of installed plugins is still follow-up work.
 
