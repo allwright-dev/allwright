@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+# crates.io publishing is only for Rust packages.
+# End-user CLI binaries and runtime plugin libraries ship through GitHub Releases.
+
 web_crates=(
   allwright-plugin-sdk
   allwright-surface-web
@@ -26,6 +29,7 @@ full_crates=(
 mode="${1:-publish}"
 profile="${2:-web}"
 publish_interval_seconds="${PUBLISH_INTERVAL_SECONDS:-20}"
+allow_experimental_surfaces="${ALLOW_EXPERIMENTAL_SURFACES:-0}"
 
 if [[ "$mode" != "publish" && "$mode" != "dry-run" ]]; then
   echo "usage: $0 [publish|dry-run] [web|full]" >&2
@@ -40,6 +44,18 @@ fi
 if [[ "$profile" == "web" ]]; then
   crates=("${web_crates[@]}")
 else
+  if [[ "$allow_experimental_surfaces" != "1" ]]; then
+    cat >&2 <<'EOF'
+refusing to publish the `full` profile by default.
+
+only the web plugin path is currently release-backed and runtime-ready.
+if you intentionally want to publish the experimental mobile/desktop surface crates too,
+rerun with:
+
+  ALLOW_EXPERIMENTAL_SURFACES=1 ./scripts/publish-crates.sh publish full
+EOF
+    exit 1
+  fi
   crates=("${full_crates[@]}")
 fi
 
@@ -120,6 +136,15 @@ publish_one() {
     return 1
   done
 }
+
+echo "publishing crates.io profile: ${profile}"
+echo "publish mode: ${mode}"
+echo "publish interval: ${publish_interval_seconds}s"
+
+if [[ "$profile" == "web" ]]; then
+  echo "this publishes Rust crates for the lightweight core + CLI + web plugin path."
+  echo "release archives for end users still come from GitHub Releases."
+fi
 
 for i in "${!crates[@]}"; do
   crate="${crates[$i]}"

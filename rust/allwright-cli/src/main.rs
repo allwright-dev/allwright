@@ -4,7 +4,7 @@ use reqwest::blocking::Client;
 use std::env;
 use std::error::Error;
 use std::fs;
-use std::io::{Cursor, Write};
+use std::io::{Cursor, Read, Write};
 use std::net::SocketAddr;
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
@@ -177,27 +177,40 @@ fn read_installed_plugins() -> Result<Vec<InstalledPlugin>, Box<dyn Error>> {
 }
 
 fn install_plugin_package(
-    _package_name: &str,
+    package_name: &str,
     version: &str,
     plugin_id: &str,
 ) -> Result<(), Box<dyn Error>> {
     let install_root = plugin_install_root(plugin_id)?;
+    let asset_name = plugin_asset_name(plugin_id, version)?;
+    let runtime_artifact = plugin_runtime_artifact_filename(plugin_id);
+
+    println!(
+        "Installing plugin `{plugin_id}` from {package_name}@{version} for {}-{}...",
+        env::consts::OS,
+        env::consts::ARCH
+    );
+
     if install_root.exists() {
+        println!("Removing previous installation at {}...", install_root.display());
         fs::remove_dir_all(&install_root)?;
     }
+    println!("Preparing install directory {}...", install_root.display());
     fs::create_dir_all(&install_root)?;
 
-    let asset_name = plugin_asset_name(plugin_id, version)?;
     let asset_bytes = download_plugin_release_asset(version, &asset_name)?;
+    println!("Unpacking {asset_name} into {}...", install_root.display());
     unpack_plugin_release_asset(&asset_name, &asset_bytes, &install_root)?;
 
     if !plugin_runtime_artifact_path(plugin_id).exists() {
         return Err(format!(
             "downloaded plugin `{plugin_id}` but did not find runtime artifact `{}` in the archive",
-            plugin_runtime_artifact_filename(plugin_id)
+            runtime_artifact
         )
         .into());
     }
+
+    println!("Verified runtime artifact `{runtime_artifact}`.");
 
     Ok(())
 }
@@ -283,7 +296,7 @@ fn download_plugin_release_asset(
         .timeout(Duration::from_secs(120))
         .build()?;
     let mut request = client
-        .get(url)
+        .get(&url)
         .header("User-Agent", format!("allwright-cli/{}", env!("CARGO_PKG_VERSION")));
 
     if let Ok(token) = env::var("ALLWRIGHT_GITHUB_TOKEN") {
@@ -292,8 +305,44 @@ fn download_plugin_release_asset(
         }
     }
 
-    let response = request.send()?.error_for_status()?;
-    Ok(response.bytes()?.to_vec())
+    println!("Downloading {asset_name} from {url}...");
+    let mut response = request.send()?.error_for_status()?;
+    let total_bytes = response.content_length();
+    let mut bytes = Vec::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    let mut downloaded = 0_u64;
+    let mut next_progress_marker = 0_u64;
+
+    loop {
+        let read = response.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+
+        bytes.extend_from_slice(&buffer[..read]);
+        downloaded += read as u64;
+
+        match total_bytes {
+            Some(total) if total > 0 => {
+                let percent = downloaded.saturating_mul(100) / total;
+                if percent >= next_progress_marker || downloaded == total {
+                    println!(
+                        "Downloaded {downloaded}/{total} bytes ({percent}%)..."
+                    );
+                    next_progress_marker = percent.saturating_add(10);
+                }
+            }
+            _ => {
+                if downloaded >= next_progress_marker {
+                    println!("Downloaded {downloaded} bytes...");
+                    next_progress_marker = downloaded.saturating_add(512 * 1024);
+                }
+            }
+        }
+    }
+
+    println!("Download complete: {} bytes.", bytes.len());
+    Ok(bytes)
 }
 
 fn unpack_plugin_release_asset(
