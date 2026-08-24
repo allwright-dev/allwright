@@ -13,18 +13,102 @@ dependencies = [
 
 [[package]]
 name = "allwright"
-version = "0.0.2"
+version = "0.0.5"
 dependencies = [
+ "allwright-core",
  "clap",
- "futures-util",
+ "tokio",
+ "tonic",
+]
+
+[[package]]
+name = "allwright-core"
+version = "0.0.5"
+dependencies = [
+ "allwright-plugin-sdk",
+ "clap",
  "prost",
  "protoc-bin-vendored",
- "serde_json",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite",
  "tonic",
  "tonic-build",
+]
+
+[[package]]
+name = "allwright-plugin-sdk"
+version = "0.0.5"
+
+[[package]]
+name = "allwright-surface-desktop"
+version = "0.0.5"
+dependencies = [
+ "allwright-plugin-sdk",
+ "tokio",
+]
+
+[[package]]
+name = "allwright-surface-desktop-linux"
+version = "0.0.5"
+dependencies = [
+ "allwright-plugin-sdk",
+ "allwright-surface-desktop",
+ "tokio",
+]
+
+[[package]]
+name = "allwright-surface-desktop-mac"
+version = "0.0.5"
+dependencies = [
+ "allwright-plugin-sdk",
+ "allwright-surface-desktop",
+ "tokio",
+]
+
+[[package]]
+name = "allwright-surface-desktop-windows"
+version = "0.0.5"
+dependencies = [
+ "allwright-plugin-sdk",
+ "allwright-surface-desktop",
+ "tokio",
+]
+
+[[package]]
+name = "allwright-surface-mobile"
+version = "0.0.5"
+dependencies = [
+ "allwright-plugin-sdk",
+ "tokio",
+]
+
+[[package]]
+name = "allwright-surface-mobile-android"
+version = "0.0.5"
+dependencies = [
+ "allwright-plugin-sdk",
+ "allwright-surface-mobile",
+ "tokio",
+]
+
+[[package]]
+name = "allwright-surface-mobile-ios"
+version = "0.0.5"
+dependencies = [
+ "allwright-plugin-sdk",
+ "allwright-surface-mobile",
+ "tokio",
+]
+
+[[package]]
+name = "allwright-surface-web"
+version = "0.0.5"
+dependencies = [
+ "allwright-plugin-sdk",
+ "futures-util",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
 ]
 
 [[package]]

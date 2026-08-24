@@ -1,0 +1,15 @@
+[package]
+name = "allwright-surface-mobile"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Shared mobile surface abstractions for allwright plugins."
+readme = "README.md"
+keywords = ["automation", "mobile", "plugin"]
+categories = ["development-tools::testing", "api-bindings"]
+
+[dependencies]
+allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.5" }
+tokio = { workspace = true }

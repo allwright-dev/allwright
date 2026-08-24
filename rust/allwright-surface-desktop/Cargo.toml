@@ -1,0 +1,15 @@
+[package]
+name = "allwright-surface-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Shared desktop surface abstractions for allwright plugins."
+readme = "README.md"
+keywords = ["automation", "desktop", "plugin"]
+categories = ["development-tools::testing", "api-bindings"]
+
+[dependencies]
+allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.5" }
+tokio = { workspace = true }

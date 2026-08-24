@@ -9,12 +9,10 @@ use crate::proto::tab_session_event::Event as TabEvent;
 use crate::proto::{
     BrowserSessionCommand, BrowserSessionEvent, ClickElementCommand, CloseBrowserSessionCommand,
     CloseTabSessionCommand, CommandRetryOptions, CountElementsCommand, ElementCountedEvent,
-    ElementFilledEvent, ElementFocusedEvent, ElementHoveredEvent, ElementsHighlightedEvent,
-    FillElementCommand, FocusElementCommand, GetInnerTextCommand, GetTextContentCommand,
-    HighlightElementsCommand, HoverElementCommand, InnerTextResolvedEvent, KeyPressedEvent,
-    LaunchChromeCommand, NavigateTabCommand, OpenTabCommand, PingRequest, PressKeyCommand,
-    SelectorWaitSatisfiedEvent, SessionPingCommand, TabSessionCommand, TabSessionEvent,
-    TabSessionPingCommand, TextContentResolvedEvent, WaitForSelectorCommand,
+    ElementsHighlightedEvent, FillElementCommand, FocusElementCommand, GetInnerTextCommand,
+    GetTextContentCommand, HighlightElementsCommand, HoverElementCommand, LaunchChromeCommand,
+    NavigateTabCommand, OpenTabCommand, PingRequest, PressKeyCommand, SessionPingCommand,
+    TabSessionCommand, TabSessionEvent, TabSessionPingCommand, WaitForSelectorCommand,
 };
 use tokio::sync::{Mutex as AsyncMutex, mpsc};
 use tokio_stream::wrappers::ReceiverStream;

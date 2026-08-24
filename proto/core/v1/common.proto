@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package allwright.engine.v1;
+option go_package = "allwright.dev/gen/allwright/engine/v1;enginev1";
+
+message PingRequest {}
+
+message PingResponse {
+  string message = 1;
+}
+
+message CommandRetryOptions {
+  optional uint32 timeout_ms = 1;
+  optional uint32 retry_interval_ms = 2;
+}

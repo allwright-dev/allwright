@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package allwright.engine.v1;
+option go_package = "allwright.dev/gen/allwright/engine/v1;enginev1";
+
+import "core/v1/common.proto";
+import "surfaces/web/v1/web.proto";
+
+message BrowserSessionCommand {
+  oneof command {
+    LaunchChromeCommand launch_chrome = 1;
+    OpenTabCommand open_tab = 2;
+    SessionPingCommand ping = 3;
+    CloseBrowserSessionCommand close = 4;
+  }
+}
+
+message OpenTabCommand {
+  optional CommandRetryOptions retry_options = 1;
+}
+
+message SessionPingCommand {
+  string message = 1;
+}
+
+message CloseBrowserSessionCommand {}
+
+message BrowserSessionEvent {
+  string session_id = 1;
+
+  oneof event {
+    ChromeLaunchedEvent chrome_launched = 2;
+    TabOpenedEvent tab_opened = 3;
+    SessionPongEvent pong = 4;
+    BrowserSessionClosedEvent closed = 5;
+    BrowserSessionErrorEvent error = 6;
+  }
+}
+
+message TabOpenedEvent {
+  string tab_session_id = 1;
+  string note = 2;
+}
+
+message SessionPongEvent {
+  string message = 1;
+}
+
+message BrowserSessionClosedEvent {
+  string reason = 1;
+}
+
+message BrowserSessionErrorEvent {
+  string message = 1;
+}

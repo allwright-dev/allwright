@@ -1,3 +1,4 @@
+use allwright_plugin_sdk::{SurfaceFamily, SurfacePlugin, SurfacePluginDescriptor};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -117,7 +118,21 @@ struct ElementCenter {
 
 const CHROMIUM_BIDI_NPM_VERSION: &str = "17.0.2";
 const CHROMIUM_BIDI_MAPPER_BUNDLE: &str =
-    include_str!("../../third_party/chromium-bidi/17.0.2/mapperTab.js");
+    include_str!("../third_party/chromium-bidi/17.0.2/mapperTab.js");
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct WebPlugin;
+
+impl SurfacePlugin for WebPlugin {
+    fn descriptor(&self) -> SurfacePluginDescriptor {
+        SurfacePluginDescriptor {
+            id: "web",
+            family: SurfaceFamily::Web,
+            version: env!("CARGO_PKG_VERSION"),
+            description: "Web surface plugin for the allwright engine.",
+        }
+    }
+}
 
 pub fn open_chrome_window(chrome_binary: Option<&str>) -> Result<ChromeLaunchInfo, String> {
     launch_chrome_for_platform(chrome_binary.filter(|value| !value.trim().is_empty()))

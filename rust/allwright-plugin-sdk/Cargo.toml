@@ -1,0 +1,13 @@
+[package]
+name = "allwright-plugin-sdk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Plugin interfaces and shared metadata for allwright surface crates."
+readme = "README.md"
+keywords = ["automation", "plugin", "sdk"]
+categories = ["development-tools::testing", "api-bindings"]
+
+[dependencies]

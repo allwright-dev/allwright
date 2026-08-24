@@ -18,35 +18,44 @@ This instruction should be treated as ongoing project policy for all future AI c
   - `allwright-dev/`
   - `typescript/`
   - `proto/`
-- `rust/allwright`: single public Rust crate containing the high-level Rust client API plus the optional CLI/server binary
-- `rust/allwright/examples/`: Rust example programs for exercising the engine server
+- `rust/allwright`: `allwright-core`, the lightweight Rust engine crate containing the high-level Rust client API, the gRPC server, and the shared plugin catalog
+- `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core` and manages plugin registration
+- `rust/allwright-plugin-sdk`: shared plugin traits and surface metadata for publishable Rust surface crates
+- `rust/allwright-surface-web`: publishable `web` surface crate
+- `rust/allwright-surface-mobile`: shared mobile surface abstractions consumed by `mobile-android` and `mobile-ios`
+- `rust/allwright-surface-mobile-android`: publishable `mobile-android` surface crate
+- `rust/allwright-surface-mobile-ios`: publishable `mobile-ios` surface crate
+- `rust/allwright-surface-desktop`: shared desktop surface abstractions consumed by `desktop-mac`, `desktop-windows`, and `desktop-linux`
+- `rust/allwright-surface-desktop-mac`: publishable `desktop-mac` surface crate
+- `rust/allwright-surface-desktop-windows`: publishable `desktop-windows` surface crate
+- `rust/allwright-surface-desktop-linux`: publishable `desktop-linux` surface crate
+- `rust/allwright/examples/`: Rust example programs for exercising the lightweight engine core
 - `go/`: Go module `allwright.dev` containing generated engine stubs, the public Go client package at the module root, and Go examples
 - `java/`: Gradle-based Java client project that generates engine stubs from the shared proto and exposes a high-level browser/page API
 - `python/`: Python client package that loads the shared proto dynamically at runtime and exposes a high-level browser/page API
 - `allwright-dev/`: standalone Next.js site for the purchased `allwright.dev` domain, intended for Vercel deployment and public-facing marketing/docs entrypoints
 - `typescript/`: TypeScript/JavaScript source folder containing the npm package source and examples
 - `proto/`: shared protobuf and gRPC contract root for all stacks
-- `rust/allwright` now vendors the current Rust engine/client implementation and the proto/build assets it needs for packaging
-
-Supporting libraries:
-
-- `rust/mobile-lib` may depend on:
-  - `rust/ios-lib`
-  - `rust/android-lib`
-- `rust/desktop-lib` may depend on:
-  - `rust/windows-lib`
-  - `rust/macos-lib`
-  - `rust/linux-lib`
+- `proto/engine/v1/engine.proto`: umbrella engine service contract that imports the split proto ownership layers
+- `proto/core/v1/`: core-owned shared engine/session/browser/tab message contracts
+- `proto/surfaces/web/v1/`: web surface-owned command and event contracts
+- `rust/allwright` now contains the lightweight Rust engine/client implementation and compiles against the shared top-level `proto/` contract during builds
 
 ## Runtime Model
 
 - The entire project should remain Tokio async runtime driven.
 - The CLI enters through `#[tokio::main]`.
-- `rust/allwright` now owns the Rust gRPC server surface and public Rust client surface in one package.
+- The Rust workspace publishable crates are currently aligned on version `0.0.5`.
+- Installing the `allwright` package should provide the CLI plus the lightweight core together.
+- `rust/allwright` now owns the lightweight Rust gRPC server surface and public Rust client surface in one package.
 - Engine behavior and engine-facing Rust contracts should stay inside `rust/allwright`.
+- allwright should remain a single engine even as the product grows broader capabilities.
+- Surface capabilities should be designed as separately installable plugins such as `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux`, all extending the core engine instead of creating separate engines or unrelated runtimes.
+- The CLI currently registers desired plugins into a local plugin manifest; runtime plugin loading is still a follow-up step.
 - The engine direction is driverless browser automation.
 - Do not introduce ChromeDriver into the primary browser control path.
 - The current gRPC layout lives in top-level `proto/`.
+- The proto contract is now split by ownership: `engine/v1` is the umbrella service surface, `core/v1` owns shared engine/session messages, and `surfaces/web/v1` owns the current web-specific messages.
 - The current proto package is `allwright.engine.v1`.
 - The current starter service is `EngineService`.
 - Generated gRPC client code is enabled and currently consumed by `rust/allwright` and its examples.
@@ -93,18 +102,18 @@ Supporting libraries:
 - Click is a separate `ClickElementCommand` on `TabSession`.
 - Future tab creation and tab-level communication should be modeled as separate commands inside the browser session stream.
 - Browser launch will likely need CDP enabled so the engine can attach to the browser session.
-- Browser launch now enables CDP and surfaces browser-level connection metadata.
-- Browser sessions should be tracked with engine session ids and associated CDP session information.
-- Tabs now open through CDP `Target.createTarget`, not GUI scripting.
-- The initial launch-created tab is discovered through CDP `Target.getTargets`.
-- Tab navigation now runs through CDP `Target.attachToTarget` plus `Page.navigate`.
-- The current navigation path waits for `Page.loadEventFired`, then injects a pinned `chromium-bidi` mapper artifact into a hidden mapper target in the same browser session.
-- The injected mapper is sourced from the published `chromium-bidi@17.0.2` package but is checked into `rust/web-lib/third_party/chromium-bidi/17.0.2/` so build/runtime do not depend on `npm`.
-- Browser sessions now persist a real `bidi_session_id` plus mapper target/session ids after mapper injection.
-- The current implemented BiDi action surface includes selector-based click through `script.evaluate` on the tab browsing context.
-- Chrome launching currently routes through `web-lib`, uses the browser binary directly, and discovers the CDP WebSocket endpoint via `DevToolsActivePort`.
-- Platform crates are support layers, not owners of engine logic.
-- `rust/allwright` now hides the engine transport behind a lazy singleton connection and exposes `launch_chrome`, `ping`, `Browser`, and `Tab` methods from the same package that also provides the optional CLI/server binary.
+- The intended web plugin implementation path enables CDP and surfaces browser-level connection metadata.
+- The intended web plugin path tracks browser sessions with engine session ids and associated CDP session information.
+- The intended web plugin path opens tabs through CDP `Target.createTarget`, not GUI scripting.
+- The intended web plugin path discovers the initial launch-created tab through CDP `Target.getTargets`.
+- The intended web plugin path runs tab navigation through CDP `Target.attachToTarget` plus `Page.navigate`.
+- The intended web plugin path waits for `Page.loadEventFired`, then injects a pinned `chromium-bidi` mapper artifact into a hidden mapper target in the same browser session.
+- The injected mapper is sourced from the published `chromium-bidi@17.0.2` package but is checked into `rust/allwright-surface-web/third_party/chromium-bidi/17.0.2/` so the publishable web surface crate does not depend on `npm`.
+- The intended web plugin path persists a real `bidi_session_id` plus mapper target/session ids after mapper injection.
+- The implemented web surface crate includes selector-based click through `script.evaluate` on the tab browsing context.
+- Chrome launching logic currently lives in `allwright-surface-web`, uses the browser binary directly, and discovers the CDP WebSocket endpoint via `DevToolsActivePort`.
+- Shared surface crates support plugin families, while leaf surface crates provide the publishable install targets.
+- `rust/allwright` now hides the engine transport behind a lazy singleton connection and exposes `launch_chrome`, `ping`, `Browser`, `Tab`, and plugin catalog metadata from the lightweight core package.
 - The Rust singleton client currently defaults to `http://127.0.0.1:50051`, also respects `ALLWRIGHT_SERVER_ADDR`, and can be redirected in-process with `allwright::set_server_addr(...)`.
 - `rust/allwright/examples/playground.rs` now exercises the engine through the `allwright` crate, supports the launch-created initial tab plus additional browser-session tabs, and closes them through the high-level browser/tab API as a minimal end-to-end test flow.
 - The Rust playground example waits for keyboard confirmation before closing the browser session so browser state can be observed manually.
@@ -130,11 +139,24 @@ Supporting libraries:
 proto/
 └── engine/v1/engine.proto
 
+rust/allwright-plugin-sdk
+rust/allwright-surface-web
+rust/allwright-surface-mobile
+├── rust/allwright-surface-mobile-android
+└── rust/allwright-surface-mobile-ios
+rust/allwright-surface-desktop
+├── rust/allwright-surface-desktop-mac
+├── rust/allwright-surface-desktop-windows
+└── rust/allwright-surface-desktop-linux
+
 rust/allwright
 ├── high-level Rust client API
-├── optional CLI/server binary
-├── packaged proto/build assets
-└── internal platform and engine modules
+├── engine implementation
+└── plugin catalog metadata
+
+rust/allwright-cli
+├── installable `allwright` binary
+└── local plugin manifest management
 ```
 
 ## Maintenance Rules
@@ -142,7 +164,8 @@ rust/allwright
 - Keep `README.md` and `Codex.md` aligned.
 - Prefer documenting ownership changes here at the same time as code changes.
 - Do not move engine logic out of `rust/allwright`.
-- Do not collapse platform-specific responsibilities back into `allwright`.
+- Do not collapse platform-specific responsibilities back into `rust/allwright`; keep them in the surface crates.
+- Prefer adding explicit extension points for surface plugins like `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux` over introducing parallel engine implementations.
 - Keep async boundaries explicit and Tokio-native.
 - Keep the gRPC contract minimal until requirements are explicitly defined.
 - Preserve the driverless direction when evolving browser and tab session APIs.

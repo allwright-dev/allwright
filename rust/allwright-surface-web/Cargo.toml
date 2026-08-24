@@ -1,0 +1,18 @@
+[package]
+name = "allwright-surface-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Web surface plugin for the allwright engine."
+readme = "README.md"
+keywords = ["automation", "browser", "cdp", "bidi"]
+categories = ["development-tools::testing", "api-bindings"]
+
+[dependencies]
+allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.5" }
+futures-util = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }

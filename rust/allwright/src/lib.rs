@@ -1,43 +1,89 @@
-#[cfg(feature = "server")]
-#[allow(dead_code)]
-#[path = "platform/android.rs"]
-mod android_lib;
 #[cfg(feature = "client")]
 mod client;
 #[cfg(feature = "server")]
-#[allow(dead_code)]
-#[path = "platform/desktop.rs"]
-mod desktop_lib;
-#[cfg(feature = "server")]
 #[path = "engine.rs"]
 mod engine_lib;
-#[cfg(feature = "server")]
-#[allow(dead_code)]
-#[path = "platform/ios.rs"]
-mod ios_lib;
-#[cfg(feature = "server")]
-#[allow(dead_code)]
-#[path = "platform/linux.rs"]
-mod linux_lib;
-#[cfg(feature = "server")]
-#[allow(dead_code)]
-#[path = "platform/macos.rs"]
-mod macos_lib;
-#[cfg(feature = "server")]
-#[allow(dead_code)]
-#[path = "platform/mobile.rs"]
-mod mobile_lib;
-#[cfg(feature = "server")]
-#[allow(dead_code)]
-#[path = "platform/web.rs"]
-mod web_lib;
-#[cfg(feature = "server")]
-#[allow(dead_code)]
-#[path = "platform/windows.rs"]
-mod windows_lib;
 
 pub mod proto {
     tonic::include_proto!("allwright.engine.v1");
+}
+
+pub mod plugins {
+    pub use allwright_plugin_sdk::{SurfaceFamily, SurfacePluginDescriptor};
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct PluginPackage {
+        pub id: &'static str,
+        pub family: SurfaceFamily,
+        pub package_name: &'static str,
+        pub version: &'static str,
+        pub description: &'static str,
+    }
+
+    const PLUGINS: [PluginPackage; 6] = [
+        PluginPackage {
+            id: "web",
+            family: SurfaceFamily::Web,
+            package_name: "allwright-surface-web",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "Web surface plugin for the allwright engine.",
+        },
+        PluginPackage {
+            id: "mobile-android",
+            family: SurfaceFamily::Mobile,
+            package_name: "allwright-surface-mobile-android",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "Android mobile surface plugin for the allwright engine.",
+        },
+        PluginPackage {
+            id: "mobile-ios",
+            family: SurfaceFamily::Mobile,
+            package_name: "allwright-surface-mobile-ios",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "iOS mobile surface plugin for the allwright engine.",
+        },
+        PluginPackage {
+            id: "desktop-mac",
+            family: SurfaceFamily::Desktop,
+            package_name: "allwright-surface-desktop-mac",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "macOS desktop surface plugin for the allwright engine.",
+        },
+        PluginPackage {
+            id: "desktop-windows",
+            family: SurfaceFamily::Desktop,
+            package_name: "allwright-surface-desktop-windows",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "Windows desktop surface plugin for the allwright engine.",
+        },
+        PluginPackage {
+            id: "desktop-linux",
+            family: SurfaceFamily::Desktop,
+            package_name: "allwright-surface-desktop-linux",
+            version: env!("CARGO_PKG_VERSION"),
+            description: "Linux desktop surface plugin for the allwright engine.",
+        },
+    ];
+
+    pub fn catalog() -> &'static [PluginPackage] {
+        &PLUGINS
+    }
+
+    pub fn package(plugin_id: &str) -> Option<&'static PluginPackage> {
+        catalog().iter().find(|plugin| plugin.id == plugin_id)
+    }
+
+    pub fn descriptors() -> Vec<SurfacePluginDescriptor> {
+        catalog()
+            .iter()
+            .map(|plugin| SurfacePluginDescriptor {
+                id: plugin.id,
+                family: plugin.family,
+                version: plugin.version,
+                description: plugin.description,
+            })
+            .collect()
+    }
 }
 
 #[cfg(feature = "client")]

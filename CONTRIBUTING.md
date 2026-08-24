@@ -15,9 +15,12 @@ Thank you for your interest in contributing to allwright.
 - Update documentation when behavior, architecture, or developer workflow changes.
 - Keep `README.md` and `Codex.md` aligned when either one needs to reflect a project-level change.
 - Follow the current repo ownership boundaries:
-  - `rust/engine-lib` owns engine behavior and the gRPC server surface.
-  - platform crates are support layers and should not take ownership of engine logic.
+  - `rust/allwright` owns the lightweight engine behavior and the gRPC server surface.
+  - `rust/allwright-cli` owns the installable `allwright` command-line package and plugin-manifest workflow.
+  - `rust/allwright-plugin-sdk` owns shared plugin traits and metadata.
+  - surface-specific code belongs in the publishable surface crates, not inline inside `rust/allwright`.
   - shared contracts belong under `proto/`.
+  - future surface capabilities should extend the single engine through explicit plugin boundaries such as `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux` rather than introducing separate engines.
 - Preserve the project's driverless browser automation direction and avoid introducing ChromeDriver into the primary control path.
 
 ## Testing
