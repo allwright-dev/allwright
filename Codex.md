@@ -23,6 +23,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `.github/workflows/release-surface-plugins.yml`: tag-triggered GitHub Actions workflow that builds platform plugin archives and attaches them to GitHub Releases
 - `scripts/install.sh`: Linux/macOS installer script for downloading the published `allwright` CLI release asset
 - `scripts/install.ps1`: Windows PowerShell installer script for downloading the published `allwright` CLI release asset
+- `scripts/sync-version.sh`: helper script that rewrites the workspace and internal crate versions from a provided release version
 - `rust/allwright-plugin-sdk`: shared plugin traits and surface metadata for publishable Rust surface crates
 - `rust/allwright-surface-web`: publishable `web` surface crate that also ships the standalone `allwright-surface-web` runtime binary
 - `rust/allwright-surface-mobile`: shared mobile surface abstractions consumed by `mobile-android` and `mobile-ios`
@@ -48,7 +49,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 
 - The entire project should remain Tokio async runtime driven.
 - The CLI enters through `#[tokio::main]`.
-- The Rust workspace publishable crates are currently aligned on version `0.0.7`.
+- The Rust workspace publishable crates should be synced from the release tag when GitHub Actions builds a tagged release.
 - Installing the `allwright` package should provide the CLI plus the lightweight core together.
 - `rust/allwright` now owns the lightweight Rust fallback gRPC server surface and public Rust client surface in one package.
 - Engine behavior and engine-facing Rust contracts should stay inside `rust/allwright`.
@@ -56,8 +57,8 @@ This instruction should be treated as ongoing project policy for all future AI c
 - Surface capabilities should be designed as separately installable plugins such as `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux`, all extending the core engine instead of creating separate engines or unrelated runtimes.
 - The CLI currently installs the `web` plugin by downloading the matching archive from GitHub Releases into the local allwright plugin directory, records it in the local plugin manifest, and delegates `allwright serve` to the installed `allwright-surface-web` binary when present.
 - The non-web surface crates should remain visible in the plugin catalog but should stay non-installable until they ship real runtime artifacts.
-- GitHub tag pushes such as `v0.0.7` should trigger release automation that builds the current web plugin runtime archives for the supported OS matrix and uploads them to the matching GitHub Release.
-- GitHub tag pushes such as `v0.0.7` should also build and upload the main `allwright` CLI archives so installer scripts can bootstrap core plus CLI without Cargo.
+- GitHub tag pushes such as `vX.Y.Z` should trigger release automation that syncs crate versions from the tag, builds the current web plugin runtime archives for the supported OS matrix, and uploads them to the matching GitHub Release.
+- GitHub tag pushes such as `vX.Y.Z` should also build and upload the main `allwright` CLI archives so installer scripts can bootstrap core plus CLI without Cargo.
 - The engine direction is driverless browser automation.
 - Do not introduce ChromeDriver into the primary browser control path.
 - The current gRPC layout lives in top-level `proto/`.
@@ -176,6 +177,9 @@ scripts/install.sh
 
 scripts/install.ps1
 └── download and install the released `allwright` CLI on Windows
+
+scripts/sync-version.sh
+└── sync workspace and internal crate versions from a release tag version
 ```
 
 ## Maintenance Rules

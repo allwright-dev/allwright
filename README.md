@@ -82,9 +82,10 @@ So the user-facing install model is now real for `web`, while the broader multi-
 
 Release automation today:
 
-- pushing a tag such as `v0.0.7` triggers the GitHub Actions release workflow
+- pushing a tag such as `vX.Y.Z` triggers the GitHub Actions release workflow
 - that workflow builds both the `allwright` CLI and `allwright-surface-web` plugin for the current release matrix and uploads the archives to the matching GitHub Release
 - `allwright plugin install web` resolves the local OS and architecture, then downloads the matching release asset
+- the release workflow syncs the Rust workspace version from the Git tag before building, so the tag is the release source of truth
 
 ## Quick Start
 
@@ -231,7 +232,7 @@ await browser.close();
 - The project should keep a single engine core even as surface modules become separately installable plugins.
 - The `web` surface plugin is now installable through the CLI via GitHub Release downloads and is started by delegating `allwright serve` to the installed plugin binary.
 - The remaining surface plugins are still intentionally disabled as install targets until their runtime binaries exist.
-- The Rust workspace is versioned as `0.0.7` across the publishable engine and surface crates.
+- The Rust workspace version is synced from the release tag during GitHub release builds.
 - The browser control path is intended to stay driverless.
 - The repo uses shared proto contracts across all supported client stacks.
 - Bun is the preferred local workflow for the TypeScript stack and the `allwright-dev/` site.
@@ -241,8 +242,8 @@ await browser.close();
 Create and push a version tag:
 
 ```bash
-git tag v0.0.7
-git push origin v0.0.7
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds and uploads the current web plugin archives for:
@@ -259,11 +260,12 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds 
 
 - `scripts/install.sh`: installs the latest or requested `allwright` CLI release on Linux and macOS
 - `scripts/install.ps1`: installs the latest or requested `allwright` CLI release on Windows PowerShell
+- `scripts/sync-version.sh`: syncs the Rust workspace and internal crate versions from a release version string such as `X.Y.Z`
 - users do not need to clone the repo; both scripts can be run directly from GitHub with `curl`, `wget`, or PowerShell `irm`
 
 Both scripts support:
 
-- `ALLWRIGHT_VERSION` to pin a specific release tag such as `v0.0.7`
+- `ALLWRIGHT_VERSION` to pin a specific release tag such as `vX.Y.Z`
 - `ALLWRIGHT_INSTALL_DIR` to override the destination directory
 - `ALLWRIGHT_REPOSITORY` to target a fork or alternate GitHub repository
 

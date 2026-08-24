@@ -37,6 +37,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Sync workspace version from tag
+        shell: bash
+        run: |
+          chmod +x ./scripts/sync-version.sh
+          ./scripts/sync-version.sh "${GITHUB_REF_NAME#v}"
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -105,6 +111,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Sync workspace version from tag
+        shell: bash
+        run: |
+          chmod +x ./scripts/sync-version.sh
+          ./scripts/sync-version.sh "${GITHUB_REF_NAME#v}"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
