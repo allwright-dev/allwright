@@ -10,6 +10,7 @@ const SERVER_ADDR_ENV_VAR = "ALLWRIGHT_SERVER_ADDR";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
+const PROTO_ROOT = path.join(REPO_ROOT, "proto");
 const ENGINE_PROTO_PATH = path.join(REPO_ROOT, "proto", "engine", "v1", "engine.proto");
 
 let runtimePromise: Promise<RuntimeClient> | null = null;
@@ -1153,6 +1154,7 @@ async function getRuntime(): Promise<RuntimeClient> {
 
 function createRuntime(): RuntimeClient {
   const loaded = protoLoader.loadSync(ENGINE_PROTO_PATH, {
+    includeDirs: [PROTO_ROOT],
     keepCase: false,
     longs: String,
     enums: String,
