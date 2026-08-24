@@ -21,6 +21,8 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `rust/allwright`: `allwright-core`, the lightweight Rust engine crate containing the high-level Rust client API, the lightweight gRPC server fallback, and the shared plugin catalog
 - `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core`, installs supported plugins, and delegates runtime startup to installed plugin binaries
 - `.github/workflows/release-surface-plugins.yml`: tag-triggered GitHub Actions workflow that builds platform plugin archives and attaches them to GitHub Releases
+- `scripts/install.sh`: Linux/macOS installer script for downloading the published `allwright` CLI release asset
+- `scripts/install.ps1`: Windows PowerShell installer script for downloading the published `allwright` CLI release asset
 - `rust/allwright-plugin-sdk`: shared plugin traits and surface metadata for publishable Rust surface crates
 - `rust/allwright-surface-web`: publishable `web` surface crate that also ships the standalone `allwright-surface-web` runtime binary
 - `rust/allwright-surface-mobile`: shared mobile surface abstractions consumed by `mobile-android` and `mobile-ios`
@@ -55,6 +57,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - The CLI currently installs the `web` plugin by downloading the matching archive from GitHub Releases into the local allwright plugin directory, records it in the local plugin manifest, and delegates `allwright serve` to the installed `allwright-surface-web` binary when present.
 - The non-web surface crates should remain visible in the plugin catalog but should stay non-installable until they ship real runtime artifacts.
 - GitHub tag pushes such as `v0.0.7` should trigger release automation that builds the current web plugin runtime archives for the supported OS matrix and uploads them to the matching GitHub Release.
+- GitHub tag pushes such as `v0.0.7` should also build and upload the main `allwright` CLI archives so installer scripts can bootstrap core plus CLI without Cargo.
 - The engine direction is driverless browser automation.
 - Do not introduce ChromeDriver into the primary browser control path.
 - The current gRPC layout lives in top-level `proto/`.
@@ -167,6 +170,12 @@ rust/allwright-cli
 
 .github/workflows/release-surface-plugins.yml
 └── build and upload release archives for installable plugin runtimes
+
+scripts/install.sh
+└── download and install the released `allwright` CLI on Linux/macOS
+
+scripts/install.ps1
+└── download and install the released `allwright` CLI on Windows
 ```
 
 ## Maintenance Rules

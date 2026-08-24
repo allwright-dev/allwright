@@ -1,4 +1,4 @@
-name: Release Surface Plugins
+name: Release Binaries
 
 on:
   push:
@@ -9,6 +9,75 @@ permissions:
   contents: write
 
 jobs:
+  release-allwright-cli:
+    name: Release allwright CLI (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive_ext: tar.gz
+            binary_name: allwright
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive_ext: zip
+            binary_name: allwright.exe
+          - runner: macos-13
+            target: x86_64-apple-darwin
+            archive_ext: tar.gz
+            binary_name: allwright
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            archive_ext: tar.gz
+            binary_name: allwright
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build allwright CLI
+        run: cargo build -p allwright --release --target ${{ matrix.target }}
+
+      - name: Package release asset
+        id: package
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          ARCHIVE_EXT: ${{ matrix.archive_ext }}
+          BINARY_NAME: ${{ matrix.binary_name }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          asset_name="allwright-${TAG_NAME}-${TARGET}.${ARCHIVE_EXT}"
+          package_root="dist/package"
+          asset_path="dist/${asset_name}"
+
+          rm -rf "$package_root" dist
+          mkdir -p "$package_root/bin"
+          cp "target/${TARGET}/release/${BINARY_NAME}" "$package_root/bin/${BINARY_NAME}"
+
+          if [[ "$ARCHIVE_EXT" == "zip" ]]; then
+            powershell -Command "Compress-Archive -Path 'dist/package/*' -DestinationPath 'dist/${asset_name}'"
+          else
+            tar -C "$package_root" -czf "$asset_path" .
+          fi
+
+          echo "asset_name=${asset_name}" >> "$GITHUB_OUTPUT"
+          echo "asset_path=${asset_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.package.outputs.asset_path }}
+
   release-web-plugin:
     name: Release web plugin (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}

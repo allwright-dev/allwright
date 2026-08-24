@@ -83,7 +83,7 @@ So the user-facing install model is now real for `web`, while the broader multi-
 Release automation today:
 
 - pushing a tag such as `v0.0.7` triggers the GitHub Actions release workflow
-- that workflow builds `allwright-surface-web` for the current release matrix and uploads the archives to the matching GitHub Release
+- that workflow builds both the `allwright` CLI and `allwright-surface-web` plugin for the current release matrix and uploads the archives to the matching GitHub Release
 - `allwright plugin install web` resolves the local OS and architecture, then downloads the matching release asset
 
 ## Quick Start
@@ -91,7 +91,13 @@ Release automation today:
 Install the CLI:
 
 ```bash
-cargo install allwright
+./scripts/install.sh
+```
+
+Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
 
 Start the engine core through the CLI:
@@ -220,10 +226,24 @@ git push origin v0.0.7
 
 That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds and uploads the current web plugin archives for:
 
+- `allwright` CLI archives for the current OS matrix
+- `allwright-surface-web` plugin archives for the current OS matrix
+
 - Linux `x86_64-unknown-linux-gnu`
 - Windows `x86_64-pc-windows-msvc`
 - macOS `x86_64-apple-darwin`
 - macOS `aarch64-apple-darwin`
+
+## Installer Scripts
+
+- `scripts/install.sh`: installs the latest or requested `allwright` CLI release on Linux and macOS
+- `scripts/install.ps1`: installs the latest or requested `allwright` CLI release on Windows PowerShell
+
+Both scripts support:
+
+- `ALLWRIGHT_VERSION` to pin a specific release tag such as `v0.0.7`
+- `ALLWRIGHT_INSTALL_DIR` to override the destination directory
+- `ALLWRIGHT_REPOSITORY` to target a fork or alternate GitHub repository
 
 For repo-specific contribution guidance, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
