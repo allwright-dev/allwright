@@ -15,7 +15,11 @@ name = "allwright"
 path = "src/main.rs"
 
 [dependencies]
-allwright = { package = "allwright-core", path = "../allwright", version = "0.0.6", features = ["server"] }
+allwright = { package = "allwright-core", path = "../allwright", version = "0.0.7", features = ["server"] }
 clap = { workspace = true, features = ["derive"] }
+flate2 = { workspace = true }
+reqwest = { workspace = true }
+tar = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
+zip = { workspace = true }

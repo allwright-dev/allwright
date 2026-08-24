@@ -18,10 +18,11 @@ This instruction should be treated as ongoing project policy for all future AI c
   - `allwright-dev/`
   - `typescript/`
   - `proto/`
-- `rust/allwright`: `allwright-core`, the lightweight Rust engine crate containing the high-level Rust client API, the gRPC server, and the shared plugin catalog
-- `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core` and manages plugin registration
+- `rust/allwright`: `allwright-core`, the lightweight Rust engine crate containing the high-level Rust client API, the lightweight gRPC server fallback, and the shared plugin catalog
+- `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core`, installs supported plugins, and delegates runtime startup to installed plugin binaries
+- `.github/workflows/release-surface-plugins.yml`: tag-triggered GitHub Actions workflow that builds platform plugin archives and attaches them to GitHub Releases
 - `rust/allwright-plugin-sdk`: shared plugin traits and surface metadata for publishable Rust surface crates
-- `rust/allwright-surface-web`: publishable `web` surface crate
+- `rust/allwright-surface-web`: publishable `web` surface crate that also ships the standalone `allwright-surface-web` runtime binary
 - `rust/allwright-surface-mobile`: shared mobile surface abstractions consumed by `mobile-android` and `mobile-ios`
 - `rust/allwright-surface-mobile-android`: publishable `mobile-android` surface crate
 - `rust/allwright-surface-mobile-ios`: publishable `mobile-ios` surface crate
@@ -45,13 +46,15 @@ This instruction should be treated as ongoing project policy for all future AI c
 
 - The entire project should remain Tokio async runtime driven.
 - The CLI enters through `#[tokio::main]`.
-- The Rust workspace publishable crates are currently aligned on version `0.0.6`.
+- The Rust workspace publishable crates are currently aligned on version `0.0.7`.
 - Installing the `allwright` package should provide the CLI plus the lightweight core together.
-- `rust/allwright` now owns the lightweight Rust gRPC server surface and public Rust client surface in one package.
+- `rust/allwright` now owns the lightweight Rust fallback gRPC server surface and public Rust client surface in one package.
 - Engine behavior and engine-facing Rust contracts should stay inside `rust/allwright`.
 - allwright should remain a single engine even as the product grows broader capabilities.
 - Surface capabilities should be designed as separately installable plugins such as `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux`, all extending the core engine instead of creating separate engines or unrelated runtimes.
-- The CLI currently registers desired plugins into a local plugin manifest; runtime plugin loading is still a follow-up step.
+- The CLI currently installs the `web` plugin by downloading the matching archive from GitHub Releases into the local allwright plugin directory, records it in the local plugin manifest, and delegates `allwright serve` to the installed `allwright-surface-web` binary when present.
+- The non-web surface crates should remain visible in the plugin catalog but should stay non-installable until they ship real runtime artifacts.
+- GitHub tag pushes such as `v0.0.7` should trigger release automation that builds the current web plugin runtime archives for the supported OS matrix and uploads them to the matching GitHub Release.
 - The engine direction is driverless browser automation.
 - Do not introduce ChromeDriver into the primary browser control path.
 - The current gRPC layout lives in top-level `proto/`.
@@ -102,12 +105,12 @@ This instruction should be treated as ongoing project policy for all future AI c
 - Click is a separate `ClickElementCommand` on `TabSession`.
 - Future tab creation and tab-level communication should be modeled as separate commands inside the browser session stream.
 - Browser launch will likely need CDP enabled so the engine can attach to the browser session.
-- The intended web plugin implementation path enables CDP and surfaces browser-level connection metadata.
-- The intended web plugin path tracks browser sessions with engine session ids and associated CDP session information.
-- The intended web plugin path opens tabs through CDP `Target.createTarget`, not GUI scripting.
-- The intended web plugin path discovers the initial launch-created tab through CDP `Target.getTargets`.
-- The intended web plugin path runs tab navigation through CDP `Target.attachToTarget` plus `Page.navigate`.
-- The intended web plugin path waits for `Page.loadEventFired`, then injects a pinned `chromium-bidi` mapper artifact into a hidden mapper target in the same browser session.
+- The implemented web plugin runtime path enables CDP and surfaces browser-level connection metadata.
+- The implemented web plugin runtime path tracks browser sessions with engine session ids and associated CDP session information.
+- The implemented web plugin runtime path opens tabs through CDP `Target.createTarget`, not GUI scripting.
+- The implemented web plugin runtime path discovers the initial launch-created tab through CDP `Target.getTargets`.
+- The implemented web plugin runtime path runs tab navigation through CDP `Target.attachToTarget` plus `Page.navigate`.
+- The implemented web plugin runtime path waits for `Page.loadEventFired`, then injects a pinned `chromium-bidi` mapper artifact into a hidden mapper target in the same browser session.
 - The injected mapper is sourced from the published `chromium-bidi@17.0.2` package but is checked into `rust/allwright-surface-web/third_party/chromium-bidi/17.0.2/` so the publishable web surface crate does not depend on `npm`.
 - The intended web plugin path persists a real `bidi_session_id` plus mapper target/session ids after mapper injection.
 - The implemented web surface crate includes selector-based click through `script.evaluate` on the tab browsing context.
@@ -141,6 +144,8 @@ proto/
 
 rust/allwright-plugin-sdk
 rust/allwright-surface-web
+├── library surface helpers
+└── standalone runtime binary
 rust/allwright-surface-mobile
 ├── rust/allwright-surface-mobile-android
 └── rust/allwright-surface-mobile-ios
@@ -151,20 +156,25 @@ rust/allwright-surface-desktop
 
 rust/allwright
 ├── high-level Rust client API
-├── engine implementation
+├── shared proto bindings
+├── lightweight fallback server
 └── plugin catalog metadata
 
 rust/allwright-cli
 ├── installable `allwright` binary
-└── local plugin manifest management
+├── plugin installation
+└── runtime delegation
+
+.github/workflows/release-surface-plugins.yml
+└── build and upload release archives for installable plugin runtimes
 ```
 
 ## Maintenance Rules
 
 - Keep `README.md` and `Codex.md` aligned.
 - Prefer documenting ownership changes here at the same time as code changes.
-- Do not move engine logic out of `rust/allwright`.
-- Do not collapse platform-specific responsibilities back into `rust/allwright`; keep them in the surface crates.
+- Keep shared engine contracts and client-facing APIs in `rust/allwright`.
+- Keep platform-specific runtime logic out of `rust/allwright`; it belongs in the surface crates.
 - Prefer adding explicit extension points for surface plugins like `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux` over introducing parallel engine implementations.
 - Keep async boundaries explicit and Tokio-native.
 - Keep the gRPC contract minimal until requirements are explicitly defined.

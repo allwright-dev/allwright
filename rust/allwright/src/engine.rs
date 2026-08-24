@@ -65,7 +65,7 @@ fn tab_event(tab_session_id: &str, event: TabEvent) -> TabSessionEvent {
 
 fn missing_plugin_message(command_name: &str, plugin_id: &str) -> String {
     format!(
-        "{command_name} requires the `{plugin_id}` surface plugin. Install it with `allwright plugin install {plugin_id}` and make it available to the runtime."
+        "{command_name} requires the `{plugin_id}` surface plugin. `allwright plugin install {plugin_id}` currently only registers that plugin in the local manifest; runtime plugin loading is not implemented in the lightweight core yet."
     )
 }
 

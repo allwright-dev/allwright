@@ -26,7 +26,8 @@ The current stage is:
 - the core product direction is broader than browser automation alone
 - the first shipped implementation work is centered on the browser engine and its future plugin boundary
 - the Rust workspace now separates a lightweight `allwright-core` from the installable `allwright` CLI and surface crates
-- the web surface implementation exists in its own crate, but runtime plugin loading is still being wired into the lightweight core
+- the `web` surface now ships as a separately installable runtime plugin crate
+- the other surface crates already exist as publishable boundaries, but only `web` is currently installable as a standalone runtime artifact
 - the public API and internal architecture are still evolving as the project grows toward wider surface coverage
 
 If you are evaluating the repo today, the clearest signal is the direction: allwright is aiming to become a unified automation engine, and browser automation is the first concrete step on that path.
@@ -67,33 +68,39 @@ For users, the intended install model is simple:
 
 Today, the plugin ecosystem looks like this:
 
-- `allwright`: installable CLI package that runs the lightweight core and manages the local plugin manifest
-- `web`: the most ready surface plugin today
-- `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux`: planned surface plugins with publishable crate boundaries, but not yet the primary ready-to-use path
+- `allwright`: installable CLI package that runs the lightweight core, installs plugins, and delegates runtime to installed surface plugins when available
+- `web`: the first installable runtime surface plugin today
+- `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux`: planned surface plugins with publishable crate boundaries, but not yet installable runtime artifacts
 
 What `plugin install` means today:
 
-- it registers the plugin in the local allwright plugin manifest
-- it makes the desired surface explicit for the local environment
-- full runtime loading of registered plugins is still being completed
+- for `web`, it downloads the matching platform archive from GitHub Releases into the local allwright plugin directory and records the installed plugin in the manifest
+- `allwright serve` delegates to the installed `web` plugin binary when that plugin is present
+- the non-web surface crates are still intentionally behind this installability switch until their runtime binaries are ready
 
-So the user-facing direction is already plugin-based, while the runtime side is still catching up to that packaging model.
+So the user-facing install model is now real for `web`, while the broader multi-surface plugin ecosystem is still being completed.
+
+Release automation today:
+
+- pushing a tag such as `v0.0.7` triggers the GitHub Actions release workflow
+- that workflow builds `allwright-surface-web` for the current release matrix and uploads the archives to the matching GitHub Release
+- `allwright plugin install web` resolves the local OS and architecture, then downloads the matching release asset
 
 ## Quick Start
 
 Install the CLI:
 
 ```bash
-cargo install allwright --features cli
+cargo install allwright
 ```
 
 Start the engine core through the CLI:
 
 ```bash
-cargo run -p allwright -- --listen-addr 127.0.0.1:50051
+cargo run -p allwright -- serve --listen-addr 127.0.0.1:50051
 ```
 
-List or register plugins:
+List or install plugins:
 
 ```bash
 cargo run -p allwright -- plugin list
@@ -127,10 +134,10 @@ Today’s working path is browser-focused, with a Rust-powered engine and high-l
 The practical path today is:
 
 - use the `allwright` CLI as the installable entrypoint
-- register the `web` plugin
-- use the Rust, Go, Java, Python, or TypeScript clients against the running core
+- install the `web` plugin
+- use the Rust, Go, Java, Python, or TypeScript clients against the running engine address that the installed plugin serves
 
-At the moment, the lightweight core and CLI/plugin packaging are ahead of runtime plugin loading. Surface crates and split proto ownership are in place, while dynamic runtime activation of installed plugins is still follow-up work.
+At the moment, the `web` runtime path is wired end to end through the installable plugin model. The other surface crates and split proto ownership are in place, while additional plugin runtime activation is still follow-up work.
 
 ## Client Experience
 
@@ -171,9 +178,9 @@ await browser.close();
 ## Repository Guide
 
 - `rust/allwright`: lightweight `allwright-core` Rust package with the client API, proto bindings, and gRPC engine core
-- `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core` and manages plugin registration
+- `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core`, installs supported plugins, and delegates runtime startup to installed plugin binaries
 - `rust/allwright-plugin-sdk`: shared plugin traits and surface metadata
-- `rust/allwright-surface-web`: publishable `web` surface crate
+- `rust/allwright-surface-web`: publishable `web` surface crate that also ships the first standalone runtime plugin binary
 - `rust/allwright-surface-mobile`: shared mobile surface abstractions
 - `rust/allwright-surface-mobile-android`: publishable `mobile-android` surface crate
 - `rust/allwright-surface-mobile-ios`: publishable `mobile-ios` surface crate
@@ -195,11 +202,28 @@ await browser.close();
 - The current implementation focus is browser automation, but the product direction is wider.
 - Installing the `allwright` package is intended to deliver the CLI plus the lightweight engine core together.
 - The project should keep a single engine core even as surface modules become separately installable plugins.
-- Surface plugins are currently registered through the CLI plugin manifest and are not yet runtime-loaded by the core automatically.
-- The Rust workspace is versioned as `0.0.6` across the publishable engine and surface crates.
+- The `web` surface plugin is now installable through the CLI via GitHub Release downloads and is started by delegating `allwright serve` to the installed plugin binary.
+- The remaining surface plugins are still intentionally disabled as install targets until their runtime binaries exist.
+- The Rust workspace is versioned as `0.0.7` across the publishable engine and surface crates.
 - The browser control path is intended to stay driverless.
 - The repo uses shared proto contracts across all supported client stacks.
 - Bun is the preferred local workflow for the TypeScript stack and the `allwright-dev/` site.
+
+## Releasing Plugins
+
+Create and push a version tag:
+
+```bash
+git tag v0.0.7
+git push origin v0.0.7
+```
+
+That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds and uploads the current web plugin archives for:
+
+- Linux `x86_64-unknown-linux-gnu`
+- Windows `x86_64-pc-windows-msvc`
+- macOS `x86_64-apple-darwin`
+- macOS `aarch64-apple-darwin`
 
 For repo-specific contribution guidance, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
