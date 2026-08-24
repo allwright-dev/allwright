@@ -8,7 +8,6 @@ use std::io::{Cursor, Write};
 use std::net::SocketAddr;
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
-use std::process::{Command, ExitStatus};
 use tar::Archive;
 use zip::ZipArchive;
 
@@ -59,29 +58,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         listen_addr: "127.0.0.1:50051".parse()?,
     }) {
         CliCommand::Serve { listen_addr } => {
-            if plugin_is_installed("web")? {
-                if !plugin_binary_path("web").exists() {
-                    return Err(
-                        "the `web` plugin is registered but its runtime binary is missing. Reinstall it with `allwright plugin install web`."
-                            .into(),
-                    );
-                }
-                println!(
-                    "Starting allwright engine with the installed `web` plugin on {}",
-                    listen_addr
-                );
-                let status =
-                    run_plugin_binary("web", &["serve", "--listen-addr", &listen_addr.to_string()])?;
-                if !status.success() {
-                    return Err(format!("web plugin exited with status {status}").into());
-                }
-            } else {
-                println!(
-                    "Starting lightweight allwright engine core on {}. Install `web` to enable browser commands.",
-                    listen_addr
-                );
-                allwright::serve(listen_addr).await?;
-            }
+            println!(
+                "Starting lightweight allwright engine core on {}. Install `web` to enable browser commands.",
+                listen_addr
+            );
+            allwright::serve(listen_addr).await?;
         }
         CliCommand::Plugin { command } => handle_plugin_command(command)?,
     }
@@ -217,10 +198,10 @@ fn install_plugin_package(
     let asset_bytes = download_plugin_release_asset(version, &asset_name)?;
     unpack_plugin_release_asset(&asset_name, &asset_bytes, &install_root)?;
 
-    if !plugin_binary_path(plugin_id).exists() {
+    if !plugin_runtime_artifact_path(plugin_id).exists() {
         return Err(format!(
-            "downloaded plugin `{plugin_id}` but did not find runtime binary `{}` in the archive",
-            plugin_binary_filename(plugin_id)
+            "downloaded plugin `{plugin_id}` but did not find runtime artifact `{}` in the archive",
+            plugin_runtime_artifact_filename(plugin_id)
         )
         .into());
     }
@@ -228,31 +209,39 @@ fn install_plugin_package(
     Ok(())
 }
 
-fn run_plugin_binary(plugin_id: &str, args: &[&str]) -> Result<ExitStatus, Box<dyn Error>> {
-    let binary = plugin_binary_path(plugin_id);
-    let status = Command::new(binary).args(args).status()?;
-    Ok(status)
-}
-
-fn plugin_binary_path(plugin_id: &str) -> PathBuf {
+fn plugin_runtime_artifact_path(plugin_id: &str) -> PathBuf {
     plugin_install_root(plugin_id)
         .unwrap_or_else(|_| PathBuf::from(plugin_id))
-        .join("bin")
-        .join(plugin_binary_filename(plugin_id))
+        .join(plugin_runtime_artifact_dir(plugin_id))
+        .join(plugin_runtime_artifact_filename(plugin_id))
 }
 
-fn plugin_binary_stem(plugin_id: &str) -> &'static str {
+fn plugin_runtime_artifact_stem(plugin_id: &str) -> &'static str {
     match plugin_id {
         "web" => "allwright-surface-web",
         _ => "allwright-plugin",
     }
 }
 
-fn plugin_binary_filename(plugin_id: &str) -> String {
-    if cfg!(windows) {
-        format!("{}.exe", plugin_binary_stem(plugin_id))
-    } else {
-        plugin_binary_stem(plugin_id).to_string()
+fn plugin_runtime_artifact_dir(plugin_id: &str) -> &'static str {
+    match plugin_id {
+        "web" => "lib",
+        _ => "lib",
+    }
+}
+
+fn plugin_runtime_artifact_filename(plugin_id: &str) -> String {
+    match env::consts::OS {
+        "macos" => format!(
+            "lib{}.dylib",
+            plugin_runtime_artifact_stem(plugin_id).replace('-', "_")
+        ),
+        "linux" => format!(
+            "lib{}.so",
+            plugin_runtime_artifact_stem(plugin_id).replace('-', "_")
+        ),
+        "windows" => format!("{}.dll", plugin_runtime_artifact_stem(plugin_id).replace('-', "_")),
+        _ => plugin_runtime_artifact_stem(plugin_id).to_string(),
     }
 }
 
@@ -270,7 +259,7 @@ fn plugin_asset_name(plugin_id: &str, version: &str) -> Result<String, Box<dyn E
     let (target, extension) = release_target_platform()?;
     Ok(format!(
         "{}-v{}-{}.{}",
-        plugin_binary_stem(plugin_id),
+        plugin_runtime_artifact_stem(plugin_id),
         version,
         target,
         extension
