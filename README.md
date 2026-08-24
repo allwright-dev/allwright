@@ -154,7 +154,7 @@ await browser.close();
 - Installing the `allwright` package is intended to deliver the CLI plus the lightweight engine core together.
 - The project should keep a single engine core even as surface modules become separately installable plugins.
 - Surface plugins are currently registered through the CLI plugin manifest and are not yet runtime-loaded by the core automatically.
-- The Rust workspace is versioned as `0.0.5` across the publishable engine and surface crates.
+- The Rust workspace is versioned as `0.0.6` across the publishable engine and surface crates.
 - The browser control path is intended to stay driverless.
 - The repo uses shared proto contracts across all supported client stacks.
 - Bun is the preferred local workflow for the TypeScript stack and the `allwright-dev/` site.

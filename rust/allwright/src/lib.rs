@@ -5,7 +5,7 @@ mod client;
 mod engine_lib;
 
 pub mod proto {
-    tonic::include_proto!("allwright.engine.v1");
+    include!("proto_generated.rs");
 }
 
 pub mod plugins {

@@ -45,7 +45,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 
 - The entire project should remain Tokio async runtime driven.
 - The CLI enters through `#[tokio::main]`.
-- The Rust workspace publishable crates are currently aligned on version `0.0.5`.
+- The Rust workspace publishable crates are currently aligned on version `0.0.6`.
 - Installing the `allwright` package should provide the CLI plus the lightweight core together.
 - `rust/allwright` now owns the lightweight Rust gRPC server surface and public Rust client surface in one package.
 - Engine behavior and engine-facing Rust contracts should stay inside `rust/allwright`.

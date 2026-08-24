@@ -15,7 +15,7 @@ name = "allwright"
 path = "src/main.rs"
 
 [dependencies]
-allwright = { package = "allwright-core", path = "../allwright", version = "0.0.5", features = ["server"] }
+allwright = { package = "allwright-core", path = "../allwright", version = "0.0.6", features = ["server"] }
 clap = { workspace = true, features = ["derive"] }
 tokio = { workspace = true }
 tonic = { workspace = true }

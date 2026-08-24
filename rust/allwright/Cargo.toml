@@ -23,15 +23,11 @@ name = "playground"
 required-features = ["client"]
 
 [dependencies]
-allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.5" }
+allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.6" }
 prost = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
 tokio-stream = { workspace = true }
-
-[build-dependencies]
-protoc-bin-vendored = { workspace = true }
-tonic-build = { workspace = true }
 
 [dev-dependencies]
 clap = { workspace = true, features = ["derive"] }
