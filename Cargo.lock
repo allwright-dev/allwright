@@ -28,7 +28,9 @@ version = "0.0.7"
 dependencies = [
  "allwright-plugin-sdk",
  "clap",
+ "libloading",
  "prost",
+ "serde_json",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -37,6 +39,10 @@ dependencies = [
 [[package]]
 name = "allwright-plugin-sdk"
 version = "0.0.7"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "allwright-surface-desktop"
@@ -105,13 +111,10 @@ version = "0.0.7"
 dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",
- "clap",
  "futures-util",
  "serde_json",
  "tokio",
- "tokio-stream",
  "tokio-tungstenite",
- "tonic",
 ]
 
 [[package]]
@@ -956,6 +959,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
 
 [[package]]
+name = "libloading"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
+dependencies = [
+ "cfg-if",
+ "windows-link",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1401,6 +1414,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
 dependencies = [
  "serde_core",
+ "serde_derive",
 ]
 
 [[package]]

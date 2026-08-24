@@ -70,12 +70,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     "Starting allwright engine with the installed `web` plugin on {}",
                     listen_addr
                 );
-                let status = run_plugin_binary("web", &["serve", "--listen-addr", &listen_addr.to_string()])?;
+                let status =
+                    run_plugin_binary("web", &["serve", "--listen-addr", &listen_addr.to_string()])?;
                 if !status.success() {
                     return Err(format!("web plugin exited with status {status}").into());
                 }
             } else {
-                println!("Starting lightweight allwright engine core on {}", listen_addr);
+                println!(
+                    "Starting lightweight allwright engine core on {}. Install `web` to enable browser commands.",
+                    listen_addr
+                );
                 allwright::serve(listen_addr).await?;
             }
         }

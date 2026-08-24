@@ -55,7 +55,8 @@ This instruction should be treated as ongoing project policy for all future AI c
 - Engine behavior and engine-facing Rust contracts should stay inside `rust/allwright`.
 - allwright should remain a single engine even as the product grows broader capabilities.
 - Surface capabilities should be designed as separately installable plugins such as `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux`, all extending the core engine instead of creating separate engines or unrelated runtimes.
-- The CLI currently installs the `web` plugin by downloading the matching archive from GitHub Releases into the local allwright plugin directory, records it in the local plugin manifest, and delegates `allwright serve` to the installed `allwright-surface-web` binary when present.
+- The CLI currently installs the `web` plugin by downloading the matching archive from GitHub Releases into the local allwright plugin directory, records it in the local plugin manifest, and delegates browser runtime handling from `allwright serve` to the installed `allwright-surface-web` binary when present.
+- If the `web` plugin is not installed, `allwright serve` should still start the core server, but browser/web commands should fail with a plugin-required error.
 - The CLI install path should be release-asset based, not `cargo install` based.
 - The non-web surface crates should remain visible in the plugin catalog but should stay non-installable until they ship real runtime artifacts.
 - GitHub tag pushes such as `vX.Y.Z` should trigger release automation that syncs crate versions from the tag, builds the current web plugin runtime archives for the supported OS matrix, and uploads them to the matching GitHub Release.

@@ -11,3 +11,5 @@ keywords = ["automation", "plugin", "sdk"]
 categories = ["development-tools::testing", "api-bindings"]
 
 [dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

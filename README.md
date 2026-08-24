@@ -75,7 +75,9 @@ Today, the plugin ecosystem looks like this:
 What `plugin install` means today:
 
 - for `web`, it downloads the matching platform archive from GitHub Releases into the local allwright plugin directory and records the installed plugin in the manifest
-- `allwright serve` delegates to the installed `web` plugin binary when that plugin is present
+- `allwright serve` always starts the engine server
+- when `web` is installed, `allwright serve` delegates browser runtime handling to the installed `web` plugin binary
+- when `web` is not installed, browser/web commands fail with a plugin-required error while the core server still runs
 - the non-web surface crates are still intentionally behind this installability switch until their runtime binaries are ready
 
 So the user-facing install model is now real for `web`, while the broader multi-surface plugin ecosystem is still being completed.

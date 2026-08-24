@@ -1,5 +1,12 @@
-use allwright_plugin_sdk::{SurfaceFamily, SurfacePlugin, SurfacePluginDescriptor};
+use allwright_plugin_sdk::{
+    ALLWRIGHT_PLUGIN_API_VERSION, ChromeLaunchInfo, ChromeTabInfo, ChromiumBidiMapperInfo,
+    ClickInfo, ElementCountInfo, FillInfo, FocusInfo, HighlightElementsInfo, HoverInfo,
+    PluginCommand, PluginEnvelope, PluginResult, PressKeyInfo, SurfaceFamily, SurfacePlugin,
+    SurfacePluginDescriptor, TabNavigationInfo, TextInfo, WaitForSelectorInfo,
+};
+use std::ffi::{CStr, CString, c_char};
 use std::fs;
+use std::future::Future;
 use std::path::PathBuf;
 use std::process::Command;
 use std::thread;
@@ -13,96 +20,6 @@ use tokio_tungstenite::MaybeTlsStream;
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChromeLaunchInfo {
-    pub browser: String,
-    pub note: String,
-    pub cdp_websocket_url: String,
-    pub user_data_dir: String,
-    pub process_id: u32,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChromeTabInfo {
-    pub note: String,
-    pub target_id: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TabNavigationInfo {
-    pub url: String,
-    pub note: String,
-    pub browsing_context_id: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChromiumBidiMapperInfo {
-    pub package_version: String,
-    pub mapper_target_id: String,
-    pub mapper_session_id: String,
-    pub note: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ClickInfo {
-    pub css_selector: String,
-    pub note: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ElementCountInfo {
-    pub css_selector: String,
-    pub count: u32,
-    pub note: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HighlightElementsInfo {
-    pub css_selector: String,
-    pub count: u32,
-    pub note: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FocusInfo {
-    pub css_selector: String,
-    pub note: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FillInfo {
-    pub css_selector: String,
-    pub value: String,
-    pub note: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HoverInfo {
-    pub css_selector: String,
-    pub note: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PressKeyInfo {
-    pub css_selector: String,
-    pub key: String,
-    pub note: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextInfo {
-    pub css_selector: String,
-    pub text: String,
-    pub note: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WaitForSelectorInfo {
-    pub css_selector: String,
-    pub visible: bool,
-    pub note: String,
-}
 
 #[derive(Debug, Clone, PartialEq)]
 struct DiscoveredElements {
@@ -1600,5 +1517,240 @@ fn require_non_empty_selector(command_name: &str, css_selector: &str) -> Result<
         ))
     } else {
         Ok(())
+    }
+}
+
+fn block_on_plugin_future<T, F>(future: F) -> Result<T, String>
+where
+    F: Future<Output = Result<T, String>>,
+{
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| format!("failed to create plugin runtime: {error}"))?;
+    runtime.block_on(future)
+}
+
+fn plugin_response(result: Result<PluginResult, String>) -> *mut c_char {
+    let envelope = match result {
+        Ok(result) => PluginEnvelope {
+            ok: true,
+            result: Some(result),
+            error: None,
+        },
+        Err(error) => PluginEnvelope {
+            ok: false,
+            result: None,
+            error: Some(error),
+        },
+    };
+
+    let json = match serde_json::to_string(&envelope) {
+        Ok(json) => json,
+        Err(error) => {
+            let fallback = PluginEnvelope {
+                ok: false,
+                result: None,
+                error: Some(format!("failed to serialize plugin response: {error}")),
+            };
+            serde_json::to_string(&fallback).unwrap_or_else(|_| {
+                "{\"ok\":false,\"result\":null,\"error\":\"failed to serialize plugin response\"}"
+                    .to_string()
+            })
+        }
+    };
+
+    CString::new(json).unwrap().into_raw()
+}
+
+fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String> {
+    match command {
+        PluginCommand::OpenChromeWindow { chrome_binary } => {
+            open_chrome_window(chrome_binary.as_deref()).map(PluginResult::OpenChromeWindow)
+        }
+        PluginCommand::DiscoverInitialTab { cdp_websocket_url } => block_on_plugin_future(
+            discover_initial_tab(&cdp_websocket_url).map(PluginResult::DiscoverInitialTab),
+        ),
+        PluginCommand::OpenChromeTab { cdp_websocket_url } => {
+            block_on_plugin_future(open_chrome_tab(&cdp_websocket_url).map(PluginResult::OpenChromeTab))
+        }
+        PluginCommand::CloseBrowserProcess { process_id } => {
+            close_browser_process(process_id)?;
+            Ok(PluginResult::CloseBrowserProcess)
+        }
+        PluginCommand::CloseChromeTab {
+            cdp_websocket_url,
+            target_id,
+        } => block_on_plugin_future(async move {
+            close_chrome_tab(&cdp_websocket_url, &target_id).await?;
+            Ok(PluginResult::CloseChromeTab)
+        }),
+        PluginCommand::NavigateChromeTab {
+            cdp_websocket_url,
+            target_id,
+            url,
+        } => block_on_plugin_future(
+            navigate_chrome_tab(&cdp_websocket_url, &target_id, &url)
+                .map(PluginResult::NavigateChromeTab),
+        ),
+        PluginCommand::InjectChromiumBidiMapper { cdp_websocket_url } => block_on_plugin_future(
+            inject_chromium_bidi_mapper(&cdp_websocket_url)
+                .map(PluginResult::InjectChromiumBidiMapper),
+        ),
+        PluginCommand::ResolveBidiContextForTab {
+            cdp_websocket_url,
+            mapper_target_id,
+            browsing_context_id,
+            url,
+        } => block_on_plugin_future(async move {
+            let (resolved_browsing_context_id, mapper) = resolve_bidi_context_for_tab(
+                &cdp_websocket_url,
+                mapper_target_id.as_deref(),
+                browsing_context_id.as_deref(),
+                url.as_deref(),
+            )
+            .await?;
+            Ok(PluginResult::ResolveBidiContextForTab {
+                browsing_context_id: resolved_browsing_context_id,
+                mapper,
+            })
+        }),
+        PluginCommand::ClickElementViaCdp {
+            cdp_websocket_url,
+            target_id,
+            css_selector,
+        } => block_on_plugin_future(
+            click_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
+                .map(PluginResult::ClickElementViaCdp),
+        ),
+        PluginCommand::CountElementsViaCdp {
+            cdp_websocket_url,
+            target_id,
+            css_selector,
+        } => block_on_plugin_future(
+            count_elements_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
+                .map(PluginResult::CountElementsViaCdp),
+        ),
+        PluginCommand::HighlightElementsViaCdp {
+            cdp_websocket_url,
+            target_id,
+            css_selector,
+            duration_ms,
+        } => block_on_plugin_future(
+            highlight_elements_via_cdp(&cdp_websocket_url, &target_id, &css_selector, duration_ms)
+                .map(PluginResult::HighlightElementsViaCdp),
+        ),
+        PluginCommand::FocusElementViaCdp {
+            cdp_websocket_url,
+            target_id,
+            css_selector,
+        } => block_on_plugin_future(
+            focus_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
+                .map(PluginResult::FocusElementViaCdp),
+        ),
+        PluginCommand::FillElementViaCdp {
+            cdp_websocket_url,
+            target_id,
+            css_selector,
+            value,
+        } => block_on_plugin_future(
+            fill_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector, &value)
+                .map(PluginResult::FillElementViaCdp),
+        ),
+        PluginCommand::HoverElementViaCdp {
+            cdp_websocket_url,
+            target_id,
+            css_selector,
+        } => block_on_plugin_future(
+            hover_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
+                .map(PluginResult::HoverElementViaCdp),
+        ),
+        PluginCommand::PressKeyViaCdp {
+            cdp_websocket_url,
+            target_id,
+            css_selector,
+            key,
+            text,
+        } => block_on_plugin_future(
+            press_key_via_cdp(
+                &cdp_websocket_url,
+                &target_id,
+                &css_selector,
+                &key,
+                text.as_deref(),
+            )
+            .map(PluginResult::PressKeyViaCdp),
+        ),
+        PluginCommand::GetTextContentViaCdp {
+            cdp_websocket_url,
+            target_id,
+            css_selector,
+        } => block_on_plugin_future(
+            get_text_content_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
+                .map(PluginResult::GetTextContentViaCdp),
+        ),
+        PluginCommand::GetInnerTextViaCdp {
+            cdp_websocket_url,
+            target_id,
+            css_selector,
+        } => block_on_plugin_future(
+            get_inner_text_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
+                .map(PluginResult::GetInnerTextViaCdp),
+        ),
+        PluginCommand::WaitForSelectorViaCdp {
+            cdp_websocket_url,
+            target_id,
+            css_selector,
+            visible,
+        } => block_on_plugin_future(
+            wait_for_selector_via_cdp(&cdp_websocket_url, &target_id, &css_selector, visible)
+                .map(PluginResult::WaitForSelectorViaCdp),
+        ),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn allwright_plugin_api_version() -> u32 {
+    ALLWRIGHT_PLUGIN_API_VERSION
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn allwright_plugin_id() -> *const c_char {
+    c"web".as_ptr()
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn allwright_plugin_invoke(request_json: *const c_char) -> *mut c_char {
+    if request_json.is_null() {
+        return plugin_response(Err("plugin request pointer is null".to_string()));
+    }
+
+    let request = match unsafe { CStr::from_ptr(request_json) }.to_str() {
+        Ok(request) => request,
+        Err(error) => {
+            return plugin_response(Err(format!(
+                "plugin request is not valid UTF-8: {error}"
+            )));
+        }
+    };
+
+    let command: PluginCommand = match serde_json::from_str(request) {
+        Ok(command) => command,
+        Err(error) => {
+            return plugin_response(Err(format!(
+                "failed to parse plugin request JSON: {error}"
+            )));
+        }
+    };
+
+    plugin_response(handle_plugin_command(command))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn allwright_plugin_free_string(value: *mut c_char) {
+    if !value.is_null() {
+        unsafe {
+            let _ = CString::from_raw(value);
+        }
     }
 }

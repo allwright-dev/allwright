@@ -3,6 +3,8 @@ mod client;
 #[cfg(feature = "server")]
 #[path = "engine.rs"]
 mod engine_lib;
+#[cfg(feature = "server")]
+mod plugin_loader;
 
 pub mod proto {
     include!("proto_generated.rs");
