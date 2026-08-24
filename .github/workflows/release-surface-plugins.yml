@@ -90,15 +90,15 @@ jobs:
           - runner: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             archive_ext: tar.gz
-            binary_name: allwright-surface-web
+            library_name: liballwright_surface_web.so
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             archive_ext: zip
-            binary_name: allwright-surface-web.exe
+            library_name: allwright_surface_web.dll
           - runner: macos-14
             target: aarch64-apple-darwin
             archive_ext: tar.gz
-            binary_name: allwright-surface-web
+            library_name: liballwright_surface_web.dylib
 
     steps:
       - name: Check out repository
@@ -115,8 +115,8 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Build web plugin runtime
-        run: cargo build -p allwright-surface-web --release --features runtime --target ${{ matrix.target }}
+      - name: Build web plugin library
+        run: cargo build -p allwright-surface-web --release --target ${{ matrix.target }}
 
       - name: Package release asset
         id: package
@@ -124,7 +124,7 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
           ARCHIVE_EXT: ${{ matrix.archive_ext }}
-          BINARY_NAME: ${{ matrix.binary_name }}
+          LIBRARY_NAME: ${{ matrix.library_name }}
           TAG_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
@@ -134,8 +134,8 @@ jobs:
           asset_path="dist/${asset_name}"
 
           rm -rf "$package_root" dist
-          mkdir -p "$package_root/bin"
-          cp "target/${TARGET}/release/${BINARY_NAME}" "$package_root/bin/${BINARY_NAME}"
+          mkdir -p "$package_root/lib"
+          cp "target/${TARGET}/release/${LIBRARY_NAME}" "$package_root/lib/${LIBRARY_NAME}"
 
           if [[ "$ARCHIVE_EXT" == "zip" ]]; then
             powershell -Command "Compress-Archive -Path 'dist/package/*' -DestinationPath 'dist/${asset_name}'"
