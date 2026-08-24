@@ -58,10 +58,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         listen_addr: "127.0.0.1:50051".parse()?,
     }) {
         CliCommand::Serve { listen_addr } => {
-            println!(
-                "Starting lightweight allwright engine core on {}. Install `web` to enable browser commands.",
-                listen_addr
-            );
+            println!("Starting allwright engine on {}", listen_addr);
             allwright::serve(listen_addr).await?;
         }
         CliCommand::Plugin { command } => handle_plugin_command(command)?,
@@ -177,10 +174,6 @@ fn read_installed_plugins() -> Result<Vec<InstalledPlugin>, Box<dyn Error>> {
         });
     }
     Ok(plugins)
-}
-
-fn plugin_is_installed(id: &str) -> Result<bool, Box<dyn Error>> {
-    Ok(read_installed_plugins()?.iter().any(|plugin| plugin.id == id))
 }
 
 fn install_plugin_package(
