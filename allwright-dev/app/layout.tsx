@@ -9,6 +9,8 @@ import {
   SITE_TITLE,
   SITE_URL,
 } from "./brand";
+import { SiteFooter } from "./site-footer";
+import { SiteHeader } from "./site-header";
 import { ThemeProvider } from "./theme-provider";
 
 const spaceGrotesk = Space_Grotesk({
@@ -86,7 +88,14 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${spaceGrotesk.variable} ${ibmPlexMono.variable}`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
+          <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,var(--accent-soft),transparent_38%),radial-gradient(circle_at_85%_15%,var(--accent-2-soft),transparent_32%),linear-gradient(180deg,var(--background)_0%,var(--background-deep)_100%)]">
+            <div className="grid-overlay pointer-events-none absolute inset-0 opacity-40" />
+            <div className="ambient-left pointer-events-none absolute left-[-10%] top-[6%] h-96 w-96 rounded-full bg-[radial-gradient(circle,var(--accent-soft),transparent_68%)] blur-md" />
+            <div className="ambient-right pointer-events-none absolute bottom-[-4%] right-[-10%] h-104 w-104 rounded-full bg-[radial-gradient(circle,var(--accent-2-soft),transparent_68%)] blur-md" />
+            <SiteHeader />
+            <main className="relative px-4 sm:px-6">{children}</main>
+            <SiteFooter />
+          </div>
         </ThemeProvider>
       </body>
     </html>

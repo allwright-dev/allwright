@@ -18,14 +18,14 @@ This instruction should be treated as ongoing project policy for all future AI c
   - `allwright-dev/`
   - `typescript/`
   - `proto/`
-- `rust/allwright`: `allwright-core`, the lightweight Rust engine crate containing the high-level Rust client API, the lightweight gRPC server fallback, and the shared plugin catalog
-- `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core`, installs supported plugins, and delegates runtime startup to installed plugin binaries
+- `rust/allwright`: `allwright-core`, the Rust engine crate containing the high-level Rust client API, the single gRPC server host, the runtime plugin loader, and the shared plugin catalog
+- `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core` and installs supported plugins
 - `.github/workflows/release-surface-plugins.yml`: tag-triggered GitHub Actions workflow that syncs crate versions from the tag, builds platform CLI/plugin archives, and attaches them to GitHub Releases
 - `scripts/install.sh`: Linux/macOS installer script for downloading the published `allwright` CLI release asset directly from GitHub without cloning the repo
 - `scripts/install.ps1`: Windows PowerShell installer script for downloading the published `allwright` CLI release asset directly from GitHub without cloning the repo
 - `scripts/sync-version.sh`: helper script that rewrites the workspace and internal crate versions from a provided release version
-- `rust/allwright-plugin-sdk`: shared plugin traits and surface metadata for publishable Rust surface crates
-- `rust/allwright-surface-web`: publishable `web` surface crate that also ships the standalone `allwright-surface-web` runtime binary
+- `rust/allwright-plugin-sdk`: shared plugin ABI, metadata, and request/response types for runtime-loaded Rust surface plugins
+- `rust/allwright-surface-web`: publishable `web` surface crate that ships a runtime-loadable shared library (`cdylib`)
 - `rust/allwright-surface-mobile`: shared mobile surface abstractions consumed by `mobile-android` and `mobile-ios`
 - `rust/allwright-surface-mobile-android`: publishable `mobile-android` surface crate
 - `rust/allwright-surface-mobile-ios`: publishable `mobile-ios` surface crate
@@ -51,13 +51,15 @@ This instruction should be treated as ongoing project policy for all future AI c
 - The CLI enters through `#[tokio::main]`.
 - The Rust workspace publishable crates should be synced from the release tag when GitHub Actions builds a tagged release.
 - Installing `allwright` should mean installing the released CLI binary plus the lightweight core behavior it owns; it should not require Cargo on end-user machines.
-- `rust/allwright` now owns the lightweight Rust fallback gRPC server surface and public Rust client surface in one package.
+- `rust/allwright` owns the single gRPC server host and public Rust client surface in one package.
 - Engine behavior and engine-facing Rust contracts should stay inside `rust/allwright`.
 - allwright should remain a single engine even as the product grows broader capabilities.
 - Surface capabilities should be designed as separately installable plugins such as `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux`, all extending the core engine instead of creating separate engines or unrelated runtimes.
-- The CLI currently installs the `web` plugin by downloading the matching archive from GitHub Releases into the local allwright plugin directory, records it in the local plugin manifest, and delegates browser runtime handling from `allwright serve` to the installed `allwright-surface-web` binary when present.
+- The CLI currently installs the `web` plugin by downloading the matching archive from GitHub Releases into the local allwright plugin directory and records it in the local plugin manifest.
 - If the `web` plugin is not installed, `allwright serve` should still start the core server, but browser/web commands should fail with a plugin-required error.
 - The CLI install path should be release-asset based, not `cargo install` based.
+- Runtime plugins should be true shared libraries loaded by the core at runtime, not subprocess executables and not compile-time linked surface implementations.
+- The `web` plugin should be packaged under `lib/` in the release archive, and the core plugin loader should resolve platform-specific library names such as `.dylib`, `.so`, and `.dll`.
 - The non-web surface crates should remain visible in the plugin catalog but should stay non-installable until they ship real runtime artifacts.
 - GitHub tag pushes such as `vX.Y.Z` should trigger release automation that syncs crate versions from the tag, builds the current web plugin runtime archives for the supported OS matrix, and uploads them to the matching GitHub Release.
 - GitHub tag pushes such as `vX.Y.Z` should also build and upload the main `allwright` CLI archives so installer scripts can bootstrap core plus CLI without Cargo.
@@ -87,6 +89,14 @@ This instruction should be treated as ongoing project policy for all future AI c
 - The core product message for `allwright-dev/` is that allwright is one automation engine for all automation needs.
 - The GitHub repository was transferred; the canonical remote and all in-repo/site links now point at `https://github.com/allwright-dev/allwright` (previously `qalens/allwright`).
 - All copy on `allwright-dev/` must read as user-facing product messaging (audience, benefits, surfaces covered); it must never describe internal implementation, architecture, or repo/dev workflow details.
+- `allwright-dev/` is now multi-page: `app/page.tsx` is the marketing home page (hero, honest per-surface status pills, benefits), and `app/how-it-works/page.tsx` is a dedicated "how it works" page that explains the one-engine model in user-facing terms (before/after comparison diagram, a client-languages → engine → surfaces flow diagram, and a "bring your own language" section linking out to the real example path per language in the GitHub repo).
+- Shared page chrome (background/ambient decoration, `SiteHeader`, `SiteFooter`) now lives in `app/layout.tsx` via `app/site-header.tsx` and `app/site-footer.tsx`, instead of being duplicated per page; `app/site-header.tsx` is a client component that highlights the active nav link with `usePathname`.
+- Per-surface status on the site must stay honest: only Web is "Available now"; Mobile (Android & iOS), Desktop (macOS, Windows, Linux), and API are all "Not yet available" until they ship real runtime artifacts, matching the plugin-catalog status above. Per-language client status must also stay honest: Rust and Go are "Published" (installable via normal package tooling); Java, Python, and TypeScript are "From source" (complete, but not yet on a package registry) — reflect this with the shared `app/status-pill.tsx` component, not ad hoc badges.
+- Core site messaging must foreground the plugin model accurately: allwright is a small core plus installable plugins ("à la carte, not a buffet") — never messaged as one monolithic engine that natively does everything. The plugin catalog shown on the site (web, mobile-android, mobile-ios, desktop-mac, desktop-windows, desktop-linux) is today's set, not a fixed/final one — copy and diagrams must say more plugins get added as new surfaces ship, not imply a closed count.
+- The site must also message that allwright is built from the ground up on its own engine — not an aggregator wrapping other automation tools' drivers/frameworks under one CLI. This appears on both `app/page.tsx` (hero + a "Built from the ground up" benefit) and `app/how-it-works/page.tsx` (the plugin-catalog section intro and the "Built from the ground up, not stitched together" section).
+- `app/how-it-works/page.tsx` includes a hand-drawn plugin-catalog diagram (`PluginCatalogDiagram`) laying out the core plus each real plugin-catalog entry in a hexagon, solid/installed vs. dashed/not-yet-available, plus a verified CLI snippet (`allwright plugin list`, `allwright plugin install web` — from `rust/allwright-cli`'s real clap subcommands). Keep any future plugin-model diagram/copy in sync with the actual CLI subcommand names if those change.
+- `app/sitemap.ts` must list every public page (currently `/` and `/how-it-works`); add new routes there when adding pages.
+- `middleware.ts` implements the `go-get=1` Go module metadata response for the `allwright.dev` vanity import path and must keep matching all routes (`matcher: ["/", "/:path*"]`); do not narrow this when adding new pages/routes.
 - `allwright-dev/` uses `next-themes` (class strategy on `<html>`, `defaultTheme="system"`) for light/dark mode via `app/theme-provider.tsx` and exposes a toggle through `app/theme-toggle.tsx`.
 - `allwright-dev/app/globals.css` defines the site palette as a green/blue (teal + blue accent) theme with light tokens on `:root` and dark tokens under `.dark`, matching the `next-themes` class strategy.
 - `allwright-dev/app/brand.tsx` is the single source of truth for site/brand constants (`SITE_URL`, `SITE_NAME`, `SITE_TITLE`, `SITE_DESCRIPTION`, `GITHUB_URL`) and the shared logo/social-card JSX; update links (like the GitHub URL) there rather than inlining them per file.
@@ -120,6 +130,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - The implemented web plugin runtime path discovers the initial launch-created tab through CDP `Target.getTargets`.
 - The implemented web plugin runtime path runs tab navigation through CDP `Target.attachToTarget` plus `Page.navigate`.
 - The implemented web plugin runtime path waits for `Page.loadEventFired`, then injects a pinned `chromium-bidi` mapper artifact into a hidden mapper target in the same browser session.
+- Clear separation of concerns is required: core should own only the generic engine host, plugin discovery/loading, shared session transport, and plugin-missing errors; all web-specific behavior, state, CDP, and BiDi logic belongs in the `web` plugin.
 - The injected mapper is sourced from the published `chromium-bidi@17.0.2` package but is checked into `rust/allwright-surface-web/third_party/chromium-bidi/17.0.2/` so the publishable web surface crate does not depend on `npm`.
 - The intended web plugin path persists a real `bidi_session_id` plus mapper target/session ids after mapper injection.
 - The implemented web surface crate includes selector-based click through `script.evaluate` on the tab browsing context.
@@ -154,7 +165,7 @@ proto/
 rust/allwright-plugin-sdk
 rust/allwright-surface-web
 ├── library surface helpers
-└── standalone runtime binary
+└── runtime-loadable shared library
 rust/allwright-surface-mobile
 ├── rust/allwright-surface-mobile-android
 └── rust/allwright-surface-mobile-ios
@@ -166,16 +177,16 @@ rust/allwright-surface-desktop
 rust/allwright
 ├── high-level Rust client API
 ├── shared proto bindings
-├── lightweight fallback server
+├── single engine server host
+├── runtime plugin loader
 └── plugin catalog metadata
 
 rust/allwright-cli
 ├── installable `allwright` binary
-├── plugin installation
-└── runtime delegation
+└── plugin installation
 
 .github/workflows/release-surface-plugins.yml
-└── build and upload release archives for installable plugin runtimes
+└── build and upload release archives for the CLI and installable plugin libraries
 
 scripts/install.sh
 └── download and install the released `allwright` CLI on Linux/macOS, preferring common writable bin directories
@@ -194,6 +205,7 @@ scripts/sync-version.sh
 - Keep shared engine contracts and client-facing APIs in `rust/allwright`.
 - Keep platform-specific runtime logic out of `rust/allwright`; it belongs in the surface crates.
 - Prefer adding explicit extension points for surface plugins like `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux` over introducing parallel engine implementations.
+- Do not reintroduce executable-style surface plugins; runtime-loaded shared libraries are the intended plugin model.
 - Prefer release downloads and installer scripts for end-user installation paths; do not reintroduce Cargo as the default user install dependency.
 - Keep release versioning tag-driven; if versions need to change, prefer updating the sync/release flow rather than hardcoding new crate versions by hand.
 - Keep async boundaries explicit and Tokio-native.

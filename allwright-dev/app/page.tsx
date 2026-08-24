@@ -1,12 +1,13 @@
-import Image from "next/image";
+import Link from "next/link";
 
 import { GITHUB_URL, LogoMark, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "./brand";
-import { ThemeToggle } from "./theme-toggle";
+import { StatusPill } from "./status-pill";
 
 const surfaces = [
   {
     label: "Web",
     description: "Real browser flows that click, type, and navigate like a person would.",
+    status: "Available now",
     position: { left: "6%", top: "10%" },
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -18,6 +19,7 @@ const surfaces = [
   {
     label: "Mobile",
     description: "The same test logic driving native and hybrid apps on real devices.",
+    status: "Not yet available",
     position: { left: "94%", top: "10%" },
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -29,6 +31,7 @@ const surfaces = [
   {
     label: "Desktop",
     description: "Full application automation for the tools your business runs on.",
+    status: "Not yet available",
     position: { left: "6%", top: "90%" },
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -39,7 +42,8 @@ const surfaces = [
   },
   {
     label: "API",
-    description: "Backend checks that stay in sync with the same flows and data.",
+    description: "Backend checks written in the same test, alongside the same browser flow.",
+    status: "Not yet available",
     position: { left: "94%", top: "90%" },
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -51,16 +55,16 @@ const surfaces = [
 
 const benefits = [
   {
-    title: "One engine, not a pile of tools",
-    body: "Every surface you test runs on the same engine, so your team learns one system instead of juggling a different framework for every platform.",
+    title: "À la carte, not a buffet",
+    body: "The core stays small on its own. Each surface is a plugin you install on purpose, so you never carry the weight of automation you don't use.",
   },
   {
-    title: "Built for steady, trustworthy runs",
-    body: "Allwright is engineered to behave the way a real user does, so results stay dependable instead of failing on things that were never actually broken.",
+    title: "Built from the ground up",
+    body: "No wrapped drivers, no glued-together tools. Every plugin runs on allwright's own engine, engineered to behave the way a real user does — so results stay dependable, not flaky.",
   },
   {
     title: "One workflow, every team",
-    body: "Web, mobile, desktop, and API testers describe automation the same way, so knowledge and coverage carry across the whole product.",
+    body: "Web, mobile, desktop, and API testers describe automation the same way, so knowledge and coverage carry across the whole product as each plugin ships.",
   },
 ];
 
@@ -85,37 +89,14 @@ const jsonLd = {
 
 export default function Home() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,var(--accent-soft),transparent_38%),radial-gradient(circle_at_85%_15%,var(--accent-2-soft),transparent_32%),linear-gradient(180deg,var(--background)_0%,var(--background-deep)_100%)] px-4 py-6 sm:px-6 sm:py-8">
+    <div className="relative mx-auto w-full max-w-6xl pb-6">
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <div className="grid-overlay pointer-events-none absolute inset-0 opacity-40" />
-      <div className="ambient-left absolute left-[-10%] top-[6%] h-[24rem] w-[24rem] rounded-full bg-[radial-gradient(circle,var(--accent-soft),transparent_68%)] blur-md" />
-      <div className="ambient-right absolute bottom-[-4%] right-[-10%] h-[26rem] w-[26rem] rounded-full bg-[radial-gradient(circle,var(--accent-2-soft),transparent_68%)] blur-md" />
 
-      <div className="relative mx-auto flex w-full max-w-6xl items-center justify-between">
-        <a href="#" className="flex items-center gap-2.5">
-          <Image src="/logo.svg" alt="" width={28} height={28} priority className="rounded-[8px]" />
-          <span className="font-mono text-[0.95rem] font-medium tracking-[-0.02em] text-[var(--ink)]">
-            allwright
-          </span>
-        </a>
-        <div className="flex items-center gap-3">
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="hidden items-center rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-2 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:border-[var(--accent-2)] sm:inline-flex"
-          >
-            Star on GitHub
-          </a>
-          <ThemeToggle />
-        </div>
-      </div>
-
-      <section className="relative mx-auto mt-10 grid w-full max-w-6xl place-items-center text-center sm:mt-16">
+      <section className="relative mx-auto mt-10 grid w-full place-items-center text-center sm:mt-16">
         <p className="animate-rise mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-1.5 font-mono text-[0.78rem] uppercase tracking-[0.14em] text-[var(--accent-2)]">
           <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
           Building in public — coming soon
@@ -129,10 +110,14 @@ export default function Home() {
         </h1>
 
         <p className="animate-rise-delay mt-6 max-w-[52ch] text-[clamp(1.02rem,2vw,1.25rem)] leading-8 text-[var(--muted)]">
-          Web, mobile, desktop, and API — allwright brings every kind of test
-          automation under one roof, so your team ships with one reliable
-          engine instead of stitching together a different tool for each
-          surface.
+          Web, mobile, desktop, and API — allwright is one small core engine
+          with an installable plugin for each surface. It&apos;s à la carte,
+          not a buffet: your team learns one system, and installs only the
+          plugin for what it&apos;s actually testing.
+        </p>
+
+        <p className="animate-rise-delay mt-4 font-mono text-[0.8rem] uppercase tracking-[0.1em] text-[var(--accent-2)]">
+          Built from the ground up — no wrapped drivers, no glued-together tools.
         </p>
 
         <div className="animate-rise-delay mt-9 flex flex-wrap items-center justify-center gap-3">
@@ -144,12 +129,12 @@ export default function Home() {
           >
             Follow the project
           </a>
-          <a
-            href="#surfaces"
+          <Link
+            href="/how-it-works"
             className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--card)] px-6 py-3 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:border-[var(--accent-2)]"
           >
-            See what it covers
-          </a>
+            See how it works
+          </Link>
         </div>
 
         <div
@@ -159,17 +144,34 @@ export default function Home() {
           <svg
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
+            role="img"
+            aria-label="A small allwright core at the center, with plugin slots reaching out to web, mobile, desktop, and API automation"
             className="absolute inset-0 h-full w-full text-[var(--line)]"
           >
+            <defs>
+              <marker
+                id="hero-arrow"
+                viewBox="0 0 8 8"
+                refX="6.5"
+                refY="4"
+                markerWidth="5"
+                markerHeight="5"
+                orient="auto-start-reverse"
+              >
+                <path d="M0,0 L8,4 L0,8 Z" fill="currentColor" />
+              </marker>
+            </defs>
             {surfaces.map((surface) => (
               <line
                 key={surface.label}
-                x1={surface.position.left}
-                y1={surface.position.top}
-                x2="50%"
-                y2="50%"
+                x1="50%"
+                y1="50%"
+                x2={surface.position.left}
+                y2={surface.position.top}
                 stroke="currentColor"
                 strokeWidth="0.5"
+                strokeDasharray={surface.status === "Available now" ? undefined : "2 2"}
+                markerEnd="url(#hero-arrow)"
               />
             ))}
           </svg>
@@ -187,7 +189,11 @@ export default function Home() {
               className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1.5"
               style={surface.position}
             >
-              <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--card)] text-[var(--accent-2)] shadow-sm backdrop-blur-xl">
+              <span
+                className={`flex h-12 w-12 items-center justify-center rounded-full border bg-[var(--card)] text-[var(--accent-2)] shadow-sm backdrop-blur-xl ${
+                  surface.status === "Available now" ? "border-[var(--line)]" : "border-dashed border-[var(--line)]"
+                }`}
+              >
                 {surface.icon}
               </span>
               <span className="font-mono text-[0.7rem] uppercase tracking-[0.08em] text-[var(--muted)]">
@@ -201,34 +207,48 @@ export default function Home() {
       <section
         id="surfaces"
         aria-label="what allwright automates"
-        className="relative mx-auto mt-10 grid w-full max-w-6xl gap-4 sm:mt-14 sm:grid-cols-2 lg:grid-cols-4"
+        className="relative mx-auto mt-14 w-full sm:mt-16"
       >
-        {surfaces.map((surface) => (
-          <article
-            key={surface.label}
-            className="animate-rise-delay rounded-[1.5rem] border border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl transition hover:-translate-y-1 hover:border-[var(--accent-2)]"
-          >
-            <span className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-2)]">
-              {surface.icon}
-            </span>
-            <h2 className="text-lg font-semibold text-[var(--ink)]">
-              {surface.label}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-              {surface.description}
-            </p>
-          </article>
-        ))}
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="font-mono text-[0.8rem] uppercase tracking-[0.14em] text-[var(--accent-2)]">
+            À la carte, not a buffet
+          </p>
+          <h2 className="mt-3 text-xl font-semibold text-[var(--ink)] sm:text-2xl">
+            The core stays small. Every surface below is an optional plugin.
+          </h2>
+        </div>
+
+        <div className="mt-8 grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {surfaces.map((surface) => (
+            <article
+              key={surface.label}
+              className="animate-rise-delay rounded-[1.5rem] border border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl transition hover:-translate-y-1 hover:border-[var(--accent-2)]"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-2)]">
+                  {surface.icon}
+                </span>
+                <StatusPill status={surface.status} />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-[var(--ink)]">
+                {surface.label}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                {surface.description}
+              </p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section
         aria-label="why allwright"
-        className="relative mx-auto mt-14 w-full max-w-6xl rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl sm:mt-16 sm:p-10"
+        className="relative mx-auto mt-14 w-full rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl sm:mt-16 sm:p-10"
       >
-        <p className="mb-8 max-w-[46ch] font-mono text-[0.8rem] uppercase tracking-[0.14em] text-[var(--accent-2)]">
+        <p className="mb-8 text-center font-mono text-[0.8rem] uppercase tracking-[0.14em] text-[var(--accent-2)]">
           Why allwright
         </p>
-        <div className="grid gap-8 sm:grid-cols-3">
+        <div className="grid gap-8 text-center sm:grid-cols-3">
           {benefits.map((benefit) => (
             <div key={benefit.title}>
               <h3 className="text-base font-semibold text-[var(--ink)]">
@@ -242,19 +262,24 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="relative mx-auto mt-14 flex w-full max-w-6xl flex-col items-center gap-3 pb-4 text-center sm:mt-16 sm:flex-row sm:justify-between sm:text-left">
-        <p className="text-sm text-[var(--muted)]">
-          allwright — one engine, all right.
+      <section
+        aria-label="learn more"
+        className="relative mx-auto mt-14 flex w-full flex-col items-center gap-4 rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-8 text-center backdrop-blur-xl sm:mt-16"
+      >
+        <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
+          Curious how the plugin model actually works?
+        </h2>
+        <p className="max-w-[46ch] text-sm leading-6 text-[var(--muted)]">
+          See the client languages allwright speaks today and exactly which
+          plugins are installable now versus still on the way.
         </p>
-        <a
-          href={GITHUB_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="text-sm font-medium text-[var(--accent-2)] underline-offset-4 hover:underline"
+        <Link
+          href="/how-it-works"
+          className="inline-flex items-center rounded-full bg-[linear-gradient(120deg,var(--accent),var(--accent-2))] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_var(--accent-soft)] transition hover:-translate-y-0.5"
         >
-          Watch our progress on GitHub
-        </a>
-      </footer>
-    </main>
+          See how it works
+        </Link>
+      </section>
+    </div>
   );
 }

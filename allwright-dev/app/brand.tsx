@@ -7,7 +7,7 @@ export const SITE_URL = "https://allwright.dev";
 export const SITE_NAME = "allwright";
 export const SITE_TITLE = "Allwright — one automation engine for everything you test";
 export const SITE_DESCRIPTION =
-  "Allwright brings web, mobile, desktop, and API testing into a single automation engine, so teams stop stitching tools together and start shipping with confidence.";
+  "Allwright is a small core engine, built from the ground up, with an installable plugin for every surface you test — web, mobile, desktop, and API. À la carte, not a buffet.";
 export const GITHUB_URL = "https://github.com/allwright-dev/allwright";
 
 export const BRAND_FROM = "#0e9f8e";
@@ -97,7 +97,7 @@ export function SocialCard() {
           maxWidth: 880,
         }}
       >
-        Web, mobile, desktop, and API — unified in a single engine.
+        Web, mobile, desktop, and API — one small core, one plugin per surface.
       </div>
 
       <div style={{ display: "flex", gap: 16, marginTop: 48 }}>

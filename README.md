@@ -26,7 +26,7 @@ The current stage is:
 - the core product direction is broader than browser automation alone
 - the first shipped implementation work is centered on the browser engine and its future plugin boundary
 - the Rust workspace now separates a lightweight `allwright-core` from the installable `allwright` CLI and surface crates
-- the `web` surface now ships as a separately installable runtime plugin crate
+- the `web` surface now ships as a separately installable runtime plugin library
 - the other surface crates already exist as publishable boundaries, but only `web` is currently installable as a standalone runtime artifact
 - the public API and internal architecture are still evolving as the project grows toward wider surface coverage
 
@@ -68,15 +68,15 @@ For users, the intended install model is simple:
 
 Today, the plugin ecosystem looks like this:
 
-- `allwright`: installable CLI package that runs the lightweight core, installs plugins, and delegates runtime to installed surface plugins when available
-- `web`: the first installable runtime surface plugin today
+- `allwright`: installable CLI package that starts the engine server and manages plugin installation
+- `web`: the first installable runtime surface plugin today, loaded by the core at runtime
 - `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux`: planned surface plugins with publishable crate boundaries, but not yet installable runtime artifacts
 
 What `plugin install` means today:
 
 - for `web`, it downloads the matching platform archive from GitHub Releases into the local allwright plugin directory and records the installed plugin in the manifest
 - `allwright serve` always starts the engine server
-- when `web` is installed, `allwright serve` delegates browser runtime handling to the installed `web` plugin binary
+- when `web` is installed, the core engine loads the installed `web` plugin library at runtime for browser/web commands
 - when `web` is not installed, browser/web commands fail with a plugin-required error while the core server still runs
 - the non-web surface crates are still intentionally behind this installability switch until their runtime binaries are ready
 
@@ -165,9 +165,9 @@ The practical path today is:
 
 - use the `allwright` CLI as the installable entrypoint
 - install the `web` plugin
-- use the Rust, Go, Java, Python, or TypeScript clients against the running engine address that the installed plugin serves
+- use the Rust, Go, Java, Python, or TypeScript clients against the running engine server
 
-At the moment, the `web` runtime path is wired end to end through the installable plugin model. The other surface crates and split proto ownership are in place, while additional plugin runtime activation is still follow-up work.
+At the moment, the `web` runtime path is wired through the installable plugin model and loaded into the core at runtime. The other surface crates and split proto ownership are in place, while additional plugin runtime activation is still follow-up work.
 
 ## Client Experience
 
@@ -208,9 +208,9 @@ await browser.close();
 ## Repository Guide
 
 - `rust/allwright`: lightweight `allwright-core` Rust package with the client API, proto bindings, and gRPC engine core
-- `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core`, installs supported plugins, and delegates runtime startup to installed plugin binaries
+- `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core` and installs supported plugins
 - `rust/allwright-plugin-sdk`: shared plugin traits and surface metadata
-- `rust/allwright-surface-web`: publishable `web` surface crate that also ships the first standalone runtime plugin binary
+- `rust/allwright-surface-web`: publishable `web` surface crate that ships the first standalone runtime plugin library
 - `rust/allwright-surface-mobile`: shared mobile surface abstractions
 - `rust/allwright-surface-mobile-android`: publishable `mobile-android` surface crate
 - `rust/allwright-surface-mobile-ios`: publishable `mobile-ios` surface crate
@@ -232,7 +232,7 @@ await browser.close();
 - The current implementation focus is browser automation, but the product direction is wider.
 - Installing the `allwright` package is intended to deliver the CLI plus the lightweight engine core together.
 - The project should keep a single engine core even as surface modules become separately installable plugins.
-- The `web` surface plugin is now installable through the CLI via GitHub Release downloads and is started by delegating `allwright serve` to the installed plugin binary.
+- The `web` surface plugin is now installable through the CLI via GitHub Release downloads and is loaded by the core engine at runtime.
 - The remaining surface plugins are still intentionally disabled as install targets until their runtime binaries exist.
 - The Rust workspace version is synced from the release tag during GitHub release builds.
 - The browser control path is intended to stay driverless.
@@ -255,7 +255,6 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds 
 
 - Linux `x86_64-unknown-linux-gnu`
 - Windows `x86_64-pc-windows-msvc`
-- macOS `x86_64-apple-darwin`
 - macOS `aarch64-apple-darwin`
 
 ## Installer Scripts
