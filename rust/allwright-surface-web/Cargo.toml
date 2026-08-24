@@ -2,6 +2,7 @@
 name = "allwright-surface-web"
 version.workspace = true
 edition.workspace = true
+autobins = false
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true

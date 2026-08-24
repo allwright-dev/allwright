@@ -1568,11 +1568,17 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
         PluginCommand::OpenChromeWindow { chrome_binary } => {
             open_chrome_window(chrome_binary.as_deref()).map(PluginResult::OpenChromeWindow)
         }
-        PluginCommand::DiscoverInitialTab { cdp_websocket_url } => block_on_plugin_future(
-            discover_initial_tab(&cdp_websocket_url).map(PluginResult::DiscoverInitialTab),
-        ),
+        PluginCommand::DiscoverInitialTab { cdp_websocket_url } => {
+            block_on_plugin_future(async move {
+                let result = discover_initial_tab(&cdp_websocket_url).await?;
+                Ok(PluginResult::DiscoverInitialTab(result))
+            })
+        }
         PluginCommand::OpenChromeTab { cdp_websocket_url } => {
-            block_on_plugin_future(open_chrome_tab(&cdp_websocket_url).map(PluginResult::OpenChromeTab))
+            block_on_plugin_future(async move {
+                let result = open_chrome_tab(&cdp_websocket_url).await?;
+                Ok(PluginResult::OpenChromeTab(result))
+            })
         }
         PluginCommand::CloseBrowserProcess { process_id } => {
             close_browser_process(process_id)?;
@@ -1589,14 +1595,16 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             cdp_websocket_url,
             target_id,
             url,
-        } => block_on_plugin_future(
-            navigate_chrome_tab(&cdp_websocket_url, &target_id, &url)
-                .map(PluginResult::NavigateChromeTab),
-        ),
-        PluginCommand::InjectChromiumBidiMapper { cdp_websocket_url } => block_on_plugin_future(
-            inject_chromium_bidi_mapper(&cdp_websocket_url)
-                .map(PluginResult::InjectChromiumBidiMapper),
-        ),
+        } => block_on_plugin_future(async move {
+            let result = navigate_chrome_tab(&cdp_websocket_url, &target_id, &url).await?;
+            Ok(PluginResult::NavigateChromeTab(result))
+        }),
+        PluginCommand::InjectChromiumBidiMapper { cdp_websocket_url } => {
+            block_on_plugin_future(async move {
+                let result = inject_chromium_bidi_mapper(&cdp_websocket_url).await?;
+                Ok(PluginResult::InjectChromiumBidiMapper(result))
+            })
+        }
         PluginCommand::ResolveBidiContextForTab {
             cdp_websocket_url,
             mapper_target_id,
@@ -1619,93 +1627,102 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             cdp_websocket_url,
             target_id,
             css_selector,
-        } => block_on_plugin_future(
-            click_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
-                .map(PluginResult::ClickElementViaCdp),
-        ),
+        } => block_on_plugin_future(async move {
+            let result = click_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
+            Ok(PluginResult::ClickElementViaCdp(result))
+        }),
         PluginCommand::CountElementsViaCdp {
             cdp_websocket_url,
             target_id,
             css_selector,
-        } => block_on_plugin_future(
-            count_elements_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
-                .map(PluginResult::CountElementsViaCdp),
-        ),
+        } => block_on_plugin_future(async move {
+            let result = count_elements_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
+            Ok(PluginResult::CountElementsViaCdp(result))
+        }),
         PluginCommand::HighlightElementsViaCdp {
             cdp_websocket_url,
             target_id,
             css_selector,
             duration_ms,
-        } => block_on_plugin_future(
-            highlight_elements_via_cdp(&cdp_websocket_url, &target_id, &css_selector, duration_ms)
-                .map(PluginResult::HighlightElementsViaCdp),
-        ),
+        } => block_on_plugin_future(async move {
+            let duration_ms = u32::try_from(duration_ms)
+                .map_err(|_| format!("highlight duration {duration_ms} exceeds u32"))?;
+            let result =
+                highlight_elements_via_cdp(&cdp_websocket_url, &target_id, &css_selector, duration_ms)
+                    .await?;
+            Ok(PluginResult::HighlightElementsViaCdp(result))
+        }),
         PluginCommand::FocusElementViaCdp {
             cdp_websocket_url,
             target_id,
             css_selector,
-        } => block_on_plugin_future(
-            focus_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
-                .map(PluginResult::FocusElementViaCdp),
-        ),
+        } => block_on_plugin_future(async move {
+            let result = focus_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
+            Ok(PluginResult::FocusElementViaCdp(result))
+        }),
         PluginCommand::FillElementViaCdp {
             cdp_websocket_url,
             target_id,
             css_selector,
             value,
-        } => block_on_plugin_future(
-            fill_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector, &value)
-                .map(PluginResult::FillElementViaCdp),
-        ),
+        } => block_on_plugin_future(async move {
+            let result =
+                fill_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector, &value).await?;
+            Ok(PluginResult::FillElementViaCdp(result))
+        }),
         PluginCommand::HoverElementViaCdp {
             cdp_websocket_url,
             target_id,
             css_selector,
-        } => block_on_plugin_future(
-            hover_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
-                .map(PluginResult::HoverElementViaCdp),
-        ),
+        } => block_on_plugin_future(async move {
+            let result = hover_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
+            Ok(PluginResult::HoverElementViaCdp(result))
+        }),
         PluginCommand::PressKeyViaCdp {
             cdp_websocket_url,
             target_id,
             css_selector,
             key,
             text,
-        } => block_on_plugin_future(
-            press_key_via_cdp(
+        } => block_on_plugin_future(async move {
+            let result = press_key_via_cdp(
                 &cdp_websocket_url,
                 &target_id,
                 &css_selector,
                 &key,
                 text.as_deref(),
             )
-            .map(PluginResult::PressKeyViaCdp),
-        ),
+            .await?;
+            Ok(PluginResult::PressKeyViaCdp(result))
+        }),
         PluginCommand::GetTextContentViaCdp {
             cdp_websocket_url,
             target_id,
             css_selector,
-        } => block_on_plugin_future(
-            get_text_content_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
-                .map(PluginResult::GetTextContentViaCdp),
-        ),
+        } => block_on_plugin_future(async move {
+            let result =
+                get_text_content_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
+            Ok(PluginResult::GetTextContentViaCdp(result))
+        }),
         PluginCommand::GetInnerTextViaCdp {
             cdp_websocket_url,
             target_id,
             css_selector,
-        } => block_on_plugin_future(
-            get_inner_text_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
-                .map(PluginResult::GetInnerTextViaCdp),
-        ),
+        } => block_on_plugin_future(async move {
+            let result = get_inner_text_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
+            Ok(PluginResult::GetInnerTextViaCdp(result))
+        }),
         PluginCommand::WaitForSelectorViaCdp {
             cdp_websocket_url,
             target_id,
             css_selector,
             visible,
-        } => block_on_plugin_future(
-            wait_for_selector_via_cdp(&cdp_websocket_url, &target_id, &css_selector, visible)
-                .map(PluginResult::WaitForSelectorViaCdp),
-        ),
+        } => block_on_plugin_future(async move {
+            let result =
+                wait_for_selector_via_cdp(&cdp_websocket_url, &target_id, &css_selector, visible)
+                    .await?;
+            Ok(PluginResult::WaitForSelectorViaCdp(result))
+        }),
     }
 }
 
