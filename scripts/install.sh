@@ -4,12 +4,82 @@ set -euo pipefail
 
 repo="${ALLWRIGHT_REPOSITORY:-allwright-dev/allwright}"
 version="${ALLWRIGHT_VERSION:-latest}"
-install_root="${ALLWRIGHT_INSTALL_DIR:-$HOME/.local/bin}"
 tmp_dir="$(mktemp -d)"
 cleanup() {
   rm -rf "$tmp_dir"
 }
 trap cleanup EXIT
+
+default_install_root() {
+  local candidate
+  local path_dir
+  local old_ifs="$IFS"
+
+  path_has_dir() {
+    case ":$PATH:" in
+      *":$1:"*) return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+
+  can_use_dir() {
+    local dir="$1"
+    if [[ -d "$dir" ]]; then
+      [[ -w "$dir" ]]
+      return
+    fi
+
+    local parent
+    parent="$(dirname "$dir")"
+    [[ -d "$parent" && -w "$parent" ]]
+  }
+
+  is_tool_managed_dir() {
+    case "$1" in
+      *"/pnpm/"*|*"/.npm/"*|*"/.yarn/"*|*"/.volta/"*|*"/.pyenv/"*|*"/.rbenv/"*|*"/.asdf/"*|*"/.cargo/"*|*"/go/bin"*|*"/bun/bin"*)
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  for candidate in \
+    "/usr/local/bin" \
+    "/opt/homebrew/bin" \
+    "$HOME/.local/bin" \
+    "$HOME/bin"
+  do
+    if can_use_dir "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  IFS=":"
+  for path_dir in $PATH; do
+    [[ -n "$path_dir" ]] || continue
+    [[ -d "$path_dir" ]] || continue
+    [[ -w "$path_dir" ]] || continue
+    is_tool_managed_dir "$path_dir" && continue
+    printf '%s\n' "$path_dir"
+    IFS="$old_ifs"
+    return 0
+  done
+  IFS="$old_ifs"
+
+  for candidate in "$HOME/.local/bin" "$HOME/bin"; do
+    if can_use_dir "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  printf '%s\n' "/tmp"
+}
+
+install_root="${ALLWRIGHT_INSTALL_DIR:-$(default_install_root)}"
 
 os="$(uname -s)"
 arch="$(uname -m)"
@@ -61,11 +131,19 @@ curl -fL "$download_url" -o "$archive_path"
 mkdir -p "$install_root"
 tar -xzf "$archive_path" -C "$tmp_dir"
 install -m 755 "$tmp_dir/bin/allwright" "$install_root/allwright"
+chmod +x "$install_root/allwright"
 
 echo "Installed allwright to $install_root/allwright"
 case ":$PATH:" in
   *":$install_root:"*) ;;
   *)
-    echo "Add $install_root to PATH to run \`allwright\` directly."
+    echo
+    echo "This install directory is not on PATH in the current shell."
+    echo "Run this in your shell before using \`allwright\`:"
+    echo "  export PATH=\"$install_root:\$PATH\""
+    echo "  hash -r"
+    echo
+    echo "To make it permanent, add this to your shell profile:"
+    echo "  export PATH=\"$install_root:\$PATH\""
     ;;
 esac

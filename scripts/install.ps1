@@ -6,13 +6,78 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Get-DefaultInstallDir {
+    $preferredDirs = @(
+        "$env:ProgramFiles\allwright\bin",
+        "$env:LOCALAPPDATA\Programs\allwright\bin"
+    )
+
+    foreach ($dir in $preferredDirs) {
+        if (-not $dir -or $dir.Trim() -eq "") {
+            continue
+        }
+        $parent = Split-Path -Parent $dir
+        if (-not $parent) {
+            continue
+        }
+        try {
+            if (-not (Test-Path $dir) -and -not (Test-Path $parent)) {
+                continue
+            }
+            if (-not (Test-Path $dir) -and -not (Test-Path $parent -PathType Container)) {
+                continue
+            }
+            if (Test-Path $dir) {
+                $probe = Join-Path $dir ("allwright-write-test-" + [System.Guid]::NewGuid().ToString("N"))
+                New-Item -ItemType Directory -Path $probe | Out-Null
+                Remove-Item $probe -Force
+                return $dir
+            }
+            $probe = Join-Path $parent ("allwright-write-test-" + [System.Guid]::NewGuid().ToString("N"))
+            New-Item -ItemType Directory -Path $probe | Out-Null
+            Remove-Item $probe -Force
+            return $dir
+        }
+        catch {
+            continue
+        }
+    }
+
+    $pathEntries = ($env:PATH -split ';') | Where-Object { $_ -and $_.Trim() -ne "" }
+    foreach ($entry in $pathEntries) {
+        if (-not (Test-Path $entry)) {
+            continue
+        }
+        if ($entry -match '\\pnpm\\' -or
+            $entry -match '\\npm\\' -or
+            $entry -match '\\Yarn\\' -or
+            $entry -match '\\Volta\\' -or
+            $entry -match '\\cargo\\' -or
+            $entry -match '\\go\\bin' -or
+            $entry -match '\\bun\\bin') {
+            continue
+        }
+        try {
+            $probe = Join-Path $entry ("allwright-write-test-" + [System.Guid]::NewGuid().ToString("N"))
+            New-Item -ItemType Directory -Path $probe | Out-Null
+            Remove-Item $probe -Force
+            return $entry
+        }
+        catch {
+            continue
+        }
+    }
+
+    return (Join-Path $env:LOCALAPPDATA "Programs\allwright\bin")
+}
+
 if (-not $Version -or $Version.Trim() -eq "") {
     $latest = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases/latest"
     $Version = $latest.tag_name
 }
 
 if (-not $InstallDir -or $InstallDir.Trim() -eq "") {
-    $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\allwright\bin"
+    $InstallDir = Get-DefaultInstallDir
 }
 
 switch ($env:PROCESSOR_ARCHITECTURE) {
@@ -49,5 +114,6 @@ if (-not $userPath) {
     $userPath = ""
 }
 if (-not (($userPath -split ';') -contains $InstallDir)) {
-    Write-Host "Add $InstallDir to your PATH to run allwright directly."
+    Write-Host "This install directory is not on your user PATH."
+    Write-Host "Add $InstallDir to PATH if the command is not available in a new shell."
 }

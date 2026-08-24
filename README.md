@@ -91,10 +91,31 @@ Release automation today:
 Install the CLI:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/allwright-dev/allwright/main/scripts/install.sh | bash
+```
+
+or:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/allwright-dev/allwright/main/scripts/install.sh | bash
+```
+
+If you already have the repo checked out:
+
+```bash
+chmod +x ./scripts/install.sh
 ./scripts/install.sh
 ```
 
+The installer prefers a writable directory that is already on `PATH`. If your shell still says `command not found: allwright`, export the printed install directory into `PATH` for the current session.
+
 Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/allwright-dev/allwright/main/scripts/install.ps1 | iex
+```
+
+If you already have the repo checked out:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
@@ -103,22 +124,22 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 Start the engine core through the CLI:
 
 ```bash
-cargo run -p allwright -- serve --listen-addr 127.0.0.1:50051
+allwright serve --listen-addr 127.0.0.1:50051
 ```
 
 List or install plugins:
 
 ```bash
-cargo run -p allwright -- plugin list
-cargo run -p allwright -- plugin install web
-```
-
-If you are using the installed CLI rather than the repo checkout, the same flow is:
-
-```bash
 allwright plugin list
 allwright plugin install web
-allwright serve --listen-addr 127.0.0.1:50051
+```
+
+If you are working from the repo checkout instead:
+
+```bash
+cargo run -p allwright -- serve --listen-addr 127.0.0.1:50051
+cargo run -p allwright -- plugin list
+cargo run -p allwright -- plugin install web
 ```
 
 Try the Rust playground against the running engine core:
@@ -238,6 +259,7 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds 
 
 - `scripts/install.sh`: installs the latest or requested `allwright` CLI release on Linux and macOS
 - `scripts/install.ps1`: installs the latest or requested `allwright` CLI release on Windows PowerShell
+- users do not need to clone the repo; both scripts can be run directly from GitHub with `curl`, `wget`, or PowerShell `irm`
 
 Both scripts support:
 
