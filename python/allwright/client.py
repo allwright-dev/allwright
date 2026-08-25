@@ -12,7 +12,7 @@ import grpc
 
 DEFAULT_SERVER_ADDR = "127.0.0.1:50051"
 SERVER_ADDR_ENV_VAR = "ALLWRIGHT_SERVER_ADDR"
-PROTO_ROOT = Path(__file__).resolve().parents[2] / "proto"
+PROTO_ROOT = Path(__file__).resolve().parent / "proto"
 PROTO_RELATIVE_PATH = Path("engine") / "v1" / "engine.proto"
 _STREAM_SENTINEL = object()
 

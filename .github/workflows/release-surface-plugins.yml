@@ -56,9 +56,47 @@ jobs:
         run: |
           GOPROXY=https://proxy.golang.org,direct go list -m "allwright.dev@${ROOT_TAG}"
 
+  publish-python-package:
+    name: Publish Python package
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/allwright-python/
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Sync Python package version from tag
+        shell: bash
+        run: |
+          chmod +x ./scripts/sync-python-version.sh
+          ./scripts/sync-python-version.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Install Python build tools
+        run: python -m pip install --upgrade build
+
+      - name: Build Python distributions
+        working-directory: python
+        run: python -m build
+
+      - name: Publish Python package
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python/dist/
+
   publish-npm-package:
     name: Publish npm package
     runs-on: ubuntu-latest
+    environment: Prod
     permissions:
       contents: read
       id-token: write
@@ -85,8 +123,11 @@ jobs:
       - name: Build npm package
         run: npm run build
 
-      - name: Publish npm package
-        run: npm publish --access public
+      - name: Publish npm core package
+        run: npm publish --workspace @allwright.dev/core --access public
+
+      - name: Publish npm Vitest package
+        run: npm publish --workspace @allwright.dev/vitest --access public
 
   publish-crates:
     name: Publish Rust crates

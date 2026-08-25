@@ -86,7 +86,8 @@ Release automation today:
 
 - pushing a tag such as `vX.Y.Z` triggers the GitHub Actions release workflow
 - that workflow creates the Go submodule tag `go/vX.Y.Z`, verifies the Go client in `go/`, and warms the public Go proxy for `allwright.dev`
-- that workflow publishes the root TypeScript package to npm as `@allwright.dev/core` using npm Trusted Publishing via GitHub Actions OIDC
+- that workflow publishes the Python client to PyPI as `allwright-python` using PyPI Trusted Publishing via GitHub Actions OIDC
+- that workflow publishes the npm workspace packages `@allwright.dev/core` and `@allwright.dev/vitest` using npm Trusted Publishing via GitHub Actions OIDC
 - that workflow builds both the `allwright` CLI and `allwright-surface-web` plugin for the current release matrix and uploads the archives to the matching GitHub Release
 - `allwright plugin install web` resolves the local OS and architecture, then downloads the matching release asset
 - the release workflow syncs the Rust workspace version from the Git tag before building, so the tag is the release source of truth
@@ -223,7 +224,8 @@ await browser.close();
 - `go/`: Go client and Go playground
 - `java/`: Java client project
 - `python/`: Python client package
-- `typescript/`: TypeScript/JavaScript client package and playground
+- `packages/core`: published TypeScript client package `@allwright.dev/core`
+- `packages/vitest`: published Vitest fixture package `@allwright.dev/vitest`
 - `proto/`: shared protobuf and gRPC contracts
   The root service entrypoint remains `proto/engine/v1/engine.proto`, while shared core messages now live under `proto/core/v1/` and the web surface messages now live under `proto/surfaces/web/v1/`.
 - `allwright-dev/`: public website project for `allwright.dev`
@@ -253,7 +255,9 @@ git push origin vX.Y.Z
 That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds and uploads the current web plugin archives for:
 
 - `allwright.dev` Go module publish by creating `go/vX.Y.Z`, verifying the `go/` module, and warming `proxy.golang.org`
-- `@allwright.dev/core` publish to npm after syncing `package.json` from the tag
+- `allwright-python` publish to PyPI after syncing `python/pyproject.toml` from the tag
+- `@allwright.dev/core` publish to npm after syncing `packages/core/package.json` from the tag
+- `@allwright.dev/vitest` publish to npm after syncing `packages/vitest/package.json` and its dependency on `@allwright.dev/core` from the tag
 - `allwright` CLI archives for the current OS matrix
 - `allwright-surface-web` plugin archives for the current OS matrix
 - crates.io publish for the Rust `web` profile after syncing every crate version from the tag
@@ -264,6 +268,14 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds 
 
 Configure the `CARGO_REGISTRY_TOKEN` repository secret before pushing a release tag if you want the crates.io publish job to succeed.
 The release workflow also sets `CARGO_PUBLISH_ALLOW_DIRTY=1` because it syncs crate versions from the tag inside CI before calling `cargo publish`.
+Configure PyPI Trusted Publishing for `allwright-python` before pushing a release tag:
+
+- owner: `allwright-dev`
+- repository name: `allwright`
+- workflow name: `release-surface-plugins.yml`
+- environment name: `pypi`
+
+The Python publish job uses the `pypi` GitHub environment plus OIDC and does not require a PyPI API token.
 Configure npm Trusted Publishing for `@allwright.dev/core` on npmjs.com before pushing a release tag:
 
 - provider: `GitHub Actions`
@@ -272,7 +284,9 @@ Configure npm Trusted Publishing for `@allwright.dev/core` on npmjs.com before p
 - workflow filename: `release-surface-plugins.yml`
 - allowed action: `npm publish`
 
-The npm publish job uses GitHub-hosted runners and OIDC instead of an `NPM_TOKEN`, which avoids bypass-2FA tokens entirely.
+Configure npm Trusted Publishing for `@allwright.dev/vitest` with the same values.
+
+The npm publish job uses the `Prod` GitHub environment plus OIDC instead of an `NPM_TOKEN`, which avoids bypass-2FA tokens entirely.
 
 ## Publishing The Go Module
 
@@ -295,12 +309,40 @@ go get allwright.dev@vX.Y.Z
 
 The `allwright-dev/` site already serves the `go-import` metadata for `allwright.dev`, so `go get` can resolve the vanity import path back to this repository's `go/` subdirectory.
 
+## Publishing The Python Package
+
+The Python client is published from the `python/` directory as the PyPI project `allwright-python`.
+
+You only create the root release tag manually:
+
+```bash
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+The release workflow syncs `python/pyproject.toml` to `X.Y.Z`, builds the source distribution and wheel from `python/`, and publishes them to PyPI through Trusted Publishing.
+
+## Publishing The TypeScript Workspace
+
+The TypeScript client lives in `packages/core` as `@allwright.dev/core`.
+The Vitest fixture package lives in `packages/vitest` as `@allwright.dev/vitest`.
+
+You only create the root release tag manually:
+
+```bash
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+The release workflow syncs both package versions to `X.Y.Z`, updates `@allwright.dev/vitest` to depend on the matching `@allwright.dev/core` version, builds the workspace, then publishes `@allwright.dev/core` first and `@allwright.dev/vitest` second.
+
 ## Installer Scripts
 
 - `scripts/install.sh`: installs the latest or requested `allwright` CLI release on Linux and macOS
 - `scripts/install.ps1`: installs the latest or requested `allwright` CLI release on Windows PowerShell
 - `scripts/sync-version.sh`: syncs the Rust workspace and internal crate versions from a release version string such as `X.Y.Z`
-- `scripts/sync-npm-version.sh`: syncs the root npm package version from a release version string such as `X.Y.Z`
+- `scripts/sync-npm-version.sh`: syncs the npm workspace package versions from a release version string such as `X.Y.Z`
+- `scripts/sync-python-version.sh`: syncs the Python package version from a release version string such as `X.Y.Z`
 - users do not need to clone the repo; both scripts can be run directly from GitHub with `curl`, `wget`, or PowerShell `irm`
 
 Both scripts support:
@@ -332,7 +374,7 @@ npm run build
 TypeScript playground:
 
 ```bash
-bun run typescript/examples/playground.ts --server-addr 127.0.0.1:50051
+npm run example:playground -- --server-addr 127.0.0.1:50051
 ```
 
 ## Testing

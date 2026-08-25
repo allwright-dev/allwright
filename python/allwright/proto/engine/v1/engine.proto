@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package allwright.engine.v1;
+option go_package = "allwright.dev/gen/allwright/engine/v1;enginev1";
+
+import "core/v1/browser.proto";
+import "core/v1/common.proto";
+import "core/v1/tab.proto";
+
+service EngineService {
+  rpc Ping(PingRequest) returns (PingResponse);
+  rpc BrowserSession(stream BrowserSessionCommand) returns (stream BrowserSessionEvent);
+  rpc TabSession(stream TabSessionCommand) returns (stream TabSessionEvent);
+}
