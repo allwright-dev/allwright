@@ -76,6 +76,10 @@ export interface PageInfo {
     sessionId: string;
     browserSessionId: string;
 }
+export interface LocatorInfo {
+    page: Page;
+    selector: string;
+}
 interface PingResponse {
     message?: string;
 }
@@ -383,6 +387,7 @@ export declare class Page {
     });
     readonly sessionId: string;
     readonly browserSessionId: string;
+    locator(selector: string): Locator;
     goto(url: string, options?: CommandOptions): Promise<NavigateResult>;
     click(selector: string, options?: CommandOptions): Promise<ClickResult>;
     count(selector: string, options?: CommandOptions): Promise<CountResult>;
@@ -398,6 +403,22 @@ export declare class Page {
     ping(message?: string): Promise<string>;
     pageInfo(): PageInfo;
     navigate(url: string, options?: CommandOptions): Promise<NavigateResult>;
+}
+export declare class Locator {
+    readonly page: Page;
+    readonly selector: string;
+    constructor(input: LocatorInfo);
+    click(options?: CommandOptions): Promise<ClickResult>;
+    count(options?: CommandOptions): Promise<CountResult>;
+    highlight(options?: HighlightOptions): Promise<HighlightResult>;
+    focus(options?: CommandOptions): Promise<ElementResult>;
+    fill(value: string, options?: CommandOptions): Promise<FillResult>;
+    hover(options?: CommandOptions): Promise<ElementResult>;
+    press(key: string, options?: PressOptions): Promise<PressResult>;
+    textContent(options?: CommandOptions): Promise<TextResult>;
+    innerText(options?: CommandOptions): Promise<TextResult>;
+    waitFor(options?: WaitForSelectorOptions): Promise<WaitForSelectorResult>;
+    locator(selector: string): Locator;
 }
 export declare const chromium: BrowserType;
 export type Tab = Page;

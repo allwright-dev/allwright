@@ -2,6 +2,7 @@ import {
   chromium,
   setServerAddr,
   shutdown,
+  Locator,
   Page,
   type Browser,
   type LaunchOptions,
@@ -41,6 +42,13 @@ export interface PageExpectMatchers {
   toBeVisible(selector: string, options?: VisibleExpectationOptions): Promise<void>;
 }
 
+export interface LocatorExpectMatchers {
+  toHaveText(expected: string | RegExp, options?: TextExpectationOptions): Promise<void>;
+  toContainText(expected: string | RegExp, options?: TextExpectationOptions): Promise<void>;
+  toHaveCount(expected: number, options?: RetryExpectationOptions): Promise<void>;
+  toBeVisible(options?: VisibleExpectationOptions): Promise<void>;
+}
+
 type AllwrightVitestContext = AllwrightVitestFixtures & {
   allwright: AllwrightVitestOptions;
 };
@@ -75,6 +83,10 @@ const DEFAULT_EXPECT_INTERVAL_MS = 100;
 
 function isPage(value: unknown): value is Page {
   return value instanceof Page;
+}
+
+function isLocator(value: unknown): value is Locator {
+  return value instanceof Locator;
 }
 
 async function retryExpectation(
@@ -145,15 +157,62 @@ function createPageExpect(page: Page): PageExpectMatchers {
   };
 }
 
+function createLocatorExpect(locator: Locator): LocatorExpectMatchers {
+  return {
+    async toHaveText(expected, options = {}) {
+      await retryExpectation(async () => {
+        const result = await locator.textContent(options.command ?? {});
+        if (expected instanceof RegExp) {
+          vitestExpect(result.text).toMatch(expected);
+          return;
+        }
+        vitestExpect(result.text).toBe(expected);
+      }, options);
+    },
+
+    async toContainText(expected, options = {}) {
+      await retryExpectation(async () => {
+        const result = await locator.textContent(options.command ?? {});
+        if (expected instanceof RegExp) {
+          vitestExpect(result.text).toMatch(expected);
+          return;
+        }
+        vitestExpect(result.text).toContain(expected);
+      }, options);
+    },
+
+    async toHaveCount(expected, options = {}) {
+      await retryExpectation(async () => {
+        const result = await locator.count({});
+        vitestExpect(result.count).toBe(expected);
+      }, options);
+    },
+
+    async toBeVisible(options = {}) {
+      await retryExpectation(async () => {
+        const result = await locator.waitFor({
+          visible: true,
+          ...(options.command ?? {}),
+        });
+        vitestExpect(result.visible).toBe(true);
+      }, options);
+    },
+  };
+}
+
 type VitestExpect = typeof vitestExpect;
 type VitestMatcherReturn = ReturnType<VitestExpect>;
 
 interface AllwrightExpect extends VitestExpect {
   (actual: Page): PageExpectMatchers;
+  (actual: Locator): LocatorExpectMatchers;
   <T>(actual: T): VitestMatcherReturn;
 }
 
 const expectImpl = ((actual: unknown) => {
+  if (isLocator(actual)) {
+    return createLocatorExpect(actual);
+  }
   if (isPage(actual)) {
     return createPageExpect(actual);
   }
@@ -168,4 +227,4 @@ for (const [key, descriptor] of Object.entries(vitestExpectDescriptors)) {
 export const expect = expectImpl;
 export { vitestExpect };
 
-export type { Browser, LaunchOptions, Page };
+export type { Browser, LaunchOptions, Locator, Page };
