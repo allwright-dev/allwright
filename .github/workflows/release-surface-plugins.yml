@@ -15,21 +15,10 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Ensure npm token is configured
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
-            echo "NPM_TOKEN is not configured. Add it to the repository secrets to enable npm publishing." >&2
-            exit 1
-          fi
 
       - name: Sync npm package version from tag
         shell: bash
@@ -40,7 +29,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
 
       - name: Install npm dependencies
@@ -50,7 +39,7 @@ jobs:
         run: npm run build
 
       - name: Publish npm package
-        run: npm publish --access public --provenance
+        run: npm publish --access public
 
   publish-crates:
     name: Publish Rust crates
