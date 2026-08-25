@@ -85,6 +85,7 @@ So the user-facing install model is now real for `web`, while the broader multi-
 Release automation today:
 
 - pushing a tag such as `vX.Y.Z` triggers the GitHub Actions release workflow
+- that workflow creates the Go submodule tag `go/vX.Y.Z`, verifies the Go client in `go/`, and warms the public Go proxy for `allwright.dev`
 - that workflow publishes the root TypeScript package to npm as `@allwright.dev/core` using npm Trusted Publishing via GitHub Actions OIDC
 - that workflow builds both the `allwright` CLI and `allwright-surface-web` plugin for the current release matrix and uploads the archives to the matching GitHub Release
 - `allwright plugin install web` resolves the local OS and architecture, then downloads the matching release asset
@@ -251,6 +252,7 @@ git push origin vX.Y.Z
 
 That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds and uploads the current web plugin archives for:
 
+- `allwright.dev` Go module publish by creating `go/vX.Y.Z`, verifying the `go/` module, and warming `proxy.golang.org`
 - `@allwright.dev/core` publish to npm after syncing `package.json` from the tag
 - `allwright` CLI archives for the current OS matrix
 - `allwright-surface-web` plugin archives for the current OS matrix
@@ -271,6 +273,27 @@ Configure npm Trusted Publishing for `@allwright.dev/core` on npmjs.com before p
 - allowed action: `npm publish`
 
 The npm publish job uses GitHub-hosted runners and OIDC instead of an `NPM_TOKEN`, which avoids bypass-2FA tokens entirely.
+
+## Publishing The Go Module
+
+The Go client is published as the vanity import path `allwright.dev`, backed by the `go/` subdirectory in this repository.
+
+You only create the root release tag manually:
+
+```bash
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+The release workflow creates the Go-specific tag `go/vX.Y.Z` on the same commit, which is the format Go requires for a module rooted in the `go/` subdirectory. The workflow also runs `go mod tidy`, verifies `go.mod` and `go.sum` stay clean, runs `go test ./...`, and asks `proxy.golang.org` for `allwright.dev@vX.Y.Z` to help the new version show up faster.
+
+Consumers can then install or upgrade with:
+
+```bash
+go get allwright.dev@vX.Y.Z
+```
+
+The `allwright-dev/` site already serves the `go-import` metadata for `allwright.dev`, so `go get` can resolve the vanity import path back to this repository's `go/` subdirectory.
 
 ## Installer Scripts
 
