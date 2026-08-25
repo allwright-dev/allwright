@@ -7,13 +7,14 @@ set -euo pipefail
 
 web_crates=(
   allwright-plugin-sdk
-  allwright-surface-web
   allwright-core
+  allwright-surface-web
   allwright
 )
 
 full_crates=(
   allwright-plugin-sdk
+  allwright-core
   allwright-surface-mobile
   allwright-surface-desktop
   allwright-surface-web
@@ -22,7 +23,6 @@ full_crates=(
   allwright-surface-desktop-mac
   allwright-surface-desktop-windows
   allwright-surface-desktop-linux
-  allwright-core
   allwright
 )
 
@@ -31,6 +31,7 @@ profile="${2:-web}"
 publish_interval_seconds="${PUBLISH_INTERVAL_SECONDS:-20}"
 allow_experimental_surfaces="${ALLOW_EXPERIMENTAL_SURFACES:-0}"
 allow_dirty="${CARGO_PUBLISH_ALLOW_DIRTY:-0}"
+dependency_retry_seconds="${DEPENDENCY_RETRY_SECONDS:-20}"
 
 if [[ "$mode" != "publish" && "$mode" != "dry-run" ]]; then
   echo "usage: $0 [publish|dry-run] [web|full]" >&2
@@ -135,6 +136,12 @@ publish_one() {
       continue
     fi
 
+    if grep -q "failed to select a version for the requirement" "$tmp"; then
+      echo "dependency version is not visible on crates.io yet; retrying in ${dependency_retry_seconds}s" >&2
+      sleep "$dependency_retry_seconds"
+      continue
+    fi
+
     echo "publish failed for ${crate}" >&2
     rm -f "$tmp"
     return 1
@@ -145,6 +152,7 @@ echo "publishing crates.io profile: ${profile}"
 echo "publish mode: ${mode}"
 echo "publish interval: ${publish_interval_seconds}s"
 echo "allow dirty working tree: ${allow_dirty}"
+echo "dependency retry interval: ${dependency_retry_seconds}s"
 
 if [[ "$profile" == "web" ]]; then
   echo "this publishes Rust crates for the lightweight core + CLI + web plugin path."
