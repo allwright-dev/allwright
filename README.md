@@ -259,6 +259,7 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds 
 - macOS `aarch64-apple-darwin`
 
 Configure the `CARGO_REGISTRY_TOKEN` repository secret before pushing a release tag if you want the crates.io publish job to succeed.
+The release workflow also sets `CARGO_PUBLISH_ALLOW_DIRTY=1` because it syncs crate versions from the tag inside CI before calling `cargo publish`.
 
 ## Installer Scripts
 

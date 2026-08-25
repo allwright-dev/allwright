@@ -30,6 +30,7 @@ mode="${1:-publish}"
 profile="${2:-web}"
 publish_interval_seconds="${PUBLISH_INTERVAL_SECONDS:-20}"
 allow_experimental_surfaces="${ALLOW_EXPERIMENTAL_SURFACES:-0}"
+allow_dirty="${CARGO_PUBLISH_ALLOW_DIRTY:-0}"
 
 if [[ "$mode" != "publish" && "$mode" != "dry-run" ]]; then
   echo "usage: $0 [publish|dry-run] [web|full]" >&2
@@ -62,6 +63,9 @@ fi
 publish_args=(publish)
 if [[ "$mode" == "dry-run" ]]; then
   publish_args+=(--dry-run)
+fi
+if [[ "$allow_dirty" == "1" ]]; then
+  publish_args+=(--allow-dirty)
 fi
 
 retry_after_epoch() {
@@ -140,6 +144,7 @@ publish_one() {
 echo "publishing crates.io profile: ${profile}"
 echo "publish mode: ${mode}"
 echo "publish interval: ${publish_interval_seconds}s"
+echo "allow dirty working tree: ${allow_dirty}"
 
 if [[ "$profile" == "web" ]]; then
   echo "this publishes Rust crates for the lightweight core + CLI + web plugin path."
