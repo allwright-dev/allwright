@@ -1,4 +1,4 @@
-import { chromium, setServerAddr, shutdown, Page, } from "@allwright.dev/core";
+import { chromium, setServerAddr, shutdown, Locator, Page, } from "@allwright.dev/core";
 import { expect as vitestExpect, test as base } from "vitest";
 export const test = base.extend({
     allwright: async ({}, use) => {
@@ -25,6 +25,9 @@ const DEFAULT_EXPECT_TIMEOUT_MS = 5_000;
 const DEFAULT_EXPECT_INTERVAL_MS = 100;
 function isPage(value) {
     return value instanceof Page;
+}
+function isLocator(value) {
+    return value instanceof Locator;
 }
 async function retryExpectation(callback, options = {}) {
     const timeoutMs = options.timeoutMs ?? DEFAULT_EXPECT_TIMEOUT_MS;
@@ -85,7 +88,49 @@ function createPageExpect(page) {
         },
     };
 }
+function createLocatorExpect(locator) {
+    return {
+        async toHaveText(expected, options = {}) {
+            await retryExpectation(async () => {
+                const result = await locator.textContent(options.command ?? {});
+                if (expected instanceof RegExp) {
+                    vitestExpect(result.text).toMatch(expected);
+                    return;
+                }
+                vitestExpect(result.text).toBe(expected);
+            }, options);
+        },
+        async toContainText(expected, options = {}) {
+            await retryExpectation(async () => {
+                const result = await locator.textContent(options.command ?? {});
+                if (expected instanceof RegExp) {
+                    vitestExpect(result.text).toMatch(expected);
+                    return;
+                }
+                vitestExpect(result.text).toContain(expected);
+            }, options);
+        },
+        async toHaveCount(expected, options = {}) {
+            await retryExpectation(async () => {
+                const result = await locator.count({});
+                vitestExpect(result.count).toBe(expected);
+            }, options);
+        },
+        async toBeVisible(options = {}) {
+            await retryExpectation(async () => {
+                const result = await locator.waitFor({
+                    visible: true,
+                    ...(options.command ?? {}),
+                });
+                vitestExpect(result.visible).toBe(true);
+            }, options);
+        },
+    };
+}
 const expectImpl = ((actual) => {
+    if (isLocator(actual)) {
+        return createLocatorExpect(actual);
+    }
     if (isPage(actual)) {
         return createPageExpect(actual);
     }

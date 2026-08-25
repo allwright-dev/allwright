@@ -185,6 +185,9 @@ export class Page {
     }
     sessionId;
     browserSessionId;
+    locator(selector) {
+        return new Locator({ page: this, selector });
+    }
     async goto(url, options = {}) {
         const handle = await this.#getHandle();
         this.#ensureOpen(handle);
@@ -576,6 +579,50 @@ export class Page {
             this.#handlePromise = createPageHandle(this.#runtime);
         }
         return this.#handlePromise;
+    }
+}
+export class Locator {
+    page;
+    selector;
+    constructor(input) {
+        this.page = input.page;
+        this.selector = input.selector;
+    }
+    async click(options = {}) {
+        return this.page.click(this.selector, options);
+    }
+    async count(options = {}) {
+        return this.page.count(this.selector, options);
+    }
+    async highlight(options = {}) {
+        return this.page.highlight(this.selector, options);
+    }
+    async focus(options = {}) {
+        return this.page.focus(this.selector, options);
+    }
+    async fill(value, options = {}) {
+        return this.page.fill(this.selector, value, options);
+    }
+    async hover(options = {}) {
+        return this.page.hover(this.selector, options);
+    }
+    async press(key, options = {}) {
+        return this.page.press(this.selector, key, options);
+    }
+    async textContent(options = {}) {
+        return this.page.textContent(this.selector, options);
+    }
+    async innerText(options = {}) {
+        return this.page.innerText(this.selector, options);
+    }
+    async waitFor(options = {}) {
+        return this.page.waitForSelector(this.selector, options);
+    }
+    locator(selector) {
+        return new Locator({
+            page: this.page,
+            selector: `${this.selector} ${selector}`,
+        });
     }
 }
 export const chromium = new BrowserType();
