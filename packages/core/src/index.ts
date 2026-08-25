@@ -9,9 +9,9 @@ const SERVER_ADDR_ENV_VAR = "ALLWRIGHT_SERVER_ADDR";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const REPO_ROOT = path.resolve(__dirname, "..", "..");
-const PROTO_ROOT = path.join(REPO_ROOT, "proto");
-const ENGINE_PROTO_PATH = path.join(REPO_ROOT, "proto", "engine", "v1", "engine.proto");
+const PACKAGE_ROOT = path.resolve(__dirname, "..");
+const PROTO_ROOT = path.join(PACKAGE_ROOT, "proto");
+const ENGINE_PROTO_PATH = path.join(PROTO_ROOT, "engine", "v1", "engine.proto");
 
 let runtimePromise: Promise<RuntimeClient> | null = null;
 let serverAddrOverride: string | null = null;

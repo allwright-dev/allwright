@@ -16,9 +16,18 @@ const path = require("path");
 
 const repoRoot = process.argv[2];
 const version = process.argv[3];
-const packageJsonPath = path.join(repoRoot, "package.json");
+const packageJsonPaths = [
+  path.join(repoRoot, "packages", "core", "package.json"),
+  path.join(repoRoot, "packages", "vitest", "package.json"),
+];
 
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
-packageJson.version = version;
-fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+for (const packageJsonPath of packageJsonPaths) {
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+  packageJson.version = version;
+  if (packageJson.name === "@allwright.dev/vitest") {
+    packageJson.dependencies = packageJson.dependencies ?? {};
+    packageJson.dependencies["@allwright.dev/core"] = version;
+  }
+  fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+}
 JS

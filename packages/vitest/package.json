@@ -1,0 +1,51 @@
+{
+  "name": "@allwright.dev/vitest",
+  "version": "0.0.1",
+  "description": "Vitest fixtures for the allwright TypeScript client.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/allwright-dev/allwright.git"
+  },
+  "homepage": "https://allwright.dev",
+  "bugs": {
+    "url": "https://github.com/allwright-dev/allwright/issues"
+  },
+  "keywords": [
+    "automation",
+    "testing",
+    "vitest",
+    "fixtures",
+    "playwright-style"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@allwright.dev/core": "0.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "vitest": "^3.2.4"
+  }
+}

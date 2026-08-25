@@ -1,7 +1,7 @@
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 
-import { chromium, setServerAddr, shutdown } from "../src/index.js";
+import { chromium, setServerAddr, shutdown } from "../dist/index.js";
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));

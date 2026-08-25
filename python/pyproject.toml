@@ -16,3 +16,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["allwright"]
+
+[tool.setuptools.package-data]
+allwright = [
+  "proto/core/v1/*.proto",
+  "proto/engine/v1/*.proto",
+  "proto/surfaces/web/v1/*.proto",
+]
