@@ -85,6 +85,7 @@ So the user-facing install model is now real for `web`, while the broader multi-
 Release automation today:
 
 - pushing a tag such as `vX.Y.Z` triggers the GitHub Actions release workflow
+- that workflow publishes the root TypeScript package to npm as `@allwright.dev/core`
 - that workflow builds both the `allwright` CLI and `allwright-surface-web` plugin for the current release matrix and uploads the archives to the matching GitHub Release
 - `allwright plugin install web` resolves the local OS and architecture, then downloads the matching release asset
 - the release workflow syncs the Rust workspace version from the Git tag before building, so the tag is the release source of truth
@@ -250,6 +251,7 @@ git push origin vX.Y.Z
 
 That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds and uploads the current web plugin archives for:
 
+- `@allwright.dev/core` publish to npm after syncing `package.json` from the tag
 - `allwright` CLI archives for the current OS matrix
 - `allwright-surface-web` plugin archives for the current OS matrix
 - crates.io publish for the Rust `web` profile after syncing every crate version from the tag
@@ -260,12 +262,14 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds 
 
 Configure the `CARGO_REGISTRY_TOKEN` repository secret before pushing a release tag if you want the crates.io publish job to succeed.
 The release workflow also sets `CARGO_PUBLISH_ALLOW_DIRTY=1` because it syncs crate versions from the tag inside CI before calling `cargo publish`.
+Configure the `NPM_TOKEN` repository secret before pushing a release tag if you want the npm publish job to succeed.
 
 ## Installer Scripts
 
 - `scripts/install.sh`: installs the latest or requested `allwright` CLI release on Linux and macOS
 - `scripts/install.ps1`: installs the latest or requested `allwright` CLI release on Windows PowerShell
 - `scripts/sync-version.sh`: syncs the Rust workspace and internal crate versions from a release version string such as `X.Y.Z`
+- `scripts/sync-npm-version.sh`: syncs the root npm package version from a release version string such as `X.Y.Z`
 - users do not need to clone the repo; both scripts can be run directly from GitHub with `curl`, `wget`, or PowerShell `irm`
 
 Both scripts support:

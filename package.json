@@ -1,5 +1,5 @@
 {
-  "name": "@allwright/core",
+  "name": "@allwright.dev/core",
   "version": "0.0.1",
   "description": "High-level TypeScript client for the allwright automation engine.",
   "license": "MIT",
@@ -34,6 +34,9 @@
     "README.md",
     "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p typescript/tsconfig.json",
     "example:playground": "bun run typescript/examples/playground.ts",

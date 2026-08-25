@@ -9,6 +9,49 @@ permissions:
   contents: write
 
 jobs:
+  publish-npm-package:
+    name: Publish npm package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Ensure npm token is configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "NPM_TOKEN is not configured. Add it to the repository secrets to enable npm publishing." >&2
+            exit 1
+          fi
+
+      - name: Sync npm package version from tag
+        shell: bash
+        run: |
+          chmod +x ./scripts/sync-npm-version.sh
+          ./scripts/sync-npm-version.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: Build npm package
+        run: npm run build
+
+      - name: Publish npm package
+        run: npm publish --access public --provenance
+
   publish-crates:
     name: Publish Rust crates
     runs-on: ubuntu-latest
