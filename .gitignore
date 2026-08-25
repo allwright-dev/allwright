@@ -21,7 +21,7 @@
 /python/build/
 /python/dist/
 /python/*.egg-info/
-
+node_modules/
 # Java client artifacts
 /java/.gradle/
 /java/build/

@@ -85,7 +85,7 @@ So the user-facing install model is now real for `web`, while the broader multi-
 Release automation today:
 
 - pushing a tag such as `vX.Y.Z` triggers the GitHub Actions release workflow
-- that workflow publishes the root TypeScript package to npm as `@allwright.dev/core`
+- that workflow publishes the root TypeScript package to npm as `@allwright.dev/core` using npm Trusted Publishing via GitHub Actions OIDC
 - that workflow builds both the `allwright` CLI and `allwright-surface-web` plugin for the current release matrix and uploads the archives to the matching GitHub Release
 - `allwright plugin install web` resolves the local OS and architecture, then downloads the matching release asset
 - the release workflow syncs the Rust workspace version from the Git tag before building, so the tag is the release source of truth
@@ -262,7 +262,15 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds 
 
 Configure the `CARGO_REGISTRY_TOKEN` repository secret before pushing a release tag if you want the crates.io publish job to succeed.
 The release workflow also sets `CARGO_PUBLISH_ALLOW_DIRTY=1` because it syncs crate versions from the tag inside CI before calling `cargo publish`.
-Configure the `NPM_TOKEN` repository secret before pushing a release tag if you want the npm publish job to succeed.
+Configure npm Trusted Publishing for `@allwright.dev/core` on npmjs.com before pushing a release tag:
+
+- provider: `GitHub Actions`
+- organization or user: `allwright-dev`
+- repository: `allwright`
+- workflow filename: `release-surface-plugins.yml`
+- allowed action: `npm publish`
+
+The npm publish job uses GitHub-hosted runners and OIDC instead of an `NPM_TOKEN`, which avoids bypass-2FA tokens entirely.
 
 ## Installer Scripts
 
