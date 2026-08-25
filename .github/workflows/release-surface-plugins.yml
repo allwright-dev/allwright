@@ -9,6 +9,53 @@ permissions:
   contents: write
 
 jobs:
+  publish-go-module:
+    name: Publish Go module
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+
+      - name: Verify Go module
+        working-directory: go
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+          go test ./...
+
+      - name: Create Go module tag
+        env:
+          ROOT_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          go_tag="go/${ROOT_TAG}"
+
+          if git rev-parse --verify --quiet "refs/tags/${go_tag}" >/dev/null; then
+            echo "Go tag ${go_tag} already exists; skipping creation"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${go_tag}" "${GITHUB_SHA}"
+          git push origin "refs/tags/${go_tag}"
+
+      - name: Warm Go module proxy
+        env:
+          ROOT_TAG: ${{ github.ref_name }}
+        run: |
+          GOPROXY=https://proxy.golang.org,direct go list -m "allwright.dev@${ROOT_TAG}"
+
   publish-npm-package:
     name: Publish npm package
     runs-on: ubuntu-latest
