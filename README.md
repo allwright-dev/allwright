@@ -252,10 +252,13 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds 
 
 - `allwright` CLI archives for the current OS matrix
 - `allwright-surface-web` plugin archives for the current OS matrix
+- crates.io publish for the Rust `web` profile after syncing every crate version from the tag
 
 - Linux `x86_64-unknown-linux-gnu`
 - Windows `x86_64-pc-windows-msvc`
 - macOS `aarch64-apple-darwin`
+
+Configure the `CARGO_REGISTRY_TOKEN` repository secret before pushing a release tag if you want the crates.io publish job to succeed.
 
 ## Installer Scripts
 
