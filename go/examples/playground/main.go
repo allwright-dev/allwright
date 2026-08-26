@@ -15,14 +15,16 @@ import (
 
 type browserSessionFlags struct {
 	serverAddr    string
-	chromeBinary  string
+	browser       string
+	browserBinary string
 	navigateURL   string
 	clickSelector string
 }
 
 func main() {
 	serverAddr := flag.String("server-addr", "127.0.0.1:50051", "Engine server address")
-	chromeBinary := flag.String("chrome-binary", "", "Optional Chrome binary path or executable name")
+	browser := flag.String("browser", "chromium", "Browser backend to launch: chromium or firefox")
+	browserBinary := flag.String("browser-binary", "", "Optional browser binary path or executable name")
 	navigateURL := flag.String("navigate-url", "https://example.com", "URL to navigate the initial tab to")
 	clickSelector := flag.String("click-selector", "", "Optional CSS selector to click over BiDi after navigation")
 	flag.Parse()
@@ -41,31 +43,37 @@ func main() {
 
 	runBrowserSession(ctx, browserSessionFlags{
 		serverAddr:    *serverAddr,
-		chromeBinary:  *chromeBinary,
+		browser:       *browser,
+		browserBinary: *browserBinary,
 		navigateURL:   *navigateURL,
 		clickSelector: *clickSelector,
 	})
 }
 
 func runBrowserSession(ctx context.Context, flags browserSessionFlags) {
-	fmt.Printf("[go-playground] launching chrome with chrome_binary=%q via singleton client runtime\n", flags.chromeBinary)
-	browser, err := allwright.LaunchChrome(ctx, allwright.LaunchOptions{
-		ChromeBinary: flags.chromeBinary,
-	})
+	fmt.Printf("[go-playground] launching %s with browser_binary=%q via singleton client runtime\n", flags.browser, flags.browserBinary)
+	var (
+		browser *allwright.Browser
+		err     error
+	)
+	switch strings.ToLower(strings.TrimSpace(flags.browser)) {
+	case "firefox":
+		browser, err = allwright.LaunchFirefox(ctx, allwright.LaunchOptions{
+			BrowserBinary: flags.browserBinary,
+		})
+	case "chromium", "chrome":
+		browser, err = allwright.LaunchChrome(ctx, allwright.LaunchOptions{
+			BrowserBinary: flags.browserBinary,
+		})
+	default:
+		log.Fatalf("unsupported --browser value %q; use chromium or firefox", flags.browser)
+	}
 	if err != nil {
-		log.Fatalf("launch chrome: %v", err)
+		log.Fatalf("launch browser: %v", err)
 	}
 
 	initialTab := browser.InitialTab()
-	fmt.Printf(
-		"[%s] chrome launched: %s (%s) cdp=%s user_data_dir=%s initial_tab_session_id=%s\n",
-		browser.SessionID(),
-		browser.BrowserName(),
-		browser.LaunchNote(),
-		browser.CdpWebSocketURL(),
-		browser.UserDataDir(),
-		initialTab.SessionID(),
-	)
+	logBrowserLaunch(browser, initialTab.SessionID())
 
 	navigateResult, err := initialTab.Navigate(ctx, flags.navigateURL)
 	if err != nil {
@@ -78,7 +86,7 @@ func runBrowserSession(ctx context.Context, flags browserSessionFlags) {
 		navigateResult.Note,
 	)
 	fmt.Printf(
-		"[%s] chromium-bidi injected: bidi_session_id=%s mapper_target_id=%s mapper_session_id=%s package_version=%s\n",
+		"[%s] automation session: bidi_session_id=%s mapper_target_id=%s mapper_session_id=%s package_version=%s\n",
 		initialTab.SessionID(),
 		navigateResult.BidiSessionID,
 		navigateResult.MapperTargetID,
@@ -100,7 +108,7 @@ func runBrowserSession(ctx context.Context, flags browserSessionFlags) {
 		)
 	}
 
-	waitForEnter("[go-playground] Press Enter to close the browser session and Chrome...")
+	waitForEnter("[go-playground] Press Enter to close the browser session and keep the browser open for observation...")
 
 	if err := initialTab.Close(ctx); err != nil {
 		log.Fatalf("close initial tab: %v", err)
@@ -111,6 +119,30 @@ func runBrowserSession(ctx context.Context, flags browserSessionFlags) {
 		log.Fatalf("close browser session: %v", err)
 	}
 	fmt.Printf("[%s] session closed\n", browser.SessionID())
+}
+
+func logBrowserLaunch(browser *allwright.Browser, initialTabSessionID string) {
+	if browser.CdpWebSocketURL() == "" {
+		fmt.Printf(
+			"[%s] browser launched: %s (%s) user_data_dir=%s initial_tab_session_id=%s\n",
+			browser.SessionID(),
+			browser.BrowserName(),
+			browser.LaunchNote(),
+			browser.UserDataDir(),
+			initialTabSessionID,
+		)
+		return
+	}
+
+	fmt.Printf(
+		"[%s] browser launched: %s (%s) cdp=%s user_data_dir=%s initial_tab_session_id=%s\n",
+		browser.SessionID(),
+		browser.BrowserName(),
+		browser.LaunchNote(),
+		browser.CdpWebSocketURL(),
+		browser.UserDataDir(),
+		initialTabSessionID,
+	)
 }
 
 func waitForEnter(prompt string) {

@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://allwright.dev/schemas/allwright.schema.json",
+  "title": "Allwright Config",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "addr": {
+          "type": "string"
+        }
+      }
+    },
+    "browser": {
+      "$ref": "#/$defs/browserConfig"
+    },
+    "expect": {
+      "$ref": "#/$defs/retryConfig"
+    },
+    "suites": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/suiteConfig"
+      }
+    }
+  },
+  "$defs": {
+    "launchOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "browserBinary": {
+          "type": "string"
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "browserConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": ["chromium", "firefox"]
+        },
+        "binary": {
+          "type": "string"
+        },
+        "launchOptions": {
+          "$ref": "#/$defs/launchOptions"
+        }
+      }
+    },
+    "retryConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "intervalMs": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "suiteConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "addr": {
+              "type": "string"
+            }
+          }
+        },
+        "browser": {
+          "$ref": "#/$defs/browserConfig"
+        },
+        "expect": {
+          "$ref": "#/$defs/retryConfig"
+        }
+      }
+    }
+  }
+}

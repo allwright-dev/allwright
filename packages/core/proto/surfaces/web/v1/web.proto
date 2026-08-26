@@ -5,6 +5,26 @@ option go_package = "allwright.dev/gen/allwright/engine/v1;enginev1";
 
 import "core/v1/common.proto";
 
+enum BrowserKind {
+  BROWSER_KIND_UNSPECIFIED = 0;
+  BROWSER_KIND_CHROMIUM = 1;
+  BROWSER_KIND_FIREFOX = 2;
+}
+
+message LaunchBrowserCommand {
+  BrowserKind browser_kind = 1;
+  optional string browser_binary = 2;
+  optional CommandRetryOptions retry_options = 3;
+}
+
+message BrowserLaunchedEvent {
+  BrowserKind browser_kind = 1;
+  string browser = 2;
+  string note = 3;
+  string user_data_dir = 4;
+  string initial_tab_session_id = 5;
+}
+
 message LaunchChromeCommand {
   optional string chrome_binary = 1;
   optional CommandRetryOptions retry_options = 2;

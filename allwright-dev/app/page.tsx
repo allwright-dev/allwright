@@ -6,7 +6,7 @@ import { StatusPill } from "./status-pill";
 const surfaces = [
   {
     label: "Web",
-    description: "Real browser flows that click, type, and navigate like a person would.",
+    description: "A small, working set of core browser actions today — not yet the full coverage real test suites need.",
     status: "Available now",
     position: { left: "6%", top: "10%" },
     icon: (
@@ -239,6 +239,13 @@ export default function Home() {
             </article>
           ))}
         </div>
+        <p className="mx-auto mt-6 max-w-[52ch] text-center text-sm leading-6 text-[var(--muted)]">
+          &ldquo;Available now&rdquo; means real and installable today, not
+          feature-complete.{" "}
+          <Link href="/availability" className="font-medium text-[var(--accent-2)] hover:underline">
+            See the detailed breakdown →
+          </Link>
+        </p>
       </section>
 
       <section
@@ -273,12 +280,20 @@ export default function Home() {
           See the client languages allwright speaks today and exactly which
           plugins are installable now versus still on the way.
         </p>
-        <Link
-          href="/how-it-works"
-          className="inline-flex items-center rounded-full bg-[linear-gradient(120deg,var(--accent),var(--accent-2))] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_var(--accent-soft)] transition hover:-translate-y-0.5"
-        >
-          See how it works
-        </Link>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/how-it-works"
+            className="inline-flex items-center rounded-full bg-[linear-gradient(120deg,var(--accent),var(--accent-2))] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_var(--accent-soft)] transition hover:-translate-y-0.5"
+          >
+            See how it works
+          </Link>
+          <Link
+            href="/availability"
+            className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--card)] px-6 py-3 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:border-[var(--accent-2)]"
+          >
+            Full availability breakdown
+          </Link>
+        </div>
       </section>
     </div>
   );

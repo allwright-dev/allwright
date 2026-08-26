@@ -41,7 +41,7 @@ class AllwrightError(RuntimeError):
 
 @dataclass(slots=True)
 class LaunchOptions:
-    chrome_binary: str | None = None
+    browser_binary: str | None = None
     timeout_ms: int | None = None
 
 
@@ -134,8 +134,11 @@ class WaitForSelectorResult:
 
 
 class BrowserType:
+    def __init__(self, browser_kind: int = engine_pb2.BROWSER_KIND_CHROMIUM) -> None:
+        self._browser_kind = browser_kind
+
     def launch(self, options: LaunchOptions | None = None) -> Browser:
-        return launch_chrome(options or LaunchOptions())
+        return launch_browser(self._browser_kind, options or LaunchOptions())
 
 
 class Browser:
@@ -268,6 +271,9 @@ class Page:
     @property
     def browser_session_id(self) -> str:
         return self._browser_session_id
+
+    def locator(self, selector: str) -> Locator:
+        return Locator(page=self, selector=selector)
 
     def goto(self, url: str, options: CommandOptions | None = None) -> NavigateResult:
         with self._lock:
@@ -729,6 +735,45 @@ class Page:
                         )
 
 
+@dataclass(slots=True)
+class Locator:
+    page: Page
+    selector: str
+
+    def locator(self, selector: str) -> Locator:
+        return Locator(page=self.page, selector=f"{self.selector} {selector}".strip())
+
+    def click(self, options: CommandOptions | None = None) -> ClickResult:
+        return self.page.click(self.selector, options)
+
+    def count(self, options: CommandOptions | None = None) -> CountResult:
+        return self.page.count(self.selector, options)
+
+    def highlight(self, options: HighlightOptions | None = None) -> HighlightResult:
+        return self.page.highlight(self.selector, options)
+
+    def focus(self, options: CommandOptions | None = None) -> ElementResult:
+        return self.page.focus(self.selector, options)
+
+    def fill(self, value: str, options: CommandOptions | None = None) -> FillResult:
+        return self.page.fill(self.selector, value, options)
+
+    def hover(self, options: CommandOptions | None = None) -> ElementResult:
+        return self.page.hover(self.selector, options)
+
+    def press(self, key: str, options: PressOptions | None = None) -> PressResult:
+        return self.page.press(self.selector, key, options)
+
+    def text_content(self, options: CommandOptions | None = None) -> TextResult:
+        return self.page.text_content(self.selector, options)
+
+    def inner_text(self, options: CommandOptions | None = None) -> TextResult:
+        return self.page.inner_text(self.selector, options)
+
+    def wait_for(self, options: WaitForSelectorOptions | None = None) -> WaitForSelectorResult:
+        return self.page.wait_for_selector(self.selector, options)
+
+
 class _StreamHandle:
     def __init__(self, stream_factory: Callable[[Iterator[Any]], Iterator[Any]]) -> None:
         self._queue: queue.Queue[Any] = queue.Queue()
@@ -778,27 +823,38 @@ def ping() -> str:
 
 
 def launch_chrome(options: LaunchOptions | None = None) -> Browser:
+    return launch_browser(engine_pb2.BROWSER_KIND_CHROMIUM, options)
+
+
+def launch_firefox(options: LaunchOptions | None = None) -> Browser:
+    return launch_browser(engine_pb2.BROWSER_KIND_FIREFOX, options)
+
+
+def launch_browser(browser_kind: int, options: LaunchOptions | None = None) -> Browser:
     runtime = _get_runtime()
     stream = _StreamHandle(runtime.stub.BrowserSession)
     launch_options = options or LaunchOptions()
 
     command_kwargs: dict[str, Any] = {}
-    if launch_options.chrome_binary:
-        command_kwargs["chrome_binary"] = launch_options.chrome_binary
+    if launch_options.browser_binary:
+        command_kwargs["browser_binary"] = launch_options.browser_binary
     if launch_options.timeout_ms is not None:
         command_kwargs["retry_options"] = _retry_options(launch_options.timeout_ms)
 
     stream.send(
         engine_pb2.BrowserSessionCommand(
-            launch_chrome=engine_pb2.LaunchChromeCommand(**command_kwargs),
+            launch_browser=engine_pb2.LaunchBrowserCommand(
+                browser_kind=browser_kind,
+                **command_kwargs,
+            ),
         )
     )
 
     while True:
         event = stream.recv("receive browser session event during launch")
         match event.WhichOneof("event"):
-            case "chrome_launched":
-                launched = event.chrome_launched
+            case "browser_launched":
+                launched = event.browser_launched
                 initial_page = Page(
                     runtime=runtime,
                     browser_session_id=event.session_id,
@@ -810,7 +866,7 @@ def launch_chrome(options: LaunchOptions | None = None) -> Browser:
                     session_id=event.session_id,
                     browser_name=launched.browser,
                     launch_note=launched.note,
-                    cdp_websocket_url=launched.cdp_websocket_url,
+                    cdp_websocket_url="",
                     user_data_dir=launched.user_data_dir,
                     initial_page=initial_page,
                 )
@@ -862,4 +918,5 @@ def _retry_options(timeout_ms: int | None) -> Any | None:
     return engine_pb2.CommandRetryOptions(timeout_ms=timeout_ms)
 
 
-chromium = BrowserType()
+chromium = BrowserType(engine_pb2.BROWSER_KIND_CHROMIUM)
+firefox = BrowserType(engine_pb2.BROWSER_KIND_FIREFOX)

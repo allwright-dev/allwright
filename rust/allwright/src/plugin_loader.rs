@@ -1,9 +1,9 @@
 use crate::plugins::package;
 use allwright_plugin_sdk::{
-    ALLWRIGHT_PLUGIN_API_VERSION, ChromeLaunchInfo, ChromeTabInfo, ChromiumBidiMapperInfo,
-    ClickInfo, ElementCountInfo, FillInfo, FocusInfo, HighlightElementsInfo, HoverInfo,
-    PluginCommand, PluginEnvelope, PluginResult, PressKeyInfo, TabNavigationInfo, TextInfo,
-    WaitForSelectorInfo,
+    ALLWRIGHT_PLUGIN_API_VERSION, BrowserKind, BrowserLaunchInfo, BrowserSessionHandle, ChromeLaunchInfo,
+    ChromeTabInfo, ChromiumBidiMapperInfo, ClickInfo, ElementCountInfo, FillInfo, FocusInfo,
+    HighlightElementsInfo, HoverInfo, PageInfo, PageSessionHandle, PluginCommand,
+    PluginEnvelope, PluginResult, PressKeyInfo, TabNavigationInfo, TextInfo, WaitForSelectorInfo,
 };
 use libloading::{Library, Symbol};
 use std::env;
@@ -144,6 +144,286 @@ pub async fn open_chrome_window(chrome_binary: Option<&str>) -> Result<ChromeLau
     {
         PluginResult::OpenChromeWindow(result) => Ok(result),
         _ => Err("web plugin returned an unexpected response for OpenChromeWindow".to_string()),
+    }
+}
+
+pub async fn launch_browser(
+    browser_kind: BrowserKind,
+    browser_binary: Option<&str>,
+) -> Result<BrowserLaunchInfo, String> {
+    match invoke_web_expected(
+        "LaunchBrowserCommand",
+        PluginCommand::LaunchBrowser {
+            browser_kind,
+            browser_binary: browser_binary.map(str::to_string),
+        },
+    )
+    .await?
+    {
+        PluginResult::LaunchBrowser(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for LaunchBrowser".to_string()),
+    }
+}
+
+pub async fn open_page(browser_session: &BrowserSessionHandle) -> Result<PageInfo, String> {
+    match invoke_web_expected(
+        "OpenTabCommand",
+        PluginCommand::OpenPage {
+            browser_session: browser_session.clone(),
+        },
+    )
+    .await?
+    {
+        PluginResult::OpenPage(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for OpenPage".to_string()),
+    }
+}
+
+pub async fn close_page(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+) -> Result<(), String> {
+    match invoke_web_expected(
+        "CloseTabSessionCommand",
+        PluginCommand::ClosePage {
+            browser_session: browser_session.clone(),
+            page_session: page_session.clone(),
+        },
+    )
+    .await?
+    {
+        PluginResult::ClosePage => Ok(()),
+        _ => Err("web plugin returned an unexpected response for ClosePage".to_string()),
+    }
+}
+
+pub async fn navigate_page(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    url: &str,
+) -> Result<TabNavigationInfo, String> {
+    match invoke_web_expected(
+        "NavigateTabCommand",
+        PluginCommand::NavigatePage {
+            browser_session: browser_session.clone(),
+            page_session: page_session.clone(),
+            url: url.to_string(),
+        },
+    )
+    .await?
+    {
+        PluginResult::NavigatePage(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for NavigatePage".to_string()),
+    }
+}
+
+pub async fn click_element(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    css_selector: &str,
+) -> Result<ClickInfo, String> {
+    match invoke_web_expected(
+        "ClickElementCommand",
+        PluginCommand::ClickElement {
+            browser_session: browser_session.clone(),
+            page_session: page_session.clone(),
+            css_selector: css_selector.to_string(),
+        },
+    )
+    .await?
+    {
+        PluginResult::ClickElement(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for ClickElement".to_string()),
+    }
+}
+
+pub async fn count_elements(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    css_selector: &str,
+) -> Result<ElementCountInfo, String> {
+    match invoke_web_expected(
+        "CountElementsCommand",
+        PluginCommand::CountElements {
+            browser_session: browser_session.clone(),
+            page_session: page_session.clone(),
+            css_selector: css_selector.to_string(),
+        },
+    )
+    .await?
+    {
+        PluginResult::CountElements(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for CountElements".to_string()),
+    }
+}
+
+pub async fn highlight_elements(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    css_selector: &str,
+    duration_ms: u64,
+) -> Result<HighlightElementsInfo, String> {
+    match invoke_web_expected(
+        "HighlightElementsCommand",
+        PluginCommand::HighlightElements {
+            browser_session: browser_session.clone(),
+            page_session: page_session.clone(),
+            css_selector: css_selector.to_string(),
+            duration_ms,
+        },
+    )
+    .await?
+    {
+        PluginResult::HighlightElements(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for HighlightElements".to_string()),
+    }
+}
+
+pub async fn focus_element(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    css_selector: &str,
+) -> Result<FocusInfo, String> {
+    match invoke_web_expected(
+        "FocusElementCommand",
+        PluginCommand::FocusElement {
+            browser_session: browser_session.clone(),
+            page_session: page_session.clone(),
+            css_selector: css_selector.to_string(),
+        },
+    )
+    .await?
+    {
+        PluginResult::FocusElement(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for FocusElement".to_string()),
+    }
+}
+
+pub async fn fill_element(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    css_selector: &str,
+    value: &str,
+) -> Result<FillInfo, String> {
+    match invoke_web_expected(
+        "FillElementCommand",
+        PluginCommand::FillElement {
+            browser_session: browser_session.clone(),
+            page_session: page_session.clone(),
+            css_selector: css_selector.to_string(),
+            value: value.to_string(),
+        },
+    )
+    .await?
+    {
+        PluginResult::FillElement(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for FillElement".to_string()),
+    }
+}
+
+pub async fn hover_element(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    css_selector: &str,
+) -> Result<HoverInfo, String> {
+    match invoke_web_expected(
+        "HoverElementCommand",
+        PluginCommand::HoverElement {
+            browser_session: browser_session.clone(),
+            page_session: page_session.clone(),
+            css_selector: css_selector.to_string(),
+        },
+    )
+    .await?
+    {
+        PluginResult::HoverElement(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for HoverElement".to_string()),
+    }
+}
+
+pub async fn press_key(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    css_selector: &str,
+    key: &str,
+    text: Option<&str>,
+) -> Result<PressKeyInfo, String> {
+    match invoke_web_expected(
+        "PressKeyCommand",
+        PluginCommand::PressKey {
+            browser_session: browser_session.clone(),
+            page_session: page_session.clone(),
+            css_selector: css_selector.to_string(),
+            key: key.to_string(),
+            text: text.map(str::to_string),
+        },
+    )
+    .await?
+    {
+        PluginResult::PressKey(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for PressKey".to_string()),
+    }
+}
+
+pub async fn get_text_content(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    css_selector: &str,
+) -> Result<TextInfo, String> {
+    match invoke_web_expected(
+        "GetTextContentCommand",
+        PluginCommand::GetTextContent {
+            browser_session: browser_session.clone(),
+            page_session: page_session.clone(),
+            css_selector: css_selector.to_string(),
+        },
+    )
+    .await?
+    {
+        PluginResult::GetTextContent(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for GetTextContent".to_string()),
+    }
+}
+
+pub async fn get_inner_text(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    css_selector: &str,
+) -> Result<TextInfo, String> {
+    match invoke_web_expected(
+        "GetInnerTextCommand",
+        PluginCommand::GetInnerText {
+            browser_session: browser_session.clone(),
+            page_session: page_session.clone(),
+            css_selector: css_selector.to_string(),
+        },
+    )
+    .await?
+    {
+        PluginResult::GetInnerText(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for GetInnerText".to_string()),
+    }
+}
+
+pub async fn wait_for_selector(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    css_selector: &str,
+    visible: bool,
+) -> Result<WaitForSelectorInfo, String> {
+    match invoke_web_expected(
+        "WaitForSelectorCommand",
+        PluginCommand::WaitForSelector {
+            browser_session: browser_session.clone(),
+            page_session: page_session.clone(),
+            css_selector: css_selector.to_string(),
+            visible,
+        },
+    )
+    .await?
+    {
+        PluginResult::WaitForSelector(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for WaitForSelector".to_string()),
     }
 }
 

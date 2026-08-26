@@ -13,9 +13,9 @@ pip install -e ./python
 ## Example
 
 ```python
-from allwright import chromium
+from allwright import firefox
 
-browser = chromium.launch()
+browser = firefox.launch()
 page = browser.page()
 page.goto("https://example.com")
 page.click("h1")

@@ -12,6 +12,7 @@ message BrowserSessionCommand {
     OpenTabCommand open_tab = 2;
     SessionPingCommand ping = 3;
     CloseBrowserSessionCommand close = 4;
+    LaunchBrowserCommand launch_browser = 5;
   }
 }
 
@@ -34,6 +35,7 @@ message BrowserSessionEvent {
     SessionPongEvent pong = 4;
     BrowserSessionClosedEvent closed = 5;
     BrowserSessionErrorEvent error = 6;
+    BrowserLaunchedEvent browser_launched = 7;
   }
 }
 

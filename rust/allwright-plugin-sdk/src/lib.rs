@@ -44,6 +44,8 @@ pub struct BrowserLaunchInfo {
     pub note: String,
     pub user_data_dir: String,
     pub process_id: u32,
+    pub browser_session: BrowserSessionHandle,
+    pub initial_page: PageInfo,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -56,7 +58,8 @@ pub struct ChromeTabInfo {
 pub struct TabNavigationInfo {
     pub url: String,
     pub note: String,
-    pub browsing_context_id: String,
+    pub page_session: PageSessionHandle,
+    pub automation: AutomationSessionInfo,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -68,9 +71,49 @@ pub struct ChromiumBidiMapperInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum BrowserSessionHandle {
+    Chromium {
+        cdp_websocket_url: String,
+    },
+    Firefox {
+        connection_id: String,
+        bidi_session_id: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PageSessionHandle {
+    Chromium {
+        target_id: String,
+        browsing_context_id: Option<String>,
+    },
+    Firefox {
+        browsing_context_id: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PageInfo {
+    pub note: String,
+    pub page_session: PageSessionHandle,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutomationSessionInfo {
+    pub bidi_session_id: String,
+    pub note: String,
+    pub mapper_target_id: Option<String>,
+    pub mapper_session_id: Option<String>,
+    pub package_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ClickInfo {
     pub css_selector: String,
     pub note: String,
+    pub bidi_session_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -133,6 +176,73 @@ pub enum PluginCommand {
     LaunchBrowser {
         browser_kind: BrowserKind,
         browser_binary: Option<String>,
+    },
+    OpenPage {
+        browser_session: BrowserSessionHandle,
+    },
+    ClosePage {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+    },
+    NavigatePage {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        url: String,
+    },
+    ClickElement {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        css_selector: String,
+    },
+    CountElements {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        css_selector: String,
+    },
+    HighlightElements {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        css_selector: String,
+        duration_ms: u64,
+    },
+    FocusElement {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        css_selector: String,
+    },
+    FillElement {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        css_selector: String,
+        value: String,
+    },
+    HoverElement {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        css_selector: String,
+    },
+    PressKey {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        css_selector: String,
+        key: String,
+        text: Option<String>,
+    },
+    GetTextContent {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        css_selector: String,
+    },
+    GetInnerText {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        css_selector: String,
+    },
+    WaitForSelector {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        css_selector: String,
+        visible: bool,
     },
     OpenChromeWindow {
         chrome_binary: Option<String>,
@@ -225,6 +335,19 @@ pub enum PluginCommand {
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum PluginResult {
     LaunchBrowser(BrowserLaunchInfo),
+    OpenPage(PageInfo),
+    ClosePage,
+    NavigatePage(TabNavigationInfo),
+    ClickElement(ClickInfo),
+    CountElements(ElementCountInfo),
+    HighlightElements(HighlightElementsInfo),
+    FocusElement(FocusInfo),
+    FillElement(FillInfo),
+    HoverElement(HoverInfo),
+    PressKey(PressKeyInfo),
+    GetTextContent(TextInfo),
+    GetInnerText(TextInfo),
+    WaitForSelector(WaitForSelectorInfo),
     OpenChromeWindow(ChromeLaunchInfo),
     DiscoverInitialTab(ChromeTabInfo),
     OpenChromeTab(ChromeTabInfo),

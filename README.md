@@ -6,7 +6,7 @@ The long-term direction is a single system that can cover web, mobile, desktop, 
 
 That direction also applies to extensibility: allwright should stay one engine at its core, while surface modules like `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux` can be installed separately as plugins instead of fragmenting the runtime into multiple engines.
 
-Right now, allwright is being built in public and the browser automation engine is the first active layer. The current implementation is focused on a driverless Chrome control path backed by CDP and Chromium BiDi, with high-level client libraries for Rust, Go, Java, Python, and TypeScript/JavaScript.
+Right now, allwright is being built in public and the browser automation engine is the first active layer. The current implementation is browser-first and driverless: Chromium runs through CDP plus Chromium BiDi, and Firefox runs through its native WebDriver BiDi Remote Agent, with high-level client libraries for Rust, Go, Java, Python, and TypeScript/JavaScript.
 
 ## Why allwright
 
@@ -179,7 +179,7 @@ allwright is designed around high-level browser objects rather than asking appli
 Rust example:
 
 ```rust
-let browser = allwright::launch_chrome(Default::default()).await?;
+let browser = allwright::launch_firefox(Default::default()).await?;
 let tab = browser.initial_tab()?;
 tab.navigate("https://example.com").await?;
 tab.click("a").await?;
@@ -189,7 +189,7 @@ browser.close().await?;
 Go example:
 
 ```go
-browser, err := allwright.LaunchChrome(ctx, allwright.LaunchOptions{})
+browser, err := allwright.LaunchFirefox(ctx, allwright.LaunchOptions{})
 tab := browser.InitialTab()
 _, err = tab.Navigate(ctx, "https://example.com")
 _, err = tab.Click(ctx, "a")
@@ -199,9 +199,9 @@ err = browser.Close(ctx)
 TypeScript example:
 
 ```ts
-import { chromium } from "./src/index.js";
+import { firefox } from "./src/index.js";
 
-const browser = await chromium.launch({});
+const browser = await firefox.launch({});
 const page = browser.page();
 await page.goto("https://example.com");
 await page.click("a");

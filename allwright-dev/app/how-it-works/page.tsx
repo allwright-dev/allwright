@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { languages, surfaceStatus } from "../availability-data";
 import { GITHUB_URL } from "../brand";
 import { StatusPill } from "../status-pill";
 
@@ -9,46 +10,6 @@ export const metadata: Metadata = {
   description:
     "allwright is a small core engine plus installable plugins for web, mobile, desktop, and API testing — à la carte, not a buffet. See what's installable today and which client languages are published.",
 };
-
-const languages = [
-  {
-    name: "Rust",
-    note: "The engine itself, plus a high-level client.",
-    status: "Published",
-    href: `${GITHUB_URL}/blob/main/rust/allwright/examples/playground.rs`,
-  },
-  {
-    name: "Go",
-    note: "A Playwright-style Browser and Page API.",
-    status: "Published",
-    href: `${GITHUB_URL}/tree/main/go/examples/playground`,
-  },
-  {
-    name: "Java",
-    note: "A Gradle-based client for JVM test suites.",
-    status: "From source",
-    href: `${GITHUB_URL}/tree/main/java`,
-  },
-  {
-    name: "Python",
-    note: "A client that feels at home in pytest.",
-    status: "From source",
-    href: `${GITHUB_URL}/tree/main/python`,
-  },
-  {
-    name: "TypeScript",
-    note: "Works from TypeScript or plain JavaScript.",
-    status: "From source",
-    href: `${GITHUB_URL}/blob/main/typescript/examples/playground.ts`,
-  },
-];
-
-const surfaceStatus = [
-  { label: "Web", detail: "Chrome-based browser automation.", status: "Available now" as const },
-  { label: "Mobile", detail: "Android & iOS, native and hybrid apps.", status: "Not yet available" as const },
-  { label: "Desktop", detail: "macOS, Windows, and Linux applications.", status: "Not yet available" as const },
-  { label: "API", detail: "Backend checks in the same test run.", status: "Not yet available" as const },
-];
 
 // The real plugin catalog: one entry per installable surface plugin, laid
 // out around the core in a hexagon. Web is the only one installable today —
@@ -446,8 +407,8 @@ export default function HowItWorks() {
             Bring your own language
           </h2>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
-            Rust and Go clients are published and ready to install. Java,
-            Python, and TypeScript clients are complete but not yet on a
+            Rust, Go, and TypeScript clients are published and ready to
+            install. Java and Python clients are complete but not yet on a
             package registry — build them from source using the examples
             below.
           </p>
@@ -476,6 +437,13 @@ export default function HowItWorks() {
             </a>
           ))}
         </div>
+        <p className="mx-auto mt-6 max-w-[52ch] text-center text-sm leading-6 text-[var(--muted)]">
+          Every client above speaks the same command set — nothing is
+          language-exclusive.{" "}
+          <Link href="/availability" className="font-medium text-[var(--accent-2)] hover:underline">
+            See exactly what that command set covers today →
+          </Link>
+        </p>
       </section>
 
       <section aria-label="what the engine actually does" className="mx-auto mt-14 w-full max-w-3xl sm:mt-16">
@@ -484,10 +452,11 @@ export default function HowItWorks() {
         </h2>
         <p className="mt-4 text-sm leading-7 text-[var(--muted)] sm:text-base">
           Once you install the web plugin, allwright drives a real, current
-          browser directly instead of going through a separate driver
-          binary you have to download and version-match by hand. That means
-          fewer &ldquo;works on my machine&rdquo; surprises, and tests that
-          behave the way an actual person clicking through your app would.
+          Chromium or Firefox browser directly instead of going through a
+          separate driver binary you have to download and version-match by
+          hand. That means fewer &ldquo;works on my machine&rdquo; surprises,
+          and tests that behave the way an actual person clicking through
+          your app would.
         </p>
         <p className="mt-4 text-sm leading-7 text-[var(--muted)] sm:text-base">
           Mobile, desktop, and API testing will work the same way once their
