@@ -87,7 +87,7 @@ Release automation today:
 - pushing a tag such as `vX.Y.Z` triggers the GitHub Actions release workflow
 - that workflow creates the Go submodule tag `go/vX.Y.Z`, verifies the Go client in `go/`, and warms the public Go proxy for `allwright.dev`
 - that workflow publishes the Java client to Maven Central as `dev.allwright:allwright` using the checked-in Gradle wrapper, a Central Portal user token, and a follow-up transfer call through Sonatype's Central Portal OSSRH Staging API compatibility service
-- that workflow publishes the Python client to PyPI as `allwright-python` using PyPI Trusted Publishing via GitHub Actions OIDC
+- that workflow publishes the Python client to PyPI as `allwright` using PyPI Trusted Publishing via GitHub Actions OIDC
 - that workflow publishes the npm workspace packages `@allwright.dev/core` and `@allwright.dev/vitest` using npm Trusted Publishing via GitHub Actions OIDC
 - that workflow builds both the `allwright` CLI and `allwright-surface-web` plugin for the current release matrix and uploads the archives to the matching GitHub Release
 - `allwright plugin install web` resolves the local OS and architecture, then downloads the matching release asset
@@ -256,7 +256,7 @@ git push origin vX.Y.Z
 That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds and uploads the current web plugin archives for:
 
 - `allwright.dev` Go module publish by creating `go/vX.Y.Z`, verifying the `go/` module, and warming `proxy.golang.org`
-- `allwright-python` publish to PyPI after syncing `python/pyproject.toml` from the tag
+- `allwright` publish to PyPI after syncing `python/pyproject.toml` from the tag
 - `@allwright.dev/core` publish to npm after syncing `typescript/core/package.json` from the tag
 - `@allwright.dev/vitest` publish to npm after syncing `typescript/vitest/package.json` and its dependency on `@allwright.dev/core` from the tag
 - `allwright` CLI archives for the current OS matrix
@@ -269,7 +269,7 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds 
 
 Configure the `CARGO_REGISTRY_TOKEN` repository secret before pushing a release tag if you want the crates.io publish job to succeed.
 The release workflow also sets `CARGO_PUBLISH_ALLOW_DIRTY=1` because it syncs crate versions from the tag inside CI before calling `cargo publish`.
-Configure PyPI Trusted Publishing for `allwright-python` before pushing a release tag:
+Configure PyPI Trusted Publishing for `allwright` before pushing a release tag:
 
 - owner: `allwright-dev`
 - repository name: `allwright`
@@ -312,7 +312,7 @@ The `allwright-dev/` site already serves the `go-import` metadata for `allwright
 
 ## Publishing The Python Package
 
-The Python client is published from the `python/` directory as the PyPI project `allwright-python`.
+The Python client is published from the `python/` directory as the PyPI project `allwright`.
 
 You only create the root release tag manually:
 

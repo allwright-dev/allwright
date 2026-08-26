@@ -46,7 +46,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `go/`: Go module `allwright.dev` containing generated engine stubs, the public Go client package at the module root, and Go examples
 - `java/`: Gradle-based Java client project that generates engine stubs from the shared proto and exposes a high-level browser/page API
 - `java/build.gradle.kts`: Java build now also owns Maven Central publication metadata for `dev.allwright:allwright`, conditional OSSRH publishing credentials, in-memory signing support, and JUnit 5 test wiring
-- `python/`: Python client package `allwright-python` that exposes a high-level browser/page API and bundles the shared proto files inside `python/allwright/proto/` for publishable runtime loading
+- `python/`: Python client package `allwright` that exposes a high-level browser/page API and bundles the shared proto files inside `python/allwright/proto/` for publishable runtime loading
 - `allwright-dev/`: standalone Next.js site for the purchased `allwright.dev` domain, intended for Vercel deployment and public-facing marketing/docs entrypoints
 - `typescript/core/`: published npm package `@allwright.dev/core`, containing the TypeScript/JavaScript client, bundled shared proto files, and examples
 - `typescript/vitest/`: published npm package `@allwright.dev/vitest`, containing Vitest fixtures and retrying browser assertions on top of `@allwright.dev/core`
