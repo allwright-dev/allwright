@@ -340,10 +340,20 @@ The release workflow syncs both package versions to `X.Y.Z`, updates `@allwright
 
 - `scripts/install.sh`: installs the latest or requested `allwright` CLI release on Linux and macOS
 - `scripts/install.ps1`: installs the latest or requested `allwright` CLI release on Windows PowerShell
+- `scripts/generate-rust-proto.sh`: regenerates `rust/allwright/src/proto_generated.rs` from the canonical top-level `proto/` tree
 - `scripts/sync-version.sh`: syncs the Rust workspace and internal crate versions from a release version string such as `X.Y.Z`
 - `scripts/sync-npm-version.sh`: syncs the npm workspace package versions from a release version string such as `X.Y.Z`
 - `scripts/sync-python-version.sh`: syncs the Python package version from a release version string such as `X.Y.Z`
 - users do not need to clone the repo; both scripts can be run directly from GitHub with `curl`, `wget`, or PowerShell `irm`
+
+Rust proto regeneration:
+
+```bash
+./scripts/generate-rust-proto.sh
+```
+
+This keeps `proto/` as the single source of truth while regenerating the checked-in Rust bindings in `rust/allwright/src/proto_generated.rs`.
+CI also verifies that `rust/allwright/src/proto_generated.rs` is up to date on pushes to `main` and on pull requests.
 
 Both scripts support:
 

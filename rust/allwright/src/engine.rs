@@ -13,20 +13,20 @@ use tonic::{Request, Response, Status, transport::Server};
 
 use proto::engine_service_server::{EngineService, EngineServiceServer};
 use proto::{
-    BrowserSessionClosedEvent, BrowserSessionCommand, BrowserSessionErrorEvent,
-    BrowserSessionEvent, ChromeLaunchedEvent, ChromiumBidiInjectionEvent, ClickElementCommand,
-    CloseBrowserSessionCommand, CloseTabSessionCommand, CommandRetryOptions, CountElementsCommand,
-    ElementClickedEvent, ElementCountedEvent, ElementFilledEvent, ElementFocusedEvent,
-    ElementHoveredEvent, ElementsHighlightedEvent, FillElementCommand, FocusElementCommand,
-    GetInnerTextCommand, GetTextContentCommand, HighlightElementsCommand, HoverElementCommand,
-    InnerTextResolvedEvent, KeyPressedEvent, LaunchChromeCommand, NavigateTabCommand,
-    OpenTabCommand, PingRequest, PingResponse, PressKeyCommand, SelectorWaitSatisfiedEvent,
-    SessionPingCommand, SessionPongEvent, TabNavigatedEvent, TabOpenedEvent,
-    TabSessionAttachedEvent, TabSessionClosedEvent, TabSessionCommand, TabSessionErrorEvent,
-    TabSessionEvent, TabSessionPingCommand, TabSessionPongEvent, TextContentResolvedEvent,
-    WaitForSelectorCommand, browser_session_command::Command as BrowserCommand,
-    browser_session_event::Event as BrowserEvent, tab_session_command::Command as TabCommand,
-    tab_session_event::Event as TabEvent,
+    BrowserKind, BrowserLaunchedEvent, BrowserSessionClosedEvent, BrowserSessionCommand,
+    BrowserSessionErrorEvent, BrowserSessionEvent, ChromeLaunchedEvent,
+    ChromiumBidiInjectionEvent, ClickElementCommand, CloseBrowserSessionCommand,
+    CloseTabSessionCommand, CommandRetryOptions, CountElementsCommand, ElementClickedEvent,
+    ElementCountedEvent, ElementFilledEvent, ElementFocusedEvent, ElementHoveredEvent,
+    ElementsHighlightedEvent, FillElementCommand, FocusElementCommand, GetInnerTextCommand,
+    GetTextContentCommand, HighlightElementsCommand, HoverElementCommand, InnerTextResolvedEvent,
+    KeyPressedEvent, LaunchBrowserCommand, LaunchChromeCommand, NavigateTabCommand, OpenTabCommand,
+    PingRequest, PingResponse, PressKeyCommand, SelectorWaitSatisfiedEvent, SessionPingCommand,
+    SessionPongEvent, TabNavigatedEvent, TabOpenedEvent, TabSessionAttachedEvent,
+    TabSessionClosedEvent, TabSessionCommand, TabSessionErrorEvent, TabSessionEvent,
+    TabSessionPingCommand, TabSessionPongEvent, TextContentResolvedEvent, WaitForSelectorCommand,
+    browser_session_command::Command as BrowserCommand, browser_session_event::Event as BrowserEvent,
+    tab_session_command::Command as TabCommand, tab_session_event::Event as TabEvent,
 };
 
 static BROWSER_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -216,6 +216,76 @@ async fn handle_browser_command(
     command: BrowserSessionCommand,
 ) -> Result<CommandOutcome, Status> {
     match command.command {
+        Some(BrowserCommand::LaunchBrowser(LaunchBrowserCommand {
+            browser_kind,
+            browser_binary,
+            retry_options,
+        })) => {
+            let browser_kind = BrowserKind::try_from(browser_kind).unwrap_or(BrowserKind::Unspecified);
+            match browser_kind {
+                BrowserKind::Chromium => {
+                    let retry_policy = command_retry_policy(retry_options.as_ref());
+                    let (launch, initial_tab) = retry_with_timeout(retry_policy, || async {
+                        let launch = web_lib::open_chrome_window(browser_binary.as_deref()).await?;
+                        let initial_tab = web_lib::discover_initial_tab(&launch.cdp_websocket_url).await?;
+                        Ok((launch, initial_tab))
+                    })
+                    .await
+                    .map_err(Status::internal)?;
+                    let initial_tab_session_id = next_tab_session_id();
+                    state.lock().await.browser_sessions.insert(
+                        session_id.to_string(),
+                        BrowserSessionState {
+                            launched: true,
+                            cdp_websocket_url: Some(launch.cdp_websocket_url.clone()),
+                            process_id: Some(launch.process_id),
+                            bidi_mapper: None,
+                        },
+                    );
+                    state.lock().await.tab_sessions.insert(
+                        initial_tab_session_id.clone(),
+                        TabSessionState {
+                            browser_session_id: session_id.to_string(),
+                            target_id: initial_tab.target_id,
+                            browsing_context_id: None,
+                            current_url: None,
+                        },
+                    );
+
+                    Ok(CommandOutcome {
+                        event: browser_event(
+                            session_id,
+                            BrowserEvent::BrowserLaunched(BrowserLaunchedEvent {
+                                browser_kind: BrowserKind::Chromium as i32,
+                                browser: launch.browser,
+                                note: format!("{}; {}", launch.note, initial_tab.note),
+                                user_data_dir: launch.user_data_dir,
+                                initial_tab_session_id,
+                            }),
+                        ),
+                        should_close: false,
+                    })
+                }
+                BrowserKind::Firefox => Ok(CommandOutcome {
+                    event: browser_event(
+                        session_id,
+                        BrowserEvent::Error(BrowserSessionErrorEvent {
+                            message: "firefox backend is not implemented yet".to_string(),
+                        }),
+                    ),
+                    should_close: false,
+                }),
+                BrowserKind::Unspecified => Ok(CommandOutcome {
+                    event: browser_event(
+                        session_id,
+                        BrowserEvent::Error(BrowserSessionErrorEvent {
+                            message: "launch_browser requires a supported browser_kind".to_string(),
+                        }),
+                    ),
+                    should_close: false,
+                }),
+            }
+        }
         Some(BrowserCommand::LaunchChrome(LaunchChromeCommand {
             chrome_binary,
             retry_options,

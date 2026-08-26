@@ -12,18 +12,25 @@ This instruction should be treated as ongoing project policy for all future AI c
 
 - Top-level repo folders are now split by technology:
 - `rust/`
-  - `go/`
-  - `java/`
-  - `python/`
-  - `allwright-dev/`
-  - `typescript/`
-  - `proto/`
+- `go/`
+- `java/`
+- `python/`
+- `allwright-dev/`
+- `packages/`
+- `proto/`
+- `scripts/`
+- `xtask/`
 - `rust/allwright`: `allwright-core`, the Rust engine crate containing the high-level Rust client API, the single gRPC server host, the runtime plugin loader, and the shared plugin catalog
 - `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core` and installs supported plugins
-- `.github/workflows/release-surface-plugins.yml`: tag-triggered GitHub Actions workflow that syncs crate versions from the tag, builds platform CLI/plugin archives, and attaches them to GitHub Releases
+- `.github/workflows/release-surface-plugins.yml`: tag-triggered GitHub Actions workflow for root `vX.Y.Z` releases; it syncs versions from the tag, publishes Go/Python/npm/Rust packages, builds platform CLI/plugin archives, and attaches them to GitHub Releases
+- `.github/workflows/ci.yml`: CI workflow that regenerates Rust proto bindings and fails if committed generated files are out of date
 - `scripts/install.sh`: Linux/macOS installer script for downloading the published `allwright` CLI release asset directly from GitHub without cloning the repo
 - `scripts/install.ps1`: Windows PowerShell installer script for downloading the published `allwright` CLI release asset directly from GitHub without cloning the repo
+- `scripts/generate-rust-proto.sh`: repo-level helper that regenerates Rust bindings from the canonical top-level `proto/` tree
 - `scripts/sync-version.sh`: helper script that rewrites the workspace and internal crate versions from a provided release version
+- `scripts/sync-npm-version.sh`: helper script that rewrites the npm workspace package versions from a provided release version and keeps `@allwright.dev/vitest` aligned to `@allwright.dev/core`
+- `scripts/sync-python-version.sh`: helper script that rewrites the Python package version from a provided release version
+- `xtask/`: internal workspace utility crate for repo maintenance commands such as Rust proto regeneration
 - `rust/allwright-plugin-sdk`: shared plugin ABI, metadata, and request/response types for runtime-loaded Rust surface plugins
 - `rust/allwright-surface-web`: publishable `web` surface crate that ships a runtime-loadable shared library (`cdylib`)
 - `rust/allwright-surface-mobile`: shared mobile surface abstractions consumed by `mobile-android` and `mobile-ios`
@@ -36,20 +43,24 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `rust/allwright/examples/`: Rust example programs for exercising the lightweight engine core
 - `go/`: Go module `allwright.dev` containing generated engine stubs, the public Go client package at the module root, and Go examples
 - `java/`: Gradle-based Java client project that generates engine stubs from the shared proto and exposes a high-level browser/page API
-- `python/`: Python client package that loads the shared proto dynamically at runtime and exposes a high-level browser/page API
+- `python/`: Python client package `allwright-python` that exposes a high-level browser/page API and bundles the shared proto files inside `python/allwright/proto/` for publishable runtime loading
 - `allwright-dev/`: standalone Next.js site for the purchased `allwright.dev` domain, intended for Vercel deployment and public-facing marketing/docs entrypoints
-- `typescript/`: TypeScript/JavaScript source folder containing the npm package source and examples
+- `packages/core/`: published npm package `@allwright.dev/core`, containing the TypeScript/JavaScript client, bundled shared proto files, and examples
+- `packages/vitest/`: published npm package `@allwright.dev/vitest`, containing Vitest fixtures and retrying browser assertions on top of `@allwright.dev/core`
 - `proto/`: shared protobuf and gRPC contract root for all stacks
 - `proto/engine/v1/engine.proto`: umbrella engine service contract that imports the split proto ownership layers
 - `proto/core/v1/`: core-owned shared engine/session/browser/tab message contracts
 - `proto/surfaces/web/v1/`: web surface-owned command and event contracts
 - `rust/allwright` now contains the lightweight Rust engine/client implementation and compiles against the shared top-level `proto/` contract during builds
+- `rust/allwright/src/proto_generated.rs` is a checked-in shim module for publishability, and `rust/allwright/src/allwright.engine.v1.rs` is the checked-in generated Rust output; both must be regenerated from the top-level `proto/` tree via `./scripts/generate-rust-proto.sh` rather than edited by hand
 
 ## Runtime Model
 
 - The entire project should remain Tokio async runtime driven.
 - The CLI enters through `#[tokio::main]`.
 - The Rust workspace publishable crates should be synced from the release tag when GitHub Actions builds a tagged release.
+- The npm workspace packages should also be synced from the release tag when GitHub Actions builds a tagged release.
+- The Python package should also be synced from the release tag when GitHub Actions builds a tagged release.
 - Installing `allwright` should mean installing the released CLI binary plus the lightweight core behavior it owns; it should not require Cargo on end-user machines.
 - `rust/allwright` owns the single gRPC server host and public Rust client surface in one package.
 - Engine behavior and engine-facing Rust contracts should stay inside `rust/allwright`.
@@ -61,8 +72,13 @@ This instruction should be treated as ongoing project policy for all future AI c
 - Runtime plugins should be true shared libraries loaded by the core at runtime, not subprocess executables and not compile-time linked surface implementations.
 - The `web` plugin should be packaged under `lib/` in the release archive, and the core plugin loader should resolve platform-specific library names such as `.dylib`, `.so`, and `.dll`.
 - The non-web surface crates should remain visible in the plugin catalog but should stay non-installable until they ship real runtime artifacts.
-- GitHub tag pushes such as `vX.Y.Z` should trigger release automation that syncs crate versions from the tag, builds the current web plugin runtime archives for the supported OS matrix, and uploads them to the matching GitHub Release.
+- GitHub tag pushes such as `vX.Y.Z` should trigger release automation that syncs crate/package versions from the tag, publishes registries, builds the current web plugin runtime archives for the supported OS matrix, and uploads them to the matching GitHub Release.
 - GitHub tag pushes such as `vX.Y.Z` should also build and upload the main `allwright` CLI archives so installer scripts can bootstrap core plus CLI without Cargo.
+- The release workflow currently publishes:
+- Go by creating a secondary `go/vX.Y.Z` tag from the root release tag and warming the Go proxy
+- Python by syncing `python/` to the release version, building from `python/`, and using PyPI trusted publishing with the GitHub `pypi` environment
+- npm by syncing the workspace package versions, running the root workspace build, and publishing `@allwright.dev/core` plus `@allwright.dev/vitest` through npm trusted publishing with the GitHub `Prod` environment
+- Rust crates by syncing workspace Cargo versions and running `scripts/publish-crates.sh publish web` with `CARGO_REGISTRY_TOKEN`; the workflow currently sets `CARGO_PUBLISH_ALLOW_DIRTY=1` because version sync edits manifests during the job
 - The release tag is the source of truth for release versioning; committed Cargo manifest versions may be rewritten during release automation.
 - Unix and Windows installer scripts should prefer common human-owned install directories first and should avoid tool-managed bins such as `pnpm`, `npm`, `yarn`, `cargo`, `volta`, `bun`, and similar package-manager-owned paths.
 - Installer examples in docs should default to direct GitHub script execution (`curl`, `wget`, or PowerShell `irm`) rather than assuming the repo has already been cloned.
@@ -75,8 +91,8 @@ This instruction should be treated as ongoing project policy for all future AI c
 - Generated gRPC client code is enabled and currently consumed by `rust/allwright` and its examples.
 - Generated Go proto/gRPC code is checked in under `go/gen/allwright/engine/v1` and consumed by the Go module.
 - The Java stack generates protobuf and gRPC stubs from `proto/engine/v1/engine.proto` during the Gradle build in `java/`.
-- The Python stack currently loads `proto/engine/v1/engine.proto` dynamically at runtime through `grpcio-tools`.
-- The TypeScript stack currently loads the shared top-level `proto/engine/v1/engine.proto` dynamically at runtime rather than checking in generated TS stubs.
+- The Python stack currently loads the bundled package-local proto files through `grpcio-tools`; published consumers must not depend on `../proto` existing outside the wheel.
+- The TypeScript/npm stack ships package-local copies of the shared top-level proto tree inside `packages/core/proto/` rather than depending on repo-relative paths after publish.
 - The public Rust client surface should stay high-level and should not expose raw gRPC connection setup.
 - The public Go client surface should stay high-level and should not expose raw gRPC connection setup.
 - The public Java client surface should stay high-level and should not expose raw gRPC connection setup.
@@ -149,12 +165,22 @@ This instruction should be treated as ongoing project policy for all future AI c
 - The Python singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and supports in-process override with `set_server_addr(...)`.
 - `allwright-dev/package.json` currently keeps Bun as the package manager declaration but uses standard `next dev`, `next build`, and `next start` scripts.
 - `allwright-dev/vercel.json` currently pins Vercel site behavior to the Next.js framework with `npm install` and `npm run build` so deployments avoid the Bun build crash path.
-- `typescript/src/index.ts` now provides the TypeScript/JavaScript client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch(...)`, `Browser`, and `Page` methods instead of public grpc-js setup.
+- `packages/core/src/index.ts` now provides the TypeScript/JavaScript client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch(...)`, `Browser`, `Page`, and `Locator` methods instead of public grpc-js setup.
 - New TypeScript work should prefer the `chromium` / `Browser` / `Page` surface; older compatibility helpers like `launchChrome`, `initialTab()`, `newTab()`, and `navigate()` should be treated as transitional.
 - The TypeScript singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and also supports in-process override with `setServerAddr(...)`.
-- The repo root `package.json` now targets npm publication as `@allwright/core`, packages `typescript/dist/` plus the shared top-level `proto/`, and keeps the playground flow under `typescript/examples/playground.ts`.
-- `typescript/examples/playground.ts` is the TypeScript-side example for a minimal browser-session test flow; use Bun for local development runs in this repo and keep it focused on real browser work rather than extra ping-style smoke commands.
+- The repo root `package.json` is now a private npm workspace root for `packages/core` and `packages/vitest`; published package metadata lives in each workspace package, not at the repo root.
+- `packages/core/examples/playground.ts` is the TypeScript-side example for a minimal browser-session test flow; use Bun or npm workspaces for local development runs in this repo and keep it focused on real browser work rather than extra ping-style smoke commands.
+- `@allwright.dev/vitest` provides ready-made Vitest fixtures (`browser`, `page`, `allwright`) plus a custom retrying `expect` surface aimed at Playwright-style ergonomics.
+- The current retrying Vitest assertions support both `expect(page)` and `expect(page.locator(...))` forms for text, count, and visibility checks; they are intentionally implemented in the npm test helper layer rather than in the engine protocol for now.
 - Regenerating Go stubs currently requires local installation of `protoc-gen-go@v1.36.10` and `protoc-gen-go-grpc@v1.5.1`, then running `protoc` against `proto/engine/v1/engine.proto` with output rooted at `go/`.
+- Regenerating Rust stubs should go through `./scripts/generate-rust-proto.sh`, which runs `cargo run -p xtask -- generate-rust-proto` against the top-level `proto/` tree and rewrites the checked-in Rust generated files under `rust/allwright/src/`.
+- `.github/workflows/ci.yml` verifies Rust proto regeneration by rerunning `./scripts/generate-rust-proto.sh`; generated Rust files must stay committed and in sync.
+- Browser launch is being generalized away from Chrome-only protocol naming:
+- `proto/surfaces/web/v1/web.proto` now defines `BrowserKind`, `LaunchBrowserCommand`, and `BrowserLaunchedEvent`
+- `proto/core/v1/browser.proto` routes browser-session launch through the neutral `launch_browser` / `browser_launched` path while keeping the older Chrome path for compatibility
+- `rust/allwright-plugin-sdk` now exposes neutral `PluginCommand::LaunchBrowser`, `PluginResult::LaunchBrowser`, `BrowserKind`, and `BrowserLaunchInfo`
+- `rust/allwright-surface-web` currently implements Chromium on that neutral path and returns a not-implemented error for Firefox
+- `rust/allwright/src/client.rs` now exposes `launch_browser(...)` plus `launch_firefox(...)`, but Firefox is not shipped yet and currently errors at runtime
 
 ## Current Dependency Hierarchy
 
@@ -185,8 +211,11 @@ rust/allwright-cli
 ├── installable `allwright` binary
 └── plugin installation
 
+.github/workflows/ci.yml
+└── verify generated Rust proto files are up to date
+
 .github/workflows/release-surface-plugins.yml
-└── build and upload release archives for the CLI and installable plugin libraries
+└── publish registries, create Go sub-tags, and build/upload release archives for the CLI and installable plugin libraries
 
 scripts/install.sh
 └── download and install the released `allwright` CLI on Linux/macOS, preferring common writable bin directories
@@ -196,11 +225,22 @@ scripts/install.ps1
 
 scripts/sync-version.sh
 └── sync workspace and internal crate versions from a release tag version before release builds
+
+scripts/sync-npm-version.sh
+└── sync npm workspace package versions from a release tag version before npm publish
+
+scripts/sync-python-version.sh
+└── sync the Python package version from a release tag version before PyPI publish
+
+xtask/
+└── repo maintenance commands including Rust proto regeneration
 ```
 
 ## Maintenance Rules
 
 - Keep `README.md` and `Codex.md` aligned.
+- Never hand-edit generated Rust proto files under `rust/allwright/src/`; regenerate them from the top-level `proto/` tree.
+- The top-level `proto/` directory is the single source of truth for engine contracts; do not fork or hand-maintain parallel protocol definitions per language.
 - Prefer documenting ownership changes here at the same time as code changes.
 - Keep shared engine contracts and client-facing APIs in `rust/allwright`.
 - Keep platform-specific runtime logic out of `rust/allwright`; it belongs in the surface crates.
@@ -208,6 +248,9 @@ scripts/sync-version.sh
 - Do not reintroduce executable-style surface plugins; runtime-loaded shared libraries are the intended plugin model.
 - Prefer release downloads and installer scripts for end-user installation paths; do not reintroduce Cargo as the default user install dependency.
 - Keep release versioning tag-driven; if versions need to change, prefer updating the sync/release flow rather than hardcoding new crate versions by hand.
+- Keep trusted publishing wired through GitHub environments for npm and PyPI; avoid reintroducing long-lived npm automation tokens when OIDC can be used.
+- When publishability and code generation conflict, prefer repo-level generation plus committed outputs over hand-written generated code or duplicated proto sources.
+- Keep Firefox work behind the neutral browser-launch model until there is a real backend; do not hardcode new browser support through Chromium-only API names.
 - Keep async boundaries explicit and Tokio-native.
 - Keep the gRPC contract minimal until requirements are explicitly defined.
 - Preserve the driverless direction when evolving browser and tab session APIs.

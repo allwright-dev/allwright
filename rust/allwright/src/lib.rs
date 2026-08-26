@@ -8,6 +8,7 @@ mod plugin_loader;
 
 pub mod proto {
     include!("proto_generated.rs");
+    pub use self::allwright::engine::v1::*;
 }
 
 pub mod plugins {

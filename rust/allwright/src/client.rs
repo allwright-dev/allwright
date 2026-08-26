@@ -7,11 +7,12 @@ use crate::proto::engine_service_client::EngineServiceClient;
 use crate::proto::tab_session_command::Command as TabCommand;
 use crate::proto::tab_session_event::Event as TabEvent;
 use crate::proto::{
-    BrowserSessionCommand, BrowserSessionEvent, ClickElementCommand, CloseBrowserSessionCommand,
-    CloseTabSessionCommand, CommandRetryOptions, CountElementsCommand, ElementCountedEvent,
-    ElementsHighlightedEvent, FillElementCommand, FocusElementCommand, GetInnerTextCommand,
-    GetTextContentCommand, HighlightElementsCommand, HoverElementCommand, LaunchChromeCommand,
-    NavigateTabCommand, OpenTabCommand, PingRequest, PressKeyCommand, SessionPingCommand,
+    BrowserKind as ProtoBrowserKind, BrowserLaunchedEvent, BrowserSessionCommand,
+    BrowserSessionEvent, ClickElementCommand, CloseBrowserSessionCommand, CloseTabSessionCommand,
+    CommandRetryOptions, CountElementsCommand, ElementCountedEvent, ElementsHighlightedEvent,
+    FillElementCommand, FocusElementCommand, GetInnerTextCommand, GetTextContentCommand,
+    HighlightElementsCommand, HoverElementCommand, LaunchBrowserCommand, NavigateTabCommand,
+    OpenTabCommand, PingRequest, PressKeyCommand, SessionPingCommand,
     TabSessionCommand, TabSessionEvent, TabSessionPingCommand, WaitForSelectorCommand,
 };
 use tokio::sync::{Mutex as AsyncMutex, mpsc};
@@ -63,6 +64,12 @@ impl From<tonic::Status> for Error {
 pub struct LaunchOptions {
     pub chrome_binary: Option<String>,
     pub timeout_ms: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BrowserKind {
+    Chromium,
+    Firefox,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -211,6 +218,14 @@ pub async fn ping() -> Result<String> {
 }
 
 pub async fn launch_chrome(options: LaunchOptions) -> Result<Browser> {
+    launch_browser(BrowserKind::Chromium, options).await
+}
+
+pub async fn launch_firefox(options: LaunchOptions) -> Result<Browser> {
+    launch_browser(BrowserKind::Firefox, options).await
+}
+
+pub async fn launch_browser(browser_kind: BrowserKind, options: LaunchOptions) -> Result<Browser> {
     let runtime = get_runtime().await?;
     let mut engine = runtime.engine.clone();
     let (command_tx, command_rx) = mpsc::channel(16);
@@ -221,13 +236,17 @@ pub async fn launch_chrome(options: LaunchOptions) -> Result<Browser> {
 
     command_tx
         .send(BrowserSessionCommand {
-            command: Some(BrowserCommand::LaunchChrome(LaunchChromeCommand {
-                chrome_binary: options.chrome_binary,
+            command: Some(BrowserCommand::LaunchBrowser(LaunchBrowserCommand {
+                browser_kind: match browser_kind {
+                    BrowserKind::Chromium => ProtoBrowserKind::Chromium as i32,
+                    BrowserKind::Firefox => ProtoBrowserKind::Firefox as i32,
+                },
+                browser_binary: options.chrome_binary,
                 retry_options: command_retry_options(options.timeout_ms),
             })),
         })
         .await
-        .map_err(|_| Error::new("failed to send LaunchChromeCommand to browser session"))?;
+        .map_err(|_| Error::new("failed to send LaunchBrowserCommand to browser session"))?;
 
     loop {
         let event = events
@@ -236,6 +255,39 @@ pub async fn launch_chrome(options: LaunchOptions) -> Result<Browser> {
             .ok_or_else(|| Error::new("browser session closed before launch response"))?;
 
         match event.event {
+            Some(BrowserEvent::BrowserLaunched(BrowserLaunchedEvent {
+                browser,
+                note,
+                user_data_dir,
+                initial_tab_session_id,
+                ..
+            })) => {
+                let browser_session_id = event.session_id;
+                let initial_tab = Tab {
+                    inner: Arc::new(TabInner {
+                        runtime: Arc::clone(&runtime),
+                        browser_session_id: browser_session_id.clone(),
+                        session_id: initial_tab_session_id,
+                        state: AsyncMutex::new(TabState::default()),
+                    }),
+                };
+                return Ok(Browser {
+                    inner: Arc::new(BrowserInner {
+                        runtime,
+                        state: AsyncMutex::new(BrowserState {
+                            command_tx,
+                            events,
+                            closed: false,
+                        }),
+                        session_id: browser_session_id,
+                        browser_name: browser,
+                        launch_note: note,
+                        cdp_websocket_url: String::new(),
+                        user_data_dir,
+                        initial_tab,
+                    }),
+                });
+            }
             Some(BrowserEvent::ChromeLaunched(launched)) => {
                 let browser_session_id = event.session_id;
                 let initial_tab = Tab {

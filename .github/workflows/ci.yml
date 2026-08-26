@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify-rust-proto:
+    name: Verify Rust proto output
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Regenerate Rust proto bindings
+        run: ./scripts/generate-rust-proto.sh
+
+      - name: Ensure generated Rust proto is committed
+        run: git diff --exit-code -- rust/allwright/src/proto_generated.rs
