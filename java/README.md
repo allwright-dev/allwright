@@ -37,9 +37,11 @@ The tagged GitHub Actions release workflow now publishes the Java artifact to Ma
 
 ```java
 import dev.allwright.client.Allwright;
+import dev.allwright.client.Browser;
+import dev.allwright.client.Page;
 
-try (Allwright.Browser browser = Allwright.firefox().launch()) {
-    Allwright.Page page = browser.page();
+try (Browser browser = Allwright.firefox().launch()) {
+    Page page = browser.page();
     page.goTo("https://example.com");
     page.click("h1");
 }

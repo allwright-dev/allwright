@@ -61,8 +61,8 @@ class AllwrightTest {
                 """
         );
 
-        Allwright.ResolvedConfig resolved = Allwright.resolveConfig(
-                new Allwright.ResolveConfigOptions(tempDir, configFile, "firefox-smoke")
+        ResolvedConfig resolved = Allwright.resolveConfig(
+                new ResolveConfigOptions(tempDir, configFile, "firefox-smoke")
         );
 
         assertEquals(configFile, resolved.configFilePath());
@@ -82,9 +82,9 @@ class AllwrightTest {
         Path configFile = tempDir.resolve("allwright.config.yaml");
         Files.writeString(configFile, "schemaVersion: 1\n");
 
-        Allwright.AllwrightException error = assertThrows(
-                Allwright.AllwrightException.class,
-                () -> Allwright.resolveConfig(new Allwright.ResolveConfigOptions(tempDir, configFile, "missing"))
+        AllwrightException error = assertThrows(
+                AllwrightException.class,
+                () -> Allwright.resolveConfig(new ResolveConfigOptions(tempDir, configFile, "missing"))
         );
 
         assertEquals(
