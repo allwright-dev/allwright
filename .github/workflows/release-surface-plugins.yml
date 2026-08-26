@@ -137,7 +137,17 @@ jobs:
           set -euo pipefail
           chmod +x ./java/gradlew
           export ALLWRIGHT_VERSION="${GITHUB_REF_NAME#v}"
-          ./java/gradlew -p java publishMavenJavaPublicationToOSSRHRepository
+          ./java/gradlew -p java publishAllPublicationsToCentralPortalRepository
+
+      - name: Transfer Java deployment into Central Portal
+        shell: bash
+        run: |
+          set -euo pipefail
+          token="$(printf '%s' "${OSSRH_USERNAME}:${OSSRH_PASSWORD}" | base64 | tr -d '\n')"
+          curl --fail-with-body \
+            --request POST \
+            --header "Authorization: Bearer ${token}" \
+            "https://ossrh-staging-api.central.sonatype.com/manual/upload/defaultRepository/dev.allwright?publishing_type=automatic"
 
   publish-npm-package:
     name: Publish npm package

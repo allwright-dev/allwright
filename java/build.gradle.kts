@@ -115,9 +115,9 @@ publishing {
 
     repositories {
         maven {
-            name = "OSSRH"
-            val releasesUrl = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
-            val snapshotsUrl = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+            name = "CentralPortal"
+            val releasesUrl = "https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/"
+            val snapshotsUrl = "https://central.sonatype.com/repository/maven-snapshots/"
             url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsUrl else releasesUrl)
 
             credentials {

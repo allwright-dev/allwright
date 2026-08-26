@@ -5,6 +5,7 @@ use allwright_plugin_sdk::{
     PageSessionHandle, PluginCommand, PluginEnvelope, PluginResult, PressKeyInfo, SurfaceFamily,
     SurfacePlugin, SurfacePluginDescriptor, TabNavigationInfo, TextInfo, WaitForSelectorInfo,
 };
+use std::borrow::Cow;
 use std::ffi::{CStr, CString, c_char};
 use std::fs;
 use std::future::Future;
@@ -36,6 +37,25 @@ struct DiscoveredElements {
 struct ElementCenter {
     x: f64,
     y: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SelectorKind {
+    Css,
+    XPath,
+}
+
+#[derive(Debug, Clone)]
+struct ParsedSelector<'a> {
+    raw: &'a str,
+    value: Cow<'a, str>,
+    kind: SelectorKind,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ExplicitSelectorPrefix {
+    kind: SelectorKind,
+    prefix_len: usize,
 }
 
 const CHROMIUM_BIDI_NPM_VERSION: &str = "17.0.2";
@@ -467,16 +487,18 @@ pub async fn click_element_via_cdp(
     target_id: &str,
     css_selector: &str,
 ) -> Result<ClickInfo, String> {
-    if css_selector.trim().is_empty() {
-        return Err("click_element command requires a non-empty css_selector".to_string());
-    }
+    let parsed = parse_selector("click_element", css_selector)?;
 
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
     let discovered =
         discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, true).await?;
     let center = discovered.first_center.ok_or_else(|| {
-        format!("element discovery did not return a clickable center for selector {css_selector}")
+        format!(
+            "element discovery did not return a clickable center for {} {}",
+            selector_kind_label(parsed.kind),
+            parsed.value
+        )
     })?;
     cdp.dispatch_mouse_click(&session_id, center.x, center.y)
         .await?;
@@ -484,7 +506,11 @@ pub async fn click_element_via_cdp(
 
     Ok(ClickInfo {
         css_selector: css_selector.to_string(),
-        note: format!("clicked element via CDP mouse events using css selector {css_selector}"),
+        note: format!(
+            "clicked element via CDP mouse events using {} {}",
+            selector_kind_label(parsed.kind),
+            parsed.value
+        ),
         bidi_session_id: String::new(),
     })
 }
@@ -494,9 +520,7 @@ pub async fn count_elements_via_cdp(
     target_id: &str,
     css_selector: &str,
 ) -> Result<ElementCountInfo, String> {
-    if css_selector.trim().is_empty() {
-        return Err("count_elements command requires a non-empty css_selector".to_string());
-    }
+    let parsed = parse_selector("count_elements", css_selector)?;
 
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
@@ -508,8 +532,10 @@ pub async fn count_elements_via_cdp(
         css_selector: css_selector.to_string(),
         count: discovered.count,
         note: format!(
-            "counted {} element(s) matching css selector {css_selector}",
-            discovered.count
+            "counted {} element(s) matching {} {}",
+            discovered.count,
+            selector_kind_label(parsed.kind),
+            parsed.value
         ),
     })
 }
@@ -520,17 +546,16 @@ pub async fn highlight_elements_via_cdp(
     css_selector: &str,
     duration_ms: u32,
 ) -> Result<HighlightElementsInfo, String> {
-    if css_selector.trim().is_empty() {
-        return Err("highlight_elements command requires a non-empty css_selector".to_string());
-    }
+    let parsed = parse_selector("highlight_elements", css_selector)?;
 
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
     let discovered =
         discover_elements_via_cdp(&mut cdp, &session_id, css_selector, false, false).await?;
 
-    let selector_literal = serde_json::to_string(css_selector)
-        .map_err(|error| format!("failed to serialize css selector for highlight: {error}"))?;
+    let selector_literal = serde_json::to_string(&parsed.value)
+        .map_err(|error| format!("failed to serialize selector for highlight: {error}"))?;
+    let query_all_js = selector_query_all_js(parsed.kind);
     let duration_ms = duration_ms.max(1);
     cdp.evaluate_expression(
         &session_id,
@@ -538,7 +563,7 @@ pub async fn highlight_elements_via_cdp(
             "(() => {{
                 const selector = {selector_literal};
                 const durationMs = {duration_ms};
-                const elements = Array.from(document.querySelectorAll(selector));
+                const elements = {query_all_js};
                 for (const element of elements) {{
                     if (!(element instanceof HTMLElement)) {{
                         continue;
@@ -568,8 +593,10 @@ pub async fn highlight_elements_via_cdp(
         css_selector: css_selector.to_string(),
         count: discovered.count,
         note: format!(
-            "highlighted {} element(s) matching css selector {css_selector} for {duration_ms}ms",
-            discovered.count
+            "highlighted {} element(s) matching {} {} for {duration_ms}ms",
+            discovered.count,
+            selector_kind_label(parsed.kind),
+            parsed.value
         ),
     })
 }
@@ -579,7 +606,7 @@ pub async fn focus_element_via_cdp(
     target_id: &str,
     css_selector: &str,
 ) -> Result<FocusInfo, String> {
-    require_non_empty_selector("focus_element", css_selector)?;
+    let parsed = parse_selector("focus_element", css_selector)?;
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
     discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, true).await?;
@@ -587,7 +614,11 @@ pub async fn focus_element_via_cdp(
 
     Ok(FocusInfo {
         css_selector: css_selector.to_string(),
-        note: format!("focused element matching css selector {css_selector}"),
+        note: format!(
+            "focused element matching {} {}",
+            selector_kind_label(parsed.kind),
+            parsed.value
+        ),
     })
 }
 
@@ -597,15 +628,15 @@ pub async fn fill_element_via_cdp(
     css_selector: &str,
     value: &str,
 ) -> Result<FillInfo, String> {
-    require_non_empty_selector("fill_element", css_selector)?;
+    let parsed = parse_selector("fill_element", css_selector)?;
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
     discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, true).await?;
-    let selector_literal = json_string_literal(css_selector, "fill selector")?;
+    let selector_literal = json_string_literal(&parsed.value, "fill selector")?;
     let value_literal = json_string_literal(value, "fill value")?;
     cdp.evaluate_expression(
         &session_id,
-        &dom_set_value_and_dispatch_events_js(&selector_literal, &value_literal),
+        &dom_set_value_and_dispatch_events_js(parsed.kind, &selector_literal, &value_literal),
         true,
     )
     .await?;
@@ -614,7 +645,11 @@ pub async fn fill_element_via_cdp(
     Ok(FillInfo {
         css_selector: css_selector.to_string(),
         value: value.to_string(),
-        note: format!("filled element matching css selector {css_selector}"),
+        note: format!(
+            "filled element matching {} {}",
+            selector_kind_label(parsed.kind),
+            parsed.value
+        ),
     })
 }
 
@@ -623,13 +658,17 @@ pub async fn hover_element_via_cdp(
     target_id: &str,
     css_selector: &str,
 ) -> Result<HoverInfo, String> {
-    require_non_empty_selector("hover_element", css_selector)?;
+    let parsed = parse_selector("hover_element", css_selector)?;
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
     let discovered =
         discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, false).await?;
     let center = discovered.first_center.ok_or_else(|| {
-        format!("element discovery did not return a hover center for selector {css_selector}")
+        format!(
+            "element discovery did not return a hover center for {} {}",
+            selector_kind_label(parsed.kind),
+            parsed.value
+        )
     })?;
     cdp.dispatch_mouse_move(&session_id, center.x, center.y)
         .await?;
@@ -637,7 +676,11 @@ pub async fn hover_element_via_cdp(
 
     Ok(HoverInfo {
         css_selector: css_selector.to_string(),
-        note: format!("hovered element matching css selector {css_selector}"),
+        note: format!(
+            "hovered element matching {} {}",
+            selector_kind_label(parsed.kind),
+            parsed.value
+        ),
     })
 }
 
@@ -648,7 +691,7 @@ pub async fn press_key_via_cdp(
     key: &str,
     text: Option<&str>,
 ) -> Result<PressKeyInfo, String> {
-    require_non_empty_selector("press_key", css_selector)?;
+    let parsed = parse_selector("press_key", css_selector)?;
     if key.trim().is_empty() {
         return Err("press_key command requires a non-empty key".to_string());
     }
@@ -662,7 +705,11 @@ pub async fn press_key_via_cdp(
     Ok(PressKeyInfo {
         css_selector: css_selector.to_string(),
         key: key.to_string(),
-        note: format!("pressed key {key} on element matching css selector {css_selector}"),
+        note: format!(
+            "pressed key {key} on element matching {} {}",
+            selector_kind_label(parsed.kind),
+            parsed.value
+        ),
     })
 }
 
@@ -674,7 +721,13 @@ pub async fn get_text_content_via_cdp(
     get_text_via_cdp(cdp_websocket_url, target_id, css_selector, "textContent")
         .await
         .map(|mut info| {
-            info.note = format!("resolved textContent for css selector {css_selector}");
+            let parsed = parse_selector("get_text_content", css_selector)
+                .expect("selector was already validated for textContent resolution");
+            info.note = format!(
+                "resolved textContent for {} {}",
+                selector_kind_label(parsed.kind),
+                parsed.value
+            );
             info
         })
 }
@@ -687,7 +740,13 @@ pub async fn get_inner_text_via_cdp(
     get_text_via_cdp(cdp_websocket_url, target_id, css_selector, "innerText")
         .await
         .map(|mut info| {
-            info.note = format!("resolved innerText for css selector {css_selector}");
+            let parsed = parse_selector("get_inner_text", css_selector)
+                .expect("selector was already validated for innerText resolution");
+            info.note = format!(
+                "resolved innerText for {} {}",
+                selector_kind_label(parsed.kind),
+                parsed.value
+            );
             info
         })
 }
@@ -698,7 +757,7 @@ pub async fn wait_for_selector_via_cdp(
     css_selector: &str,
     visible: bool,
 ) -> Result<WaitForSelectorInfo, String> {
-    require_non_empty_selector("wait_for_selector", css_selector)?;
+    let parsed = parse_selector("wait_for_selector", css_selector)?;
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
     let discovered =
@@ -712,9 +771,17 @@ pub async fn wait_for_selector_via_cdp(
 
     if !success {
         return Err(if visible {
-            format!("no visible element matches css selector {css_selector}")
+            format!(
+                "no visible element matches {} {}",
+                selector_kind_label(parsed.kind),
+                parsed.value
+            )
         } else {
-            format!("no element matches css selector {css_selector}")
+            format!(
+                "no element matches {} {}",
+                selector_kind_label(parsed.kind),
+                parsed.value
+            )
         });
     }
 
@@ -722,9 +789,17 @@ pub async fn wait_for_selector_via_cdp(
         css_selector: css_selector.to_string(),
         visible,
         note: if visible {
-            format!("visible element matched css selector {css_selector}")
+            format!(
+                "visible element matched {} {}",
+                selector_kind_label(parsed.kind),
+                parsed.value
+            )
         } else {
-            format!("element matched css selector {css_selector}")
+            format!(
+                "element matched {} {}",
+                selector_kind_label(parsed.kind),
+                parsed.value
+            )
         },
     })
 }
@@ -748,36 +823,41 @@ pub async fn click_element(
                 browsing_context_id,
             },
         ) => {
-            firefox_require_selector(css_selector, "click_element")?;
+            let parsed = parse_selector("click_element", css_selector)?;
             let mut sessions = firefox_session_guard(connection_id).await?;
             let bidi = &mut sessions
                 .get_mut(connection_id)
                 .expect("Firefox session guard validated connection id")
                 .connection;
+            let query_first_js = selector_query_first_js(parsed.kind);
             firefox_evaluate_void(
                 bidi,
                 browsing_context_id,
                 &format!(
                     "(() => {{
                         const selector = {};
-                        const element = document.querySelector(selector);
+                        const element = {query_first_js};
                         if (!element) {{
-                            throw new Error(`No element matches selector: ${{selector}}`);
+                            throw new Error(`No element matches {}: ${{selector}}`);
                         }}
                         if (!(element instanceof HTMLElement)) {{
-                            throw new Error(`Element is not clickable: ${{selector}}`);
+                            throw new Error(`Element matched by {} is not clickable: ${{selector}}`);
                         }}
                         element.scrollIntoView({{ block: 'center', inline: 'center', behavior: 'instant' }});
                         element.click();
                     }})()",
-                    json_string_literal(css_selector, "click selector")?,
+                    json_string_literal(&parsed.value, "click selector")?,
+                    selector_kind_label(parsed.kind),
+                    selector_kind_label(parsed.kind),
                 ),
             )
             .await?;
             Ok(ClickInfo {
                 css_selector: css_selector.to_string(),
                 note: format!(
-                    "clicked element via Firefox WebDriver BiDi using css selector {css_selector}"
+                    "clicked element via Firefox WebDriver BiDi using {} {}",
+                    selector_kind_label(parsed.kind),
+                    parsed.value
                 ),
                 bidi_session_id: bidi_session_id.clone(),
             })
@@ -802,25 +882,33 @@ pub async fn count_elements(
                 browsing_context_id,
             },
         ) => {
-            firefox_require_selector(css_selector, "count_elements")?;
+            let parsed = parse_selector("count_elements", css_selector)?;
             let mut sessions = firefox_session_guard(connection_id).await?;
             let bidi = &mut sessions
                 .get_mut(connection_id)
                 .expect("Firefox session guard validated connection id")
                 .connection;
+            let query_all_js = selector_query_all_js(parsed.kind);
             let count = firefox_evaluate_u32(
                 bidi,
                 browsing_context_id,
                 &format!(
-                    "(() => document.querySelectorAll({}).length)()",
-                    json_string_literal(css_selector, "count selector")?,
+                    "(() => {{
+                        const selector = {};
+                        return {query_all_js}.length;
+                    }})()",
+                    json_string_literal(&parsed.value, "count selector")?,
                 ),
             )
             .await?;
             Ok(ElementCountInfo {
                 css_selector: css_selector.to_string(),
                 count,
-                note: format!("counted {count} element(s) matching css selector {css_selector}"),
+                note: format!(
+                    "counted {count} element(s) matching {} {}",
+                    selector_kind_label(parsed.kind),
+                    parsed.value
+                ),
             })
         }
         _ => Err("browser/page backend mismatch while counting elements".to_string()),
@@ -852,13 +940,14 @@ pub async fn highlight_elements(
                 browsing_context_id,
             },
         ) => {
-            firefox_require_selector(css_selector, "highlight_elements")?;
+            let parsed = parse_selector("highlight_elements", css_selector)?;
             let duration_ms = u32::try_from(duration_ms).unwrap_or(u32::MAX).max(1);
             let mut sessions = firefox_session_guard(connection_id).await?;
             let bidi = &mut sessions
                 .get_mut(connection_id)
                 .expect("Firefox session guard validated connection id")
                 .connection;
+            let query_all_js = selector_query_all_js(parsed.kind);
             let count = firefox_evaluate_u32(
                 bidi,
                 browsing_context_id,
@@ -866,7 +955,7 @@ pub async fn highlight_elements(
                     "(() => {{
                         const selector = {};
                         const durationMs = {duration_ms};
-                        const elements = Array.from(document.querySelectorAll(selector));
+                        const elements = {query_all_js};
                         for (const element of elements) {{
                             if (!(element instanceof HTMLElement)) {{
                                 continue;
@@ -886,7 +975,7 @@ pub async fn highlight_elements(
                         }}
                         return elements.length;
                     }})()",
-                    json_string_literal(css_selector, "highlight selector")?,
+                    json_string_literal(&parsed.value, "highlight selector")?,
                 ),
             )
             .await?;
@@ -894,7 +983,9 @@ pub async fn highlight_elements(
                 css_selector: css_selector.to_string(),
                 count,
                 note: format!(
-                    "highlighted {count} element(s) matching css selector {css_selector} for {duration_ms}ms"
+                    "highlighted {count} element(s) matching {} {} for {duration_ms}ms",
+                    selector_kind_label(parsed.kind),
+                    parsed.value
                 ),
             })
         }
@@ -918,35 +1009,42 @@ pub async fn focus_element(
                 browsing_context_id,
             },
         ) => {
-            firefox_require_selector(css_selector, "focus_element")?;
+            let parsed = parse_selector("focus_element", css_selector)?;
             let mut sessions = firefox_session_guard(connection_id).await?;
             let bidi = &mut sessions
                 .get_mut(connection_id)
                 .expect("Firefox session guard validated connection id")
                 .connection;
+            let query_first_js = selector_query_first_js(parsed.kind);
             firefox_evaluate_void(
                 bidi,
                 browsing_context_id,
                 &format!(
                     "(() => {{
                         const selector = {};
-                        const element = document.querySelector(selector);
+                        const element = {query_first_js};
                         if (!element) {{
-                            throw new Error(`No element matches selector: ${{selector}}`);
+                            throw new Error(`No element matches {}: ${{selector}}`);
                         }}
                         if (!(element instanceof HTMLElement)) {{
-                            throw new Error(`Element is not focusable: ${{selector}}`);
+                            throw new Error(`Element matched by {} is not focusable: ${{selector}}`);
                         }}
                         element.scrollIntoView({{ block: 'center', inline: 'center', behavior: 'instant' }});
                         element.focus();
                     }})()",
-                    json_string_literal(css_selector, "focus selector")?,
+                    json_string_literal(&parsed.value, "focus selector")?,
+                    selector_kind_label(parsed.kind),
+                    selector_kind_label(parsed.kind),
                 ),
             )
             .await?;
             Ok(FocusInfo {
                 css_selector: css_selector.to_string(),
-                note: format!("focused element matching css selector {css_selector}"),
+                note: format!(
+                    "focused element matching {} {}",
+                    selector_kind_label(parsed.kind),
+                    parsed.value
+                ),
             })
         }
         _ => Err("browser/page backend mismatch while focusing element".to_string()),
@@ -970,7 +1068,7 @@ pub async fn fill_element(
                 browsing_context_id,
             },
         ) => {
-            firefox_require_selector(css_selector, "fill_element")?;
+            let parsed = parse_selector("fill_element", css_selector)?;
             let mut sessions = firefox_session_guard(connection_id).await?;
             let bidi = &mut sessions
                 .get_mut(connection_id)
@@ -980,7 +1078,8 @@ pub async fn fill_element(
                 bidi,
                 browsing_context_id,
                 &dom_set_value_and_dispatch_events_js(
-                    &json_string_literal(css_selector, "fill selector")?,
+                    parsed.kind,
+                    &json_string_literal(&parsed.value, "fill selector")?,
                     &json_string_literal(value, "fill value")?,
                 ),
             )
@@ -988,7 +1087,11 @@ pub async fn fill_element(
             Ok(FillInfo {
                 css_selector: css_selector.to_string(),
                 value: value.to_string(),
-                note: format!("filled element matching css selector {css_selector}"),
+                note: format!(
+                    "filled element matching {} {}",
+                    selector_kind_label(parsed.kind),
+                    parsed.value
+                ),
             })
         }
         _ => Err("browser/page backend mismatch while filling element".to_string()),
@@ -1011,37 +1114,44 @@ pub async fn hover_element(
                 browsing_context_id,
             },
         ) => {
-            firefox_require_selector(css_selector, "hover_element")?;
+            let parsed = parse_selector("hover_element", css_selector)?;
             let mut sessions = firefox_session_guard(connection_id).await?;
             let bidi = &mut sessions
                 .get_mut(connection_id)
                 .expect("Firefox session guard validated connection id")
                 .connection;
+            let query_first_js = selector_query_first_js(parsed.kind);
             firefox_evaluate_void(
                 bidi,
                 browsing_context_id,
                 &format!(
                     "(() => {{
                         const selector = {};
-                        const element = document.querySelector(selector);
+                        const element = {query_first_js};
                         if (!element) {{
-                            throw new Error(`No element matches selector: ${{selector}}`);
+                            throw new Error(`No element matches {}: ${{selector}}`);
                         }}
                         if (!(element instanceof HTMLElement)) {{
-                            throw new Error(`Element is not hoverable: ${{selector}}`);
+                            throw new Error(`Element matched by {} is not hoverable: ${{selector}}`);
                         }}
                         element.scrollIntoView({{ block: 'center', inline: 'center', behavior: 'instant' }});
                         for (const type of ['pointerover', 'mouseover', 'mouseenter', 'mousemove']) {{
                             element.dispatchEvent(new MouseEvent(type, {{ bubbles: true, cancelable: true, view: window }}));
                         }}
                     }})()",
-                    json_string_literal(css_selector, "hover selector")?,
+                    json_string_literal(&parsed.value, "hover selector")?,
+                    selector_kind_label(parsed.kind),
+                    selector_kind_label(parsed.kind),
                 ),
             )
             .await?;
             Ok(HoverInfo {
                 css_selector: css_selector.to_string(),
-                note: format!("hovered element matching css selector {css_selector}"),
+                note: format!(
+                    "hovered element matching {} {}",
+                    selector_kind_label(parsed.kind),
+                    parsed.value
+                ),
             })
         }
         _ => Err("browser/page backend mismatch while hovering element".to_string()),
@@ -1066,7 +1176,7 @@ pub async fn press_key(
                 browsing_context_id,
             },
         ) => {
-            firefox_require_selector(css_selector, "press_key")?;
+            let parsed = parse_selector("press_key", css_selector)?;
             if key.trim().is_empty() {
                 return Err("press_key command requires a non-empty key".to_string());
             }
@@ -1075,6 +1185,7 @@ pub async fn press_key(
                 .get_mut(connection_id)
                 .expect("Firefox session guard validated connection id")
                 .connection;
+            let query_first_js = selector_query_first_js(parsed.kind);
             firefox_evaluate_void(
                 bidi,
                 browsing_context_id,
@@ -1083,12 +1194,12 @@ pub async fn press_key(
                         const selector = {};
                         const key = {};
                         const text = {};
-                        const element = document.querySelector(selector);
+                        const element = {query_first_js};
                         if (!element) {{
-                            throw new Error(`No element matches selector: ${{selector}}`);
+                            throw new Error(`No element matches {}: ${{selector}}`);
                         }}
                         if (!(element instanceof HTMLElement)) {{
-                            throw new Error(`Element is not keyboard-targetable: ${{selector}}`);
+                            throw new Error(`Element matched by {} is not keyboard-targetable: ${{selector}}`);
                         }}
                         element.focus();
                         element.dispatchEvent(new KeyboardEvent('keydown', {{ key, bubbles: true }}));
@@ -1099,16 +1210,22 @@ pub async fn press_key(
                         }}
                         element.dispatchEvent(new KeyboardEvent('keyup', {{ key, bubbles: true }}));
                     }})()",
-                    json_string_literal(css_selector, "press selector")?,
+                    json_string_literal(&parsed.value, "press selector")?,
                     json_string_literal(key, "press key")?,
                     json_string_literal(text.unwrap_or(""), "press text")?,
+                    selector_kind_label(parsed.kind),
+                    selector_kind_label(parsed.kind),
                 ),
             )
             .await?;
             Ok(PressKeyInfo {
                 css_selector: css_selector.to_string(),
                 key: key.to_string(),
-                note: format!("pressed key {key} on element matching css selector {css_selector}"),
+                note: format!(
+                    "pressed key {key} on element matching {} {}",
+                    selector_kind_label(parsed.kind),
+                    parsed.value
+                ),
             })
         }
         _ => Err("browser/page backend mismatch while pressing a key".to_string()),
@@ -1188,19 +1305,20 @@ pub async fn wait_for_selector(
                 browsing_context_id,
             },
         ) => {
-            firefox_require_selector(css_selector, "wait_for_selector")?;
+            let parsed = parse_selector("wait_for_selector", css_selector)?;
             let mut sessions = firefox_session_guard(connection_id).await?;
             let bidi = &mut sessions
                 .get_mut(connection_id)
                 .expect("Firefox session guard validated connection id")
                 .connection;
+            let query_first_js = selector_query_first_js(parsed.kind);
             let success = firefox_evaluate_bool(
                 bidi,
                 browsing_context_id,
                 &format!(
                     "(() => {{
                         const selector = {};
-                        const element = document.querySelector(selector);
+                        const element = {query_first_js};
                         if (!element) {{
                             return false;
                         }}
@@ -1213,25 +1331,41 @@ pub async fn wait_for_selector(
                         const rect = element.getBoundingClientRect();
                         return !!(rect.width && rect.height);
                     }})()",
-                    json_string_literal(css_selector, "wait selector")?,
+                    json_string_literal(&parsed.value, "wait selector")?,
                     if visible { "true" } else { "false" },
                 ),
             )
             .await?;
             if !success {
                 return Err(if visible {
-                    format!("no visible element matches css selector {css_selector}")
+                    format!(
+                        "no visible element matches {} {}",
+                        selector_kind_label(parsed.kind),
+                        parsed.value
+                    )
                 } else {
-                    format!("no element matches css selector {css_selector}")
+                    format!(
+                        "no element matches {} {}",
+                        selector_kind_label(parsed.kind),
+                        parsed.value
+                    )
                 });
             }
             Ok(WaitForSelectorInfo {
                 css_selector: css_selector.to_string(),
                 visible,
                 note: if visible {
-                    format!("visible element matched css selector {css_selector}")
+                    format!(
+                        "visible element matched {} {}",
+                        selector_kind_label(parsed.kind),
+                        parsed.value
+                    )
                 } else {
-                    format!("element matched css selector {css_selector}")
+                    format!(
+                        "element matched {} {}",
+                        selector_kind_label(parsed.kind),
+                        parsed.value
+                    )
                 },
             })
         }
@@ -1242,16 +1376,20 @@ pub async fn wait_for_selector(
 async fn discover_elements_via_cdp(
     cdp: &mut CdpConnection,
     session_id: &str,
-    css_selector: &str,
+    selector: &str,
     require_match: bool,
     focus_first_match: bool,
 ) -> Result<DiscoveredElements, String> {
-    let selector_literal = serde_json::to_string(css_selector)
-        .map_err(|error| format!("failed to serialize css selector for discovery: {error}"))?;
+    let selector_literal = json_string_literal(selector, "selector for discovery")?;
+    let selector_segments_literal = selector_segments_literal("discover_elements", selector)?;
+    let selector_kind_label = selector_chain_kind_label("discover_elements", selector)?;
+    let query_all_js = selector_chain_query_all_js();
     let expression = format!(
         "(() => {{
             const selector = {selector_literal};
-            const elements = Array.from(document.querySelectorAll(selector));
+            const selectorSegments = {selector_segments_literal};
+            const selectorChainQueryAll = () => {query_all_js};
+            const elements = {query_all_js};
             const first = elements[0] ?? null;
             if (first) {{
                 first.scrollIntoView({{ block: 'center', inline: 'center', behavior: 'instant' }});
@@ -1260,14 +1398,14 @@ async fn discover_elements_via_cdp(
                 }}
             }}
             if ({require_match} && !first) {{
-                throw new Error(`No element matches selector: ${{selector}}`);
+                throw new Error(`No element matches {selector_kind_label}: ${{selector}}`);
             }}
             if (first && !(first instanceof Element)) {{
-                throw new Error(`Selector did not resolve to a DOM Element: ${{selector}}`);
+                throw new Error(`{selector_kind_label} did not resolve to a DOM Element: ${{selector}}`);
             }}
             const rect = first ? first.getBoundingClientRect() : null;
             if (first && (!rect.width || !rect.height)) {{
-                throw new Error(`Element matched by selector has zero size: ${{selector}}`);
+                throw new Error(`Element matched by {selector_kind_label} has zero size: ${{selector}}`);
             }}
             return {{
                 count: elements.length,
@@ -1304,29 +1442,35 @@ async fn discover_elements_via_cdp(
 async fn get_text_via_cdp(
     cdp_websocket_url: &str,
     target_id: &str,
-    css_selector: &str,
+    selector: &str,
     property: &str,
 ) -> Result<TextInfo, String> {
-    require_non_empty_selector("get_text", css_selector)?;
+    let parsed = parse_selector("get_text", selector)?;
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
-    discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, false).await?;
-    let selector_literal = json_string_literal(css_selector, "text selector")?;
+    discover_elements_via_cdp(&mut cdp, &session_id, selector, true, false).await?;
+    let selector_literal = json_string_literal(selector, "text selector")?;
+    let selector_segments_literal = selector_segments_literal("get_text", selector)?;
     let property_literal = json_string_literal(property, "text property")?;
+    let selector_kind_label = selector_chain_kind_label("get_text", selector)?;
+    let query_first_js = selector_chain_query_first_js();
     let result = cdp
         .evaluate_expression(
             &session_id,
             &format!(
                 "(() => {{
                     const selector = {selector_literal};
+                    const selectorSegments = {selector_segments_literal};
+                    const selectorChainQueryAll = () => {};
                     const property = {property_literal};
-                    const element = document.querySelector(selector);
+                    const element = {query_first_js};
                     if (!element) {{
-                        throw new Error(`No element matches selector: ${{selector}}`);
+                        throw new Error(`No element matches {selector_kind_label}: ${{selector}}`);
                     }}
                     const value = element[property];
                     return typeof value === 'string' ? value : '';
-                }})()"
+                }})()",
+                selector_chain_query_all_js(),
             ),
             true,
         )
@@ -1334,23 +1478,29 @@ async fn get_text_via_cdp(
     cdp.detach_from_target(&session_id).await?;
 
     Ok(TextInfo {
-        css_selector: css_selector.to_string(),
+        css_selector: parsed.raw.to_string(),
         text: json_string(&result, "/result/value")?,
         note: String::new(),
     })
 }
 
-fn dom_set_value_and_dispatch_events_js(selector_literal: &str, value_literal: &str) -> String {
+fn dom_set_value_and_dispatch_events_js(
+    selector_kind: SelectorKind,
+    selector_literal: &str,
+    value_literal: &str,
+) -> String {
+    let query_first_js = selector_query_first_js(selector_kind);
+    let selector_kind_label = selector_kind_label(selector_kind);
     format!(
         "(() => {{
             const selector = {selector_literal};
             const nextValue = {value_literal};
-            const element = document.querySelector(selector);
+            const element = {query_first_js};
             if (!element) {{
-                throw new Error(`No element matches selector: ${{selector}}`);
+                throw new Error(`No element matches {selector_kind_label}: ${{selector}}`);
             }}
             if (!(element instanceof HTMLElement)) {{
-                throw new Error(`Element is not editable: ${{selector}}`);
+                throw new Error(`Element matched by {selector_kind_label} is not editable: ${{selector}}`);
             }}
 
             element.focus();
@@ -1362,13 +1512,13 @@ fn dom_set_value_and_dispatch_events_js(selector_literal: &str, value_literal: &
                 const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
                 const setter = descriptor?.set;
                 if (!setter) {{
-                    throw new Error(`Element value setter is unavailable: ${{selector}}`);
+                    throw new Error(`Element value setter is unavailable for {selector_kind_label}: ${{selector}}`);
                 }}
                 setter.call(element, nextValue);
             }} else if (element.isContentEditable) {{
                 element.textContent = nextValue;
             }} else {{
-                throw new Error(`Element does not support fill: ${{selector}}`);
+                throw new Error(`Element matched by {selector_kind_label} does not support fill: ${{selector}}`);
             }}
 
             const inputEvent = typeof InputEvent === 'function'
@@ -1697,6 +1847,351 @@ async fn wait_for_bidi_endpoint(ws_url: &str) -> Result<BidiConnection, String> 
     ))
 }
 
+fn parse_selector<'a>(command_name: &str, selector: &'a str) -> Result<ParsedSelector<'a>, String> {
+    let trimmed = selector.trim();
+    if trimmed.is_empty() {
+        return Err(format!(
+            "{command_name} command requires a non-empty selector"
+        ));
+    }
+
+    let lowercase = trimmed.to_ascii_lowercase();
+    let parsed = if lowercase.starts_with("xpath=") {
+        let value = parse_selector_value(&trimmed[6..])?;
+        ParsedSelector {
+            raw: selector,
+            value,
+            kind: SelectorKind::XPath,
+        }
+    } else if lowercase.starts_with("xpath:") {
+        let value = parse_selector_value(&trimmed[6..])?;
+        ParsedSelector {
+            raw: selector,
+            value,
+            kind: SelectorKind::XPath,
+        }
+    } else if lowercase.starts_with("css=") {
+        let value = parse_selector_value(&trimmed[4..])?;
+        ParsedSelector {
+            raw: selector,
+            value,
+            kind: SelectorKind::Css,
+        }
+    } else if lowercase.starts_with("css:") {
+        let value = parse_selector_value(&trimmed[4..])?;
+        ParsedSelector {
+            raw: selector,
+            value,
+            kind: SelectorKind::Css,
+        }
+    } else if looks_like_xpath(trimmed) {
+        ParsedSelector {
+            raw: selector,
+            value: Cow::Borrowed(trimmed),
+            kind: SelectorKind::XPath,
+        }
+    } else {
+        ParsedSelector {
+            raw: selector,
+            value: Cow::Borrowed(trimmed),
+            kind: SelectorKind::Css,
+        }
+    };
+
+    if parsed.value.is_empty() {
+        return Err(format!(
+            "{command_name} command requires a non-empty selector"
+        ));
+    }
+
+    Ok(parsed)
+}
+
+fn parse_selector_value(raw: &str) -> Result<Cow<'_, str>, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("selector value must not be empty".to_string());
+    }
+    if trimmed.starts_with('"') {
+        let end = find_json_string_end(trimmed)
+            .ok_or_else(|| "selector value contains an unterminated JSON string".to_string())?;
+        if trimmed[end..].trim().is_empty() {
+            let decoded = serde_json::from_str::<String>(&trimmed[..end])
+                .map_err(|error| format!("failed to decode selector JSON string: {error}"))?;
+            return Ok(Cow::Owned(decoded));
+        }
+    }
+    Ok(Cow::Borrowed(trimmed))
+}
+
+fn find_json_string_end(value: &str) -> Option<usize> {
+    let bytes = value.as_bytes();
+    if bytes.first().copied()? != b'"' {
+        return None;
+    }
+
+    let mut index = 1usize;
+    let mut escaped = false;
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if escaped {
+            escaped = false;
+            index += 1;
+            continue;
+        }
+        match byte {
+            b'\\' => escaped = true,
+            b'"' => return Some(index + 1),
+            _ => {}
+        }
+        index += 1;
+    }
+    None
+}
+
+fn looks_like_xpath(selector: &str) -> bool {
+    selector.starts_with("//")
+        || selector.starts_with(".//")
+        || selector.starts_with("../")
+        || selector.starts_with('/')
+        || selector.starts_with('(')
+}
+
+fn parse_explicit_selector_prefix(selector: &str) -> Option<ExplicitSelectorPrefix> {
+    let lower = selector.to_ascii_lowercase();
+    if lower.starts_with("xpath=") || lower.starts_with("xpath:") {
+        return Some(ExplicitSelectorPrefix {
+            kind: SelectorKind::XPath,
+            prefix_len: 6,
+        });
+    }
+    if lower.starts_with("css=") || lower.starts_with("css:") {
+        return Some(ExplicitSelectorPrefix {
+            kind: SelectorKind::Css,
+            prefix_len: 4,
+        });
+    }
+    None
+}
+
+fn parse_selector_chain<'a>(
+    command_name: &str,
+    selector: &'a str,
+) -> Result<Vec<ParsedSelector<'a>>, String> {
+    let trimmed = selector.trim();
+    if trimmed.is_empty() {
+        return Err(format!(
+            "{command_name} command requires a non-empty selector"
+        ));
+    }
+
+    let Some(first_prefix) = parse_explicit_selector_prefix(trimmed) else {
+        return Ok(vec![parse_selector(command_name, selector)?]);
+    };
+
+    let mut segments = Vec::new();
+    let mut current_start = 0usize;
+    let mut current_prefix = first_prefix;
+    let bytes = trimmed.as_bytes();
+    let mut scan = current_prefix.prefix_len;
+    let mut in_json_string = false;
+    let mut escaped = false;
+
+    while scan < bytes.len() {
+        let byte = bytes[scan];
+        if in_json_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_json_string = false;
+            }
+            scan += 1;
+            continue;
+        }
+
+        if byte == b'"' {
+            in_json_string = true;
+            scan += 1;
+            continue;
+        }
+
+        if byte.is_ascii_whitespace() {
+            let next = scan + 1;
+            if next < bytes.len()
+                && let Some(prefix) = parse_explicit_selector_prefix(&trimmed[next..])
+            {
+                let value = parse_selector_value(
+                    &trimmed[current_start + current_prefix.prefix_len..scan],
+                )?;
+                if value.is_empty() {
+                    return Err(format!(
+                        "{command_name} command requires a non-empty selector"
+                    ));
+                }
+                segments.push(ParsedSelector {
+                    raw: selector,
+                    value,
+                    kind: current_prefix.kind,
+                });
+                current_start = next;
+                current_prefix = prefix;
+                scan = current_start + current_prefix.prefix_len;
+                continue;
+            }
+        }
+        scan += 1;
+    }
+
+    let value = parse_selector_value(&trimmed[current_start + current_prefix.prefix_len..])?;
+    if value.is_empty() {
+        return Err(format!(
+            "{command_name} command requires a non-empty selector"
+        ));
+    }
+    segments.push(ParsedSelector {
+        raw: selector,
+        value,
+        kind: current_prefix.kind,
+    });
+    Ok(segments)
+}
+
+fn selector_kind_label(kind: SelectorKind) -> &'static str {
+    match kind {
+        SelectorKind::Css => "css selector",
+        SelectorKind::XPath => "xpath selector",
+    }
+}
+
+fn selector_query_all_js(kind: SelectorKind) -> &'static str {
+    match kind {
+        SelectorKind::Css => "Array.from(document.querySelectorAll(selector))",
+        SelectorKind::XPath => {
+            "(() => {
+                const result = document.evaluate(
+                    selector,
+                    document,
+                    null,
+                    XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+                    null
+                );
+                const elements = [];
+                for (let index = 0; index < result.snapshotLength; index += 1) {
+                    const candidate = result.snapshotItem(index);
+                    if (candidate instanceof Element) {
+                        elements.push(candidate);
+                    }
+                }
+                return elements;
+            })()"
+        }
+    }
+}
+
+fn selector_query_first_js(kind: SelectorKind) -> &'static str {
+    match kind {
+        SelectorKind::Css => "document.querySelector(selector)",
+        SelectorKind::XPath => {
+            "(() => {
+                const result = document.evaluate(
+                    selector,
+                    document,
+                    null,
+                    XPathResult.FIRST_ORDERED_NODE_TYPE,
+                    null
+                );
+                const candidate = result.singleNodeValue;
+                return candidate instanceof Element ? candidate : null;
+            })()"
+        }
+    }
+}
+
+fn selector_segments_literal(command_name: &str, selector: &str) -> Result<String, String> {
+    let segments = parse_selector_chain(command_name, selector)?;
+    let serialized = segments
+        .into_iter()
+        .enumerate()
+        .map(|(index, segment)| {
+            let value = if index > 0 && segment.kind == SelectorKind::XPath {
+                if segment.value.starts_with("//") {
+                    format!(".{}", segment.value)
+                } else if segment.value.starts_with('/') {
+                    format!(".{}", segment.value)
+                } else if segment.value.starts_with('.') {
+                    segment.value.to_string()
+                } else {
+                    format!(".//{}", segment.value)
+                }
+            } else {
+                segment.value.to_string()
+            };
+            json!({
+                "kind": match segment.kind {
+                    SelectorKind::Css => "css",
+                    SelectorKind::XPath => "xpath",
+                },
+                "value": value,
+            })
+        })
+        .collect::<Vec<_>>();
+    serde_json::to_string(&serialized)
+        .map_err(|error| format!("failed to serialize selector chain: {error}"))
+}
+
+fn selector_chain_kind_label(command_name: &str, selector: &str) -> Result<String, String> {
+    let segments = parse_selector_chain(command_name, selector)?;
+    if segments.len() == 1 {
+        Ok(selector_kind_label(segments[0].kind).to_string())
+    } else {
+        Ok("selector chain".to_string())
+    }
+}
+
+fn selector_chain_query_all_js() -> &'static str {
+    "(() => {
+        let roots = [document];
+        for (const segment of selectorSegments) {
+            const nextRoots = [];
+            for (const root of roots) {
+                if (segment.kind === 'css') {
+                    const matches = root.querySelectorAll(segment.value);
+                    for (const match of matches) {
+                        if (match instanceof Element) {
+                            nextRoots.push(match);
+                        }
+                    }
+                    continue;
+                }
+                const result = document.evaluate(
+                    segment.value,
+                    root,
+                    null,
+                    XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+                    null
+                );
+                for (let index = 0; index < result.snapshotLength; index += 1) {
+                    const candidate = result.snapshotItem(index);
+                    if (candidate instanceof Element) {
+                        nextRoots.push(candidate);
+                    }
+                }
+            }
+            roots = nextRoots;
+        }
+        return roots;
+    })()"
+}
+
+fn selector_chain_query_first_js() -> &'static str {
+    "(() => {
+        const elements = selectorChainQueryAll();
+        return elements[0] ?? null;
+    })()"
+}
+
 fn firefox_session_registry() -> &'static Mutex<HashMap<String, FirefoxSessionState>> {
     FIREFOX_SESSION_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
 }
@@ -1712,16 +2207,6 @@ async fn firefox_session_guard(
         Err(format!(
             "Firefox automation session {connection_id} is not available"
         ))
-    }
-}
-
-fn firefox_require_selector(css_selector: &str, command_name: &str) -> Result<(), String> {
-    if css_selector.trim().is_empty() {
-        Err(format!(
-            "{command_name} command requires a non-empty css_selector"
-        ))
-    } else {
-        Ok(())
     }
 }
 
@@ -1815,12 +2300,13 @@ async fn firefox_get_text(
     css_selector: &str,
     property: &str,
 ) -> Result<TextInfo, String> {
-    firefox_require_selector(css_selector, "get_text")?;
+    let parsed = parse_selector("get_text", css_selector)?;
     let mut sessions = firefox_session_guard(connection_id).await?;
     let bidi = &mut sessions
         .get_mut(connection_id)
         .expect("Firefox session guard validated connection id")
         .connection;
+    let query_first_js = selector_query_first_js(parsed.kind);
     let value = firefox_evaluate_json(
         bidi,
         browsing_context_id,
@@ -1828,15 +2314,16 @@ async fn firefox_get_text(
             "JSON.stringify((() => {{
                 const selector = {};
                 const property = {};
-                const element = document.querySelector(selector);
+                const element = {query_first_js};
                 if (!element) {{
-                    throw new Error(`No element matches selector: ${{selector}}`);
+                    throw new Error(`No element matches {}: ${{selector}}`);
                 }}
                 const value = element[property];
                 return typeof value === 'string' ? value : '';
             }})())",
-            json_string_literal(css_selector, "text selector")?,
+            json_string_literal(&parsed.value, "text selector")?,
             json_string_literal(property, "text property")?,
+            selector_kind_label(parsed.kind),
         ),
     )
     .await?;
@@ -1844,7 +2331,11 @@ async fn firefox_get_text(
     Ok(TextInfo {
         css_selector: css_selector.to_string(),
         text: value.as_str().map(str::to_string).unwrap_or_default(),
-        note: format!("resolved {property} for css selector {css_selector}"),
+        note: format!(
+            "resolved {property} for {} {}",
+            selector_kind_label(parsed.kind),
+            parsed.value
+        ),
     })
 }
 
@@ -2676,16 +3167,6 @@ fn json_string_literal(value: &str, context: &str) -> Result<String, String> {
     serde_json::to_string(value).map_err(|error| format!("failed to serialize {context}: {error}"))
 }
 
-fn require_non_empty_selector(command_name: &str, css_selector: &str) -> Result<(), String> {
-    if css_selector.trim().is_empty() {
-        Err(format!(
-            "{command_name} command requires a non-empty css_selector"
-        ))
-    } else {
-        Ok(())
-    }
-}
-
 fn block_on_plugin_future<T, F>(future: F) -> Result<T, String>
 where
     F: Future<Output = Result<T, String>>,
@@ -3080,5 +3561,58 @@ pub unsafe extern "C" fn allwright_plugin_free_string(value: *mut c_char) {
         unsafe {
             let _ = CString::from_raw(value);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SelectorKind, parse_selector};
+
+    #[test]
+    fn parse_selector_detects_explicit_xpath_prefix() {
+        let parsed = parse_selector("click_element", "xpath=//button[normalize-space()='Save']")
+            .expect("selector should parse");
+        assert_eq!(parsed.kind, SelectorKind::XPath);
+        assert_eq!(parsed.value, "//button[normalize-space()='Save']");
+    }
+
+    #[test]
+    fn parse_selector_detects_xpath_heuristically() {
+        let parsed =
+            parse_selector("click_element", "//div[@role='dialog']").expect("selector should parse");
+        assert_eq!(parsed.kind, SelectorKind::XPath);
+    }
+
+    #[test]
+    fn parse_selector_preserves_css_by_default() {
+        let parsed = parse_selector("click_element", "button[data-testid='save']")
+            .expect("selector should parse");
+        assert_eq!(parsed.kind, SelectorKind::Css);
+        assert_eq!(parsed.value, "button[data-testid='save']");
+    }
+
+    #[test]
+    fn parse_selector_decodes_json_quoted_xpath_payload() {
+        let parsed = parse_selector(
+            "click_element",
+            r#"xpath="//button[normalize-space()='Save Changes']""#,
+        )
+        .expect("selector should parse");
+        assert_eq!(parsed.kind, SelectorKind::XPath);
+        assert_eq!(parsed.value, "//button[normalize-space()='Save Changes']");
+    }
+
+    #[test]
+    fn parse_selector_chain_handles_quoted_hybrid_segments() {
+        let segments = super::parse_selector_chain(
+            "click_element",
+            r#"xpath="//div[@role='dialog']" css="button.primary""#,
+        )
+        .expect("selector chain should parse");
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].kind, SelectorKind::XPath);
+        assert_eq!(segments[0].value, "//div[@role='dialog']");
+        assert_eq!(segments[1].kind, SelectorKind::Css);
+        assert_eq!(segments[1].value, "button.primary");
     }
 }

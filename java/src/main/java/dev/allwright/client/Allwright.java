@@ -72,6 +72,119 @@ public final class Allwright {
         return FIREFOX;
     }
 
+    private static SelectorTransport parseSelectorForTransport(String selector) {
+        String trimmed = selector == null ? "" : selector.trim();
+        String lowered = trimmed.toLowerCase();
+        if (lowered.startsWith("xpath=") || lowered.startsWith("xpath:")) {
+            return new SelectorTransport("xpath", decodeSelectorBody(trimmed.substring(6)));
+        }
+        if (lowered.startsWith("css=") || lowered.startsWith("css:")) {
+            return new SelectorTransport("css", decodeSelectorBody(trimmed.substring(4)));
+        }
+        if (
+                trimmed.startsWith("//")
+                        || trimmed.startsWith(".//")
+                        || trimmed.startsWith("../")
+                        || trimmed.startsWith("/")
+                        || trimmed.startsWith("(")
+        ) {
+            return new SelectorTransport("xpath", trimmed);
+        }
+        return new SelectorTransport("css", trimmed);
+    }
+
+    private static String decodeSelectorBody(String body) {
+        String candidate = body == null ? "" : body.trim();
+        if (candidate.length() >= 2 && candidate.charAt(0) == '"' && candidate.charAt(candidate.length() - 1) == '"') {
+            try {
+                return unescapeJsonString(candidate.substring(1, candidate.length() - 1));
+            } catch (IllegalArgumentException ignored) {
+                return candidate;
+            }
+        }
+        return candidate;
+    }
+
+    private static String normalizeSelectorForTransport(String selector) {
+        SelectorTransport parsed = parseSelectorForTransport(selector);
+        return parsed.kind() + "=" + quoteJson(parsed.body());
+    }
+
+    private static String chainSelectorForTransport(String parent, String child) {
+        String normalizedParent = parent == null || parent.trim().isEmpty()
+                ? ""
+                : normalizeSelectorForTransport(parent);
+        String normalizedChild = child == null || child.trim().isEmpty()
+                ? ""
+                : normalizeSelectorForTransport(child);
+        if (normalizedParent.isEmpty()) {
+            return normalizedChild;
+        }
+        if (normalizedChild.isEmpty()) {
+            return normalizedParent;
+        }
+        return normalizedParent + " " + normalizedChild;
+    }
+
+    private static String quoteJson(String value) {
+        StringBuilder builder = new StringBuilder(value.length() + 2);
+        builder.append('"');
+        for (int index = 0; index < value.length(); index++) {
+            char ch = value.charAt(index);
+            switch (ch) {
+                case '"' -> builder.append("\\\"");
+                case '\\' -> builder.append("\\\\");
+                case '\b' -> builder.append("\\b");
+                case '\f' -> builder.append("\\f");
+                case '\n' -> builder.append("\\n");
+                case '\r' -> builder.append("\\r");
+                case '\t' -> builder.append("\\t");
+                default -> {
+                    if (ch < 0x20) {
+                        builder.append(String.format("\\u%04x", (int) ch));
+                    } else {
+                        builder.append(ch);
+                    }
+                }
+            }
+        }
+        builder.append('"');
+        return builder.toString();
+    }
+
+    private static String unescapeJsonString(String value) {
+        StringBuilder builder = new StringBuilder(value.length());
+        for (int index = 0; index < value.length(); index++) {
+            char ch = value.charAt(index);
+            if (ch != '\\') {
+                builder.append(ch);
+                continue;
+            }
+            if (index + 1 >= value.length()) {
+                throw new IllegalArgumentException("unterminated escape");
+            }
+            char escaped = value.charAt(++index);
+            switch (escaped) {
+                case '"', '\\', '/' -> builder.append(escaped);
+                case 'b' -> builder.append('\b');
+                case 'f' -> builder.append('\f');
+                case 'n' -> builder.append('\n');
+                case 'r' -> builder.append('\r');
+                case 't' -> builder.append('\t');
+                case 'u' -> {
+                    if (index + 4 >= value.length()) {
+                        throw new IllegalArgumentException("invalid unicode escape");
+                    }
+                    String hex = value.substring(index + 1, index + 5);
+                    builder.append((char) Integer.parseInt(hex, 16));
+                    index += 4;
+                }
+                default -> throw new IllegalArgumentException("unsupported escape");
+            }
+        }
+        return builder.toString();
+    }
+
     public static Browser launchChrome() {
         return launchChrome(new LaunchOptions());
     }
@@ -609,7 +722,7 @@ public final class Allwright {
         }
 
         public Locator locator(String selector) {
-            return new Locator(this, selector);
+            return new Locator(this, normalizeSelectorForTransport(selector));
         }
 
         public synchronized NavigateResult goTo(String url) {
@@ -684,7 +797,8 @@ public final class Allwright {
             StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
             ensureOpen();
             CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
-            ClickElementCommand.Builder click = ClickElementCommand.newBuilder().setCssSelector(selector);
+            String transportSelector = normalizeSelectorForTransport(selector);
+            ClickElementCommand.Builder click = ClickElementCommand.newBuilder().setCssSelector(transportSelector);
             if (hasTimeout(resolvedOptions.timeoutMs())) {
                 click.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
             }
@@ -727,7 +841,8 @@ public final class Allwright {
             StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
             ensureOpen();
             CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
-            CountElementsCommand.Builder count = CountElementsCommand.newBuilder().setCssSelector(selector);
+            String transportSelector = normalizeSelectorForTransport(selector);
+            CountElementsCommand.Builder count = CountElementsCommand.newBuilder().setCssSelector(transportSelector);
             if (hasTimeout(resolvedOptions.timeoutMs())) {
                 count.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
             }
@@ -770,7 +885,9 @@ public final class Allwright {
             StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
             ensureOpen();
             HighlightOptions resolvedOptions = options == null ? new HighlightOptions() : options;
-            HighlightElementsCommand.Builder highlight = HighlightElementsCommand.newBuilder().setCssSelector(selector);
+            String transportSelector = normalizeSelectorForTransport(selector);
+            HighlightElementsCommand.Builder highlight =
+                    HighlightElementsCommand.newBuilder().setCssSelector(transportSelector);
             if (resolvedOptions.durationMs() != null && resolvedOptions.durationMs() > 0) {
                 highlight.setDurationMs(resolvedOptions.durationMs());
             }
@@ -816,7 +933,8 @@ public final class Allwright {
 
         public synchronized ElementResult focus(String selector, CommandOptions options) {
             CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
-            FocusElementCommand.Builder focus = FocusElementCommand.newBuilder().setCssSelector(selector);
+            String transportSelector = normalizeSelectorForTransport(selector);
+            FocusElementCommand.Builder focus = FocusElementCommand.newBuilder().setCssSelector(transportSelector);
             if (hasTimeout(resolvedOptions.timeoutMs())) {
                 focus.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
             }
@@ -839,8 +957,9 @@ public final class Allwright {
             StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
             ensureOpen();
             CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+            String transportSelector = normalizeSelectorForTransport(selector);
             FillElementCommand.Builder fill = FillElementCommand.newBuilder()
-                    .setCssSelector(selector)
+                    .setCssSelector(transportSelector)
                     .setValue(value);
             if (hasTimeout(resolvedOptions.timeoutMs())) {
                 fill.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
@@ -882,7 +1001,8 @@ public final class Allwright {
 
         public synchronized ElementResult hover(String selector, CommandOptions options) {
             CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
-            HoverElementCommand.Builder hover = HoverElementCommand.newBuilder().setCssSelector(selector);
+            String transportSelector = normalizeSelectorForTransport(selector);
+            HoverElementCommand.Builder hover = HoverElementCommand.newBuilder().setCssSelector(transportSelector);
             if (hasTimeout(resolvedOptions.timeoutMs())) {
                 hover.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
             }
@@ -905,8 +1025,9 @@ public final class Allwright {
             StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
             ensureOpen();
             PressOptions resolvedOptions = options == null ? new PressOptions() : options;
+            String transportSelector = normalizeSelectorForTransport(selector);
             PressKeyCommand.Builder press = PressKeyCommand.newBuilder()
-                    .setCssSelector(selector)
+                    .setCssSelector(transportSelector)
                     .setKey(key);
             if (resolvedOptions.text() != null && !resolvedOptions.text().isBlank()) {
                 press.setText(resolvedOptions.text());
@@ -969,7 +1090,9 @@ public final class Allwright {
             StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
             ensureOpen();
             WaitForSelectorOptions resolvedOptions = options == null ? new WaitForSelectorOptions() : options;
-            WaitForSelectorCommand.Builder waitForSelector = WaitForSelectorCommand.newBuilder().setCssSelector(selector);
+            String transportSelector = normalizeSelectorForTransport(selector);
+            WaitForSelectorCommand.Builder waitForSelector =
+                    WaitForSelectorCommand.newBuilder().setCssSelector(transportSelector);
             if (resolvedOptions.visible() != null) {
                 waitForSelector.setVisible(resolvedOptions.visible());
             }
@@ -1125,17 +1248,20 @@ public final class Allwright {
             StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
             ensureOpen();
             CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+            String transportSelector = normalizeSelectorForTransport(selector);
             TabSessionCommand.Builder command = TabSessionCommand.newBuilder()
                     .setBrowserSessionId(browserSessionId)
                     .setTabSessionId(sessionId);
             if (textContent) {
-                GetTextContentCommand.Builder getTextContent = GetTextContentCommand.newBuilder().setCssSelector(selector);
+                GetTextContentCommand.Builder getTextContent =
+                        GetTextContentCommand.newBuilder().setCssSelector(transportSelector);
                 if (hasTimeout(resolvedOptions.timeoutMs())) {
                     getTextContent.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
                 }
                 command.setGetTextContent(getTextContent);
             } else {
-                GetInnerTextCommand.Builder getInnerText = GetInnerTextCommand.newBuilder().setCssSelector(selector);
+                GetInnerTextCommand.Builder getInnerText =
+                        GetInnerTextCommand.newBuilder().setCssSelector(transportSelector);
                 if (hasTimeout(resolvedOptions.timeoutMs())) {
                     getInnerText.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
                 }
@@ -1211,7 +1337,7 @@ public final class Allwright {
         }
 
         public Locator locator(String childSelector) {
-            return new Locator(page, (selector + " " + childSelector).trim());
+            return new Locator(page, chainSelectorForTransport(selector, childSelector));
         }
 
         public ClickResult click() {
@@ -1294,6 +1420,8 @@ public final class Allwright {
             return page.waitForSelector(selector, options);
         }
     }
+
+    private record SelectorTransport(String kind, String body) {}
 
     public static final class AllwrightException extends RuntimeException {
         public AllwrightException(String message) {

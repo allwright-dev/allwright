@@ -17,6 +17,46 @@ const ENGINE_PROTO_PATH = path.join(PROTO_ROOT, "engine", "v1", "engine.proto");
 let runtimePromise: Promise<RuntimeClient> | null = null;
 let serverAddrOverride: string | null = null;
 
+type SelectorFlavor = "css" | "xpath";
+
+function parseSelectorForTransport(selector: string): { flavor: SelectorFlavor; body: string } {
+  const trimmed = selector.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith("xpath=") || lower.startsWith("xpath:")) {
+    return { flavor: "xpath", body: trimmed.slice(6).trim() };
+  }
+  if (lower.startsWith("css=") || lower.startsWith("css:")) {
+    return { flavor: "css", body: trimmed.slice(4).trim() };
+  }
+  if (
+    trimmed.startsWith("//") ||
+    trimmed.startsWith(".//") ||
+    trimmed.startsWith("../") ||
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("(")
+  ) {
+    return { flavor: "xpath", body: trimmed };
+  }
+  return { flavor: "css", body: trimmed };
+}
+
+function normalizeSelectorForTransport(selector: string): string {
+  const parsed = parseSelectorForTransport(selector);
+  return `${parsed.flavor}=${JSON.stringify(parsed.body)}`;
+}
+
+function chainSelectorForTransport(parent: string, child: string): string {
+  const parentSelector = normalizeSelectorForTransport(parent);
+  const childSelector = normalizeSelectorForTransport(child);
+  if (!parentSelector) {
+    return childSelector;
+  }
+  if (!childSelector) {
+    return parentSelector;
+  }
+  return `${parentSelector} ${childSelector}`;
+}
+
 export interface LaunchOptions {
   browserBinary?: string;
   timeoutMs?: number;
@@ -792,7 +832,7 @@ class PageImpl implements Page {
   readonly browserSessionId: string;
 
   locator(selector: string): Locator {
-    return new LocatorImpl({ page: this, selector });
+    return new LocatorImpl({ page: this, selector: normalizeSelectorForTransport(selector) });
   }
 
   async goto(url: string, options: CommandOptions = {}): Promise<NavigateResult> {
@@ -842,11 +882,12 @@ class PageImpl implements Page {
   async click(selector: string, options: CommandOptions = {}): Promise<ClickResult> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
+    const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
       browserSessionId: this.browserSessionId,
       tabSessionId: this.sessionId,
       clickElement: {
-        cssSelector: selector,
+        cssSelector: transportSelector,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });
@@ -873,11 +914,12 @@ class PageImpl implements Page {
   async count(selector: string, options: CommandOptions = {}): Promise<CountResult> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
+    const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
       browserSessionId: this.browserSessionId,
       tabSessionId: this.sessionId,
       countElements: {
-        cssSelector: selector,
+        cssSelector: transportSelector,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });
@@ -904,11 +946,12 @@ class PageImpl implements Page {
   async highlight(selector: string, options: HighlightOptions = {}): Promise<HighlightResult> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
+    const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
       browserSessionId: this.browserSessionId,
       tabSessionId: this.sessionId,
       highlightElements: {
-        cssSelector: selector,
+        cssSelector: transportSelector,
         durationMs: options.durationMs,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
@@ -936,11 +979,12 @@ class PageImpl implements Page {
   async focus(selector: string, options: CommandOptions = {}): Promise<ElementResult> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
+    const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
       browserSessionId: this.browserSessionId,
       tabSessionId: this.sessionId,
       focusElement: {
-        cssSelector: selector,
+        cssSelector: transportSelector,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });
@@ -966,11 +1010,12 @@ class PageImpl implements Page {
   async fill(selector: string, value: string, options: CommandOptions = {}): Promise<FillResult> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
+    const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
       browserSessionId: this.browserSessionId,
       tabSessionId: this.sessionId,
       fillElement: {
-        cssSelector: selector,
+        cssSelector: transportSelector,
         value,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
@@ -998,11 +1043,12 @@ class PageImpl implements Page {
   async hover(selector: string, options: CommandOptions = {}): Promise<ElementResult> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
+    const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
       browserSessionId: this.browserSessionId,
       tabSessionId: this.sessionId,
       hoverElement: {
-        cssSelector: selector,
+        cssSelector: transportSelector,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });
@@ -1028,11 +1074,12 @@ class PageImpl implements Page {
   async press(selector: string, key: string, options: PressOptions = {}): Promise<PressResult> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
+    const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
       browserSessionId: this.browserSessionId,
       tabSessionId: this.sessionId,
       pressKey: {
-        cssSelector: selector,
+        cssSelector: transportSelector,
         key,
         text: options.text,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
@@ -1072,11 +1119,12 @@ class PageImpl implements Page {
   ): Promise<WaitForSelectorResult> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
+    const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
       browserSessionId: this.browserSessionId,
       tabSessionId: this.sessionId,
       waitForSelector: {
-        cssSelector: selector,
+        cssSelector: transportSelector,
         visible: options.visible,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
@@ -1170,13 +1218,14 @@ class PageImpl implements Page {
   ): Promise<TextResult> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
+    const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write(
       textContent
         ? {
             browserSessionId: this.browserSessionId,
             tabSessionId: this.sessionId,
             getTextContent: {
-              cssSelector: selector,
+              cssSelector: transportSelector,
               retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
             },
           }
@@ -1184,7 +1233,7 @@ class PageImpl implements Page {
             browserSessionId: this.browserSessionId,
             tabSessionId: this.sessionId,
             getInnerText: {
-              cssSelector: selector,
+              cssSelector: transportSelector,
               retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
             },
           },
@@ -1282,7 +1331,7 @@ class LocatorImpl implements Locator {
   locator(selector: string): Locator {
     return new LocatorImpl({
       page: this.page,
-      selector: `${this.selector} ${selector}`,
+      selector: chainSelectorForTransport(this.selector, selector),
     });
   }
 }

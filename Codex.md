@@ -23,7 +23,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `rust/allwright`: `allwright-core`, the Rust engine crate containing the high-level Rust client API, the single gRPC server host, the runtime plugin loader, and the shared plugin catalog
 - `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core` and installs supported plugins
 - `.github/workflows/release-surface-plugins.yml`: tag-triggered GitHub Actions workflow for root `vX.Y.Z` releases; it syncs versions from the tag, publishes Go/Python/npm/Rust packages, builds platform CLI/plugin archives, and attaches them to GitHub Releases
-- `.github/workflows/release-surface-plugins.yml` now also publishes the Java client to Maven Central via the checked-in Gradle wrapper using `OSSRH_USERNAME`, `OSSRH_PASSWORD`, `SIGNING_KEY`, and `SIGNING_PASSWORD`
+- `.github/workflows/release-surface-plugins.yml` now also publishes the Java client to Maven Central via the checked-in Gradle wrapper using Sonatype Central Portal token credentials in `OSSRH_USERNAME` / `OSSRH_PASSWORD`, plus `SIGNING_KEY` and `SIGNING_PASSWORD`
 - `.github/workflows/ci.yml`: CI workflow that regenerates Rust proto bindings and fails if committed generated files are out of date
 - `.github/workflows/ci.yml` now also runs the Java client tests through the checked-in Gradle wrapper on Java 21
 - `scripts/install.sh`: Linux/macOS installer script for downloading the published `allwright` CLI release asset directly from GitHub without cloning the repo
@@ -94,8 +94,8 @@ This instruction should be treated as ongoing project policy for all future AI c
 - Generated gRPC client code is enabled and currently consumed by `rust/allwright` and its examples.
 - Generated Go proto/gRPC code is checked in under `go/gen/allwright/engine/v1` and consumed by the Go module.
 - The Java stack generates protobuf and gRPC stubs from `proto/engine/v1/engine.proto` during the Gradle build in `java/`.
-- The Java build is now publication-ready for Maven Central under `dev.allwright`, with `publishMavenJavaPublicationToOSSRHRepository` / `publishToMavenLocal` using `ALLWRIGHT_VERSION` or Gradle property `allwrightVersion`, and signing sourced from `SIGNING_KEY` / `SIGNING_PASSWORD` or matching Gradle properties.
-- The tagged release workflow now uses `java/gradlew -p java publishMavenJavaPublicationToOSSRHRepository` on Java 21 to publish the Java client to Maven Central when OSSRH and signing secrets are configured.
+- The Java build is now publication-ready for Maven Central under `dev.allwright`, with `publishAllPublicationsToCentralPortalRepository` / `publishToMavenLocal` using `ALLWRIGHT_VERSION` or Gradle property `allwrightVersion`, and signing sourced from `SIGNING_KEY` / `SIGNING_PASSWORD` or matching Gradle properties.
+- The tagged release workflow now uses `java/gradlew -p java publishAllPublicationsToCentralPortalRepository` on Java 21, then `POST`s to Sonatype's `/manual/upload/defaultRepository/dev.allwright?publishing_type=automatic` endpoint from the same job so the deployment is transferred from the Central Portal OSSRH Staging API compatibility service into the Central Publisher Portal.
 - The Python stack currently loads the bundled package-local proto files through `grpcio-tools`; published consumers must not depend on `../proto` existing outside the wheel.
 - The TypeScript/npm stack ships package-local copies of the shared top-level proto tree inside `typescript/core/proto/` rather than depending on repo-relative paths after publish.
 - The public Rust client surface should stay high-level and should not expose raw gRPC connection setup.
@@ -255,6 +255,7 @@ xtask/
 ## Maintenance Rules
 
 - Keep `README.md` and `Codex.md` aligned.
+- Before finishing any change, review newly created local artifacts and update `.gitignore` when needed; this is especially important for Java/Gradle outputs such as `java/bin/`, `java/build/`, `.gradle-user-home/`, and similar generated directories.
 - Never hand-edit generated Rust proto files under `rust/allwright/src/`; regenerate them from the top-level `proto/` tree.
 - The top-level `proto/` directory is the single source of truth for engine contracts; do not fork or hand-maintain parallel protocol definitions per language.
 - Prefer documenting ownership changes here at the same time as code changes.

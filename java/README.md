@@ -29,7 +29,9 @@ For Sonatype publishing, provide:
 - `SIGNING_KEY`
 - `SIGNING_PASSWORD`
 
-The tagged GitHub Actions release workflow now publishes the Java artifact to Maven Central as `dev.allwright:allwright` when those secrets are configured.
+Use a Central Portal user token for `OSSRH_USERNAME` / `OSSRH_PASSWORD`.
+
+The tagged GitHub Actions release workflow now publishes the Java artifact to Maven Central as `dev.allwright:allwright` by uploading through Sonatype's Central Portal OSSRH Staging API compatibility service and then transferring the deployment into the Central Publisher Portal automatically.
 
 ## Example
 

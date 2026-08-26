@@ -49,6 +49,51 @@ class AllwrightError(RuntimeError):
     pass
 
 
+def _decode_selector_body(body: str) -> str:
+    candidate = body.strip()
+    if len(candidate) >= 2 and candidate[0] == '"' and candidate[-1] == '"':
+        try:
+            decoded = json.loads(candidate)
+        except json.JSONDecodeError:
+            return candidate
+        if isinstance(decoded, str):
+            return decoded
+    return candidate
+
+
+def _parse_selector_for_transport(selector: str) -> tuple[str, str]:
+    trimmed = selector.strip()
+    lowered = trimmed.lower()
+    if lowered.startswith("xpath=") or lowered.startswith("xpath:"):
+        return "xpath", _decode_selector_body(trimmed[6:])
+    if lowered.startswith("css=") or lowered.startswith("css:"):
+        return "css", _decode_selector_body(trimmed[4:])
+    if (
+        trimmed.startswith("//")
+        or trimmed.startswith(".//")
+        or trimmed.startswith("../")
+        or trimmed.startswith("/")
+        or trimmed.startswith("(")
+    ):
+        return "xpath", trimmed
+    return "css", trimmed
+
+
+def _normalize_selector_for_transport(selector: str) -> str:
+    flavor, body = _parse_selector_for_transport(selector)
+    return f"{flavor}={json.dumps(body)}"
+
+
+def _chain_selector_for_transport(parent: str, child: str) -> str:
+    parent_selector = _normalize_selector_for_transport(parent) if parent.strip() else ""
+    child_selector = _normalize_selector_for_transport(child) if child.strip() else ""
+    if not parent_selector:
+        return child_selector
+    if not child_selector:
+        return parent_selector
+    return f"{parent_selector} {child_selector}"
+
+
 @dataclass(slots=True)
 class LaunchOptions:
     browser_binary: str | None = None
@@ -316,7 +361,7 @@ class Page:
         return self._browser_session_id
 
     def locator(self, selector: str) -> Locator:
-        return Locator(page=self, selector=selector)
+        return Locator(page=self, selector=_normalize_selector_for_transport(selector))
 
     def goto(self, url: str, options: CommandOptions | None = None) -> NavigateResult:
         with self._lock:
@@ -372,12 +417,13 @@ class Page:
             handle = self._ensure_handle()
             self._ensure_open()
             command_options = options or CommandOptions()
+            transport_selector = _normalize_selector_for_transport(selector)
             handle.send(
                 engine_pb2.TabSessionCommand(
                     browser_session_id=self.browser_session_id,
                     tab_session_id=self.session_id,
                     click_element=engine_pb2.ClickElementCommand(
-                        css_selector=selector,
+                        css_selector=transport_selector,
                         retry_options=_retry_options(command_options.timeout_ms),
                     ),
                 )
@@ -408,12 +454,13 @@ class Page:
             handle = self._ensure_handle()
             self._ensure_open()
             command_options = options or CommandOptions()
+            transport_selector = _normalize_selector_for_transport(selector)
             handle.send(
                 engine_pb2.TabSessionCommand(
                     browser_session_id=self.browser_session_id,
                     tab_session_id=self.session_id,
                     count_elements=engine_pb2.CountElementsCommand(
-                        css_selector=selector,
+                        css_selector=transport_selector,
                         retry_options=_retry_options(command_options.timeout_ms),
                     ),
                 )
@@ -444,12 +491,13 @@ class Page:
             handle = self._ensure_handle()
             self._ensure_open()
             highlight_options = options or HighlightOptions()
+            transport_selector = _normalize_selector_for_transport(selector)
             handle.send(
                 engine_pb2.TabSessionCommand(
                     browser_session_id=self.browser_session_id,
                     tab_session_id=self.session_id,
                     highlight_elements=engine_pb2.HighlightElementsCommand(
-                        css_selector=selector,
+                        css_selector=transport_selector,
                         duration_ms=highlight_options.duration_ms,
                         retry_options=_retry_options(highlight_options.timeout_ms),
                     ),
@@ -477,6 +525,7 @@ class Page:
                         )
 
     def focus(self, selector: str, options: CommandOptions | None = None) -> ElementResult:
+        transport_selector = _normalize_selector_for_transport(selector)
         return self._element_command(
             action="focusing",
             event_name="element_focused",
@@ -484,13 +533,14 @@ class Page:
                 browser_session_id=self.browser_session_id,
                 tab_session_id=self.session_id,
                 focus_element=engine_pb2.FocusElementCommand(
-                    css_selector=selector,
+                    css_selector=transport_selector,
                     retry_options=_retry_options((options or CommandOptions()).timeout_ms),
                 ),
             ),
         )
 
     def hover(self, selector: str, options: CommandOptions | None = None) -> ElementResult:
+        transport_selector = _normalize_selector_for_transport(selector)
         return self._element_command(
             action="hovering",
             event_name="element_hovered",
@@ -498,7 +548,7 @@ class Page:
                 browser_session_id=self.browser_session_id,
                 tab_session_id=self.session_id,
                 hover_element=engine_pb2.HoverElementCommand(
-                    css_selector=selector,
+                    css_selector=transport_selector,
                     retry_options=_retry_options((options or CommandOptions()).timeout_ms),
                 ),
             ),
@@ -514,12 +564,13 @@ class Page:
             handle = self._ensure_handle()
             self._ensure_open()
             command_options = options or CommandOptions()
+            transport_selector = _normalize_selector_for_transport(selector)
             handle.send(
                 engine_pb2.TabSessionCommand(
                     browser_session_id=self.browser_session_id,
                     tab_session_id=self.session_id,
                     fill_element=engine_pb2.FillElementCommand(
-                        css_selector=selector,
+                        css_selector=transport_selector,
                         value=value,
                         retry_options=_retry_options(command_options.timeout_ms),
                     ),
@@ -556,12 +607,13 @@ class Page:
             handle = self._ensure_handle()
             self._ensure_open()
             press_options = options or PressOptions()
+            transport_selector = _normalize_selector_for_transport(selector)
             handle.send(
                 engine_pb2.TabSessionCommand(
                     browser_session_id=self.browser_session_id,
                     tab_session_id=self.session_id,
                     press_key=engine_pb2.PressKeyCommand(
-                        css_selector=selector,
+                        css_selector=transport_selector,
                         key=key,
                         text=press_options.text,
                         retry_options=_retry_options(press_options.timeout_ms),
@@ -604,12 +656,13 @@ class Page:
             handle = self._ensure_handle()
             self._ensure_open()
             wait_options = options or WaitForSelectorOptions()
+            transport_selector = _normalize_selector_for_transport(selector)
             handle.send(
                 engine_pb2.TabSessionCommand(
                     browser_session_id=self.browser_session_id,
                     tab_session_id=self.session_id,
                     wait_for_selector=engine_pb2.WaitForSelectorCommand(
-                        css_selector=selector,
+                        css_selector=transport_selector,
                         visible=wait_options.visible,
                         retry_options=_retry_options(wait_options.timeout_ms),
                     ),
@@ -730,12 +783,13 @@ class Page:
         with self._lock:
             handle = self._ensure_handle()
             self._ensure_open()
+            transport_selector = _normalize_selector_for_transport(selector)
             if text_content:
                 command = engine_pb2.TabSessionCommand(
                     browser_session_id=self.browser_session_id,
                     tab_session_id=self.session_id,
                     get_text_content=engine_pb2.GetTextContentCommand(
-                        css_selector=selector,
+                        css_selector=transport_selector,
                         retry_options=_retry_options(options.timeout_ms),
                     ),
                 )
@@ -744,7 +798,7 @@ class Page:
                     browser_session_id=self.browser_session_id,
                     tab_session_id=self.session_id,
                     get_inner_text=engine_pb2.GetInnerTextCommand(
-                        css_selector=selector,
+                        css_selector=transport_selector,
                         retry_options=_retry_options(options.timeout_ms),
                     ),
                 )
@@ -784,7 +838,7 @@ class Locator:
     selector: str
 
     def locator(self, selector: str) -> Locator:
-        return Locator(page=self.page, selector=f"{self.selector} {selector}".strip())
+        return Locator(page=self.page, selector=_chain_selector_for_transport(self.selector, selector))
 
     def click(self, options: CommandOptions | None = None) -> ClickResult:
         return self.page.click(self.selector, options)

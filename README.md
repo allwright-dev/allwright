@@ -86,7 +86,7 @@ Release automation today:
 
 - pushing a tag such as `vX.Y.Z` triggers the GitHub Actions release workflow
 - that workflow creates the Go submodule tag `go/vX.Y.Z`, verifies the Go client in `go/`, and warms the public Go proxy for `allwright.dev`
-- that workflow publishes the Java client to Maven Central as `dev.allwright:allwright` using the checked-in Gradle wrapper plus OSSRH/signing secrets
+- that workflow publishes the Java client to Maven Central as `dev.allwright:allwright` using the checked-in Gradle wrapper, a Central Portal user token, and a follow-up transfer call through Sonatype's Central Portal OSSRH Staging API compatibility service
 - that workflow publishes the Python client to PyPI as `allwright-python` using PyPI Trusted Publishing via GitHub Actions OIDC
 - that workflow publishes the npm workspace packages `@allwright.dev/core` and `@allwright.dev/vitest` using npm Trusted Publishing via GitHub Actions OIDC
 - that workflow builds both the `allwright` CLI and `allwright-surface-web` plugin for the current release matrix and uploads the archives to the matching GitHub Release

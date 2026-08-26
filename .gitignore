@@ -28,6 +28,7 @@ node_modules/
 /java/.gradle/
 /java/build/
 /java/out/
+/java/bin/
 /.gradle-user-home/
 
 # Next.js site artifacts

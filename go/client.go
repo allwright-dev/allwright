@@ -37,6 +37,70 @@ var runtimeState struct {
 	serverAddrOverride string
 }
 
+type selectorFlavor string
+
+const (
+	selectorFlavorCSS   selectorFlavor = "css"
+	selectorFlavorXPath selectorFlavor = "xpath"
+)
+
+func decodeSelectorBody(body string) string {
+	candidate := strings.TrimSpace(body)
+	if len(candidate) >= 2 && candidate[0] == '"' && candidate[len(candidate)-1] == '"' {
+		var decoded string
+		if err := json.Unmarshal([]byte(candidate), &decoded); err == nil {
+			return decoded
+		}
+	}
+	return candidate
+}
+
+func parseSelectorForTransport(selector string) (selectorFlavor, string) {
+	trimmed := strings.TrimSpace(selector)
+	lowered := strings.ToLower(trimmed)
+	if strings.HasPrefix(lowered, "xpath=") || strings.HasPrefix(lowered, "xpath:") {
+		return selectorFlavorXPath, decodeSelectorBody(trimmed[6:])
+	}
+	if strings.HasPrefix(lowered, "css=") || strings.HasPrefix(lowered, "css:") {
+		return selectorFlavorCSS, decodeSelectorBody(trimmed[4:])
+	}
+	if strings.HasPrefix(trimmed, "//") ||
+		strings.HasPrefix(trimmed, ".//") ||
+		strings.HasPrefix(trimmed, "../") ||
+		strings.HasPrefix(trimmed, "/") ||
+		strings.HasPrefix(trimmed, "(") {
+		return selectorFlavorXPath, trimmed
+	}
+	return selectorFlavorCSS, trimmed
+}
+
+func normalizeSelectorForTransport(selector string) string {
+	flavor, body := parseSelectorForTransport(selector)
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Sprintf("%s=%q", flavor, body)
+	}
+	return fmt.Sprintf("%s=%s", flavor, encoded)
+}
+
+func chainSelectorForTransport(parent string, child string) string {
+	parentSelector := ""
+	childSelector := ""
+	if strings.TrimSpace(parent) != "" {
+		parentSelector = normalizeSelectorForTransport(parent)
+	}
+	if strings.TrimSpace(child) != "" {
+		childSelector = normalizeSelectorForTransport(child)
+	}
+	if parentSelector == "" {
+		return childSelector
+	}
+	if childSelector == "" {
+		return parentSelector
+	}
+	return parentSelector + " " + childSelector
+}
+
 type runtimeClient struct {
 	conn   *grpc.ClientConn
 	engine enginev1.EngineServiceClient
@@ -668,7 +732,7 @@ func (t *Tab) Locator(selector string) *Locator {
 	}
 	return &Locator{
 		page:     t,
-		selector: selector,
+		selector: normalizeSelectorForTransport(selector),
 	}
 }
 
@@ -741,6 +805,7 @@ func (t *Tab) Click(ctx context.Context, cssSelector string, options ...CommandO
 	}
 
 	commandOptions := firstCommandOptions(options)
+	cssSelector = normalizeSelectorForTransport(cssSelector)
 
 	if err := t.stream.Send(&enginev1.TabSessionCommand{
 		BrowserSessionId: t.browserSessionID,
@@ -790,6 +855,7 @@ func (t *Tab) Count(ctx context.Context, cssSelector string, options ...CommandO
 	}
 
 	commandOptions := firstCommandOptions(options)
+	cssSelector = normalizeSelectorForTransport(cssSelector)
 
 	if err := t.stream.Send(&enginev1.TabSessionCommand{
 		BrowserSessionId: t.browserSessionID,
@@ -838,6 +904,7 @@ func (t *Tab) Highlight(ctx context.Context, cssSelector string, options ...High
 	}
 
 	highlightOptions := firstHighlightOptions(options)
+	cssSelector = normalizeSelectorForTransport(cssSelector)
 
 	if err := t.stream.Send(&enginev1.TabSessionCommand{
 		BrowserSessionId: t.browserSessionID,
@@ -887,6 +954,7 @@ func (t *Tab) Focus(ctx context.Context, cssSelector string, options ...CommandO
 	}
 
 	commandOptions := firstCommandOptions(options)
+	cssSelector = normalizeSelectorForTransport(cssSelector)
 
 	if err := t.stream.Send(&enginev1.TabSessionCommand{
 		BrowserSessionId: t.browserSessionID,
@@ -934,6 +1002,7 @@ func (t *Tab) Fill(ctx context.Context, cssSelector string, value string, option
 	}
 
 	commandOptions := firstCommandOptions(options)
+	cssSelector = normalizeSelectorForTransport(cssSelector)
 
 	if err := t.stream.Send(&enginev1.TabSessionCommand{
 		BrowserSessionId: t.browserSessionID,
@@ -983,6 +1052,7 @@ func (t *Tab) Hover(ctx context.Context, cssSelector string, options ...CommandO
 	}
 
 	commandOptions := firstCommandOptions(options)
+	cssSelector = normalizeSelectorForTransport(cssSelector)
 
 	if err := t.stream.Send(&enginev1.TabSessionCommand{
 		BrowserSessionId: t.browserSessionID,
@@ -1030,6 +1100,7 @@ func (t *Tab) Press(ctx context.Context, cssSelector string, key string, options
 	}
 
 	pressOptions := firstPressOptions(options)
+	cssSelector = normalizeSelectorForTransport(cssSelector)
 
 	if err := t.stream.Send(&enginev1.TabSessionCommand{
 		BrowserSessionId: t.browserSessionID,
@@ -1088,6 +1159,7 @@ func (t *Tab) WaitForSelector(ctx context.Context, cssSelector string, options .
 	}
 
 	waitOptions := firstWaitForSelectorOptions(options)
+	cssSelector = normalizeSelectorForTransport(cssSelector)
 
 	if err := t.stream.Send(&enginev1.TabSessionCommand{
 		BrowserSessionId: t.browserSessionID,
@@ -1196,6 +1268,7 @@ func (t *Tab) readText(ctx context.Context, cssSelector string, textContent bool
 	if t.closed {
 		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
 	}
+	cssSelector = normalizeSelectorForTransport(cssSelector)
 
 	var sendErr error
 	if textContent {
@@ -1372,7 +1445,7 @@ func (l *Locator) Locator(selector string) *Locator {
 	}
 	return &Locator{
 		page:     l.page,
-		selector: strings.TrimSpace(l.selector + " " + selector),
+		selector: chainSelectorForTransport(l.selector, selector),
 	}
 }
 

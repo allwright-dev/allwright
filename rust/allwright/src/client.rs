@@ -38,6 +38,80 @@ type Result<T> = std::result::Result<T, Error>;
 static RUNTIME: OnceLock<Mutex<Option<Arc<RuntimeClient>>>> = OnceLock::new();
 static SERVER_ADDR_OVERRIDE: OnceLock<Mutex<Option<String>>> = OnceLock::new();
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SelectorFlavor {
+    Css,
+    XPath,
+}
+
+impl SelectorFlavor {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Css => "css",
+            Self::XPath => "xpath",
+        }
+    }
+}
+
+fn decode_selector_body(body: &str) -> String {
+    let candidate = body.trim();
+    if candidate.len() >= 2 && candidate.starts_with('"') && candidate.ends_with('"') {
+        if let Ok(decoded) = serde_json::from_str::<String>(candidate) {
+            return decoded;
+        }
+    }
+    candidate.to_string()
+}
+
+fn parse_selector_for_transport(selector: &str) -> (SelectorFlavor, String) {
+    let trimmed = selector.trim();
+    let lowered = trimmed.to_ascii_lowercase();
+    if lowered.starts_with("xpath=") || lowered.starts_with("xpath:") {
+        return (SelectorFlavor::XPath, decode_selector_body(&trimmed[6..]));
+    }
+    if lowered.starts_with("css=") || lowered.starts_with("css:") {
+        return (SelectorFlavor::Css, decode_selector_body(&trimmed[4..]));
+    }
+    if trimmed.starts_with("//")
+        || trimmed.starts_with(".//")
+        || trimmed.starts_with("../")
+        || trimmed.starts_with('/')
+        || trimmed.starts_with('(')
+    {
+        return (SelectorFlavor::XPath, trimmed.to_string());
+    }
+    (SelectorFlavor::Css, trimmed.to_string())
+}
+
+fn normalize_selector_for_transport(selector: &str) -> String {
+    let (flavor, body) = parse_selector_for_transport(selector);
+    format!(
+        "{}={}",
+        flavor.as_str(),
+        serde_json::to_string(&body).unwrap_or_else(|_| format!("{body:?}"))
+    )
+}
+
+fn chain_selector_for_transport(parent: &str, child: &str) -> String {
+    let parent_selector = if parent.trim().is_empty() {
+        String::new()
+    } else {
+        normalize_selector_for_transport(parent)
+    };
+    let child_selector = if child.trim().is_empty() {
+        String::new()
+    } else {
+        normalize_selector_for_transport(child)
+    };
+    if parent_selector.is_empty() {
+        return child_selector;
+    }
+    if child_selector.is_empty() {
+        return parent_selector;
+    }
+    format!("{parent_selector} {child_selector}")
+}
+
 #[derive(Debug)]
 pub struct Error {
     message: String,
@@ -785,7 +859,7 @@ impl Tab {
     pub fn locator(&self, css_selector: impl Into<String>) -> Locator {
         Locator {
             page: self.clone(),
-            selector: css_selector.into(),
+            selector: normalize_selector_for_transport(&css_selector.into()),
         }
     }
 
@@ -938,6 +1012,7 @@ impl Tab {
         css_selector: impl Into<String>,
         options: CommandOptions,
     ) -> Result<ClickResult> {
+        let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
         if handle.closed {
@@ -953,7 +1028,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::ClickElement(ClickElementCommand {
-                    css_selector: css_selector.into(),
+                    css_selector,
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
             })
@@ -1003,6 +1078,7 @@ impl Tab {
         css_selector: impl Into<String>,
         options: CommandOptions,
     ) -> Result<CountResult> {
+        let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
         if handle.closed {
@@ -1018,7 +1094,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::CountElements(CountElementsCommand {
-                    css_selector: css_selector.into(),
+                    css_selector,
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
             })
@@ -1064,6 +1140,7 @@ impl Tab {
         css_selector: impl Into<String>,
         options: HighlightOptions,
     ) -> Result<HighlightResult> {
+        let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
         if handle.closed {
@@ -1079,7 +1156,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::HighlightElements(HighlightElementsCommand {
-                    css_selector: css_selector.into(),
+                    css_selector,
                     duration_ms: options.duration_ms,
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
@@ -1125,6 +1202,7 @@ impl Tab {
         css_selector: impl Into<String>,
         options: CommandOptions,
     ) -> Result<ElementResult> {
+        let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
         if handle.closed {
@@ -1139,7 +1217,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::FocusElement(FocusElementCommand {
-                    css_selector: css_selector.into(),
+                    css_selector,
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
             })
@@ -1191,6 +1269,7 @@ impl Tab {
         value: impl Into<String>,
         options: CommandOptions,
     ) -> Result<FillResult> {
+        let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
         if handle.closed {
@@ -1205,7 +1284,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::FillElement(FillElementCommand {
-                    css_selector: css_selector.into(),
+                    css_selector,
                     value: value.into(),
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
@@ -1254,6 +1333,7 @@ impl Tab {
         css_selector: impl Into<String>,
         options: CommandOptions,
     ) -> Result<ElementResult> {
+        let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
         if handle.closed {
@@ -1268,7 +1348,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::HoverElement(HoverElementCommand {
-                    css_selector: css_selector.into(),
+                    css_selector,
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
             })
@@ -1320,6 +1400,7 @@ impl Tab {
         key: impl Into<String>,
         options: PressOptions,
     ) -> Result<PressResult> {
+        let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
         if handle.closed {
@@ -1334,7 +1415,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::PressKey(PressKeyCommand {
-                    css_selector: css_selector.into(),
+                    css_selector,
                     key: key.into(),
                     text: options.text,
                     retry_options: command_retry_options(options.timeout_ms),
@@ -1384,7 +1465,8 @@ impl Tab {
         css_selector: impl Into<String>,
         options: CommandOptions,
     ) -> Result<TextResult> {
-        self.read_text(css_selector.into(), options, true).await
+        self.read_text(normalize_selector_for_transport(&css_selector.into()), options, true)
+            .await
     }
 
     pub async fn inner_text(&self, css_selector: impl Into<String>) -> Result<TextResult> {
@@ -1397,7 +1479,8 @@ impl Tab {
         css_selector: impl Into<String>,
         options: CommandOptions,
     ) -> Result<TextResult> {
-        self.read_text(css_selector.into(), options, false).await
+        self.read_text(normalize_selector_for_transport(&css_selector.into()), options, false)
+            .await
     }
 
     pub async fn wait_for_selector(
@@ -1413,6 +1496,7 @@ impl Tab {
         css_selector: impl Into<String>,
         options: WaitForSelectorOptions,
     ) -> Result<WaitForSelectorResult> {
+        let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
         if handle.closed {
@@ -1427,7 +1511,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::WaitForSelector(WaitForSelectorCommand {
-                    css_selector: css_selector.into(),
+                    css_selector,
                     visible: options.visible,
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
@@ -1618,9 +1702,10 @@ impl Locator {
     }
 
     pub fn locator(&self, css_selector: impl Into<String>) -> Locator {
+        let child_selector = css_selector.into();
         Locator {
             page: self.page.clone(),
-            selector: format!("{} {}", self.selector, css_selector.into()),
+            selector: chain_selector_for_transport(&self.selector, &child_selector),
         }
     }
 
