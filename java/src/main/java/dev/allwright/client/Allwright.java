@@ -1,7 +1,33 @@
 package dev.allwright.client;
 
-import allwright.engine.v1.EngineServiceGrpc;
-import allwright.engine.v1.Engine.*;
+import dev.allwright.engine.v1.BrowserLaunchedEvent;
+import dev.allwright.engine.v1.BrowserKind;
+import dev.allwright.engine.v1.BrowserSessionClosedEvent;
+import dev.allwright.engine.v1.BrowserSessionCommand;
+import dev.allwright.engine.v1.BrowserSessionEvent;
+import dev.allwright.engine.v1.ClickElementCommand;
+import dev.allwright.engine.v1.CloseBrowserSessionCommand;
+import dev.allwright.engine.v1.CloseTabSessionCommand;
+import dev.allwright.engine.v1.CommandRetryOptions;
+import dev.allwright.engine.v1.CountElementsCommand;
+import dev.allwright.engine.v1.EngineServiceGrpc;
+import dev.allwright.engine.v1.FillElementCommand;
+import dev.allwright.engine.v1.FocusElementCommand;
+import dev.allwright.engine.v1.GetInnerTextCommand;
+import dev.allwright.engine.v1.GetTextContentCommand;
+import dev.allwright.engine.v1.HighlightElementsCommand;
+import dev.allwright.engine.v1.HoverElementCommand;
+import dev.allwright.engine.v1.LaunchBrowserCommand;
+import dev.allwright.engine.v1.NavigateTabCommand;
+import dev.allwright.engine.v1.OpenTabCommand;
+import dev.allwright.engine.v1.PingRequest;
+import dev.allwright.engine.v1.PressKeyCommand;
+import dev.allwright.engine.v1.SessionPingCommand;
+import dev.allwright.engine.v1.TabOpenedEvent;
+import dev.allwright.engine.v1.TabSessionCommand;
+import dev.allwright.engine.v1.TabSessionEvent;
+import dev.allwright.engine.v1.TabSessionPingCommand;
+import dev.allwright.engine.v1.WaitForSelectorCommand;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
@@ -9,12 +35,12 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.yaml.snakeyaml.Yaml;
 
@@ -276,6 +302,10 @@ public final class Allwright {
         return CommandRetryOptions.newBuilder().setTimeoutMs(timeoutMs).build();
     }
 
+    private static boolean hasTimeout(Integer timeoutMs) {
+        return timeoutMs != null && timeoutMs > 0;
+    }
+
     public record LaunchOptions(String browserBinary, Integer timeoutMs) {
         public LaunchOptions() {
             this(null, null);
@@ -381,10 +411,10 @@ public final class Allwright {
         }
     }
 
-    public static final class Browser {
+    public static final class Browser implements AutoCloseable {
         private final RuntimeClient runtime;
         private final StreamHandle<BrowserSessionCommand, BrowserSessionEvent> stream;
-        private final Map<String, Page> pages = new ConcurrentHashMap<>();
+        private final Map<String, Page> pages = new LinkedHashMap<>();
         private final Page initialPage;
         private boolean closed;
 
@@ -420,7 +450,7 @@ public final class Allwright {
         }
 
         public Locator locator(String selector) {
-            return new Locator(this, selector);
+            return initialPage.locator(selector);
         }
 
         public String browserName() {
@@ -451,9 +481,22 @@ public final class Allwright {
             return initialPage;
         }
 
+        public synchronized List<Page> pages() {
+            return List.copyOf(new ArrayList<>(pages.values()));
+        }
+
         public synchronized Page newPage() {
+            return newPage(new CommandOptions());
+        }
+
+        public synchronized Page newPage(CommandOptions options) {
             ensureOpen();
-            stream.send(BrowserSessionCommand.newBuilder().setOpenTab(OpenTabCommand.newBuilder().build()).build());
+            CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+            OpenTabCommand.Builder openTab = OpenTabCommand.newBuilder();
+            if (resolvedOptions.timeoutMs() != null && resolvedOptions.timeoutMs() > 0) {
+                openTab.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
+            }
+            stream.send(BrowserSessionCommand.newBuilder().setOpenTab(openTab).build());
 
             while (true) {
                 BrowserSessionEvent event = stream.recv("receive browser session event while opening page");
@@ -474,7 +517,15 @@ public final class Allwright {
         }
 
         public Page newTab() {
-            return newPage();
+            return newPage(new CommandOptions());
+        }
+
+        public Page newTab(CommandOptions options) {
+            return newPage(options);
+        }
+
+        public synchronized String ping() {
+            return ping("ping");
         }
 
         public synchronized String ping(String message) {
@@ -536,7 +587,7 @@ public final class Allwright {
         }
     }
 
-    public static final class Page {
+    public static final class Page implements AutoCloseable {
         private final RuntimeClient runtime;
         private final String browserSessionId;
         private final String sessionId;
@@ -557,14 +608,27 @@ public final class Allwright {
             return sessionId;
         }
 
+        public Locator locator(String selector) {
+            return new Locator(this, selector);
+        }
+
         public synchronized NavigateResult goTo(String url) {
+            return goTo(url, new CommandOptions());
+        }
+
+        public synchronized NavigateResult goTo(String url, CommandOptions options) {
             StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
             ensureOpen();
+            CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+            NavigateTabCommand.Builder navigate = NavigateTabCommand.newBuilder().setUrl(url);
+            if (hasTimeout(resolvedOptions.timeoutMs())) {
+                navigate.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
+            }
             handle.send(
                     TabSessionCommand.newBuilder()
                             .setBrowserSessionId(browserSessionId)
                             .setTabSessionId(sessionId)
-                            .setNavigate(NavigateTabCommand.newBuilder().setUrl(url).build())
+                            .setNavigate(navigate)
                             .build()
             );
 
@@ -605,17 +669,30 @@ public final class Allwright {
         }
 
         public synchronized NavigateResult navigate(String url) {
-            return goTo(url);
+            return goTo(url, new CommandOptions());
+        }
+
+        public synchronized NavigateResult navigate(String url, CommandOptions options) {
+            return goTo(url, options);
         }
 
         public synchronized ClickResult click(String selector) {
+            return click(selector, new CommandOptions());
+        }
+
+        public synchronized ClickResult click(String selector, CommandOptions options) {
             StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
             ensureOpen();
+            CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+            ClickElementCommand.Builder click = ClickElementCommand.newBuilder().setCssSelector(selector);
+            if (hasTimeout(resolvedOptions.timeoutMs())) {
+                click.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
+            }
             handle.send(
                     TabSessionCommand.newBuilder()
                             .setBrowserSessionId(browserSessionId)
                             .setTabSessionId(sessionId)
-                            .setClickElement(ClickElementCommand.newBuilder().setCssSelector(selector).build())
+                            .setClickElement(click)
                             .build()
             );
 
@@ -640,6 +717,300 @@ public final class Allwright {
                     }
                 }
             }
+        }
+
+        public synchronized CountResult count(String selector) {
+            return count(selector, new CommandOptions());
+        }
+
+        public synchronized CountResult count(String selector, CommandOptions options) {
+            StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+            ensureOpen();
+            CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+            CountElementsCommand.Builder count = CountElementsCommand.newBuilder().setCssSelector(selector);
+            if (hasTimeout(resolvedOptions.timeoutMs())) {
+                count.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
+            }
+            handle.send(
+                    TabSessionCommand.newBuilder()
+                            .setBrowserSessionId(browserSessionId)
+                            .setTabSessionId(sessionId)
+                            .setCountElements(count)
+                            .build()
+            );
+
+            while (true) {
+                TabSessionEvent event = handle.recv("receive tab session event while counting elements");
+                switch (event.getEventCase()) {
+                    case ELEMENT_COUNTED -> {
+                        return new CountResult(
+                                event.getElementCounted().getCssSelector(),
+                                event.getElementCounted().getCount(),
+                                event.getElementCounted().getNote()
+                        );
+                    }
+                    case CLOSED -> {
+                        closed = true;
+                        throw new AllwrightException("page session " + sessionId + " closed while counting elements");
+                    }
+                    case ERROR -> throw new AllwrightException(
+                            "page session error while counting elements: " + event.getError().getMessage()
+                    );
+                    default -> {
+                    }
+                }
+            }
+        }
+
+        public synchronized HighlightResult highlight(String selector) {
+            return highlight(selector, new HighlightOptions());
+        }
+
+        public synchronized HighlightResult highlight(String selector, HighlightOptions options) {
+            StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+            ensureOpen();
+            HighlightOptions resolvedOptions = options == null ? new HighlightOptions() : options;
+            HighlightElementsCommand.Builder highlight = HighlightElementsCommand.newBuilder().setCssSelector(selector);
+            if (resolvedOptions.durationMs() != null && resolvedOptions.durationMs() > 0) {
+                highlight.setDurationMs(resolvedOptions.durationMs());
+            }
+            if (hasTimeout(resolvedOptions.timeoutMs())) {
+                highlight.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
+            }
+            handle.send(
+                    TabSessionCommand.newBuilder()
+                            .setBrowserSessionId(browserSessionId)
+                            .setTabSessionId(sessionId)
+                            .setHighlightElements(highlight)
+                            .build()
+            );
+
+            while (true) {
+                TabSessionEvent event = handle.recv("receive tab session event while highlighting elements");
+                switch (event.getEventCase()) {
+                    case ELEMENTS_HIGHLIGHTED -> {
+                        return new HighlightResult(
+                                event.getElementsHighlighted().getCssSelector(),
+                                event.getElementsHighlighted().getCount(),
+                                event.getElementsHighlighted().getNote()
+                        );
+                    }
+                    case CLOSED -> {
+                        closed = true;
+                        throw new AllwrightException(
+                                "page session " + sessionId + " closed while highlighting elements"
+                        );
+                    }
+                    case ERROR -> throw new AllwrightException(
+                            "page session error while highlighting elements: " + event.getError().getMessage()
+                    );
+                    default -> {
+                    }
+                }
+            }
+        }
+
+        public synchronized ElementResult focus(String selector) {
+            return focus(selector, new CommandOptions());
+        }
+
+        public synchronized ElementResult focus(String selector, CommandOptions options) {
+            CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+            FocusElementCommand.Builder focus = FocusElementCommand.newBuilder().setCssSelector(selector);
+            if (hasTimeout(resolvedOptions.timeoutMs())) {
+                focus.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
+            }
+            return performElementCommand(
+                    "focusing",
+                    TabSessionCommand.newBuilder()
+                            .setBrowserSessionId(browserSessionId)
+                            .setTabSessionId(sessionId)
+                            .setFocusElement(focus)
+                            .build(),
+                    TabSessionEvent.EventCase.ELEMENT_FOCUSED
+            );
+        }
+
+        public synchronized FillResult fill(String selector, String value) {
+            return fill(selector, value, new CommandOptions());
+        }
+
+        public synchronized FillResult fill(String selector, String value, CommandOptions options) {
+            StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+            ensureOpen();
+            CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+            FillElementCommand.Builder fill = FillElementCommand.newBuilder()
+                    .setCssSelector(selector)
+                    .setValue(value);
+            if (hasTimeout(resolvedOptions.timeoutMs())) {
+                fill.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
+            }
+            handle.send(
+                    TabSessionCommand.newBuilder()
+                            .setBrowserSessionId(browserSessionId)
+                            .setTabSessionId(sessionId)
+                            .setFillElement(fill)
+                            .build()
+            );
+
+            while (true) {
+                TabSessionEvent event = handle.recv("receive tab session event while filling");
+                switch (event.getEventCase()) {
+                    case ELEMENT_FILLED -> {
+                        return new FillResult(
+                                event.getElementFilled().getCssSelector(),
+                                event.getElementFilled().getValue(),
+                                event.getElementFilled().getNote()
+                        );
+                    }
+                    case CLOSED -> {
+                        closed = true;
+                        throw new AllwrightException("page session " + sessionId + " closed while filling");
+                    }
+                    case ERROR -> throw new AllwrightException(
+                            "page session error while filling: " + event.getError().getMessage()
+                    );
+                    default -> {
+                    }
+                }
+            }
+        }
+
+        public synchronized ElementResult hover(String selector) {
+            return hover(selector, new CommandOptions());
+        }
+
+        public synchronized ElementResult hover(String selector, CommandOptions options) {
+            CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+            HoverElementCommand.Builder hover = HoverElementCommand.newBuilder().setCssSelector(selector);
+            if (hasTimeout(resolvedOptions.timeoutMs())) {
+                hover.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
+            }
+            return performElementCommand(
+                    "hovering",
+                    TabSessionCommand.newBuilder()
+                            .setBrowserSessionId(browserSessionId)
+                            .setTabSessionId(sessionId)
+                            .setHoverElement(hover)
+                            .build(),
+                    TabSessionEvent.EventCase.ELEMENT_HOVERED
+            );
+        }
+
+        public synchronized PressResult press(String selector, String key) {
+            return press(selector, key, new PressOptions());
+        }
+
+        public synchronized PressResult press(String selector, String key, PressOptions options) {
+            StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+            ensureOpen();
+            PressOptions resolvedOptions = options == null ? new PressOptions() : options;
+            PressKeyCommand.Builder press = PressKeyCommand.newBuilder()
+                    .setCssSelector(selector)
+                    .setKey(key);
+            if (resolvedOptions.text() != null && !resolvedOptions.text().isBlank()) {
+                press.setText(resolvedOptions.text());
+            }
+            if (hasTimeout(resolvedOptions.timeoutMs())) {
+                press.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
+            }
+            handle.send(
+                    TabSessionCommand.newBuilder()
+                            .setBrowserSessionId(browserSessionId)
+                            .setTabSessionId(sessionId)
+                            .setPressKey(press)
+                            .build()
+            );
+
+            while (true) {
+                TabSessionEvent event = handle.recv("receive tab session event while pressing key");
+                switch (event.getEventCase()) {
+                    case KEY_PRESSED -> {
+                        return new PressResult(
+                                event.getKeyPressed().getCssSelector(),
+                                event.getKeyPressed().getKey(),
+                                event.getKeyPressed().getNote()
+                        );
+                    }
+                    case CLOSED -> {
+                        closed = true;
+                        throw new AllwrightException("page session " + sessionId + " closed while pressing key");
+                    }
+                    case ERROR -> throw new AllwrightException(
+                            "page session error while pressing key: " + event.getError().getMessage()
+                    );
+                    default -> {
+                    }
+                }
+            }
+        }
+
+        public synchronized TextResult textContent(String selector) {
+            return textContent(selector, new CommandOptions());
+        }
+
+        public synchronized TextResult textContent(String selector, CommandOptions options) {
+            return readText(selector, options, true);
+        }
+
+        public synchronized TextResult innerText(String selector) {
+            return innerText(selector, new CommandOptions());
+        }
+
+        public synchronized TextResult innerText(String selector, CommandOptions options) {
+            return readText(selector, options, false);
+        }
+
+        public synchronized WaitForSelectorResult waitForSelector(String selector) {
+            return waitForSelector(selector, new WaitForSelectorOptions());
+        }
+
+        public synchronized WaitForSelectorResult waitForSelector(String selector, WaitForSelectorOptions options) {
+            StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+            ensureOpen();
+            WaitForSelectorOptions resolvedOptions = options == null ? new WaitForSelectorOptions() : options;
+            WaitForSelectorCommand.Builder waitForSelector = WaitForSelectorCommand.newBuilder().setCssSelector(selector);
+            if (resolvedOptions.visible() != null) {
+                waitForSelector.setVisible(resolvedOptions.visible());
+            }
+            if (hasTimeout(resolvedOptions.timeoutMs())) {
+                waitForSelector.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
+            }
+            handle.send(
+                    TabSessionCommand.newBuilder()
+                            .setBrowserSessionId(browserSessionId)
+                            .setTabSessionId(sessionId)
+                            .setWaitForSelector(waitForSelector)
+                            .build()
+            );
+
+            while (true) {
+                TabSessionEvent event = handle.recv("receive tab session event while waiting for selector");
+                switch (event.getEventCase()) {
+                    case SELECTOR_WAIT_SATISFIED -> {
+                        return new WaitForSelectorResult(
+                                event.getSelectorWaitSatisfied().getCssSelector(),
+                                event.getSelectorWaitSatisfied().getVisible(),
+                                event.getSelectorWaitSatisfied().getNote()
+                        );
+                    }
+                    case CLOSED -> {
+                        closed = true;
+                        throw new AllwrightException(
+                                "page session " + sessionId + " closed while waiting for selector"
+                        );
+                    }
+                    case ERROR -> throw new AllwrightException(
+                            "page session error while waiting for selector: " + event.getError().getMessage()
+                    );
+                    default -> {
+                    }
+                }
+            }
+        }
+
+        public synchronized String ping() {
+            return ping("ping");
         }
 
         public synchronized String ping(String message) {
@@ -709,6 +1080,111 @@ public final class Allwright {
             }
         }
 
+        private ElementResult performElementCommand(
+                String action,
+                TabSessionCommand command,
+                TabSessionEvent.EventCase successCase
+        ) {
+            StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+            ensureOpen();
+            handle.send(command);
+
+            while (true) {
+                TabSessionEvent event = handle.recv("receive tab session event while " + action);
+                switch (event.getEventCase()) {
+                    case ELEMENT_FOCUSED -> {
+                        if (successCase == TabSessionEvent.EventCase.ELEMENT_FOCUSED) {
+                            return new ElementResult(
+                                    event.getElementFocused().getCssSelector(),
+                                    event.getElementFocused().getNote()
+                            );
+                        }
+                    }
+                    case ELEMENT_HOVERED -> {
+                        if (successCase == TabSessionEvent.EventCase.ELEMENT_HOVERED) {
+                            return new ElementResult(
+                                    event.getElementHovered().getCssSelector(),
+                                    event.getElementHovered().getNote()
+                            );
+                        }
+                    }
+                    case CLOSED -> {
+                        closed = true;
+                        throw new AllwrightException("page session " + sessionId + " closed while " + action);
+                    }
+                    case ERROR -> throw new AllwrightException(
+                            "page session error while " + action + ": " + event.getError().getMessage()
+                    );
+                    default -> {
+                    }
+                }
+            }
+        }
+
+        private TextResult readText(String selector, CommandOptions options, boolean textContent) {
+            StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+            ensureOpen();
+            CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+            TabSessionCommand.Builder command = TabSessionCommand.newBuilder()
+                    .setBrowserSessionId(browserSessionId)
+                    .setTabSessionId(sessionId);
+            if (textContent) {
+                GetTextContentCommand.Builder getTextContent = GetTextContentCommand.newBuilder().setCssSelector(selector);
+                if (hasTimeout(resolvedOptions.timeoutMs())) {
+                    getTextContent.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
+                }
+                command.setGetTextContent(getTextContent);
+            } else {
+                GetInnerTextCommand.Builder getInnerText = GetInnerTextCommand.newBuilder().setCssSelector(selector);
+                if (hasTimeout(resolvedOptions.timeoutMs())) {
+                    getInnerText.setRetryOptions(commandRetryOptions(resolvedOptions.timeoutMs()));
+                }
+                command.setGetInnerText(getInnerText);
+            }
+            handle.send(command.build());
+
+            while (true) {
+                TabSessionEvent event = handle.recv(
+                        "receive tab session event while " + (textContent ? "reading text content" : "reading inner text")
+                );
+                switch (event.getEventCase()) {
+                    case TEXT_CONTENT_RESOLVED -> {
+                        if (textContent) {
+                            return new TextResult(
+                                    event.getTextContentResolved().getCssSelector(),
+                                    event.getTextContentResolved().getText(),
+                                    event.getTextContentResolved().getNote()
+                            );
+                        }
+                    }
+                    case INNER_TEXT_RESOLVED -> {
+                        if (!textContent) {
+                            return new TextResult(
+                                    event.getInnerTextResolved().getCssSelector(),
+                                    event.getInnerTextResolved().getText(),
+                                    event.getInnerTextResolved().getNote()
+                            );
+                        }
+                    }
+                    case CLOSED -> {
+                        closed = true;
+                        throw new AllwrightException(
+                                "page session " + sessionId + " closed while "
+                                        + (textContent ? "reading text content" : "reading inner text")
+                        );
+                    }
+                    case ERROR -> throw new AllwrightException(
+                            "page session error while "
+                                    + (textContent ? "reading text content" : "reading inner text")
+                                    + ": "
+                                    + event.getError().getMessage()
+                    );
+                    default -> {
+                    }
+                }
+            }
+        }
+
         private StreamHandle<TabSessionCommand, TabSessionEvent> ensureStream() {
             if (stream == null) {
                 stream = new StreamHandle<>(runtime.asyncStub::tabSession);
@@ -742,40 +1218,80 @@ public final class Allwright {
             return page.click(selector);
         }
 
+        public ClickResult click(CommandOptions options) {
+            return page.click(selector, options);
+        }
+
         public CountResult count() {
             return page.count(selector);
+        }
+
+        public CountResult count(CommandOptions options) {
+            return page.count(selector, options);
         }
 
         public HighlightResult highlight() {
             return page.highlight(selector);
         }
 
+        public HighlightResult highlight(HighlightOptions options) {
+            return page.highlight(selector, options);
+        }
+
         public ElementResult focus() {
             return page.focus(selector);
+        }
+
+        public ElementResult focus(CommandOptions options) {
+            return page.focus(selector, options);
         }
 
         public FillResult fill(String value) {
             return page.fill(selector, value);
         }
 
+        public FillResult fill(String value, CommandOptions options) {
+            return page.fill(selector, value, options);
+        }
+
         public ElementResult hover() {
             return page.hover(selector);
+        }
+
+        public ElementResult hover(CommandOptions options) {
+            return page.hover(selector, options);
         }
 
         public PressResult press(String key) {
             return page.press(selector, key);
         }
 
+        public PressResult press(String key, PressOptions options) {
+            return page.press(selector, key, options);
+        }
+
         public TextResult textContent() {
             return page.textContent(selector);
+        }
+
+        public TextResult textContent(CommandOptions options) {
+            return page.textContent(selector, options);
         }
 
         public TextResult innerText() {
             return page.innerText(selector);
         }
 
+        public TextResult innerText(CommandOptions options) {
+            return page.innerText(selector, options);
+        }
+
         public WaitForSelectorResult waitFor() {
             return page.waitForSelector(selector);
+        }
+
+        public WaitForSelectorResult waitFor(WaitForSelectorOptions options) {
+            return page.waitForSelector(selector, options);
         }
     }
 

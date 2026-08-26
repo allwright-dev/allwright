@@ -28,6 +28,7 @@ node_modules/
 /java/.gradle/
 /java/build/
 /java/out/
+/.gradle-user-home/
 
 # Next.js site artifacts
 /allwright.dev/node_modules/

@@ -93,6 +93,52 @@ jobs:
         with:
           packages-dir: python/dist/
 
+  publish-java-package:
+    name: Publish Java package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ALLWRIGHT_VERSION: ${{ github.ref_name }}
+      OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+      OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+      SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+      SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Ensure Maven Central secrets are configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in OSSRH_USERNAME OSSRH_PASSWORD SIGNING_KEY SIGNING_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "${name} is not configured. Add it to the repository secrets to enable Java publishing." >&2
+              missing=1
+            fi
+          done
+          if [[ "$missing" -ne 0 ]]; then
+            exit 1
+          fi
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Publish Java package
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./java/gradlew
+          export ALLWRIGHT_VERSION="${GITHUB_REF_NAME#v}"
+          ./java/gradlew -p java publishMavenJavaPublicationToOSSRHRepository
+
   publish-npm-package:
     name: Publish npm package
     runs-on: ubuntu-latest

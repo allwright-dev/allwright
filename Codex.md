@@ -23,7 +23,9 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `rust/allwright`: `allwright-core`, the Rust engine crate containing the high-level Rust client API, the single gRPC server host, the runtime plugin loader, and the shared plugin catalog
 - `rust/allwright-cli`: installable `allwright` CLI package that depends on `allwright-core` and installs supported plugins
 - `.github/workflows/release-surface-plugins.yml`: tag-triggered GitHub Actions workflow for root `vX.Y.Z` releases; it syncs versions from the tag, publishes Go/Python/npm/Rust packages, builds platform CLI/plugin archives, and attaches them to GitHub Releases
+- `.github/workflows/release-surface-plugins.yml` now also publishes the Java client to Maven Central via the checked-in Gradle wrapper using `OSSRH_USERNAME`, `OSSRH_PASSWORD`, `SIGNING_KEY`, and `SIGNING_PASSWORD`
 - `.github/workflows/ci.yml`: CI workflow that regenerates Rust proto bindings and fails if committed generated files are out of date
+- `.github/workflows/ci.yml` now also runs the Java client tests through the checked-in Gradle wrapper on Java 21
 - `scripts/install.sh`: Linux/macOS installer script for downloading the published `allwright` CLI release asset directly from GitHub without cloning the repo
 - `scripts/install.ps1`: Windows PowerShell installer script for downloading the published `allwright` CLI release asset directly from GitHub without cloning the repo
 - `scripts/generate-rust-proto.sh`: repo-level helper that regenerates Rust bindings from the canonical top-level `proto/` tree
@@ -43,6 +45,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `rust/allwright/examples/`: Rust example programs for exercising the lightweight engine core
 - `go/`: Go module `allwright.dev` containing generated engine stubs, the public Go client package at the module root, and Go examples
 - `java/`: Gradle-based Java client project that generates engine stubs from the shared proto and exposes a high-level browser/page API
+- `java/build.gradle.kts`: Java build now also owns Maven Central publication metadata for `dev.allwright:allwright`, conditional OSSRH publishing credentials, in-memory signing support, and JUnit 5 test wiring
 - `python/`: Python client package `allwright-python` that exposes a high-level browser/page API and bundles the shared proto files inside `python/allwright/proto/` for publishable runtime loading
 - `allwright-dev/`: standalone Next.js site for the purchased `allwright.dev` domain, intended for Vercel deployment and public-facing marketing/docs entrypoints
 - `typescript/core/`: published npm package `@allwright.dev/core`, containing the TypeScript/JavaScript client, bundled shared proto files, and examples
@@ -91,6 +94,8 @@ This instruction should be treated as ongoing project policy for all future AI c
 - Generated gRPC client code is enabled and currently consumed by `rust/allwright` and its examples.
 - Generated Go proto/gRPC code is checked in under `go/gen/allwright/engine/v1` and consumed by the Go module.
 - The Java stack generates protobuf and gRPC stubs from `proto/engine/v1/engine.proto` during the Gradle build in `java/`.
+- The Java build is now publication-ready for Maven Central under `dev.allwright`, with `publishMavenJavaPublicationToOSSRHRepository` / `publishToMavenLocal` using `ALLWRIGHT_VERSION` or Gradle property `allwrightVersion`, and signing sourced from `SIGNING_KEY` / `SIGNING_PASSWORD` or matching Gradle properties.
+- The tagged release workflow now uses `java/gradlew -p java publishMavenJavaPublicationToOSSRHRepository` on Java 21 to publish the Java client to Maven Central when OSSRH and signing secrets are configured.
 - The Python stack currently loads the bundled package-local proto files through `grpcio-tools`; published consumers must not depend on `../proto` existing outside the wheel.
 - The TypeScript/npm stack ships package-local copies of the shared top-level proto tree inside `typescript/core/proto/` rather than depending on repo-relative paths after publish.
 - The public Rust client surface should stay high-level and should not expose raw gRPC connection setup.
@@ -162,6 +167,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - The Go singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`.
 - `go/examples/playground` is the Go-side example and currently exercises a minimal browser-session test flow directly, without extra ping-style smoke commands.
 - `java/src/main/java/dev/allwright/client/Allwright.java` now provides the Java client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch(...)`, `Browser`, and `Page` methods instead of public gRPC setup.
+- The Java `Browser` and `Page` types now implement `AutoCloseable` for try-with-resources usage, `Browser.pages()` mirrors the other client libraries, and `Page` now includes the same locator-backed selector actions (`count`, `highlight`, `focus`, `fill`, `hover`, `press`, `textContent`, `innerText`, `waitForSelector`) that `Locator` already expected.
 - The Java singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and supports in-process override with `Allwright.setServerAddr(...)`.
 - `python/allwright/client.py` now provides the Python client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch()`, `Browser`, and `Page` methods instead of public grpc setup.
 - The Python singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and supports in-process override with `set_server_addr(...)`.

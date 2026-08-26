@@ -26,3 +26,24 @@ jobs:
 
       - name: Ensure generated Rust proto is committed
         run: git diff --exit-code -- rust/allwright/src/proto_generated.rs
+
+  test-java-client:
+    name: Test Java client
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Run Java tests
+        shell: bash
+        run: |
+          chmod +x ./java/gradlew
+          ./java/gradlew -p java test

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package allwright.engine.v1;
 option go_package = "allwright.dev/gen/allwright/engine/v1;enginev1";
+option java_package = "dev.allwright.engine.v1";
+option java_multiple_files = true;
 
 import "core/v1/common.proto";
 import "surfaces/web/v1/web.proto";

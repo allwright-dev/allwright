@@ -8,17 +8,37 @@ The project generates Java protobuf and gRPC stubs from the shared `../proto/eng
 
 ```bash
 cd java
-gradle build
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+./gradlew build
 ```
+
+## Publish Prep
+
+The Java artifact is configured for Maven Central publication under `dev.allwright`.
+
+```bash
+cd java
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+ALLWRIGHT_VERSION=0.0.7 ./gradlew publishToMavenLocal
+```
+
+For Sonatype publishing, provide:
+
+- `OSSRH_USERNAME`
+- `OSSRH_PASSWORD`
+- `SIGNING_KEY`
+- `SIGNING_PASSWORD`
+
+The tagged GitHub Actions release workflow now publishes the Java artifact to Maven Central as `dev.allwright:allwright` when those secrets are configured.
 
 ## Example
 
 ```java
 import dev.allwright.client.Allwright;
 
-Allwright.Browser browser = Allwright.firefox().launch();
-Allwright.Page page = browser.page();
-page.goTo("https://example.com");
-page.click("h1");
-browser.close();
+try (Allwright.Browser browser = Allwright.firefox().launch()) {
+    Allwright.Page page = browser.page();
+    page.goTo("https://example.com");
+    page.click("h1");
+}
 ```

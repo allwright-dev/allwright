@@ -32,9 +32,11 @@ cargo_files = [
     repo_root / "rust" / "allwright" / "Cargo.toml",
     repo_root / "rust" / "allwright-cli" / "Cargo.toml",
 ]
+java_build_file = repo_root / "java" / "build.gradle.kts"
 
 workspace_pattern = re.compile(r'(?m)^version = "[^"]+"$')
 dependency_pattern = re.compile(r'version = "\d+\.\d+\.\d+"')
+java_version_pattern = re.compile(r'\.orElse\("\d+\.\d+\.\d+"\)')
 
 for path in cargo_files:
     text = path.read_text()
@@ -45,6 +47,12 @@ for path in cargo_files:
     else:
         text = dependency_pattern.sub(f'version = "{version}"', text)
     path.write_text(text)
+
+java_text = java_build_file.read_text()
+java_text, count = java_version_pattern.subn(f'.orElse("{version}")', java_text, count=1)
+if count != 1:
+    raise SystemExit(f"failed to update Java version fallback in {java_build_file}")
+java_build_file.write_text(java_text)
 PY
 
 cargo generate-lockfile --manifest-path "$repo_root/Cargo.toml"
