@@ -79,11 +79,7 @@ fn handle_plugin_command(command: PluginCommand) -> Result<(), Box<dyn Error>> {
                     .unwrap_or_else(|| "available".to_string());
                 println!(
                     "{}\t{}\t{}\t{}\t{}",
-                    plugin.id,
-                    plugin.package_name,
-                    plugin.version,
-                    status,
-                    plugin.description
+                    plugin.id, plugin.package_name, plugin.version, status, plugin.description
                 );
             }
         }
@@ -110,7 +106,12 @@ fn handle_plugin_command(command: PluginCommand) -> Result<(), Box<dyn Error>> {
                 ensure_plugin_install_supported(package.id)?;
                 let target_version = version.as_deref().unwrap_or(package.version);
                 install_plugin_package(package.package_name, target_version, package.id)?;
-                upsert_plugin(&mut installed, package.id, package.package_name, target_version);
+                upsert_plugin(
+                    &mut installed,
+                    package.id,
+                    package.package_name,
+                    target_version,
+                );
                 println!(
                     "Installed plugin `{}` -> {}@{}",
                     package.id, package.package_name, target_version
@@ -165,8 +166,12 @@ fn read_installed_plugins() -> Result<Vec<InstalledPlugin>, Box<dyn Error>> {
         }
         let mut parts = trimmed.splitn(3, '\t');
         let Some(id) = parts.next() else { continue };
-        let Some(package_name) = parts.next() else { continue };
-        let Some(version) = parts.next() else { continue };
+        let Some(package_name) = parts.next() else {
+            continue;
+        };
+        let Some(version) = parts.next() else {
+            continue;
+        };
         plugins.push(InstalledPlugin {
             id: id.to_string(),
             package_name: package_name.to_string(),
@@ -192,7 +197,10 @@ fn install_plugin_package(
     );
 
     if install_root.exists() {
-        println!("Removing previous installation at {}...", install_root.display());
+        println!(
+            "Removing previous installation at {}...",
+            install_root.display()
+        );
         fs::remove_dir_all(&install_root)?;
     }
     println!("Preparing install directory {}...", install_root.display());
@@ -246,7 +254,10 @@ fn plugin_runtime_artifact_filename(plugin_id: &str) -> String {
             "lib{}.so",
             plugin_runtime_artifact_stem(plugin_id).replace('-', "_")
         ),
-        "windows" => format!("{}.dll", plugin_runtime_artifact_stem(plugin_id).replace('-', "_")),
+        "windows" => format!(
+            "{}.dll",
+            plugin_runtime_artifact_stem(plugin_id).replace('-', "_")
+        ),
         _ => plugin_runtime_artifact_stem(plugin_id).to_string(),
     }
 }
@@ -280,10 +291,9 @@ fn release_target_platform() -> Result<(&'static str, &'static str), Box<dyn Err
         ("linux", "x86_64") => Ok(("x86_64-unknown-linux-gnu", "tar.gz")),
         ("windows", "aarch64") => Ok(("aarch64-pc-windows-msvc", "zip")),
         ("windows", "x86_64") => Ok(("x86_64-pc-windows-msvc", "zip")),
-        (os, arch) => Err(format!(
-            "unsupported platform for plugin downloads: os={os}, arch={arch}"
-        )
-        .into()),
+        (os, arch) => {
+            Err(format!("unsupported platform for plugin downloads: os={os}, arch={arch}").into())
+        }
     }
 }
 
@@ -295,9 +305,10 @@ fn download_plugin_release_asset(
     let client = Client::builder()
         .timeout(Duration::from_secs(120))
         .build()?;
-    let mut request = client
-        .get(&url)
-        .header("User-Agent", format!("allwright-cli/{}", env!("CARGO_PKG_VERSION")));
+    let mut request = client.get(&url).header(
+        "User-Agent",
+        format!("allwright-cli/{}", env!("CARGO_PKG_VERSION")),
+    );
 
     if let Ok(token) = env::var("ALLWRIGHT_GITHUB_TOKEN") {
         if !token.trim().is_empty() {
@@ -326,9 +337,7 @@ fn download_plugin_release_asset(
             Some(total) if total > 0 => {
                 let percent = downloaded.saturating_mul(100) / total;
                 if percent >= next_progress_marker || downloaded == total {
-                    println!(
-                        "Downloaded {downloaded}/{total} bytes ({percent}%)..."
-                    );
+                    println!("Downloaded {downloaded}/{total} bytes ({percent}%)...");
                     next_progress_marker = percent.saturating_add(10);
                 }
             }

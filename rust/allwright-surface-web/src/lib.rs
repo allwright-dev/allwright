@@ -17,6 +17,7 @@ use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{Value, json};
 use std::collections::HashMap;
+use std::sync::OnceLock;
 use tokio::net::TcpStream;
 use tokio::sync::{Mutex, MutexGuard};
 use tokio::time::{Duration, sleep};
@@ -24,7 +25,6 @@ use tokio_tungstenite::MaybeTlsStream;
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
-use std::sync::OnceLock;
 
 #[derive(Debug, Clone, PartialEq)]
 struct DiscoveredElements {
@@ -128,7 +128,10 @@ pub fn close_browser_process(process_id: u32) -> Result<(), String> {
     close_browser_process_for_platform(process_id)
 }
 
-pub fn launch_browser(browser_kind: BrowserKind, browser_binary: Option<&str>) -> Result<BrowserLaunchInfo, String> {
+pub fn launch_browser(
+    browser_kind: BrowserKind,
+    browser_binary: Option<&str>,
+) -> Result<BrowserLaunchInfo, String> {
     match browser_kind {
         BrowserKind::Chromium => {
             let launch = open_chrome_window(browser_binary)?;
@@ -157,9 +160,7 @@ pub fn launch_browser(browser_kind: BrowserKind, browser_binary: Option<&str>) -
     }
 }
 
-pub async fn open_page(
-    browser_session: &BrowserSessionHandle,
-) -> Result<PageInfo, String> {
+pub async fn open_page(browser_session: &BrowserSessionHandle) -> Result<PageInfo, String> {
     match browser_session {
         BrowserSessionHandle::Chromium { cdp_websocket_url } => {
             let tab = open_chrome_tab(cdp_websocket_url).await?;
@@ -171,9 +172,7 @@ pub async fn open_page(
                 },
             })
         }
-        BrowserSessionHandle::Firefox {
-            connection_id, ..
-        } => {
+        BrowserSessionHandle::Firefox { connection_id, .. } => {
             let mut sessions = firefox_session_guard(connection_id).await?;
             let bidi = &mut sessions
                 .get_mut(connection_id)
@@ -208,9 +207,7 @@ pub async fn close_page(
             PageSessionHandle::Chromium { target_id, .. },
         ) => close_chrome_tab(cdp_websocket_url, target_id).await,
         (
-            BrowserSessionHandle::Firefox {
-                connection_id, ..
-            },
+            BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
                 browsing_context_id,
             },
@@ -779,7 +776,9 @@ pub async fn click_element(
             .await?;
             Ok(ClickInfo {
                 css_selector: css_selector.to_string(),
-                note: format!("clicked element via Firefox WebDriver BiDi using css selector {css_selector}"),
+                note: format!(
+                    "clicked element via Firefox WebDriver BiDi using css selector {css_selector}"
+                ),
                 bidi_session_id: bidi_session_id.clone(),
             })
         }
@@ -798,9 +797,7 @@ pub async fn count_elements(
             PageSessionHandle::Chromium { target_id, .. },
         ) => count_elements_via_cdp(cdp_websocket_url, target_id, css_selector).await,
         (
-            BrowserSessionHandle::Firefox {
-                connection_id, ..
-            },
+            BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
                 browsing_context_id,
             },
@@ -840,17 +837,17 @@ pub async fn highlight_elements(
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
             PageSessionHandle::Chromium { target_id, .. },
-        ) => highlight_elements_via_cdp(
-            cdp_websocket_url,
-            target_id,
-            css_selector,
-            u32::try_from(duration_ms).unwrap_or(u32::MAX),
-        )
-        .await,
+        ) => {
+            highlight_elements_via_cdp(
+                cdp_websocket_url,
+                target_id,
+                css_selector,
+                u32::try_from(duration_ms).unwrap_or(u32::MAX),
+            )
+            .await
+        }
         (
-            BrowserSessionHandle::Firefox {
-                connection_id, ..
-            },
+            BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
                 browsing_context_id,
             },
@@ -916,9 +913,7 @@ pub async fn focus_element(
             PageSessionHandle::Chromium { target_id, .. },
         ) => focus_element_via_cdp(cdp_websocket_url, target_id, css_selector).await,
         (
-            BrowserSessionHandle::Firefox {
-                connection_id, ..
-            },
+            BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
                 browsing_context_id,
             },
@@ -970,9 +965,7 @@ pub async fn fill_element(
             PageSessionHandle::Chromium { target_id, .. },
         ) => fill_element_via_cdp(cdp_websocket_url, target_id, css_selector, value).await,
         (
-            BrowserSessionHandle::Firefox {
-                connection_id, ..
-            },
+            BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
                 browsing_context_id,
             },
@@ -1013,9 +1006,7 @@ pub async fn hover_element(
             PageSessionHandle::Chromium { target_id, .. },
         ) => hover_element_via_cdp(cdp_websocket_url, target_id, css_selector).await,
         (
-            BrowserSessionHandle::Firefox {
-                connection_id, ..
-            },
+            BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
                 browsing_context_id,
             },
@@ -1070,9 +1061,7 @@ pub async fn press_key(
             PageSessionHandle::Chromium { target_id, .. },
         ) => press_key_via_cdp(cdp_websocket_url, target_id, css_selector, key, text).await,
         (
-            BrowserSessionHandle::Firefox {
-                connection_id, ..
-            },
+            BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
                 browsing_context_id,
             },
@@ -1137,13 +1126,19 @@ pub async fn get_text_content(
             PageSessionHandle::Chromium { target_id, .. },
         ) => get_text_content_via_cdp(cdp_websocket_url, target_id, css_selector).await,
         (
-            BrowserSessionHandle::Firefox {
-                connection_id, ..
-            },
+            BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
                 browsing_context_id,
             },
-        ) => firefox_get_text(connection_id, browsing_context_id, css_selector, "textContent").await,
+        ) => {
+            firefox_get_text(
+                connection_id,
+                browsing_context_id,
+                css_selector,
+                "textContent",
+            )
+            .await
+        }
         _ => Err("browser/page backend mismatch while resolving textContent".to_string()),
     }
 }
@@ -1159,13 +1154,19 @@ pub async fn get_inner_text(
             PageSessionHandle::Chromium { target_id, .. },
         ) => get_inner_text_via_cdp(cdp_websocket_url, target_id, css_selector).await,
         (
-            BrowserSessionHandle::Firefox {
-                connection_id, ..
-            },
+            BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
                 browsing_context_id,
             },
-        ) => firefox_get_text(connection_id, browsing_context_id, css_selector, "innerText").await,
+        ) => {
+            firefox_get_text(
+                connection_id,
+                browsing_context_id,
+                css_selector,
+                "innerText",
+            )
+            .await
+        }
         _ => Err("browser/page backend mismatch while resolving innerText".to_string()),
     }
 }
@@ -1182,9 +1183,7 @@ pub async fn wait_for_selector(
             PageSessionHandle::Chromium { target_id, .. },
         ) => wait_for_selector_via_cdp(cdp_websocket_url, target_id, css_selector, visible).await,
         (
-            BrowserSessionHandle::Firefox {
-                connection_id, ..
-            },
+            BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
                 browsing_context_id,
             },
@@ -1341,10 +1340,7 @@ async fn get_text_via_cdp(
     })
 }
 
-fn dom_set_value_and_dispatch_events_js(
-    selector_literal: &str,
-    value_literal: &str,
-) -> String {
+fn dom_set_value_and_dispatch_events_js(selector_literal: &str, value_literal: &str) -> String {
     format!(
         "(() => {{
             const selector = {selector_literal};
@@ -1550,9 +1546,9 @@ fn parse_devtools_active_port(contents: &str) -> Result<String, String> {
 
 #[cfg(target_os = "macos")]
 fn launch_firefox_with_bidi(browser_binary: Option<&str>) -> Result<BrowserLaunchInfo, String> {
-    let browser_binary = browser_binary.map(ToOwned::to_owned).unwrap_or_else(|| {
-        "/Applications/Firefox.app/Contents/MacOS/firefox".to_string()
-    });
+    let browser_binary = browser_binary
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| "/Applications/Firefox.app/Contents/MacOS/firefox".to_string());
     launch_firefox_with_remote_agent(&browser_binary)
 }
 
@@ -1748,7 +1744,10 @@ async fn firefox_evaluate_json(
         .await?;
     let result_type = json_string(&result, "/result/type")?;
     if result_type != "success" {
-        let details = result.pointer("/result/exceptionDetails").cloned().unwrap_or(Value::Null);
+        let details = result
+            .pointer("/result/exceptionDetails")
+            .cloned()
+            .unwrap_or(Value::Null);
         return Err(format!("Firefox script.evaluate failed: {details}"));
     }
     let value = json_string(&result, "/result/result/value")?;
@@ -1789,7 +1788,9 @@ async fn firefox_evaluate_u32(
         return u32::try_from(number)
             .map_err(|_| format!("Firefox script result is out of range for u32: {number}"));
     }
-    Err(format!("expected numeric Firefox script result, found {value}"))
+    Err(format!(
+        "expected numeric Firefox script result, found {value}"
+    ))
 }
 
 async fn firefox_evaluate_bool(
@@ -1803,7 +1804,9 @@ async fn firefox_evaluate_bool(
         &format!("JSON.stringify({expression})"),
     )
     .await?;
-    value.as_bool().ok_or_else(|| format!("expected boolean Firefox script result, found {value}"))
+    value
+        .as_bool()
+        .ok_or_else(|| format!("expected boolean Firefox script result, found {value}"))
 }
 
 async fn firefox_get_text(
@@ -1840,10 +1843,7 @@ async fn firefox_get_text(
 
     Ok(TextInfo {
         css_selector: css_selector.to_string(),
-        text: value
-            .as_str()
-            .map(str::to_string)
-            .unwrap_or_default(),
+        text: value.as_str().map(str::to_string).unwrap_or_default(),
         note: format!("resolved {property} for css selector {css_selector}"),
     })
 }
@@ -2544,7 +2544,9 @@ impl BidiConnection {
                     .get("message")
                     .and_then(Value::as_str)
                     .unwrap_or("unknown WebDriver BiDi error");
-                return Err(format!("WebDriver BiDi command {method} returned {error}: {message_text}"));
+                return Err(format!(
+                    "WebDriver BiDi command {method} returned {error}: {message_text}"
+                ));
             }
 
             return Ok(message);
@@ -2584,7 +2586,9 @@ impl BidiConnection {
                 .next()
                 .await
                 .ok_or_else(|| "WebDriver BiDi websocket closed unexpectedly".to_string())?
-                .map_err(|error| format!("failed to read WebDriver BiDi websocket message: {error}"))?;
+                .map_err(|error| {
+                    format!("failed to read WebDriver BiDi websocket message: {error}")
+                })?;
 
             match message {
                 Message::Text(text) => {
@@ -2603,7 +2607,9 @@ impl BidiConnection {
                     self.socket
                         .send(Message::Pong(payload))
                         .await
-                        .map_err(|error| format!("failed to reply to WebDriver BiDi ping: {error}"))?;
+                        .map_err(|error| {
+                            format!("failed to reply to WebDriver BiDi ping: {error}")
+                        })?;
                 }
                 Message::Pong(_) => {}
                 Message::Frame(_) => {}
@@ -2742,9 +2748,13 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
         PluginCommand::LaunchBrowser {
             browser_kind,
             browser_binary,
-        } => launch_browser(browser_kind, browser_binary.as_deref()).map(PluginResult::LaunchBrowser),
+        } => {
+            launch_browser(browser_kind, browser_binary.as_deref()).map(PluginResult::LaunchBrowser)
+        }
         PluginCommand::OpenPage { browser_session } => block_on_plugin_future(async move {
-            open_page(&browser_session).await.map(PluginResult::OpenPage)
+            open_page(&browser_session)
+                .await
+                .map(PluginResult::OpenPage)
         }),
         PluginCommand::ClosePage {
             browser_session,
@@ -2872,12 +2882,10 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
                 Ok(PluginResult::DiscoverInitialTab(result))
             })
         }
-        PluginCommand::OpenChromeTab { cdp_websocket_url } => {
-            block_on_plugin_future(async move {
-                let result = open_chrome_tab(&cdp_websocket_url).await?;
-                Ok(PluginResult::OpenChromeTab(result))
-            })
-        }
+        PluginCommand::OpenChromeTab { cdp_websocket_url } => block_on_plugin_future(async move {
+            let result = open_chrome_tab(&cdp_websocket_url).await?;
+            Ok(PluginResult::OpenChromeTab(result))
+        }),
         PluginCommand::CloseBrowserProcess { process_id } => {
             close_browser_process(process_id)?;
             Ok(PluginResult::CloseBrowserProcess)
@@ -2926,7 +2934,8 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             target_id,
             css_selector,
         } => block_on_plugin_future(async move {
-            let result = click_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
+            let result =
+                click_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
             Ok(PluginResult::ClickElementViaCdp(result))
         }),
         PluginCommand::CountElementsViaCdp {
@@ -2934,7 +2943,8 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             target_id,
             css_selector,
         } => block_on_plugin_future(async move {
-            let result = count_elements_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
+            let result =
+                count_elements_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
             Ok(PluginResult::CountElementsViaCdp(result))
         }),
         PluginCommand::HighlightElementsViaCdp {
@@ -2945,9 +2955,13 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
         } => block_on_plugin_future(async move {
             let duration_ms = u32::try_from(duration_ms)
                 .map_err(|_| format!("highlight duration {duration_ms} exceeds u32"))?;
-            let result =
-                highlight_elements_via_cdp(&cdp_websocket_url, &target_id, &css_selector, duration_ms)
-                    .await?;
+            let result = highlight_elements_via_cdp(
+                &cdp_websocket_url,
+                &target_id,
+                &css_selector,
+                duration_ms,
+            )
+            .await?;
             Ok(PluginResult::HighlightElementsViaCdp(result))
         }),
         PluginCommand::FocusElementViaCdp {
@@ -2955,7 +2969,8 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             target_id,
             css_selector,
         } => block_on_plugin_future(async move {
-            let result = focus_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
+            let result =
+                focus_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
             Ok(PluginResult::FocusElementViaCdp(result))
         }),
         PluginCommand::FillElementViaCdp {
@@ -2973,7 +2988,8 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             target_id,
             css_selector,
         } => block_on_plugin_future(async move {
-            let result = hover_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
+            let result =
+                hover_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
             Ok(PluginResult::HoverElementViaCdp(result))
         }),
         PluginCommand::PressKeyViaCdp {
@@ -3007,7 +3023,8 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             target_id,
             css_selector,
         } => block_on_plugin_future(async move {
-            let result = get_inner_text_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
+            let result =
+                get_inner_text_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
             Ok(PluginResult::GetInnerTextViaCdp(result))
         }),
         PluginCommand::WaitForSelectorViaCdp {
@@ -3043,18 +3060,14 @@ pub unsafe extern "C" fn allwright_plugin_invoke(request_json: *const c_char) ->
     let request = match unsafe { CStr::from_ptr(request_json) }.to_str() {
         Ok(request) => request,
         Err(error) => {
-            return plugin_response(Err(format!(
-                "plugin request is not valid UTF-8: {error}"
-            )));
+            return plugin_response(Err(format!("plugin request is not valid UTF-8: {error}")));
         }
     };
 
     let command: PluginCommand = match serde_json::from_str(request) {
         Ok(command) => command,
         Err(error) => {
-            return plugin_response(Err(format!(
-                "failed to parse plugin request JSON: {error}"
-            )));
+            return plugin_response(Err(format!("failed to parse plugin request JSON: {error}")));
         }
     };
 

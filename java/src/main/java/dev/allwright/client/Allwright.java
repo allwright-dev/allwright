@@ -6,15 +6,29 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
+import org.yaml.snakeyaml.Yaml;
 
 public final class Allwright {
     public static final String DEFAULT_SERVER_ADDR = "127.0.0.1:50051";
     public static final String SERVER_ADDR_ENV_VAR = "ALLWRIGHT_SERVER_ADDR";
+    private static final List<String> CONFIG_FILENAMES = List.of(
+            "allwright.config.yaml",
+            "allwright.config.yml",
+            "allwright.config.json",
+            ".allwright/config.yaml",
+            ".allwright/config.yml",
+            ".allwright/config.json"
+    );
 
     private static final Object RUNTIME_LOCK = new Object();
     private static RuntimeClient runtimeClient;
@@ -110,6 +124,120 @@ public final class Allwright {
         }
     }
 
+    public static Path findConfigFile() {
+        return findConfigFile(Path.of("").toAbsolutePath());
+    }
+
+    public static Path findConfigFile(Path startDir) {
+        Path currentDir = Objects.requireNonNull(startDir, "startDir").toAbsolutePath().normalize();
+        while (true) {
+            for (String filename : CONFIG_FILENAMES) {
+                Path candidate = currentDir.resolve(filename);
+                if (Files.isRegularFile(candidate)) {
+                    return candidate;
+                }
+            }
+            Path parent = currentDir.getParent();
+            if (parent == null) {
+                return null;
+            }
+            currentDir = parent;
+        }
+    }
+
+    public static AllwrightConfig loadConfigFile(Path configFile) {
+        Path resolved = Objects.requireNonNull(configFile, "configFile").toAbsolutePath().normalize();
+        try {
+            Object loaded = new Yaml().load(Files.readString(resolved));
+            if (!(loaded instanceof Map<?, ?> root)) {
+                throw new AllwrightException("allwright config " + resolved + " must contain a top-level object");
+            }
+            validateConfigShape(root, resolved);
+            return new AllwrightConfig(
+                    integerValue(root.get("schemaVersion")),
+                    mapValue(root.get("server")),
+                    mapValue(root.get("browser")),
+                    retryConfigValue(root.get("expect")),
+                    suiteMapValue(root.get("suites"))
+            );
+        } catch (IOException exception) {
+            throw new AllwrightException("read allwright config " + resolved + ": " + exception.getMessage(), exception);
+        }
+    }
+
+    public static ResolvedConfig resolveConfig() {
+        return resolveConfig(new ResolveConfigOptions());
+    }
+
+    public static ResolvedConfig resolveConfig(ResolveConfigOptions options) {
+        ResolveConfigOptions resolvedOptions = options == null ? new ResolveConfigOptions() : options;
+        Path configFilePath = resolvedOptions.configFile() != null
+                ? resolvedOptions.configFile().toAbsolutePath().normalize()
+                : findConfigFile(resolvedOptions.cwd() == null ? Path.of("").toAbsolutePath() : resolvedOptions.cwd());
+        AllwrightConfig fileConfig = configFilePath != null ? loadConfigFile(configFilePath) : new AllwrightConfig();
+        String suiteName = trimToNull(resolvedOptions.suite());
+        Map<String, Object> suiteConfig = null;
+
+        if (suiteName != null) {
+            suiteConfig = fileConfig.suites() == null ? null : fileConfig.suites().get(suiteName);
+            if (suiteConfig == null) {
+                throw new AllwrightException(
+                        "allwright config suite \"" + suiteName + "\" was not found in "
+                                + (configFilePath == null ? "the resolved config file" : configFilePath)
+                );
+            }
+        }
+
+        String browserName = firstNonBlank(
+                browserNameValue(mapValue(suiteConfig == null ? null : suiteConfig.get("browser"))),
+                browserNameValue(fileConfig.browser()),
+                "chromium"
+        );
+        String browserBinary = firstNonBlank(
+                browserBinaryValue(mapValue(suiteConfig == null ? null : suiteConfig.get("browser"))),
+                browserBinaryValue(fileConfig.browser())
+        );
+        String serverAddr = firstNonBlank(
+                serverAddrValue(mapValue(suiteConfig == null ? null : suiteConfig.get("server"))),
+                serverAddrValue(fileConfig.server())
+        );
+        LaunchOptions launchOptions = mergeLaunchOptions(
+                launchOptionsValue(fileConfig.browser()),
+                launchOptionsValue(mapValue(suiteConfig == null ? null : suiteConfig.get("browser")))
+        );
+        if (browserBinary != null) {
+            launchOptions = new LaunchOptions(browserBinary, launchOptions.timeoutMs());
+        }
+        RetryConfig expect = mergeRetryConfig(
+                fileConfig.expect(),
+                retryConfigValue(suiteConfig == null ? null : suiteConfig.get("expect"))
+        );
+
+        return new ResolvedConfig(
+                configFilePath,
+                suiteName,
+                serverAddr,
+                browserName,
+                browserBinary,
+                launchOptions,
+                expect
+        );
+    }
+
+    public static Browser launchConfiguredBrowser(ResolvedConfig config) {
+        Objects.requireNonNull(config, "config");
+        if (config.serverAddr() != null && !config.serverAddr().isBlank()) {
+            setServerAddr(config.serverAddr());
+        }
+        return switch (config.browserName()) {
+            case "firefox" -> launchFirefox(config.launchOptions());
+            case "chromium", "" -> launchChrome(config.launchOptions());
+            default -> throw new AllwrightException(
+                    "unsupported browser.name \"" + config.browserName() + "\"; use \"chromium\" or \"firefox\""
+            );
+        };
+    }
+
     private static RuntimeClient getRuntime() {
         synchronized (RUNTIME_LOCK) {
             if (runtimeClient == null) {
@@ -153,6 +281,40 @@ public final class Allwright {
             this(null, null);
         }
     }
+
+    public record RetryConfig(Integer timeoutMs, Integer intervalMs) {
+        public RetryConfig() {
+            this(null, null);
+        }
+    }
+
+    public record AllwrightConfig(
+            Integer schemaVersion,
+            Map<String, Object> server,
+            Map<String, Object> browser,
+            RetryConfig expect,
+            Map<String, Map<String, Object>> suites
+    ) {
+        public AllwrightConfig() {
+            this(null, null, null, null, null);
+        }
+    }
+
+    public record ResolveConfigOptions(Path cwd, Path configFile, String suite) {
+        public ResolveConfigOptions() {
+            this(null, null, null);
+        }
+    }
+
+    public record ResolvedConfig(
+            Path configFilePath,
+            String suiteName,
+            String serverAddr,
+            String browserName,
+            String browserBinary,
+            LaunchOptions launchOptions,
+            RetryConfig expect
+    ) {}
 
     public record CommandOptions(Integer timeoutMs) {
         public CommandOptions() {
@@ -625,6 +787,142 @@ public final class Allwright {
         public AllwrightException(String message, Throwable cause) {
             super(message, cause);
         }
+    }
+
+    private static void validateConfigShape(Map<?, ?> root, Path source) {
+        Integer schemaVersion = integerValue(root.get("schemaVersion"));
+        if (schemaVersion != null && schemaVersion != 1) {
+            throw new AllwrightException(
+                    "allwright config " + source + " has unsupported schemaVersion " + schemaVersion + "; expected 1"
+            );
+        }
+
+        String browserName = browserNameValue(mapValue(root.get("browser")));
+        if (browserName != null && !browserName.equals("chromium") && !browserName.equals("firefox")) {
+            throw new AllwrightException(
+                    "allwright config " + source + " has unsupported browser.name \"" + browserName
+                            + "\"; use \"chromium\" or \"firefox\""
+            );
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> mapValue(Object value) {
+        if (!(value instanceof Map<?, ?> map)) {
+            return null;
+        }
+        Map<String, Object> converted = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            if (entry.getKey() != null) {
+                converted.put(String.valueOf(entry.getKey()), entry.getValue());
+            }
+        }
+        return converted;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Map<String, Object>> suiteMapValue(Object value) {
+        if (!(value instanceof Map<?, ?> raw)) {
+            return null;
+        }
+        Map<String, Map<String, Object>> suites = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : raw.entrySet()) {
+            if (entry.getKey() != null) {
+                suites.put(String.valueOf(entry.getKey()), mapValue(entry.getValue()));
+            }
+        }
+        return suites;
+    }
+
+    private static RetryConfig retryConfigValue(Object value) {
+        Map<String, Object> map = mapValue(value);
+        if (map == null) {
+            return null;
+        }
+        return new RetryConfig(integerValue(map.get("timeoutMs")), integerValue(map.get("intervalMs")));
+    }
+
+    private static LaunchOptions launchOptionsValue(Map<String, Object> browser) {
+        if (browser == null) {
+            return new LaunchOptions();
+        }
+        Map<String, Object> launchOptions = mapValue(browser.get("launchOptions"));
+        if (launchOptions == null) {
+            return new LaunchOptions();
+        }
+        return new LaunchOptions(
+                trimToNull(stringValue(launchOptions.get("browserBinary"))),
+                integerValue(launchOptions.get("timeoutMs"))
+        );
+    }
+
+    private static LaunchOptions mergeLaunchOptions(LaunchOptions base, LaunchOptions override) {
+        if (override == null) {
+            return base == null ? new LaunchOptions() : base;
+        }
+        LaunchOptions resolvedBase = base == null ? new LaunchOptions() : base;
+        return new LaunchOptions(
+                firstNonBlank(override.browserBinary(), resolvedBase.browserBinary()),
+                override.timeoutMs() != null ? override.timeoutMs() : resolvedBase.timeoutMs()
+        );
+    }
+
+    private static RetryConfig mergeRetryConfig(RetryConfig base, RetryConfig override) {
+        RetryConfig resolvedBase = base == null ? new RetryConfig() : base;
+        if (override == null) {
+            return resolvedBase;
+        }
+        return new RetryConfig(
+                override.timeoutMs() != null ? override.timeoutMs() : resolvedBase.timeoutMs(),
+                override.intervalMs() != null ? override.intervalMs() : resolvedBase.intervalMs()
+        );
+    }
+
+    private static String browserNameValue(Map<String, Object> browser) {
+        return trimToNull(stringValue(browser == null ? null : browser.get("name")));
+    }
+
+    private static String browserBinaryValue(Map<String, Object> browser) {
+        return trimToNull(stringValue(browser == null ? null : browser.get("binary")));
+    }
+
+    private static String serverAddrValue(Map<String, Object> server) {
+        return trimToNull(stringValue(server == null ? null : server.get("addr")));
+    }
+
+    private static Integer integerValue(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String string && !string.isBlank()) {
+            try {
+                return Integer.parseInt(string.trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private record RuntimeClient(

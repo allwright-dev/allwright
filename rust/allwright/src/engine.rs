@@ -4,9 +4,9 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use allwright_plugin_sdk::{BrowserSessionHandle, PageSessionHandle};
 use crate::plugin_loader as web_lib;
 use crate::proto;
+use allwright_plugin_sdk::{BrowserSessionHandle, PageSessionHandle};
 use tokio::sync::{Mutex, mpsc};
 use tokio::time::{Duration, Instant, sleep};
 use tokio_stream::{Stream, wrappers::ReceiverStream};
@@ -15,19 +15,20 @@ use tonic::{Request, Response, Status, transport::Server};
 use proto::engine_service_server::{EngineService, EngineServiceServer};
 use proto::{
     BrowserKind, BrowserLaunchedEvent, BrowserSessionClosedEvent, BrowserSessionCommand,
-    BrowserSessionErrorEvent, BrowserSessionEvent, ChromeLaunchedEvent,
-    ChromiumBidiInjectionEvent, ClickElementCommand, CloseBrowserSessionCommand,
-    CloseTabSessionCommand, CommandRetryOptions, CountElementsCommand, ElementClickedEvent,
-    ElementCountedEvent, ElementFilledEvent, ElementFocusedEvent, ElementHoveredEvent,
-    ElementsHighlightedEvent, FillElementCommand, FocusElementCommand, GetInnerTextCommand,
-    GetTextContentCommand, HighlightElementsCommand, HoverElementCommand, InnerTextResolvedEvent,
-    KeyPressedEvent, LaunchBrowserCommand, LaunchChromeCommand, NavigateTabCommand, OpenTabCommand,
-    PingRequest, PingResponse, PressKeyCommand, SelectorWaitSatisfiedEvent, SessionPingCommand,
-    SessionPongEvent, TabNavigatedEvent, TabOpenedEvent, TabSessionAttachedEvent,
-    TabSessionClosedEvent, TabSessionCommand, TabSessionErrorEvent, TabSessionEvent,
-    TabSessionPingCommand, TabSessionPongEvent, TextContentResolvedEvent, WaitForSelectorCommand,
-    browser_session_command::Command as BrowserCommand, browser_session_event::Event as BrowserEvent,
-    tab_session_command::Command as TabCommand, tab_session_event::Event as TabEvent,
+    BrowserSessionErrorEvent, BrowserSessionEvent, ChromeLaunchedEvent, ChromiumBidiInjectionEvent,
+    ClickElementCommand, CloseBrowserSessionCommand, CloseTabSessionCommand, CommandRetryOptions,
+    CountElementsCommand, ElementClickedEvent, ElementCountedEvent, ElementFilledEvent,
+    ElementFocusedEvent, ElementHoveredEvent, ElementsHighlightedEvent, FillElementCommand,
+    FocusElementCommand, GetInnerTextCommand, GetTextContentCommand, HighlightElementsCommand,
+    HoverElementCommand, InnerTextResolvedEvent, KeyPressedEvent, LaunchBrowserCommand,
+    LaunchChromeCommand, NavigateTabCommand, OpenTabCommand, PingRequest, PingResponse,
+    PressKeyCommand, SelectorWaitSatisfiedEvent, SessionPingCommand, SessionPongEvent,
+    TabNavigatedEvent, TabOpenedEvent, TabSessionAttachedEvent, TabSessionClosedEvent,
+    TabSessionCommand, TabSessionErrorEvent, TabSessionEvent, TabSessionPingCommand,
+    TabSessionPongEvent, TextContentResolvedEvent, WaitForSelectorCommand,
+    browser_session_command::Command as BrowserCommand,
+    browser_session_event::Event as BrowserEvent, tab_session_command::Command as TabCommand,
+    tab_session_event::Event as TabEvent,
 };
 
 static BROWSER_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -174,14 +175,17 @@ async fn handle_browser_command(
             browser_binary,
             retry_options,
         })) => {
-            let browser_kind = BrowserKind::try_from(browser_kind).unwrap_or(BrowserKind::Unspecified);
+            let browser_kind =
+                BrowserKind::try_from(browser_kind).unwrap_or(BrowserKind::Unspecified);
             match browser_kind {
                 BrowserKind::Chromium | BrowserKind::Firefox => {
                     let retry_policy = command_retry_policy(retry_options.as_ref());
                     let launch = retry_with_timeout(retry_policy, || async {
                         web_lib::launch_browser(
                             match browser_kind {
-                                BrowserKind::Chromium => allwright_plugin_sdk::BrowserKind::Chromium,
+                                BrowserKind::Chromium => {
+                                    allwright_plugin_sdk::BrowserKind::Chromium
+                                }
                                 BrowserKind::Firefox => allwright_plugin_sdk::BrowserKind::Firefox,
                                 BrowserKind::Unspecified => unreachable!(),
                             },
@@ -320,7 +324,9 @@ async fn handle_browser_command(
                 }
             };
             let retry_policy = command_retry_policy(retry_options.as_ref());
-            let page = retry_with_timeout(retry_policy, || async { web_lib::open_page(&browser_session).await })
+            let page = retry_with_timeout(retry_policy, || async {
+                web_lib::open_page(&browser_session).await
+            })
             .await
             .map_err(Status::internal)?;
             let tab_session_id = next_tab_session_id();
@@ -515,8 +521,8 @@ async fn handle_tab_command(
             let navigation = retry_with_timeout(retry_policy, || async {
                 web_lib::navigate_page(&browser_session, &page_session, &url).await
             })
-                .await
-                .map_err(Status::internal)?;
+            .await
+            .map_err(Status::internal)?;
             {
                 let mut state = state.lock().await;
                 let tab_session = state
@@ -629,7 +635,8 @@ async fn handle_tab_command(
                     &page_session,
                     &css_selector,
                     duration_ms.unwrap_or(2_000).into(),
-                ).await
+                )
+                .await
             })
             .await
             .map_err(Status::internal)?;
@@ -797,7 +804,8 @@ async fn handle_tab_command(
                     &page_session,
                     &css_selector,
                     visible.unwrap_or(false),
-                ).await
+                )
+                .await
             })
             .await
             .map_err(Status::internal)?;

@@ -36,15 +36,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     set_server_addr(&args.server_addr)?;
     println!(
         "[playground] launching {} with browser_binary={:?} via singleton Rust client runtime",
-        args.browser,
-        args.browser_binary
+        args.browser, args.browser_binary
     );
     let browser_kind = parse_browser_kind(&args.browser)?;
-    let browser = launch_browser(browser_kind, LaunchOptions {
-        browser_binary: args.browser_binary.clone(),
-        timeout_ms: None,
-        ..Default::default()
-    })
+    let browser = launch_browser(
+        browser_kind,
+        LaunchOptions {
+            browser_binary: args.browser_binary.clone(),
+            timeout_ms: None,
+            ..Default::default()
+        },
+    )
     .await?;
 
     let initial_tab = browser.initial_tab();
@@ -134,11 +136,15 @@ async fn wait_for_enter(prompt: &str) -> Result<(), Box<dyn std::error::Error + 
     Ok(())
 }
 
-fn parse_browser_kind(value: &str) -> Result<BrowserKind, Box<dyn std::error::Error + Send + Sync>> {
+fn parse_browser_kind(
+    value: &str,
+) -> Result<BrowserKind, Box<dyn std::error::Error + Send + Sync>> {
     match value.trim().to_ascii_lowercase().as_str() {
         "chromium" | "chrome" => Ok(BrowserKind::Chromium),
         "firefox" => Ok(BrowserKind::Firefox),
-        other => Err(format!("unsupported --browser value `{other}`; use chromium or firefox").into()),
+        other => {
+            Err(format!("unsupported --browser value `{other}`; use chromium or firefox").into())
+        }
     }
 }
 

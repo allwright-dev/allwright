@@ -1,8 +1,8 @@
 use crate::plugins::package;
 use allwright_plugin_sdk::{
-    ALLWRIGHT_PLUGIN_API_VERSION, BrowserKind, BrowserLaunchInfo, BrowserSessionHandle, ChromeLaunchInfo,
-    ChromeTabInfo, ChromiumBidiMapperInfo, ClickInfo, ElementCountInfo, FillInfo, FocusInfo,
-    HighlightElementsInfo, HoverInfo, PageInfo, PageSessionHandle, PluginCommand,
+    ALLWRIGHT_PLUGIN_API_VERSION, BrowserKind, BrowserLaunchInfo, BrowserSessionHandle,
+    ChromeLaunchInfo, ChromeTabInfo, ChromiumBidiMapperInfo, ClickInfo, ElementCountInfo, FillInfo,
+    FocusInfo, HighlightElementsInfo, HoverInfo, PageInfo, PageSessionHandle, PluginCommand,
     PluginEnvelope, PluginResult, PressKeyInfo, TabNavigationInfo, TextInfo, WaitForSelectorInfo,
 };
 use libloading::{Library, Symbol};
@@ -20,7 +20,8 @@ fn plugin_home() -> Result<PathBuf, String> {
         return Ok(PathBuf::from(home));
     }
 
-    let home = env::var("HOME").map_err(|_| "HOME is not set and ALLWRIGHT_HOME was not provided")?;
+    let home =
+        env::var("HOME").map_err(|_| "HOME is not set and ALLWRIGHT_HOME was not provided")?;
     Ok(PathBuf::from(home).join(".allwright"))
 }
 
@@ -49,11 +50,15 @@ fn invoke_web(command: PluginCommand) -> Result<PluginResult, String> {
 
     let request_json = serde_json::to_string(&command)
         .map_err(|error| format!("failed to encode plugin request: {error}"))?;
-    let request_cstr =
-        CString::new(request_json).map_err(|error| format!("plugin request contains NUL: {error}"))?;
+    let request_cstr = CString::new(request_json)
+        .map_err(|error| format!("plugin request contains NUL: {error}"))?;
 
-    let library = unsafe { Library::new(&library_path) }
-        .map_err(|error| format!("failed to load web plugin library {:?}: {error}", library_path))?;
+    let library = unsafe { Library::new(&library_path) }.map_err(|error| {
+        format!(
+            "failed to load web plugin library {:?}: {error}",
+            library_path
+        )
+    })?;
 
     unsafe {
         let api_version: Symbol<'_, PluginApiVersionFn> = library
@@ -78,7 +83,9 @@ fn invoke_web(command: PluginCommand) -> Result<PluginResult, String> {
             .to_str()
             .map_err(|error| format!("web plugin id is not valid UTF-8: {error}"))?;
         if plugin_id != "web" {
-            return Err(format!("unexpected plugin id `{plugin_id}` loaded for web surface"));
+            return Err(format!(
+                "unexpected plugin id `{plugin_id}` loaded for web surface"
+            ));
         }
 
         let invoke: Symbol<'_, PluginInvokeFn> = library
@@ -123,7 +130,10 @@ fn plugin_required_error(plugin_id: &str, command_name: &str) -> String {
     )
 }
 
-async fn invoke_web_expected(command_name: &str, command: PluginCommand) -> Result<PluginResult, String> {
+async fn invoke_web_expected(
+    command_name: &str,
+    command: PluginCommand,
+) -> Result<PluginResult, String> {
     tokio::task::block_in_place(move || match invoke_web(command) {
         Ok(result) => Ok(result),
         Err(error) if error == "web plugin is not installed" => {
@@ -460,10 +470,9 @@ pub fn close_browser_process(process_id: u32) -> Result<(), String> {
         let command = PluginCommand::CloseBrowserProcess { process_id };
         match invoke_web(command) {
             Ok(result) => Ok(result),
-            Err(error) if error == "web plugin is not installed" => Err(plugin_required_error(
-                "web",
-                "CloseBrowserSessionCommand",
-            )),
+            Err(error) if error == "web plugin is not installed" => {
+                Err(plugin_required_error("web", "CloseBrowserSessionCommand"))
+            }
             Err(error) => Err(error),
         }
     })? {
@@ -760,8 +769,8 @@ pub async fn wait_for_selector_via_cdp(
     .await?
     {
         PluginResult::WaitForSelectorViaCdp(result) => Ok(result),
-        _ => Err(
-            "web plugin returned an unexpected response for WaitForSelectorViaCdp".to_string(),
-        ),
+        _ => {
+            Err("web plugin returned an unexpected response for WaitForSelectorViaCdp".to_string())
+        }
     }
 }
