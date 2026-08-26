@@ -17,8 +17,8 @@ const path = require("path");
 const repoRoot = process.argv[2];
 const version = process.argv[3];
 const packageJsonPaths = [
-  path.join(repoRoot, "packages", "core", "package.json"),
-  path.join(repoRoot, "packages", "vitest", "package.json"),
+  path.join(repoRoot, "typescript", "core", "package.json"),
+  path.join(repoRoot, "typescript", "vitest", "package.json"),
 ];
 
 for (const packageJsonPath of packageJsonPaths) {
