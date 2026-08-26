@@ -1,8 +1,9 @@
 use allwright_plugin_sdk::{
-    ALLWRIGHT_PLUGIN_API_VERSION, ChromeLaunchInfo, ChromeTabInfo, ChromiumBidiMapperInfo,
-    ClickInfo, ElementCountInfo, FillInfo, FocusInfo, HighlightElementsInfo, HoverInfo,
-    PluginCommand, PluginEnvelope, PluginResult, PressKeyInfo, SurfaceFamily, SurfacePlugin,
-    SurfacePluginDescriptor, TabNavigationInfo, TextInfo, WaitForSelectorInfo,
+    ALLWRIGHT_PLUGIN_API_VERSION, BrowserKind, BrowserLaunchInfo, ChromeLaunchInfo, ChromeTabInfo,
+    ChromiumBidiMapperInfo, ClickInfo, ElementCountInfo, FillInfo, FocusInfo,
+    HighlightElementsInfo, HoverInfo, PluginCommand, PluginEnvelope, PluginResult, PressKeyInfo,
+    SurfaceFamily, SurfacePlugin, SurfacePluginDescriptor, TabNavigationInfo, TextInfo,
+    WaitForSelectorInfo,
 };
 use std::ffi::{CStr, CString, c_char};
 use std::fs;
@@ -1565,6 +1566,24 @@ fn plugin_response(result: Result<PluginResult, String>) -> *mut c_char {
 
 fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String> {
     match command {
+        PluginCommand::LaunchBrowser {
+            browser_kind,
+            browser_binary,
+        } => match browser_kind {
+            BrowserKind::Chromium => {
+                let launch = open_chrome_window(browser_binary.as_deref())?;
+                Ok(PluginResult::LaunchBrowser(BrowserLaunchInfo {
+                    browser_kind,
+                    browser: launch.browser,
+                    note: launch.note,
+                    user_data_dir: launch.user_data_dir,
+                    process_id: launch.process_id,
+                }))
+            }
+            BrowserKind::Firefox => {
+                Err("firefox backend is not implemented yet for the web plugin".to_string())
+            }
+        },
         PluginCommand::OpenChromeWindow { chrome_binary } => {
             open_chrome_window(chrome_binary.as_deref()).map(PluginResult::OpenChromeWindow)
         }

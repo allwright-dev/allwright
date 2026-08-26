@@ -9,6 +9,13 @@ pub enum SurfaceFamily {
     Desktop,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum BrowserKind {
+    Chromium,
+    Firefox,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SurfacePluginDescriptor {
     pub id: &'static str,
@@ -26,6 +33,15 @@ pub struct ChromeLaunchInfo {
     pub browser: String,
     pub note: String,
     pub cdp_websocket_url: String,
+    pub user_data_dir: String,
+    pub process_id: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BrowserLaunchInfo {
+    pub browser_kind: BrowserKind,
+    pub browser: String,
+    pub note: String,
     pub user_data_dir: String,
     pub process_id: u32,
 }
@@ -114,6 +130,10 @@ pub struct WaitForSelectorInfo {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum PluginCommand {
+    LaunchBrowser {
+        browser_kind: BrowserKind,
+        browser_binary: Option<String>,
+    },
     OpenChromeWindow {
         chrome_binary: Option<String>,
     },
@@ -204,6 +224,7 @@ pub enum PluginCommand {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum PluginResult {
+    LaunchBrowser(BrowserLaunchInfo),
     OpenChromeWindow(ChromeLaunchInfo),
     DiscoverInitialTab(ChromeTabInfo),
     OpenChromeTab(ChromeTabInfo),

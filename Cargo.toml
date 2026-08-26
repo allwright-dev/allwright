@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "xtask",
     "rust/allwright-plugin-sdk",
     "rust/allwright-surface-web",
     "rust/allwright-surface-mobile",
