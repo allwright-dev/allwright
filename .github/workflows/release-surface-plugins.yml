@@ -117,11 +117,16 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - name: Install npm dependencies
-        run: npm install
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.20
+
+      - name: Install Bun dependencies
+        run: bun install
 
       - name: Build npm package
-        run: npm run build
+        run: bun run build
 
       - name: Publish npm core package
         run: npm publish --workspace @allwright.dev/core --access public

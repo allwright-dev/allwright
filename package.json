@@ -7,9 +7,9 @@
     "typescript/vitest"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "build:core": "npm run build --workspace @allwright.dev/core",
-    "build:vitest": "npm run build --workspace @allwright.dev/vitest",
-    "example:playground": "npm run example:playground --workspace @allwright.dev/core"
+    "build": "bun run --filter '*' build",
+    "build:core": "bun run --filter @allwright.dev/core build",
+    "build:vitest": "bun run --filter @allwright.dev/vitest build",
+    "example:playground": "bun run --filter @allwright.dev/core example:playground"
   }
 }

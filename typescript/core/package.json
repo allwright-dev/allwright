@@ -38,7 +38,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "example:playground": "bun run examples/playground.ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.0",

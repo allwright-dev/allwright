@@ -5,7 +5,7 @@ Vitest fixtures for allwright with Playwright-style `browser` and `page` injecti
 Install:
 
 ```bash
-npm install -D vitest @allwright.dev/vitest
+bun add -d vitest @allwright.dev/vitest
 ```
 
 ```ts

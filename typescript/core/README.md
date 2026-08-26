@@ -5,7 +5,7 @@ High-level TypeScript client for the allwright automation engine.
 Install:
 
 ```bash
-npm install @allwright.dev/core
+bun add @allwright.dev/core
 ```
 
 ```ts

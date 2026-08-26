@@ -378,13 +378,13 @@ TypeScript build:
 
 ```bash
 bun install
-npm run build
+bun run build
 ```
 
 TypeScript playground:
 
 ```bash
-npm run example:playground -- --server-addr 127.0.0.1:50051
+bun run example:playground -- --server-addr 127.0.0.1:50051
 ```
 
 ## Testing

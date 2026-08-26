@@ -6,8 +6,10 @@
 
 # TypeScript build and install artifacts
 /typescript/node_modules/
-/typescript/dist/
 /typescript/*.tsbuildinfo
+/typescript/**/dist/
+/typescript/**/.tsbuildinfo
+/package-lock.json
 
 # Python client artifacts
 /python/.venv/
