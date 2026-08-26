@@ -21,13 +21,13 @@ export const languages = [
   {
     name: "Java",
     note: "A Gradle-based client for JVM test suites.",
-    status: "From source",
+    status: "Published",
     href: `${GITHUB_URL}/tree/main/java`,
   },
   {
     name: "Python",
     note: "A client that feels at home in pytest.",
-    status: "From source",
+    status: "Published",
     href: `${GITHUB_URL}/tree/main/python`,
   },
   {

@@ -1,5 +1,11 @@
 # allwright
 
+[![crates.io](https://img.shields.io/crates/v/allwright-core?label=crates.io)](https://crates.io/crates/allwright-core)
+[![Go Reference](https://pkg.go.dev/badge/allwright.dev.svg)](https://pkg.go.dev/allwright.dev)
+[![Maven Central](https://img.shields.io/maven-central/v/dev.allwright/allwright?label=maven%20central)](https://central.sonatype.com/artifact/dev.allwright/allwright)
+[![PyPI](https://img.shields.io/pypi/v/allwright?label=pypi)](https://pypi.org/project/allwright/)
+[![npm](https://img.shields.io/npm/v/%40allwright.dev%2Fcore?label=npm)](https://www.npmjs.com/package/@allwright.dev/core)
+
 allwright is one automation engine for everything you test.
 
 The long-term direction is a single system that can cover web, mobile, desktop, and API automation without forcing teams to stitch together a different tool for every surface. The project is designed so automation can feel consistent across the whole product, not fragmented by platform.
@@ -209,6 +215,32 @@ await page.click("a");
 await browser.close();
 ```
 
+Java example:
+
+```java
+import dev.allwright.client.Allwright;
+import dev.allwright.client.Browser;
+import dev.allwright.client.Page;
+
+try (Browser browser = Allwright.firefox().launch()) {
+    Page page = browser.page();
+    page.goTo("https://example.com");
+    page.click("a");
+}
+```
+
+Python example:
+
+```python
+from allwright import firefox
+
+browser = firefox.launch()
+page = browser.page()
+page.goto("https://example.com")
+page.click("a")
+browser.close()
+```
+
 ## Repository Guide
 
 - `rust/allwright`: lightweight `allwright-core` Rust package with the client API, proto bindings, and gRPC engine core
@@ -222,9 +254,9 @@ await browser.close();
 - `rust/allwright-surface-desktop-mac`: publishable `desktop-mac` surface crate
 - `rust/allwright-surface-desktop-windows`: publishable `desktop-windows` surface crate
 - `rust/allwright-surface-desktop-linux`: publishable `desktop-linux` surface crate
-- `go/`: Go client and Go playground
-- `java/`: Java client project
-- `python/`: Python client package
+- `go/`: published Go client `allwright.dev` and Go playground
+- `java/`: published Java client `dev.allwright:allwright` on Maven Central
+- `python/`: published Python client package `allwright` on PyPI
 - `typescript/core`: published TypeScript client package `@allwright.dev/core`
 - `typescript/vitest`: published Vitest fixture package `@allwright.dev/vitest`
 - `proto/`: shared protobuf and gRPC contracts
@@ -309,6 +341,37 @@ go get allwright.dev@vX.Y.Z
 ```
 
 The `allwright-dev/` site already serves the `go-import` metadata for `allwright.dev`, so `go get` can resolve the vanity import path back to this repository's `go/` subdirectory.
+
+## Publishing The Java Package
+
+The Java client is published from the `java/` directory to Maven Central as `dev.allwright:allwright`.
+
+You only create the root release tag manually:
+
+```bash
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+The release workflow builds `java/` with the checked-in Gradle wrapper using `ALLWRIGHT_VERSION=X.Y.Z`, then publishes to Maven Central by uploading through Sonatype's Central Portal OSSRH Staging API compatibility service and transferring the deployment into the Central Publisher Portal.
+
+Consumers can then depend on it with Gradle:
+
+```kotlin
+dependencies {
+    implementation("dev.allwright:allwright:X.Y.Z")
+}
+```
+
+or Maven:
+
+```xml
+<dependency>
+    <groupId>dev.allwright</groupId>
+    <artifactId>allwright</artifactId>
+    <version>X.Y.Z</version>
+</dependency>
+```
 
 ## Publishing The Python Package
 

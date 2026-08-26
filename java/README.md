@@ -12,9 +12,31 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 ./gradlew build
 ```
 
+## Install
+
+The client is published to Maven Central as `dev.allwright:allwright`.
+
+Gradle:
+
+```kotlin
+dependencies {
+    implementation("dev.allwright:allwright:X.Y.Z")
+}
+```
+
+Maven:
+
+```xml
+<dependency>
+    <groupId>dev.allwright</groupId>
+    <artifactId>allwright</artifactId>
+    <version>X.Y.Z</version>
+</dependency>
+```
+
 ## Publish Prep
 
-The Java artifact is configured for Maven Central publication under `dev.allwright`.
+For local testing without waiting on a tagged release:
 
 ```bash
 cd java
@@ -31,7 +53,7 @@ For Sonatype publishing, provide:
 
 Use a Central Portal user token for `OSSRH_USERNAME` / `OSSRH_PASSWORD`.
 
-The tagged GitHub Actions release workflow now publishes the Java artifact to Maven Central as `dev.allwright:allwright` by uploading through Sonatype's Central Portal OSSRH Staging API compatibility service and then transferring the deployment into the Central Publisher Portal automatically.
+The tagged GitHub Actions release workflow publishes the Java artifact to Maven Central as `dev.allwright:allwright` by uploading through Sonatype's Central Portal OSSRH Staging API compatibility service and then transferring the deployment into the Central Publisher Portal automatically.
 
 ## Example
 

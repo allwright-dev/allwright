@@ -7,6 +7,12 @@ It loads the shared `proto/engine/v1/engine.proto` contract dynamically at runti
 ## Install
 
 ```bash
+pip install allwright
+```
+
+Installing from a local checkout instead:
+
+```bash
 pip install -e ./python
 ```
 

@@ -407,10 +407,8 @@ export default function HowItWorks() {
             Bring your own language
           </h2>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
-            Rust, Go, and TypeScript clients are published and ready to
-            install. Java and Python clients are complete but not yet on a
-            package registry — build them from source using the examples
-            below.
+            Rust, Go, Java, Python, and TypeScript clients are all published
+            and ready to install from their usual package registries.
           </p>
         </div>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
