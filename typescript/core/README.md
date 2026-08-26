@@ -2,6 +2,12 @@
 
 High-level TypeScript client for the allwright automation engine.
 
+Install:
+
+```bash
+npm install @allwright.dev/core
+```
+
 ```ts
 import { firefox } from "@allwright.dev/core";
 
@@ -10,6 +16,8 @@ const page = browser.page();
 await page.goto("https://example.com");
 await browser.close();
 ```
+
+A small runnable example also lives in [examples/basic.ts](./examples/basic.ts), and the fuller end-to-end playground lives in [examples/playground.ts](./examples/playground.ts).
 
 Shared config files are stack-agnostic and can live in `allwright.config.yaml` or `allwright.config.json`.
 The shared schema lives at the repo root in `allwright.schema.json`.

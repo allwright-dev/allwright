@@ -45,8 +45,8 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `java/`: Gradle-based Java client project that generates engine stubs from the shared proto and exposes a high-level browser/page API
 - `python/`: Python client package `allwright-python` that exposes a high-level browser/page API and bundles the shared proto files inside `python/allwright/proto/` for publishable runtime loading
 - `allwright-dev/`: standalone Next.js site for the purchased `allwright.dev` domain, intended for Vercel deployment and public-facing marketing/docs entrypoints
-- `packages/core/`: published npm package `@allwright.dev/core`, containing the TypeScript/JavaScript client, bundled shared proto files, and examples
-- `packages/vitest/`: published npm package `@allwright.dev/vitest`, containing Vitest fixtures and retrying browser assertions on top of `@allwright.dev/core`
+- `typescript/core/`: published npm package `@allwright.dev/core`, containing the TypeScript/JavaScript client, bundled shared proto files, and examples
+- `typescript/vitest/`: published npm package `@allwright.dev/vitest`, containing Vitest fixtures and retrying browser assertions on top of `@allwright.dev/core`
 - `proto/`: shared protobuf and gRPC contract root for all stacks
 - `proto/engine/v1/engine.proto`: umbrella engine service contract that imports the split proto ownership layers
 - `proto/core/v1/`: core-owned shared engine/session/browser/tab message contracts
@@ -92,7 +92,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - Generated Go proto/gRPC code is checked in under `go/gen/allwright/engine/v1` and consumed by the Go module.
 - The Java stack generates protobuf and gRPC stubs from `proto/engine/v1/engine.proto` during the Gradle build in `java/`.
 - The Python stack currently loads the bundled package-local proto files through `grpcio-tools`; published consumers must not depend on `../proto` existing outside the wheel.
-- The TypeScript/npm stack ships package-local copies of the shared top-level proto tree inside `packages/core/proto/` rather than depending on repo-relative paths after publish.
+- The TypeScript/npm stack ships package-local copies of the shared top-level proto tree inside `typescript/core/proto/` rather than depending on repo-relative paths after publish.
 - The public Rust client surface should stay high-level and should not expose raw gRPC connection setup.
 - The public Go client surface should stay high-level and should not expose raw gRPC connection setup.
 - The public Java client surface should stay high-level and should not expose raw gRPC connection setup.
@@ -167,13 +167,13 @@ This instruction should be treated as ongoing project policy for all future AI c
 - The Python singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and supports in-process override with `set_server_addr(...)`.
 - `allwright-dev/package.json` currently keeps Bun as the package manager declaration but uses standard `next dev`, `next build`, and `next start` scripts.
 - `allwright-dev/vercel.json` currently pins Vercel site behavior to the Next.js framework with `npm install` and `npm run build` so deployments avoid the Bun build crash path.
-- `packages/core/src/index.ts` now provides the TypeScript/JavaScript client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch(...)`, `Browser`, `Page`, and `Locator` methods instead of public grpc-js setup.
+- `typescript/core/src/index.ts` now provides the TypeScript/JavaScript client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch(...)`, `Browser`, `Page`, and `Locator` methods instead of public grpc-js setup.
 - The shared stack-agnostic config contract now lives at the repo root in `allwright.schema.json`, with `allwright.config.yaml` as the preferred human-authored format and `allwright.config.json` also supported against the same schema.
-- `packages/core/src/index.ts` is the first JavaScript loader for that shared config model and exposes helpers such as `findConfigFile()`, `loadConfigFile()`, `resolveConfig()`, and `launchConfiguredBrowser()`.
+- `typescript/core/src/index.ts` is the first JavaScript loader for that shared config model and exposes helpers such as `findConfigFile()`, `loadConfigFile()`, `resolveConfig()`, and `launchConfiguredBrowser()`.
 - New TypeScript work should prefer the `chromium` / `Browser` / `Page` surface; older compatibility helpers like `launchChrome`, `initialTab()`, `newTab()`, and `navigate()` should be treated as transitional.
 - The TypeScript singleton client currently uses `ALLWRIGHT_SERVER_ADDR` or falls back to `127.0.0.1:50051`, and also supports in-process override with `setServerAddr(...)`.
-- The repo root `package.json` is now a private npm workspace root for `packages/core` and `packages/vitest`; published package metadata lives in each workspace package, not at the repo root.
-- `packages/core/examples/playground.ts` is the TypeScript-side example for a minimal browser-session test flow; use Bun or npm workspaces for local development runs in this repo and keep it focused on real browser work rather than extra ping-style smoke commands.
+- The repo root `package.json` is now a private npm workspace root for `typescript/core` and `typescript/vitest`; published package metadata lives in each workspace package, not at the repo root.
+- `typescript/core/examples/playground.ts` is the TypeScript-side example for a minimal browser-session test flow; use Bun or npm workspaces for local development runs in this repo and keep it focused on real browser work rather than extra ping-style smoke commands.
 - `@allwright.dev/vitest` provides ready-made Vitest fixtures (`browser`, `page`, `allwright`) plus a custom retrying `expect` surface aimed at Playwright-style ergonomics.
 - `@allwright.dev/vitest` is now the first consumer of that shared config model: it auto-resolves `allwright.config.yaml`, `allwright.config.yml`, or `allwright.config.json`, supports shared retry defaults plus per-suite selection through `allwright.suite`, and merges test-level overrides on top instead of inventing a Vitest-only config file shape.
 - The current retrying Vitest assertions support both `expect(page)` and `expect(page.locator(...))` forms for text, count, and visibility checks; they are intentionally implemented in the npm test helper layer rather than in the engine protocol for now.
@@ -188,7 +188,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `rust/allwright/src/engine.rs` now stores opaque backend browser/page handles from the web plugin instead of top-level `cdp_websocket_url` / `target_id` fields, while the public gRPC events remain compatibility-shaped for existing clients
 - `rust/allwright/src/plugin_loader.rs` and `rust/allwright-plugin-sdk` now expose backend-neutral browser/page operations (`LaunchBrowser`, `OpenPage`, `NavigatePage`, selector actions, etc.) alongside the older Chromium-specific compatibility commands
 - `rust/allwright/src/client.rs` now exposes `launch_browser(...)` plus `launch_firefox(...)`, and Firefox launches through the same high-level `Browser` / `Tab` API
-- `packages/core/src/index.ts`, `python/allwright/client.py`, and `java/src/main/java/dev/allwright/client/Allwright.java` now expose `firefox` / `launch_firefox` entrypoints on top of the neutral launch command while still preserving the older Chromium entrypoints
+- `typescript/core/src/index.ts`, `python/allwright/client.py`, and `java/src/main/java/dev/allwright/client/Allwright.java` now expose `firefox` / `launch_firefox` entrypoints on top of the neutral launch command while still preserving the older Chromium entrypoints
 
 ## Current Dependency Hierarchy
 

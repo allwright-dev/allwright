@@ -224,8 +224,8 @@ await browser.close();
 - `go/`: Go client and Go playground
 - `java/`: Java client project
 - `python/`: Python client package
-- `packages/core`: published TypeScript client package `@allwright.dev/core`
-- `packages/vitest`: published Vitest fixture package `@allwright.dev/vitest`
+- `typescript/core`: published TypeScript client package `@allwright.dev/core`
+- `typescript/vitest`: published Vitest fixture package `@allwright.dev/vitest`
 - `proto/`: shared protobuf and gRPC contracts
   The root service entrypoint remains `proto/engine/v1/engine.proto`, while shared core messages now live under `proto/core/v1/` and the web surface messages now live under `proto/surfaces/web/v1/`.
 - `allwright-dev/`: public website project for `allwright.dev`
@@ -256,8 +256,8 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds 
 
 - `allwright.dev` Go module publish by creating `go/vX.Y.Z`, verifying the `go/` module, and warming `proxy.golang.org`
 - `allwright-python` publish to PyPI after syncing `python/pyproject.toml` from the tag
-- `@allwright.dev/core` publish to npm after syncing `packages/core/package.json` from the tag
-- `@allwright.dev/vitest` publish to npm after syncing `packages/vitest/package.json` and its dependency on `@allwright.dev/core` from the tag
+- `@allwright.dev/core` publish to npm after syncing `typescript/core/package.json` from the tag
+- `@allwright.dev/vitest` publish to npm after syncing `typescript/vitest/package.json` and its dependency on `@allwright.dev/core` from the tag
 - `allwright` CLI archives for the current OS matrix
 - `allwright-surface-web` plugin archives for the current OS matrix
 - crates.io publish for the Rust `web` profile after syncing every crate version from the tag
@@ -324,8 +324,8 @@ The release workflow syncs `python/pyproject.toml` to `X.Y.Z`, builds the source
 
 ## Publishing The TypeScript Workspace
 
-The TypeScript client lives in `packages/core` as `@allwright.dev/core`.
-The Vitest fixture package lives in `packages/vitest` as `@allwright.dev/vitest`.
+The TypeScript client lives in `typescript/core` as `@allwright.dev/core`.
+The Vitest fixture package lives in `typescript/vitest` as `@allwright.dev/vitest`.
 
 You only create the root release tag manually:
 
