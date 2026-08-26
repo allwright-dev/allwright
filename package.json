@@ -3,8 +3,8 @@
   "private": true,
   "packageManager": "bun@1.2.20",
   "workspaces": [
-    "packages/core",
-    "packages/vitest"
+    "typescript/core",
+    "typescript/vitest"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

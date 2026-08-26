@@ -2,6 +2,12 @@
 
 Vitest fixtures for allwright with Playwright-style `browser` and `page` injection.
 
+Install:
+
+```bash
+npm install -D vitest @allwright.dev/vitest
+```
+
 ```ts
 import { expect, test } from "@allwright.dev/vitest";
 
@@ -11,6 +17,8 @@ test("opens a page", async ({ page }) => {
   expect(title.text).toContain("Example");
 });
 ```
+
+A checked-in example spec also lives in [examples/basic.spec.ts](./examples/basic.spec.ts).
 
 The fixture package reads the shared stack-agnostic config format through `@allwright.dev/core`.
 Use `allwright.config.yaml` by default, or `allwright.config.json` if you prefer. Both follow the same root schema in `allwright.schema.json`.

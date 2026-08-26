@@ -32,9 +32,9 @@ export const languages = [
   },
   {
     name: "TypeScript",
-    note: "Works from TypeScript or plain JavaScript.",
+    note: "Core client plus Vitest fixtures, for TypeScript or plain JavaScript.",
     status: "Published",
-    href: `${GITHUB_URL}/blob/main/typescript/examples/playground.ts`,
+    href: `${GITHUB_URL}/tree/main/typescript`,
   },
 ] as const;
 
