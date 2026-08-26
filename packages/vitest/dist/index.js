@@ -1,18 +1,21 @@
-import { chromium, setServerAddr, shutdown, Locator, Page, } from "@allwright.dev/core";
+import { launchConfiguredBrowser, resolveConfig, setServerAddr, shutdown, } from "@allwright.dev/core";
 import { expect as vitestExpect, test as base } from "vitest";
 export const test = base.extend({
     allwright: async ({}, use) => {
         await use({});
     },
     browser: async ({ allwright }, use) => {
-        if (allwright.serverAddr) {
-            setServerAddr(allwright.serverAddr);
+        const config = resolveVitestConfig(allwright);
+        if (config.serverAddr) {
+            setServerAddr(config.serverAddr);
         }
-        const browser = await chromium.launch(allwright.launchOptions ?? {});
+        activeExpectDefaults = config.expect;
+        const browser = await launchConfiguredBrowser(config);
         try {
             await use(browser);
         }
         finally {
+            activeExpectDefaults = {};
             await browser.close().catch(() => undefined);
             await shutdown();
         }
@@ -24,14 +27,38 @@ export const test = base.extend({
 const DEFAULT_EXPECT_TIMEOUT_MS = 5_000;
 const DEFAULT_EXPECT_INTERVAL_MS = 100;
 function isPage(value) {
-    return value instanceof Page;
+    return !!value && typeof value === "object" && typeof value.locator === "function";
 }
 function isLocator(value) {
-    return value instanceof Locator;
+    return (!!value &&
+        typeof value === "object" &&
+        typeof value.page === "object" &&
+        typeof value.click === "function");
 }
-async function retryExpectation(callback, options = {}) {
-    const timeoutMs = options.timeoutMs ?? DEFAULT_EXPECT_TIMEOUT_MS;
-    const intervalMs = options.intervalMs ?? DEFAULT_EXPECT_INTERVAL_MS;
+function resolveVitestConfig(options) {
+    const config = resolveConfig({
+        configFile: options.configFile,
+        suite: options.suite,
+    });
+    return {
+        ...config,
+        serverAddr: options.serverAddr ?? config.serverAddr,
+        browserName: options.browser ?? config.browserName,
+        browserBinary: options.browserBinary ?? config.browserBinary,
+        launchOptions: {
+            ...config.launchOptions,
+            ...(options.launchOptions ?? {}),
+            browserBinary: options.launchOptions?.browserBinary ??
+                options.browserBinary ??
+                config.browserBinary ??
+                config.launchOptions.browserBinary,
+        },
+        expect: config.expect,
+    };
+}
+async function retryExpectation(callback, options = {}, defaults = {}) {
+    const timeoutMs = options.timeoutMs ?? defaults.timeoutMs ?? DEFAULT_EXPECT_TIMEOUT_MS;
+    const intervalMs = options.intervalMs ?? defaults.intervalMs ?? DEFAULT_EXPECT_INTERVAL_MS;
     const deadline = Date.now() + timeoutMs;
     let lastError;
     while (Date.now() <= deadline) {
@@ -59,7 +86,7 @@ function createPageExpect(page) {
                     return;
                 }
                 vitestExpect(result.text).toBe(expected);
-            }, options);
+            }, options, currentExpectDefaults());
         },
         async toContainText(selector, expected, options = {}) {
             await retryExpectation(async () => {
@@ -69,13 +96,13 @@ function createPageExpect(page) {
                     return;
                 }
                 vitestExpect(result.text).toContain(expected);
-            }, options);
+            }, options, currentExpectDefaults());
         },
         async toHaveCount(selector, expected, options = {}) {
             await retryExpectation(async () => {
                 const result = await page.count(selector, {});
                 vitestExpect(result.count).toBe(expected);
-            }, options);
+            }, options, currentExpectDefaults());
         },
         async toBeVisible(selector, options = {}) {
             await retryExpectation(async () => {
@@ -84,7 +111,7 @@ function createPageExpect(page) {
                     ...(options.command ?? {}),
                 });
                 vitestExpect(result.visible).toBe(true);
-            }, options);
+            }, options, currentExpectDefaults());
         },
     };
 }
@@ -98,7 +125,7 @@ function createLocatorExpect(locator) {
                     return;
                 }
                 vitestExpect(result.text).toBe(expected);
-            }, options);
+            }, options, currentExpectDefaults());
         },
         async toContainText(expected, options = {}) {
             await retryExpectation(async () => {
@@ -108,13 +135,13 @@ function createLocatorExpect(locator) {
                     return;
                 }
                 vitestExpect(result.text).toContain(expected);
-            }, options);
+            }, options, currentExpectDefaults());
         },
         async toHaveCount(expected, options = {}) {
             await retryExpectation(async () => {
                 const result = await locator.count({});
                 vitestExpect(result.count).toBe(expected);
-            }, options);
+            }, options, currentExpectDefaults());
         },
         async toBeVisible(options = {}) {
             await retryExpectation(async () => {
@@ -123,9 +150,13 @@ function createLocatorExpect(locator) {
                     ...(options.command ?? {}),
                 });
                 vitestExpect(result.visible).toBe(true);
-            }, options);
+            }, options, currentExpectDefaults());
         },
     };
+}
+let activeExpectDefaults = {};
+function currentExpectDefaults() {
+    return activeExpectDefaults;
 }
 const expectImpl = ((actual) => {
     if (isLocator(actual)) {

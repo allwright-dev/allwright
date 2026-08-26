@@ -19,7 +19,8 @@ public final class Allwright {
     private static final Object RUNTIME_LOCK = new Object();
     private static RuntimeClient runtimeClient;
     private static String serverAddrOverride;
-    private static final BrowserType CHROMIUM = new BrowserType();
+    private static final BrowserType CHROMIUM = new BrowserType(BrowserKind.BROWSER_KIND_CHROMIUM);
+    private static final BrowserType FIREFOX = new BrowserType(BrowserKind.BROWSER_KIND_FIREFOX);
 
     private Allwright() {}
 
@@ -27,30 +28,46 @@ public final class Allwright {
         return CHROMIUM;
     }
 
+    public static BrowserType firefox() {
+        return FIREFOX;
+    }
+
     public static Browser launchChrome() {
         return launchChrome(new LaunchOptions());
     }
 
     public static Browser launchChrome(LaunchOptions options) {
+        return launchBrowser(BrowserKind.BROWSER_KIND_CHROMIUM, options);
+    }
+
+    public static Browser launchFirefox() {
+        return launchFirefox(new LaunchOptions());
+    }
+
+    public static Browser launchFirefox(LaunchOptions options) {
+        return launchBrowser(BrowserKind.BROWSER_KIND_FIREFOX, options);
+    }
+
+    public static Browser launchBrowser(BrowserKind browserKind, LaunchOptions options) {
         RuntimeClient runtime = getRuntime();
         StreamHandle<BrowserSessionCommand, BrowserSessionEvent> stream =
                 new StreamHandle<>(runtime.asyncStub::browserSession);
 
-        LaunchChromeCommand.Builder launch = LaunchChromeCommand.newBuilder();
-        if (options.chromeBinary() != null && !options.chromeBinary().isBlank()) {
-            launch.setChromeBinary(options.chromeBinary());
+        LaunchBrowserCommand.Builder launch = LaunchBrowserCommand.newBuilder().setBrowserKind(browserKind);
+        if (options.browserBinary() != null && !options.browserBinary().isBlank()) {
+            launch.setBrowserBinary(options.browserBinary());
         }
         if (options.timeoutMs() != null && options.timeoutMs() > 0) {
             launch.setRetryOptions(commandRetryOptions(options.timeoutMs()));
         }
 
-        stream.send(BrowserSessionCommand.newBuilder().setLaunchChrome(launch).build());
+        stream.send(BrowserSessionCommand.newBuilder().setLaunchBrowser(launch).build());
 
         while (true) {
             BrowserSessionEvent event = stream.recv("receive browser session event during launch");
             switch (event.getEventCase()) {
-                case CHROME_LAUNCHED -> {
-                    ChromeLaunchedEvent launched = event.getChromeLaunched();
+                case BROWSER_LAUNCHED -> {
+                    BrowserLaunchedEvent launched = event.getBrowserLaunched();
                     Page initialPage = new Page(runtime, event.getSessionId(), launched.getInitialTabSessionId());
                     return new Browser(
                             runtime,
@@ -58,7 +75,7 @@ public final class Allwright {
                             event.getSessionId(),
                             launched.getBrowser(),
                             launched.getNote(),
-                            launched.getCdpWebsocketUrl(),
+                            "",
                             launched.getUserDataDir(),
                             initialPage
                     );
@@ -131,7 +148,7 @@ public final class Allwright {
         return CommandRetryOptions.newBuilder().setTimeoutMs(timeoutMs).build();
     }
 
-    public record LaunchOptions(String chromeBinary, Integer timeoutMs) {
+    public record LaunchOptions(String browserBinary, Integer timeoutMs) {
         public LaunchOptions() {
             this(null, null);
         }
@@ -187,12 +204,18 @@ public final class Allwright {
     public record WaitForSelectorResult(String selector, boolean visible, String note) {}
 
     public static final class BrowserType {
+        private final BrowserKind browserKind;
+
+        private BrowserType(BrowserKind browserKind) {
+            this.browserKind = browserKind;
+        }
+
         public Browser launch() {
             return launch(new LaunchOptions());
         }
 
         public Browser launch(LaunchOptions options) {
-            return Allwright.launchChrome(options);
+            return Allwright.launchBrowser(browserKind, options);
         }
     }
 
@@ -232,6 +255,10 @@ public final class Allwright {
 
         public String sessionId() {
             return sessionId;
+        }
+
+        public Locator locator(String selector) {
+            return new Locator(this, selector);
         }
 
         public String browserName() {
@@ -525,6 +552,68 @@ public final class Allwright {
                 stream = new StreamHandle<>(runtime.asyncStub::tabSession);
             }
             return stream;
+        }
+    }
+
+    public static final class Locator {
+        private final Page page;
+        private final String selector;
+
+        private Locator(Page page, String selector) {
+            this.page = page;
+            this.selector = selector;
+        }
+
+        public Page page() {
+            return page;
+        }
+
+        public String selector() {
+            return selector;
+        }
+
+        public Locator locator(String childSelector) {
+            return new Locator(page, (selector + " " + childSelector).trim());
+        }
+
+        public ClickResult click() {
+            return page.click(selector);
+        }
+
+        public CountResult count() {
+            return page.count(selector);
+        }
+
+        public HighlightResult highlight() {
+            return page.highlight(selector);
+        }
+
+        public ElementResult focus() {
+            return page.focus(selector);
+        }
+
+        public FillResult fill(String value) {
+            return page.fill(selector, value);
+        }
+
+        public ElementResult hover() {
+            return page.hover(selector);
+        }
+
+        public PressResult press(String key) {
+            return page.press(selector, key);
+        }
+
+        public TextResult textContent() {
+            return page.textContent(selector);
+        }
+
+        public TextResult innerText() {
+            return page.innerText(selector);
+        }
+
+        public WaitForSelectorResult waitFor() {
+            return page.waitForSelector(selector);
         }
     }
 

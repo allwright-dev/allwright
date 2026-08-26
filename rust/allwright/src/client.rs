@@ -62,7 +62,7 @@ impl From<tonic::Status> for Error {
 
 #[derive(Debug, Clone, Default)]
 pub struct LaunchOptions {
-    pub chrome_binary: Option<String>,
+    pub browser_binary: Option<String>,
     pub timeout_ms: Option<u32>,
 }
 
@@ -70,6 +70,11 @@ pub struct LaunchOptions {
 pub enum BrowserKind {
     Chromium,
     Firefox,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BrowserType {
+    browser_kind: BrowserKind,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -170,6 +175,14 @@ pub struct Tab {
     inner: Arc<TabInner>,
 }
 
+pub type Page = Tab;
+
+#[derive(Clone)]
+pub struct Locator {
+    page: Tab,
+    selector: String,
+}
+
 #[derive(Clone)]
 struct RuntimeClient {
     engine: EngineServiceClient<Channel>,
@@ -241,7 +254,7 @@ pub async fn launch_browser(browser_kind: BrowserKind, options: LaunchOptions) -
                     BrowserKind::Chromium => ProtoBrowserKind::Chromium as i32,
                     BrowserKind::Firefox => ProtoBrowserKind::Firefox as i32,
                 },
-                browser_binary: options.chrome_binary,
+                browser_binary: options.browser_binary,
                 retry_options: command_retry_options(options.timeout_ms),
             })),
         })
@@ -326,6 +339,18 @@ pub async fn launch_browser(browser_kind: BrowserKind, options: LaunchOptions) -
     }
 }
 
+pub fn chromium() -> BrowserType {
+    BrowserType {
+        browser_kind: BrowserKind::Chromium,
+    }
+}
+
+pub fn firefox() -> BrowserType {
+    BrowserType {
+        browser_kind: BrowserKind::Firefox,
+    }
+}
+
 pub fn set_server_addr(server_addr: impl Into<String>) -> Result<()> {
     let normalized = normalize_server_addr(&server_addr.into());
     let mut override_slot = server_addr_override_slot()
@@ -348,6 +373,14 @@ pub async fn shutdown() {
 }
 
 impl Browser {
+    pub fn page(&self) -> Page {
+        self.initial_tab()
+    }
+
+    pub fn initial_page(&self) -> Page {
+        self.initial_tab()
+    }
+
     pub fn session_id(&self) -> &str {
         &self.inner.session_id
     }
@@ -374,6 +407,10 @@ impl Browser {
 
     pub async fn new_tab(&self) -> Result<Tab> {
         self.new_tab_with_options(CommandOptions::default()).await
+    }
+
+    pub async fn new_page(&self) -> Result<Page> {
+        self.new_tab().await
     }
 
     pub async fn new_tab_with_options(&self, options: CommandOptions) -> Result<Tab> {
@@ -500,8 +537,19 @@ impl Browser {
 }
 
 impl Tab {
+    pub fn locator(&self, css_selector: impl Into<String>) -> Locator {
+        Locator {
+            page: self.clone(),
+            selector: css_selector.into(),
+        }
+    }
+
     pub fn session_id(&self) -> &str {
         &self.inner.session_id
+    }
+
+    pub async fn goto(&self, url: impl Into<String>) -> Result<NavigateResult> {
+        self.navigate(url).await
     }
 
     pub async fn ping(&self, message: impl Into<String>) -> Result<String> {
@@ -1306,6 +1354,69 @@ impl Tab {
             .handle
             .as_mut()
             .ok_or_else(|| Error::new("tab session handle was not initialized"))
+    }
+}
+
+impl BrowserType {
+    pub async fn launch(&self, options: LaunchOptions) -> Result<Browser> {
+        launch_browser(self.browser_kind, options).await
+    }
+}
+
+impl Locator {
+    pub fn page(&self) -> &Page {
+        &self.page
+    }
+
+    pub fn selector(&self) -> &str {
+        &self.selector
+    }
+
+    pub fn locator(&self, css_selector: impl Into<String>) -> Locator {
+        Locator {
+            page: self.page.clone(),
+            selector: format!("{} {}", self.selector, css_selector.into()),
+        }
+    }
+
+    pub async fn click(&self) -> Result<ClickResult> {
+        self.page.click(self.selector.clone()).await
+    }
+
+    pub async fn count(&self) -> Result<CountResult> {
+        self.page.count(self.selector.clone()).await
+    }
+
+    pub async fn highlight(&self) -> Result<HighlightResult> {
+        self.page.highlight(self.selector.clone()).await
+    }
+
+    pub async fn focus(&self) -> Result<ElementResult> {
+        self.page.focus(self.selector.clone()).await
+    }
+
+    pub async fn fill(&self, value: impl Into<String>) -> Result<FillResult> {
+        self.page.fill(self.selector.clone(), value.into()).await
+    }
+
+    pub async fn hover(&self) -> Result<ElementResult> {
+        self.page.hover(self.selector.clone()).await
+    }
+
+    pub async fn press(&self, key: impl Into<String>) -> Result<PressResult> {
+        self.page.press(self.selector.clone(), key.into()).await
+    }
+
+    pub async fn text_content(&self) -> Result<TextResult> {
+        self.page.text_content(self.selector.clone()).await
+    }
+
+    pub async fn inner_text(&self) -> Result<TextResult> {
+        self.page.inner_text(self.selector.clone()).await
+    }
+
+    pub async fn wait_for(&self) -> Result<WaitForSelectorResult> {
+        self.page.wait_for_selector(self.selector.clone()).await
     }
 }
 

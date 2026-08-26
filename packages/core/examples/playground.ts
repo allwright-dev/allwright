@@ -1,31 +1,28 @@
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 
-import { chromium, setServerAddr, shutdown } from "../dist/index.js";
+import { chromium, firefox, setServerAddr, shutdown, type BrowserKind } from "../dist/index.js";
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   setServerAddr(args.serverAddr);
 
   console.log(
-    `[ts-playground] launching chrome with chromeBinary=${JSON.stringify(args.chromeBinary)} via singleton TypeScript client runtime`,
+    `[ts-playground] launching ${args.browser} with browserBinary=${JSON.stringify(args.browserBinary)} via singleton TypeScript client runtime`,
   );
 
-  const browser = await chromium.launch({
-    chromeBinary: args.chromeBinary ?? undefined,
+  const browserType = args.browser === "firefox" ? firefox : chromium;
+  const browser = await browserType.launch({
+    browserBinary: args.browserBinary ?? undefined,
   });
   const initialTab = browser.page();
-  console.log(
-    `[${browser.sessionId}] chrome launched: ${browser.browserName} (${browser.launchNote}) cdp=${browser.cdpWebSocketURL} user_data_dir=${browser.userDataDir} initial_tab_session_id=${initialTab.sessionId}`,
-  );
+  logBrowserLaunch(browser, initialTab.sessionId);
 
   const initialNavigation = await initialTab.navigate(args.navigateUrl);
   console.log(
     `[${initialTab.sessionId}] tab navigated: ${initialNavigation.url} (${initialNavigation.note})`,
   );
-  console.log(
-    `[${initialTab.sessionId}] chromium-bidi injected: bidi_session_id=${initialNavigation.bidiSessionId} mapper_target_id=${initialNavigation.mapperTargetId} mapper_session_id=${initialNavigation.mapperSessionId} package_version=${initialNavigation.packageVersion}`,
-  );
+  logNavigationAutomation(initialTab.sessionId, initialNavigation);
 
   if (args.clickSelector) {
     const click = await initialTab.click(args.clickSelector);
@@ -41,6 +38,7 @@ async function main(): Promise<void> {
     console.log(`[${browser.sessionId}] tab opened: ${tab.sessionId} (requested additional tab ${tabNumber})`);
     const navigation = await tab.navigate(args.navigateUrl);
     console.log(`[${tab.sessionId}] tab navigated: ${navigation.url} (${navigation.note})`);
+    logNavigationAutomation(tab.sessionId, navigation);
     if (args.clickSelector) {
       const click = await tab.click(args.clickSelector);
       console.log(
@@ -67,7 +65,8 @@ async function main(): Promise<void> {
 
 interface ParsedArgs {
   serverAddr: string;
-  chromeBinary: string | null;
+  browser: BrowserKind;
+  browserBinary: string | null;
   navigateUrl: string;
   clickSelector: string | null;
   tabs: number;
@@ -75,7 +74,8 @@ interface ParsedArgs {
 
 function parseArgs(argv: string[]): ParsedArgs {
   let serverAddr = "127.0.0.1:50051";
-  let chromeBinary: string | null = null;
+  let browser: BrowserKind = "chromium";
+  let browserBinary: string | null = null;
   let navigateUrl = "https://example.com";
   let clickSelector: string | null = null;
   let tabs = 3;
@@ -88,8 +88,13 @@ function parseArgs(argv: string[]): ParsedArgs {
       index += 1;
       continue;
     }
-    if (arg === "--chrome-binary" && next) {
-      chromeBinary = next;
+    if (arg === "--browser" && next && (next === "chromium" || next === "firefox")) {
+      browser = next;
+      index += 1;
+      continue;
+    }
+    if (arg === "--browser-binary" && next) {
+      browserBinary = next;
       index += 1;
       continue;
     }
@@ -112,11 +117,28 @@ function parseArgs(argv: string[]): ParsedArgs {
 
   return {
     serverAddr,
-    chromeBinary,
+    browser,
+    browserBinary,
     navigateUrl,
     clickSelector,
     tabs,
   };
+}
+
+function logBrowserLaunch(browser: { sessionId: string; browserName: string; launchNote: string; cdpWebSocketURL: string; userDataDir: string }, initialTabSessionId: string): void {
+  const cdpPart = browser.cdpWebSocketURL ? ` cdp=${browser.cdpWebSocketURL}` : "";
+  console.log(
+    `[${browser.sessionId}] browser launched: ${browser.browserName} (${browser.launchNote})${cdpPart} user_data_dir=${browser.userDataDir} initial_tab_session_id=${initialTabSessionId}`,
+  );
+}
+
+function logNavigationAutomation(
+  tabSessionId: string,
+  navigation: { bidiSessionId: string; mapperTargetId: string; mapperSessionId: string; packageVersion: string },
+): void {
+  console.log(
+    `[${tabSessionId}] automation session: bidi_session_id=${navigation.bidiSessionId} mapper_target_id=${navigation.mapperTargetId} mapper_session_id=${navigation.mapperSessionId} package_version=${navigation.packageVersion}`,
+  );
 }
 
 main()

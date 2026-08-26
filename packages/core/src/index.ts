@@ -1,4 +1,5 @@
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import grpc from "@grpc/grpc-js";
@@ -17,9 +18,11 @@ let runtimePromise: Promise<RuntimeClient> | null = null;
 let serverAddrOverride: string | null = null;
 
 export interface LaunchOptions {
-  chromeBinary?: string;
+  browserBinary?: string;
   timeoutMs?: number;
 }
+
+export type BrowserKind = "chromium" | "firefox";
 
 export interface CommandOptions {
   timeoutMs?: number;
@@ -114,6 +117,104 @@ export interface LocatorInfo {
   selector: string;
 }
 
+export interface BrowserType {
+  launch(options?: LaunchOptions): Promise<Browser>;
+}
+
+export interface Browser extends BrowserInfo {
+  page(): Page;
+  initialPage(): Page;
+  initialTab(): Page;
+  pages(): Page[];
+  newPage(options?: CommandOptions): Promise<Page>;
+  newTab(options?: CommandOptions): Promise<Page>;
+  close(): Promise<void>;
+  ping(message?: string): Promise<string>;
+  browserInfo(): BrowserInfo;
+}
+
+export interface Page extends PageInfo {
+  locator(selector: string): Locator;
+  goto(url: string, options?: CommandOptions): Promise<NavigateResult>;
+  navigate(url: string, options?: CommandOptions): Promise<NavigateResult>;
+  click(selector: string, options?: CommandOptions): Promise<ClickResult>;
+  count(selector: string, options?: CommandOptions): Promise<CountResult>;
+  highlight(selector: string, options?: HighlightOptions): Promise<HighlightResult>;
+  focus(selector: string, options?: CommandOptions): Promise<ElementResult>;
+  fill(selector: string, value: string, options?: CommandOptions): Promise<FillResult>;
+  hover(selector: string, options?: CommandOptions): Promise<ElementResult>;
+  press(selector: string, key: string, options?: PressOptions): Promise<PressResult>;
+  textContent(selector: string, options?: CommandOptions): Promise<TextResult>;
+  innerText(selector: string, options?: CommandOptions): Promise<TextResult>;
+  waitForSelector(selector: string, options?: WaitForSelectorOptions): Promise<WaitForSelectorResult>;
+  close(): Promise<void>;
+  ping(message?: string): Promise<string>;
+  pageInfo(): PageInfo;
+}
+
+export interface Locator {
+  readonly page: Page;
+  readonly selector: string;
+  click(options?: CommandOptions): Promise<ClickResult>;
+  count(options?: CommandOptions): Promise<CountResult>;
+  highlight(options?: HighlightOptions): Promise<HighlightResult>;
+  focus(options?: CommandOptions): Promise<ElementResult>;
+  fill(value: string, options?: CommandOptions): Promise<FillResult>;
+  hover(options?: CommandOptions): Promise<ElementResult>;
+  press(key: string, options?: PressOptions): Promise<PressResult>;
+  textContent(options?: CommandOptions): Promise<TextResult>;
+  innerText(options?: CommandOptions): Promise<TextResult>;
+  waitFor(options?: WaitForSelectorOptions): Promise<WaitForSelectorResult>;
+  locator(selector: string): Locator;
+}
+
+export interface AllwrightConfig {
+  schemaVersion?: 1;
+  server?: {
+    addr?: string;
+  };
+  browser?: {
+    name?: BrowserKind;
+    binary?: string;
+    launchOptions?: LaunchOptions;
+  };
+  expect?: RetryConfig;
+  suites?: Record<string, AllwrightSuiteConfig>;
+}
+
+export interface AllwrightSuiteConfig {
+  server?: {
+    addr?: string;
+  };
+  browser?: {
+    name?: BrowserKind;
+    binary?: string;
+    launchOptions?: LaunchOptions;
+  };
+  expect?: RetryConfig;
+}
+
+export interface RetryConfig {
+  timeoutMs?: number;
+  intervalMs?: number;
+}
+
+export interface ResolvedAllwrightConfig {
+  configFilePath: string | null;
+  suiteName: string | null;
+  serverAddr?: string;
+  browserName: BrowserKind;
+  browserBinary?: string;
+  launchOptions: LaunchOptions;
+  expect: RetryConfig;
+}
+
+export interface ResolveConfigOptions {
+  cwd?: string;
+  configFile?: string;
+  suite?: string;
+}
+
 interface PingResponse {
   message?: string;
 }
@@ -126,10 +227,19 @@ interface ChromeLaunchedPayload {
   initialTabSessionId?: string;
 }
 
+interface BrowserLaunchedPayload {
+  browserKind?: number;
+  browser?: string;
+  note?: string;
+  userDataDir?: string;
+  initialTabSessionId?: string;
+}
+
 interface BrowserSessionEvent {
   sessionId?: string;
   event?: string;
   chromeLaunched?: ChromeLaunchedPayload;
+  browserLaunched?: BrowserLaunchedPayload;
   tabOpened?: {
     tabSessionId?: string;
     note?: string;
@@ -224,6 +334,16 @@ interface TabSessionEvent {
 interface LaunchChromeRequest {
   launchChrome: {
     chromeBinary?: string;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
+interface LaunchBrowserRequest {
+  launchBrowser: {
+    browserKind: number;
+    browserBinary?: string;
     retryOptions?: {
       timeoutMs?: number;
     };
@@ -389,6 +509,7 @@ interface CloseTabRequest {
 }
 
 type BrowserSessionRequest =
+  | LaunchBrowserRequest
   | LaunchChromeRequest
   | OpenTabRequest
   | BrowserPingRequest
@@ -436,12 +557,21 @@ interface RuntimeClient {
   client: EngineServiceClientShape;
 }
 
+const CONFIG_FILENAMES = [
+  "allwright.config.yaml",
+  "allwright.config.yml",
+  "allwright.config.json",
+  ".allwright/config.yaml",
+  ".allwright/config.yml",
+  ".allwright/config.json",
+] as const;
+
 interface BrowserLaunchState {
   runtime: RuntimeClient;
   stream: BrowserSessionStream;
   queue: EventQueue<BrowserSessionEvent>;
   sessionId: string;
-  chromeLaunched: ChromeLaunchedPayload;
+  launched: BrowserLaunchedPayload;
 }
 
 interface PageHandle {
@@ -490,13 +620,19 @@ class EventQueue<T> {
   }
 }
 
-export class BrowserType {
+class BrowserTypeImpl implements BrowserType {
+  #browserKind: BrowserKind;
+
+  constructor(browserKind: BrowserKind = "chromium") {
+    this.#browserKind = browserKind;
+  }
+
   async launch(options: LaunchOptions = {}): Promise<Browser> {
-    return launchChrome(options);
+    return launchBrowser(this.#browserKind, options);
   }
 }
 
-export class Browser {
+class BrowserImpl implements Browser {
   #closed = false;
   #runtime: RuntimeClient;
   #stream: BrowserSessionStream;
@@ -507,10 +643,10 @@ export class Browser {
   constructor(state: BrowserLaunchState) {
     const browserInfo: BrowserInfo = {
       sessionId: state.sessionId,
-      browserName: state.chromeLaunched.browser ?? "",
-      launchNote: state.chromeLaunched.note ?? "",
-      cdpWebSocketURL: state.chromeLaunched.cdpWebsocketUrl ?? "",
-      userDataDir: state.chromeLaunched.userDataDir ?? "",
+      browserName: state.launched.browser ?? "",
+      launchNote: state.launched.note ?? "",
+      cdpWebSocketURL: "",
+      userDataDir: state.launched.userDataDir ?? "",
     };
 
     this.#runtime = state.runtime;
@@ -522,7 +658,7 @@ export class Browser {
     this.cdpWebSocketURL = browserInfo.cdpWebSocketURL;
     this.userDataDir = browserInfo.userDataDir;
 
-    this.#initialPage = this.#createPage(state.chromeLaunched.initialTabSessionId ?? "");
+    this.#initialPage = this.#createPage(state.launched.initialTabSessionId ?? "");
   }
 
   readonly sessionId: string;
@@ -626,7 +762,7 @@ export class Browser {
     if (existing) {
       return existing;
     }
-    const page = new Page({
+    const page = new PageImpl({
       runtime: this.#runtime,
       browserSessionId: this.sessionId,
       sessionId,
@@ -642,7 +778,7 @@ export class Browser {
   }
 }
 
-export class Page {
+class PageImpl implements Page {
   #runtime: RuntimeClient;
   #handlePromise: Promise<PageHandle> | null = null;
 
@@ -656,7 +792,7 @@ export class Page {
   readonly browserSessionId: string;
 
   locator(selector: string): Locator {
-    return new Locator({ page: this, selector });
+    return new LocatorImpl({ page: this, selector });
   }
 
   async goto(url: string, options: CommandOptions = {}): Promise<NavigateResult> {
@@ -1094,7 +1230,7 @@ export class Page {
   }
 }
 
-export class Locator {
+class LocatorImpl implements Locator {
   readonly page: Page;
   readonly selector: string;
 
@@ -1144,14 +1280,15 @@ export class Locator {
   }
 
   locator(selector: string): Locator {
-    return new Locator({
+    return new LocatorImpl({
       page: this.page,
       selector: `${this.selector} ${selector}`,
     });
   }
 }
 
-export const chromium = new BrowserType();
+export const chromium: BrowserType = new BrowserTypeImpl("chromium");
+export const firefox: BrowserType = new BrowserTypeImpl("firefox");
 
 export type Tab = Page;
 
@@ -1169,26 +1306,41 @@ export async function ping(): Promise<string> {
 }
 
 export async function launchChrome(options: LaunchOptions = {}): Promise<Browser> {
+  return launchBrowser("chromium", options);
+}
+
+export async function launchConfiguredBrowser(config: ResolvedAllwrightConfig): Promise<Browser> {
+  return launchBrowser(config.browserName, {
+    ...config.launchOptions,
+    browserBinary: config.browserBinary ?? config.launchOptions.browserBinary,
+  });
+}
+
+export async function launchBrowser(
+  browserKind: BrowserKind,
+  options: LaunchOptions = {},
+): Promise<Browser> {
   const runtime = await getRuntime();
   const stream = runtime.client.BrowserSession();
   const queue = bindStreamQueue(stream);
 
   stream.write({
-    launchChrome: {
-      chromeBinary: options.chromeBinary,
+    launchBrowser: {
+      browserKind: browserKind === "firefox" ? 2 : 1,
+      browserBinary: options.browserBinary,
       retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
     },
   });
 
   while (true) {
     const event = await queue.next();
-    if (event.chromeLaunched) {
-      return new Browser({
+    if (event.browserLaunched) {
+      return new BrowserImpl({
         runtime,
         stream,
         queue,
         sessionId: event.sessionId ?? "",
-        chromeLaunched: event.chromeLaunched,
+        launched: event.browserLaunched,
       });
     }
     if (event.error?.message) {
@@ -1209,6 +1361,69 @@ export async function shutdown(): Promise<void> {
   const runtime = await runtimePromise;
   runtime.client.close();
   runtimePromise = null;
+}
+
+export function findConfigFile(startDir = process.cwd()): string | null {
+  let currentDir = path.resolve(startDir);
+
+  while (true) {
+    for (const filename of CONFIG_FILENAMES) {
+      const candidate = path.join(currentDir, filename);
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+        return candidate;
+      }
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      return null;
+    }
+    currentDir = parentDir;
+  }
+}
+
+export function loadConfigFile(configFile: string): AllwrightConfig {
+  const resolved = path.resolve(configFile);
+  const raw = fs.readFileSync(resolved, "utf8");
+  const parsed = parseConfigContents(raw, resolved);
+  validateConfigShape(parsed, resolved);
+  return parsed as AllwrightConfig;
+}
+
+export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedAllwrightConfig {
+  const configFilePath =
+    options.configFile ? path.resolve(options.configFile) : findConfigFile(options.cwd);
+  const fileConfig = configFilePath ? loadConfigFile(configFilePath) : {};
+  const suiteName = options.suite?.trim() || null;
+  const suiteConfig = suiteName ? fileConfig.suites?.[suiteName] : undefined;
+
+  if (suiteName && !suiteConfig) {
+    throw new Error(
+      `allwright config suite "${suiteName}" was not found in ${configFilePath ?? "the resolved config file"}`,
+    );
+  }
+
+  const serverAddr = suiteConfig?.server?.addr ?? fileConfig.server?.addr;
+  const browserName = suiteConfig?.browser?.name ?? fileConfig.browser?.name ?? "chromium";
+  const browserBinary = suiteConfig?.browser?.binary ?? fileConfig.browser?.binary;
+  const launchOptions = mergeLaunchOptions(
+    fileConfig.browser?.launchOptions,
+    suiteConfig?.browser?.launchOptions,
+  );
+  const expect = {
+    ...(fileConfig.expect ?? {}),
+    ...(suiteConfig?.expect ?? {}),
+  };
+
+  return {
+    configFilePath,
+    suiteName,
+    serverAddr,
+    browserName,
+    browserBinary,
+    launchOptions: browserBinary ? { ...launchOptions, browserBinary } : launchOptions,
+    expect,
+  };
 }
 
 async function getRuntime(): Promise<RuntimeClient> {
@@ -1241,6 +1456,157 @@ function configuredServerAddr(): string {
     return serverAddrOverride;
   }
   return normalizeServerAddr(process.env[SERVER_ADDR_ENV_VAR] ?? DEFAULT_SERVER_ADDR);
+}
+
+function mergeLaunchOptions(
+  base?: LaunchOptions,
+  override?: LaunchOptions,
+): LaunchOptions {
+  return {
+    ...(base ?? {}),
+    ...(override ?? {}),
+  };
+}
+
+function validateConfigShape(value: unknown, source: string): void {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`allwright config ${source} must contain a top-level object`);
+  }
+
+  const config = value as Record<string, unknown>;
+  if (config.schemaVersion !== undefined && config.schemaVersion !== 1) {
+    throw new Error(
+      `allwright config ${source} has unsupported schemaVersion ${String(config.schemaVersion)}; expected 1`,
+    );
+  }
+
+  const browserName =
+    (config.browser as { name?: unknown } | undefined)?.name;
+  if (browserName !== undefined && browserName !== "chromium" && browserName !== "firefox") {
+    throw new Error(
+      `allwright config ${source} has unsupported browser.name ${String(browserName)}; use "chromium" or "firefox"`,
+    );
+  }
+}
+
+function parseConfigContents(raw: string, source: string): unknown {
+  const extension = path.extname(source).toLowerCase();
+  if (extension === ".json") {
+    return JSON.parse(raw) as unknown;
+  }
+  if (extension === ".yaml" || extension === ".yml") {
+    return parseSimpleYaml(raw, source);
+  }
+  throw new Error(
+    `unsupported allwright config file extension ${extension || "<none>"} for ${source}`,
+  );
+}
+
+function parseSimpleYaml(raw: string, source: string): unknown {
+  const root: Record<string, unknown> = {};
+  const stack: Array<{ indent: number; value: Record<string, unknown> }> = [
+    { indent: -1, value: root },
+  ];
+
+  for (const [index, originalLine] of raw.split(/\r?\n/).entries()) {
+    const lineNumber = index + 1;
+    const line = stripYamlComment(originalLine);
+    if (!line.trim()) {
+      continue;
+    }
+
+    const indent = countLeadingSpaces(line);
+    if (indent % 2 !== 0) {
+      throw new Error(
+        `invalid YAML indentation in ${source}:${lineNumber}; use multiples of 2 spaces`,
+      );
+    }
+
+    while (stack.length > 1 && indent <= stack[stack.length - 1]!.indent) {
+      stack.pop();
+    }
+
+    const current = stack[stack.length - 1]!;
+    const trimmed = line.trim();
+    const separatorIndex = trimmed.indexOf(":");
+    if (separatorIndex <= 0) {
+      throw new Error(`invalid YAML mapping in ${source}:${lineNumber}`);
+    }
+
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const rawValue = trimmed.slice(separatorIndex + 1).trim();
+    if (!key) {
+      throw new Error(`empty YAML key in ${source}:${lineNumber}`);
+    }
+
+    if (!rawValue) {
+      const child: Record<string, unknown> = {};
+      current.value[key] = child;
+      stack.push({ indent, value: child });
+      continue;
+    }
+
+    current.value[key] = parseYamlScalar(rawValue, source, lineNumber);
+  }
+
+  return root;
+}
+
+function stripYamlComment(line: string): string {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      continue;
+    }
+    if (char === "\"" && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      continue;
+    }
+    if (char === "#" && !inSingleQuote && !inDoubleQuote) {
+      return line.slice(0, index);
+    }
+  }
+
+  return line;
+}
+
+function countLeadingSpaces(line: string): number {
+  let count = 0;
+  while (count < line.length && line[count] === " ") {
+    count += 1;
+  }
+  return count;
+}
+
+function parseYamlScalar(value: string, source: string, lineNumber: number): unknown {
+  if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
+    return value.slice(1, -1);
+  }
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  if (value === "null") {
+    return null;
+  }
+  if (/^-?\d+$/.test(value)) {
+    return Number.parseInt(value, 10);
+  }
+  if (/^-?\d+\.\d+$/.test(value)) {
+    return Number.parseFloat(value);
+  }
+  if (value.startsWith("[") || value.startsWith("{")) {
+    throw new Error(
+      `unsupported YAML collection syntax in ${source}:${lineNumber}; use nested mappings instead`,
+    );
+  }
+  return value;
 }
 
 function normalizeServerAddr(raw: string): string {

@@ -16,7 +16,7 @@ gradle build
 ```java
 import dev.allwright.client.Allwright;
 
-Allwright.Browser browser = Allwright.chromium().launch();
+Allwright.Browser browser = Allwright.firefox().launch();
 Allwright.Page page = browser.page();
 page.goTo("https://example.com");
 page.click("h1");

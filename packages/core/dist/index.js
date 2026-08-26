@@ -1,4 +1,5 @@
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import grpc from "@grpc/grpc-js";
 import protoLoader from "@grpc/proto-loader";
@@ -11,6 +12,14 @@ const PROTO_ROOT = path.join(PACKAGE_ROOT, "proto");
 const ENGINE_PROTO_PATH = path.join(PROTO_ROOT, "engine", "v1", "engine.proto");
 let runtimePromise = null;
 let serverAddrOverride = null;
+const CONFIG_FILENAMES = [
+    "allwright.config.yaml",
+    "allwright.config.yml",
+    "allwright.config.json",
+    ".allwright/config.yaml",
+    ".allwright/config.yml",
+    ".allwright/config.json",
+];
 class EventQueue {
     #items = [];
     #waiters = [];
@@ -44,12 +53,16 @@ class EventQueue {
         });
     }
 }
-export class BrowserType {
+class BrowserTypeImpl {
+    #browserKind;
+    constructor(browserKind = "chromium") {
+        this.#browserKind = browserKind;
+    }
     async launch(options = {}) {
-        return launchChrome(options);
+        return launchBrowser(this.#browserKind, options);
     }
 }
-export class Browser {
+class BrowserImpl {
     #closed = false;
     #runtime;
     #stream;
@@ -59,10 +72,10 @@ export class Browser {
     constructor(state) {
         const browserInfo = {
             sessionId: state.sessionId,
-            browserName: state.chromeLaunched.browser ?? "",
-            launchNote: state.chromeLaunched.note ?? "",
-            cdpWebSocketURL: state.chromeLaunched.cdpWebsocketUrl ?? "",
-            userDataDir: state.chromeLaunched.userDataDir ?? "",
+            browserName: state.launched.browser ?? "",
+            launchNote: state.launched.note ?? "",
+            cdpWebSocketURL: "",
+            userDataDir: state.launched.userDataDir ?? "",
         };
         this.#runtime = state.runtime;
         this.#stream = state.stream;
@@ -72,7 +85,7 @@ export class Browser {
         this.launchNote = browserInfo.launchNote;
         this.cdpWebSocketURL = browserInfo.cdpWebSocketURL;
         this.userDataDir = browserInfo.userDataDir;
-        this.#initialPage = this.#createPage(state.chromeLaunched.initialTabSessionId ?? "");
+        this.#initialPage = this.#createPage(state.launched.initialTabSessionId ?? "");
     }
     sessionId;
     browserName;
@@ -161,7 +174,7 @@ export class Browser {
         if (existing) {
             return existing;
         }
-        const page = new Page({
+        const page = new PageImpl({
             runtime: this.#runtime,
             browserSessionId: this.sessionId,
             sessionId,
@@ -175,7 +188,7 @@ export class Browser {
         }
     }
 }
-export class Page {
+class PageImpl {
     #runtime;
     #handlePromise = null;
     constructor(input) {
@@ -186,7 +199,7 @@ export class Page {
     sessionId;
     browserSessionId;
     locator(selector) {
-        return new Locator({ page: this, selector });
+        return new LocatorImpl({ page: this, selector });
     }
     async goto(url, options = {}) {
         const handle = await this.#getHandle();
@@ -581,7 +594,7 @@ export class Page {
         return this.#handlePromise;
     }
 }
-export class Locator {
+class LocatorImpl {
     page;
     selector;
     constructor(input) {
@@ -619,13 +632,14 @@ export class Locator {
         return this.page.waitForSelector(this.selector, options);
     }
     locator(selector) {
-        return new Locator({
+        return new LocatorImpl({
             page: this.page,
             selector: `${this.selector} ${selector}`,
         });
     }
 }
-export const chromium = new BrowserType();
+export const chromium = new BrowserTypeImpl("chromium");
+export const firefox = new BrowserTypeImpl("firefox");
 export async function ping() {
     const runtime = await getRuntime();
     return new Promise((resolve, reject) => {
@@ -639,24 +653,34 @@ export async function ping() {
     });
 }
 export async function launchChrome(options = {}) {
+    return launchBrowser("chromium", options);
+}
+export async function launchConfiguredBrowser(config) {
+    return launchBrowser(config.browserName, {
+        ...config.launchOptions,
+        browserBinary: config.browserBinary ?? config.launchOptions.browserBinary,
+    });
+}
+export async function launchBrowser(browserKind, options = {}) {
     const runtime = await getRuntime();
     const stream = runtime.client.BrowserSession();
     const queue = bindStreamQueue(stream);
     stream.write({
-        launchChrome: {
-            chromeBinary: options.chromeBinary,
+        launchBrowser: {
+            browserKind: browserKind === "firefox" ? 2 : 1,
+            browserBinary: options.browserBinary,
             retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
         },
     });
     while (true) {
         const event = await queue.next();
-        if (event.chromeLaunched) {
-            return new Browser({
+        if (event.browserLaunched) {
+            return new BrowserImpl({
                 runtime,
                 stream,
                 queue,
                 sessionId: event.sessionId ?? "",
-                chromeLaunched: event.chromeLaunched,
+                launched: event.browserLaunched,
             });
         }
         if (event.error?.message) {
@@ -675,6 +699,55 @@ export async function shutdown() {
     const runtime = await runtimePromise;
     runtime.client.close();
     runtimePromise = null;
+}
+export function findConfigFile(startDir = process.cwd()) {
+    let currentDir = path.resolve(startDir);
+    while (true) {
+        for (const filename of CONFIG_FILENAMES) {
+            const candidate = path.join(currentDir, filename);
+            if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+                return candidate;
+            }
+        }
+        const parentDir = path.dirname(currentDir);
+        if (parentDir === currentDir) {
+            return null;
+        }
+        currentDir = parentDir;
+    }
+}
+export function loadConfigFile(configFile) {
+    const resolved = path.resolve(configFile);
+    const raw = fs.readFileSync(resolved, "utf8");
+    const parsed = parseConfigContents(raw, resolved);
+    validateConfigShape(parsed, resolved);
+    return parsed;
+}
+export function resolveConfig(options = {}) {
+    const configFilePath = options.configFile ? path.resolve(options.configFile) : findConfigFile(options.cwd);
+    const fileConfig = configFilePath ? loadConfigFile(configFilePath) : {};
+    const suiteName = options.suite?.trim() || null;
+    const suiteConfig = suiteName ? fileConfig.suites?.[suiteName] : undefined;
+    if (suiteName && !suiteConfig) {
+        throw new Error(`allwright config suite "${suiteName}" was not found in ${configFilePath ?? "the resolved config file"}`);
+    }
+    const serverAddr = suiteConfig?.server?.addr ?? fileConfig.server?.addr;
+    const browserName = suiteConfig?.browser?.name ?? fileConfig.browser?.name ?? "chromium";
+    const browserBinary = suiteConfig?.browser?.binary ?? fileConfig.browser?.binary;
+    const launchOptions = mergeLaunchOptions(fileConfig.browser?.launchOptions, suiteConfig?.browser?.launchOptions);
+    const expect = {
+        ...(fileConfig.expect ?? {}),
+        ...(suiteConfig?.expect ?? {}),
+    };
+    return {
+        configFilePath,
+        suiteName,
+        serverAddr,
+        browserName,
+        browserBinary,
+        launchOptions: browserBinary ? { ...launchOptions, browserBinary } : launchOptions,
+        expect,
+    };
 }
 async function getRuntime() {
     if (!runtimePromise) {
@@ -701,6 +774,124 @@ function configuredServerAddr() {
         return serverAddrOverride;
     }
     return normalizeServerAddr(process.env[SERVER_ADDR_ENV_VAR] ?? DEFAULT_SERVER_ADDR);
+}
+function mergeLaunchOptions(base, override) {
+    return {
+        ...(base ?? {}),
+        ...(override ?? {}),
+    };
+}
+function validateConfigShape(value, source) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        throw new Error(`allwright config ${source} must contain a top-level object`);
+    }
+    const config = value;
+    if (config.schemaVersion !== undefined && config.schemaVersion !== 1) {
+        throw new Error(`allwright config ${source} has unsupported schemaVersion ${String(config.schemaVersion)}; expected 1`);
+    }
+    const browserName = config.browser?.name;
+    if (browserName !== undefined && browserName !== "chromium" && browserName !== "firefox") {
+        throw new Error(`allwright config ${source} has unsupported browser.name ${String(browserName)}; use "chromium" or "firefox"`);
+    }
+}
+function parseConfigContents(raw, source) {
+    const extension = path.extname(source).toLowerCase();
+    if (extension === ".json") {
+        return JSON.parse(raw);
+    }
+    if (extension === ".yaml" || extension === ".yml") {
+        return parseSimpleYaml(raw, source);
+    }
+    throw new Error(`unsupported allwright config file extension ${extension || "<none>"} for ${source}`);
+}
+function parseSimpleYaml(raw, source) {
+    const root = {};
+    const stack = [
+        { indent: -1, value: root },
+    ];
+    for (const [index, originalLine] of raw.split(/\r?\n/).entries()) {
+        const lineNumber = index + 1;
+        const line = stripYamlComment(originalLine);
+        if (!line.trim()) {
+            continue;
+        }
+        const indent = countLeadingSpaces(line);
+        if (indent % 2 !== 0) {
+            throw new Error(`invalid YAML indentation in ${source}:${lineNumber}; use multiples of 2 spaces`);
+        }
+        while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+            stack.pop();
+        }
+        const current = stack[stack.length - 1];
+        const trimmed = line.trim();
+        const separatorIndex = trimmed.indexOf(":");
+        if (separatorIndex <= 0) {
+            throw new Error(`invalid YAML mapping in ${source}:${lineNumber}`);
+        }
+        const key = trimmed.slice(0, separatorIndex).trim();
+        const rawValue = trimmed.slice(separatorIndex + 1).trim();
+        if (!key) {
+            throw new Error(`empty YAML key in ${source}:${lineNumber}`);
+        }
+        if (!rawValue) {
+            const child = {};
+            current.value[key] = child;
+            stack.push({ indent, value: child });
+            continue;
+        }
+        current.value[key] = parseYamlScalar(rawValue, source, lineNumber);
+    }
+    return root;
+}
+function stripYamlComment(line) {
+    let inSingleQuote = false;
+    let inDoubleQuote = false;
+    for (let index = 0; index < line.length; index += 1) {
+        const char = line[index];
+        if (char === "'" && !inDoubleQuote) {
+            inSingleQuote = !inSingleQuote;
+            continue;
+        }
+        if (char === "\"" && !inSingleQuote) {
+            inDoubleQuote = !inDoubleQuote;
+            continue;
+        }
+        if (char === "#" && !inSingleQuote && !inDoubleQuote) {
+            return line.slice(0, index);
+        }
+    }
+    return line;
+}
+function countLeadingSpaces(line) {
+    let count = 0;
+    while (count < line.length && line[count] === " ") {
+        count += 1;
+    }
+    return count;
+}
+function parseYamlScalar(value, source, lineNumber) {
+    if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
+        return value.slice(1, -1);
+    }
+    if (value === "true") {
+        return true;
+    }
+    if (value === "false") {
+        return false;
+    }
+    if (value === "null") {
+        return null;
+    }
+    if (/^-?\d+$/.test(value)) {
+        return Number.parseInt(value, 10);
+    }
+    if (/^-?\d+\.\d+$/.test(value)) {
+        return Number.parseFloat(value);
+    }
+    if (value.startsWith("[") || value.startsWith("{")) {
+        throw new Error(`unsupported YAML collection syntax in ${source}:${lineNumber}; use nested mappings instead`);
+    }
+    return value;
 }
 function normalizeServerAddr(raw) {
     const trimmed = raw.trim();

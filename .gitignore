@@ -38,7 +38,7 @@ node_modules/
 /allwright-dev/.vercel/
 /allwright-dev/out/
 /allwright-dev/*.tsbuildinfo
-
+.allwright-dev/
 # Editor and OS noise
 .DS_Store
 .idea/

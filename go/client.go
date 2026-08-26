@@ -29,9 +29,13 @@ type runtimeClient struct {
 	engine enginev1.EngineServiceClient
 }
 
+type BrowserType struct {
+	browserKind enginev1.BrowserKind
+}
+
 type LaunchOptions struct {
-	ChromeBinary string
-	Timeout      time.Duration
+	BrowserBinary string
+	Timeout       time.Duration
 }
 
 type CommandOptions struct {
@@ -133,6 +137,13 @@ type Tab struct {
 	lastBidiSessionID string
 }
 
+type Page = Tab
+
+type Locator struct {
+	page     *Tab
+	selector string
+}
+
 type browserSessionStream interface {
 	Send(*enginev1.BrowserSessionCommand) error
 	Recv() (*enginev1.BrowserSessionEvent, error)
@@ -144,6 +155,11 @@ type tabSessionStream interface {
 	Recv() (*enginev1.TabSessionEvent, error)
 	CloseSend() error
 }
+
+var (
+	Chromium = BrowserType{browserKind: enginev1.BrowserKind_BROWSER_KIND_CHROMIUM}
+	Firefox  = BrowserType{browserKind: enginev1.BrowserKind_BROWSER_KIND_FIREFOX}
+)
 
 func Ping(ctx context.Context) (string, error) {
 	runtime, err := getRuntime(ctx)
@@ -159,6 +175,14 @@ func Ping(ctx context.Context) (string, error) {
 }
 
 func LaunchChrome(ctx context.Context, options LaunchOptions) (*Browser, error) {
+	return LaunchBrowser(ctx, enginev1.BrowserKind_BROWSER_KIND_CHROMIUM, options)
+}
+
+func LaunchFirefox(ctx context.Context, options LaunchOptions) (*Browser, error) {
+	return LaunchBrowser(ctx, enginev1.BrowserKind_BROWSER_KIND_FIREFOX, options)
+}
+
+func LaunchBrowser(ctx context.Context, browserKind enginev1.BrowserKind, options LaunchOptions) (*Browser, error) {
 	runtime, err := getRuntime(ctx)
 	if err != nil {
 		return nil, err
@@ -170,15 +194,16 @@ func LaunchChrome(ctx context.Context, options LaunchOptions) (*Browser, error) 
 	}
 
 	command := &enginev1.BrowserSessionCommand{
-		Command: &enginev1.BrowserSessionCommand_LaunchChrome{
-			LaunchChrome: &enginev1.LaunchChromeCommand{
-				ChromeBinary: optionalString(options.ChromeBinary),
-				RetryOptions: retryOptionsProto(options.Timeout),
+		Command: &enginev1.BrowserSessionCommand_LaunchBrowser{
+			LaunchBrowser: &enginev1.LaunchBrowserCommand{
+				BrowserKind:   browserKind,
+				BrowserBinary: optionalString(options.BrowserBinary),
+				RetryOptions:  retryOptionsProto(options.Timeout),
 			},
 		},
 	}
 	if err := stream.Send(command); err != nil {
-		return nil, fmt.Errorf("send LaunchChromeCommand: %w", err)
+		return nil, fmt.Errorf("send LaunchBrowserCommand: %w", err)
 	}
 
 	for {
@@ -188,6 +213,22 @@ func LaunchChrome(ctx context.Context, options LaunchOptions) (*Browser, error) 
 		}
 
 		switch payload := event.GetEvent().(type) {
+		case *enginev1.BrowserSessionEvent_BrowserLaunched:
+			browser := &Browser{
+				runtime:         runtime,
+				stream:          stream,
+				sessionID:       event.GetSessionId(),
+				browserName:     payload.BrowserLaunched.GetBrowser(),
+				launchNote:      payload.BrowserLaunched.GetNote(),
+				cdpWebSocketURL: "",
+				userDataDir:     payload.BrowserLaunched.GetUserDataDir(),
+			}
+			browser.initialTab = &Tab{
+				runtime:          runtime,
+				browserSessionID: browser.sessionID,
+				sessionID:        payload.BrowserLaunched.GetInitialTabSessionId(),
+			}
+			return browser, nil
 		case *enginev1.BrowserSessionEvent_ChromeLaunched:
 			browser := &Browser{
 				runtime:         runtime,
@@ -221,6 +262,10 @@ func Shutdown() error {
 	err := runtimeState.client.conn.Close()
 	runtimeState.client = nil
 	return err
+}
+
+func (bt BrowserType) Launch(ctx context.Context, options LaunchOptions) (*Browser, error) {
+	return LaunchBrowser(ctx, bt.browserKind, options)
 }
 
 func (b *Browser) SessionID() string {
@@ -265,6 +310,14 @@ func (b *Browser) InitialTab() *Tab {
 	return b.initialTab
 }
 
+func (b *Browser) Page() *Page {
+	return b.InitialTab()
+}
+
+func (b *Browser) InitialPage() *Page {
+	return b.InitialTab()
+}
+
 func (b *Browser) NewTab(ctx context.Context, options ...CommandOptions) (*Tab, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -302,6 +355,10 @@ func (b *Browser) NewTab(ctx context.Context, options ...CommandOptions) (*Tab, 
 			return nil, fmt.Errorf("browser session error while opening tab: %s", payload.Error.GetMessage())
 		}
 	}
+}
+
+func (b *Browser) NewPage(ctx context.Context, options ...CommandOptions) (*Page, error) {
+	return b.NewTab(ctx, options...)
 }
 
 func (b *Browser) Ping(ctx context.Context, message string) (string, error) {
@@ -378,6 +435,20 @@ func (t *Tab) SessionID() string {
 		return ""
 	}
 	return t.sessionID
+}
+
+func (t *Tab) Locator(selector string) *Locator {
+	if t == nil {
+		return nil
+	}
+	return &Locator{
+		page:     t,
+		selector: selector,
+	}
+}
+
+func (t *Tab) Goto(ctx context.Context, url string, options ...CommandOptions) (*NavigateResult, error) {
+	return t.Navigate(ctx, url, options...)
 }
 
 func (t *Tab) Navigate(ctx context.Context, url string, options ...CommandOptions) (*NavigateResult, error) {
@@ -1054,6 +1125,70 @@ func (t *Tab) ensureStream(ctx context.Context) error {
 	}
 	t.stream = stream
 	return nil
+}
+
+func (l *Locator) Page() *Page {
+	if l == nil {
+		return nil
+	}
+	return l.page
+}
+
+func (l *Locator) Selector() string {
+	if l == nil {
+		return ""
+	}
+	return l.selector
+}
+
+func (l *Locator) Locator(selector string) *Locator {
+	if l == nil {
+		return nil
+	}
+	return &Locator{
+		page:     l.page,
+		selector: strings.TrimSpace(l.selector + " " + selector),
+	}
+}
+
+func (l *Locator) Click(ctx context.Context, options ...CommandOptions) (*ClickResult, error) {
+	return l.page.Click(ctx, l.selector, options...)
+}
+
+func (l *Locator) Count(ctx context.Context, options ...CommandOptions) (*CountResult, error) {
+	return l.page.Count(ctx, l.selector, options...)
+}
+
+func (l *Locator) Highlight(ctx context.Context, options ...HighlightOptions) (*HighlightResult, error) {
+	return l.page.Highlight(ctx, l.selector, options...)
+}
+
+func (l *Locator) Focus(ctx context.Context, options ...CommandOptions) (*ElementResult, error) {
+	return l.page.Focus(ctx, l.selector, options...)
+}
+
+func (l *Locator) Fill(ctx context.Context, value string, options ...CommandOptions) (*FillResult, error) {
+	return l.page.Fill(ctx, l.selector, value, options...)
+}
+
+func (l *Locator) Hover(ctx context.Context, options ...CommandOptions) (*ElementResult, error) {
+	return l.page.Hover(ctx, l.selector, options...)
+}
+
+func (l *Locator) Press(ctx context.Context, key string, options ...PressOptions) (*PressResult, error) {
+	return l.page.Press(ctx, l.selector, key, options...)
+}
+
+func (l *Locator) TextContent(ctx context.Context, options ...CommandOptions) (*TextResult, error) {
+	return l.page.TextContent(ctx, l.selector, options...)
+}
+
+func (l *Locator) InnerText(ctx context.Context, options ...CommandOptions) (*TextResult, error) {
+	return l.page.InnerText(ctx, l.selector, options...)
+}
+
+func (l *Locator) WaitFor(ctx context.Context, options ...WaitForSelectorOptions) (*WaitForSelectorResult, error) {
+	return l.page.WaitForSelector(ctx, l.selector, options...)
 }
 
 func getRuntime(ctx context.Context) (*runtimeClient, error) {

@@ -1,8 +1,12 @@
-import { Locator, Page, type Browser, type LaunchOptions, type WaitForSelectorOptions } from "@allwright.dev/core";
+import { type Browser, type BrowserKind, type LaunchOptions, type Locator, type Page, type WaitForSelectorOptions } from "@allwright.dev/core";
 import { expect as vitestExpect } from "vitest";
 export interface AllwrightVitestOptions {
     launchOptions?: LaunchOptions;
     serverAddr?: string;
+    browser?: BrowserKind;
+    browserBinary?: string;
+    configFile?: string;
+    suite?: string;
 }
 export interface AllwrightVitestFixtures {
     browser: Browser;

@@ -4,6 +4,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use allwright_plugin_sdk::{BrowserSessionHandle, PageSessionHandle};
 use crate::plugin_loader as web_lib;
 use crate::proto;
 use tokio::sync::{Mutex, mpsc};
@@ -31,29 +32,27 @@ use proto::{
 
 static BROWSER_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 static TAB_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
-static BIDI_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Clone)]
-struct BrowserBidiMapperState {
+struct BrowserAutomationState {
     bidi_session_id: String,
-    mapper_target_id: String,
-    mapper_session_id: String,
-    package_version: String,
+    mapper_target_id: Option<String>,
+    mapper_session_id: Option<String>,
+    package_version: Option<String>,
 }
 
 #[derive(Debug, Default)]
 struct BrowserSessionState {
     launched: bool,
-    cdp_websocket_url: Option<String>,
+    browser_session: Option<BrowserSessionHandle>,
     process_id: Option<u32>,
-    bidi_mapper: Option<BrowserBidiMapperState>,
+    automation: Option<BrowserAutomationState>,
 }
 
 #[derive(Debug, Clone)]
 struct TabSessionState {
     browser_session_id: String,
-    target_id: String,
-    browsing_context_id: Option<String>,
+    page_session: PageSessionHandle,
     current_url: Option<String>,
 }
 
@@ -150,13 +149,6 @@ fn next_tab_session_id() -> String {
     )
 }
 
-fn next_bidi_session_id() -> String {
-    format!(
-        "bidi-session-{}",
-        BIDI_SESSION_COUNTER.fetch_add(1, Ordering::Relaxed)
-    )
-}
-
 fn browser_event(session_id: &str, event: BrowserEvent) -> BrowserSessionEvent {
     BrowserSessionEvent {
         session_id: session_id.to_string(),
@@ -169,45 +161,6 @@ fn tab_event(tab_session_id: &str, event: TabEvent) -> TabSessionEvent {
         tab_session_id: tab_session_id.to_string(),
         event: Some(event),
     }
-}
-
-async fn ensure_browser_bidi_mapper(
-    state: Arc<Mutex<EngineState>>,
-    browser_session_id: &str,
-    cdp_websocket_url: &str,
-) -> Result<(BrowserBidiMapperState, bool), Status> {
-    if let Some(existing) = state
-        .lock()
-        .await
-        .browser_sessions
-        .get(browser_session_id)
-        .and_then(|session| session.bidi_mapper.clone())
-    {
-        return Ok((existing, false));
-    }
-
-    let injected = web_lib::inject_chromium_bidi_mapper(cdp_websocket_url)
-        .await
-        .map_err(Status::internal)?;
-    let mapper_state = BrowserBidiMapperState {
-        bidi_session_id: next_bidi_session_id(),
-        mapper_target_id: injected.mapper_target_id,
-        mapper_session_id: injected.mapper_session_id,
-        package_version: injected.package_version,
-    };
-
-    let mut state = state.lock().await;
-    let browser_session = state
-        .browser_sessions
-        .get_mut(browser_session_id)
-        .ok_or_else(|| Status::internal("browser session disappeared during mapper injection"))?;
-
-    if let Some(existing) = browser_session.bidi_mapper.clone() {
-        return Ok((existing, false));
-    }
-
-    browser_session.bidi_mapper = Some(mapper_state.clone());
-    Ok((mapper_state, true))
 }
 
 async fn handle_browser_command(
@@ -223,12 +176,18 @@ async fn handle_browser_command(
         })) => {
             let browser_kind = BrowserKind::try_from(browser_kind).unwrap_or(BrowserKind::Unspecified);
             match browser_kind {
-                BrowserKind::Chromium => {
+                BrowserKind::Chromium | BrowserKind::Firefox => {
                     let retry_policy = command_retry_policy(retry_options.as_ref());
-                    let (launch, initial_tab) = retry_with_timeout(retry_policy, || async {
-                        let launch = web_lib::open_chrome_window(browser_binary.as_deref()).await?;
-                        let initial_tab = web_lib::discover_initial_tab(&launch.cdp_websocket_url).await?;
-                        Ok((launch, initial_tab))
+                    let launch = retry_with_timeout(retry_policy, || async {
+                        web_lib::launch_browser(
+                            match browser_kind {
+                                BrowserKind::Chromium => allwright_plugin_sdk::BrowserKind::Chromium,
+                                BrowserKind::Firefox => allwright_plugin_sdk::BrowserKind::Firefox,
+                                BrowserKind::Unspecified => unreachable!(),
+                            },
+                            browser_binary.as_deref(),
+                        )
+                        .await
                     })
                     .await
                     .map_err(Status::internal)?;
@@ -237,17 +196,16 @@ async fn handle_browser_command(
                         session_id.to_string(),
                         BrowserSessionState {
                             launched: true,
-                            cdp_websocket_url: Some(launch.cdp_websocket_url.clone()),
+                            browser_session: Some(launch.browser_session.clone()),
                             process_id: Some(launch.process_id),
-                            bidi_mapper: None,
+                            automation: None,
                         },
                     );
                     state.lock().await.tab_sessions.insert(
                         initial_tab_session_id.clone(),
                         TabSessionState {
                             browser_session_id: session_id.to_string(),
-                            target_id: initial_tab.target_id,
-                            browsing_context_id: None,
+                            page_session: launch.initial_page.page_session.clone(),
                             current_url: None,
                         },
                     );
@@ -256,9 +214,9 @@ async fn handle_browser_command(
                         event: browser_event(
                             session_id,
                             BrowserEvent::BrowserLaunched(BrowserLaunchedEvent {
-                                browser_kind: BrowserKind::Chromium as i32,
+                                browser_kind: browser_kind as i32,
                                 browser: launch.browser,
-                                note: format!("{}; {}", launch.note, initial_tab.note),
+                                note: format!("{}; {}", launch.note, launch.initial_page.note),
                                 user_data_dir: launch.user_data_dir,
                                 initial_tab_session_id,
                             }),
@@ -266,15 +224,6 @@ async fn handle_browser_command(
                         should_close: false,
                     })
                 }
-                BrowserKind::Firefox => Ok(CommandOutcome {
-                    event: browser_event(
-                        session_id,
-                        BrowserEvent::Error(BrowserSessionErrorEvent {
-                            message: "firefox backend is not implemented yet".to_string(),
-                        }),
-                    ),
-                    should_close: false,
-                }),
                 BrowserKind::Unspecified => Ok(CommandOutcome {
                     event: browser_event(
                         session_id,
@@ -303,17 +252,21 @@ async fn handle_browser_command(
                 session_id.to_string(),
                 BrowserSessionState {
                     launched: true,
-                    cdp_websocket_url: Some(launch.cdp_websocket_url.clone()),
+                    browser_session: Some(BrowserSessionHandle::Chromium {
+                        cdp_websocket_url: launch.cdp_websocket_url.clone(),
+                    }),
                     process_id: Some(launch.process_id),
-                    bidi_mapper: None,
+                    automation: None,
                 },
             );
             state.lock().await.tab_sessions.insert(
                 initial_tab_session_id.clone(),
                 TabSessionState {
                     browser_session_id: session_id.to_string(),
-                    target_id: initial_tab.target_id,
-                    browsing_context_id: None,
+                    page_session: PageSessionHandle::Chromium {
+                        target_id: initial_tab.target_id,
+                        browsing_context_id: None,
+                    },
                     current_url: None,
                 },
             );
@@ -333,12 +286,12 @@ async fn handle_browser_command(
             })
         }
         Some(BrowserCommand::OpenTab(OpenTabCommand { retry_options })) => {
-            let cdp_websocket_url = {
+            let browser_session = {
                 let state = state.lock().await;
                 match state.browser_sessions.get(session_id) {
                     Some(browser_session) if browser_session.launched => {
-                        browser_session.cdp_websocket_url.clone().ok_or_else(|| {
-                            Status::internal("browser session is missing CDP websocket metadata")
+                        browser_session.browser_session.clone().ok_or_else(|| {
+                            Status::internal("browser session is missing backend session metadata")
                         })?
                     }
                     Some(_) => {
@@ -367,9 +320,7 @@ async fn handle_browser_command(
                 }
             };
             let retry_policy = command_retry_policy(retry_options.as_ref());
-            let tab = retry_with_timeout(retry_policy, || async {
-                web_lib::open_chrome_tab(&cdp_websocket_url).await
-            })
+            let page = retry_with_timeout(retry_policy, || async { web_lib::open_page(&browser_session).await })
             .await
             .map_err(Status::internal)?;
             let tab_session_id = next_tab_session_id();
@@ -377,8 +328,7 @@ async fn handle_browser_command(
                 tab_session_id.clone(),
                 TabSessionState {
                     browser_session_id: session_id.to_string(),
-                    target_id: tab.target_id,
-                    browsing_context_id: None,
+                    page_session: page.page_session,
                     current_url: None,
                 },
             );
@@ -388,7 +338,7 @@ async fn handle_browser_command(
                     session_id,
                     BrowserEvent::TabOpened(TabOpenedEvent {
                         tab_session_id,
-                        note: tab.note,
+                        note: page.note,
                     }),
                 ),
                 should_close: false,
@@ -473,7 +423,7 @@ async fn handle_tab_command(
         });
     }
 
-    let (cdp_websocket_url, target_id, existing_bidi_mapper) = {
+    let (browser_session, page_session, existing_automation) = {
         let state = state.lock().await;
         let browser_session = match state.browser_sessions.get(&browser_session_id) {
             Some(browser_session) => browser_session,
@@ -523,11 +473,11 @@ async fn handle_tab_command(
         }
 
         (
-            browser_session.cdp_websocket_url.clone().ok_or_else(|| {
-                Status::internal("browser session is missing CDP websocket metadata")
+            browser_session.browser_session.clone().ok_or_else(|| {
+                Status::internal("browser session is missing backend session metadata")
             })?,
-            tab_session.target_id.clone(),
-            browser_session.bidi_mapper.clone(),
+            tab_session.page_session.clone(),
+            browser_session.automation.clone(),
         )
     };
 
@@ -546,7 +496,7 @@ async fn handle_tab_command(
             should_close: false,
         }),
         Some(TabCommand::Close(CloseTabSessionCommand {})) => {
-            web_lib::close_chrome_tab(&cdp_websocket_url, &target_id)
+            web_lib::close_page(&browser_session, &page_session)
                 .await
                 .map_err(Status::internal)?;
             state.lock().await.tab_sessions.remove(&tab_session_id);
@@ -562,37 +512,9 @@ async fn handle_tab_command(
         }
         Some(TabCommand::Navigate(NavigateTabCommand { url, retry_options })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
-            let (navigation, resolved_browsing_context_id, bidi_mapper, created) =
-                retry_with_timeout(retry_policy, || async {
-                    let navigation =
-                        web_lib::navigate_chrome_tab(&cdp_websocket_url, &target_id, &url).await?;
-                    let (bidi_mapper, created) = ensure_browser_bidi_mapper(
-                        Arc::clone(&state),
-                        &browser_session_id,
-                        &cdp_websocket_url,
-                    )
-                    .await
-                    .map_err(|status| status.message().to_string())?;
-                    let (resolved_browsing_context_id, resolved_mapper) =
-                        web_lib::resolve_bidi_context_for_tab(
-                            &cdp_websocket_url,
-                            Some(&bidi_mapper.mapper_target_id),
-                            Some(&navigation.browsing_context_id),
-                            Some(&navigation.url),
-                        )
-                        .await?;
-                    Ok((
-                        navigation,
-                        resolved_browsing_context_id,
-                        BrowserBidiMapperState {
-                            bidi_session_id: bidi_mapper.bidi_session_id.clone(),
-                            mapper_target_id: resolved_mapper.mapper_target_id,
-                            mapper_session_id: resolved_mapper.mapper_session_id,
-                            package_version: resolved_mapper.package_version,
-                        },
-                        created,
-                    ))
-                })
+            let navigation = retry_with_timeout(retry_policy, || async {
+                web_lib::navigate_page(&browser_session, &page_session, &url).await
+            })
                 .await
                 .map_err(Status::internal)?;
             {
@@ -601,23 +523,17 @@ async fn handle_tab_command(
                     .tab_sessions
                     .get_mut(&tab_session_id)
                     .ok_or_else(|| Status::internal("tab session disappeared during navigation"))?;
-                tab_session.browsing_context_id = Some(resolved_browsing_context_id);
+                tab_session.page_session = navigation.page_session.clone();
                 tab_session.current_url = Some(navigation.url.clone());
                 if let Some(browser_session) = state.browser_sessions.get_mut(&browser_session_id) {
-                    browser_session.bidi_mapper = Some(bidi_mapper.clone());
+                    browser_session.automation = Some(BrowserAutomationState {
+                        bidi_session_id: navigation.automation.bidi_session_id.clone(),
+                        mapper_target_id: navigation.automation.mapper_target_id.clone(),
+                        mapper_session_id: navigation.automation.mapper_session_id.clone(),
+                        package_version: navigation.automation.package_version.clone(),
+                    });
                 }
             }
-            let bidi_note = if created {
-                format!(
-                    "chromium-bidi mapper injected from pinned chromium-bidi@{} into hidden mapper target after navigation",
-                    bidi_mapper.package_version
-                )
-            } else {
-                format!(
-                    "reused existing chromium-bidi mapper session {} from pinned chromium-bidi@{} after navigation",
-                    bidi_mapper.bidi_session_id, bidi_mapper.package_version
-                )
-            };
             Ok(TabCommandOutcome {
                 events: vec![
                     tab_event(
@@ -630,11 +546,20 @@ async fn handle_tab_command(
                     tab_event(
                         &tab_session_id,
                         TabEvent::ChromiumBidiInjection(ChromiumBidiInjectionEvent {
-                            note: bidi_note,
-                            bidi_session_id: bidi_mapper.bidi_session_id,
-                            mapper_target_id: bidi_mapper.mapper_target_id,
-                            mapper_session_id: bidi_mapper.mapper_session_id,
-                            package_version: bidi_mapper.package_version,
+                            note: navigation.automation.note,
+                            bidi_session_id: navigation.automation.bidi_session_id,
+                            mapper_target_id: navigation
+                                .automation
+                                .mapper_target_id
+                                .unwrap_or_default(),
+                            mapper_session_id: navigation
+                                .automation
+                                .mapper_session_id
+                                .unwrap_or_default(),
+                            package_version: navigation
+                                .automation
+                                .package_version
+                                .unwrap_or_default(),
                         }),
                     ),
                 ],
@@ -647,7 +572,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let click = retry_with_timeout(retry_policy, || async {
-                web_lib::click_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+                web_lib::click_element(&browser_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
@@ -657,10 +582,14 @@ async fn handle_tab_command(
                     TabEvent::ElementClicked(ElementClickedEvent {
                         css_selector: click.css_selector,
                         note: click.note,
-                        bidi_session_id: existing_bidi_mapper
-                            .as_ref()
-                            .map(|bidi_mapper| bidi_mapper.bidi_session_id.clone())
-                            .unwrap_or_default(),
+                        bidi_session_id: if click.bidi_session_id.is_empty() {
+                            existing_automation
+                                .as_ref()
+                                .map(|automation| automation.bidi_session_id.clone())
+                                .unwrap_or_default()
+                        } else {
+                            click.bidi_session_id
+                        },
                     }),
                 )],
                 should_close: false,
@@ -672,7 +601,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let count = retry_with_timeout(retry_policy, || async {
-                web_lib::count_elements_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+                web_lib::count_elements(&browser_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
@@ -695,13 +624,12 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let highlight = retry_with_timeout(retry_policy, || async {
-                web_lib::highlight_elements_via_cdp(
-                    &cdp_websocket_url,
-                    &target_id,
+                web_lib::highlight_elements(
+                    &browser_session,
+                    &page_session,
                     &css_selector,
                     duration_ms.unwrap_or(2_000).into(),
-                )
-                .await
+                ).await
             })
             .await
             .map_err(Status::internal)?;
@@ -723,7 +651,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let focus = retry_with_timeout(retry_policy, || async {
-                web_lib::focus_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+                web_lib::focus_element(&browser_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
@@ -745,8 +673,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let fill = retry_with_timeout(retry_policy, || async {
-                web_lib::fill_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector, &value)
-                    .await
+                web_lib::fill_element(&browser_session, &page_session, &css_selector, &value).await
             })
             .await
             .map_err(Status::internal)?;
@@ -768,7 +695,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let hover = retry_with_timeout(retry_policy, || async {
-                web_lib::hover_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+                web_lib::hover_element(&browser_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
@@ -791,9 +718,9 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let press = retry_with_timeout(retry_policy, || async {
-                web_lib::press_key_via_cdp(
-                    &cdp_websocket_url,
-                    &target_id,
+                web_lib::press_key(
+                    &browser_session,
+                    &page_session,
                     &css_selector,
                     &key,
                     text.as_deref(),
@@ -820,8 +747,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let text = retry_with_timeout(retry_policy, || async {
-                web_lib::get_text_content_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
-                    .await
+                web_lib::get_text_content(&browser_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
@@ -843,7 +769,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let text = retry_with_timeout(retry_policy, || async {
-                web_lib::get_inner_text_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+                web_lib::get_inner_text(&browser_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
@@ -866,13 +792,12 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let wait = retry_with_timeout(retry_policy, || async {
-                web_lib::wait_for_selector_via_cdp(
-                    &cdp_websocket_url,
-                    &target_id,
+                web_lib::wait_for_selector(
+                    &browser_session,
+                    &page_session,
                     &css_selector,
                     visible.unwrap_or(false),
-                )
-                .await
+                ).await
             })
             .await
             .map_err(Status::internal)?;
