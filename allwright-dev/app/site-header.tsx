@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/how-it-works", label: "How it works" },
   { href: "/availability", label: "Availability" },
+  { href: "/blog", label: "Blog" },
 ];
 
 export function SiteHeader() {

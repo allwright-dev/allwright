@@ -1,0 +1,194 @@
+---
+title: "Get started with allwright in TypeScript"
+description: "Go from an empty folder to a passing, real-browser test in about five minutes, using @allwright.dev/vitest — no driver binaries, no manual browser setup."
+date: "2026-08-28"
+author: "The allwright team"
+published: true
+tags: ["typescript", "vitest", "getting-started", "web testing"]
+keywords:
+  [
+    "allwright typescript",
+    "allwright vitest",
+    "typescript test automation",
+    "vitest browser testing",
+    "web test automation tutorial",
+    "playwright alternative",
+    "end-to-end testing typescript",
+  ]
+---
+
+allwright is a small core engine with an installable plugin per surface —
+web today, mobile, desktop, and API to come. The fastest way to feel that in
+your hands is the TypeScript client: install one package, write one test,
+and allwright drives a real Chromium or Firefox browser for you. No separate
+driver to download, no version to match by hand.
+
+This walks through the exact steps behind
+[`allwright-typescript-sample`](https://github.com/allwright-dev/allwright-typescript-sample),
+a minimal, working example repo. You can either follow along and build the
+project from scratch, or clone the sample and skip straight to running it.
+
+```bash
+git clone https://github.com/allwright-dev/allwright-typescript-sample
+cd allwright-typescript-sample
+npm install
+npm test
+```
+
+If you'd rather understand each piece as you add it, keep reading — it's the
+same five files, built up one at a time.
+
+## Prerequisites
+
+- Node.js 18 or newer
+- npm (or your package manager of choice — the sample uses npm)
+
+That's it. `@allwright.dev/vitest` pulls in everything else it needs,
+including bootstrapping the allwright engine itself on first run.
+
+## 1. Start a new project
+
+```bash
+mkdir allwright-typescript-sample
+cd allwright-typescript-sample
+npm init -y
+```
+
+## 2. Install allwright's Vitest fixtures
+
+`@allwright.dev/vitest` is a thin, Playwright-style layer over allwright's
+core TypeScript client: it hands your test a ready-to-use `page` fixture and
+a retrying `expect` for locator assertions, wired directly into Vitest.
+
+```bash
+npm install --save-dev typescript @allwright.dev/vitest
+```
+
+Your `package.json` should now look like this:
+
+```json
+{
+  "name": "allwright-typescript-sample",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@allwright.dev/vitest": "^0.0.36"
+  }
+}
+```
+
+## 3. Configure TypeScript
+
+Add a `tsconfig.json` that targets modern JS and points `types` at Vitest's
+globals, so `test`, `expect`, and friends are available without importing
+them in every file if you choose to use the globals style:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["vitest/globals"]
+  },
+  "include": ["src"]
+}
+```
+
+## 4. Configure Vitest
+
+A `vitest.config.ts` at the project root turns on globals and runs in the
+`node` environment — allwright drives a real, separate browser process, so
+your test file itself doesn't need a DOM environment like `jsdom`:
+
+```ts
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: "node",
+  },
+});
+```
+
+## 5. Write your first test
+
+Create `src/themoderninternet.test.ts`. This test opens a real site, clicks
+into a card by its visible text, and asserts that the destination heading
+becomes visible — the same locator-first style you'd expect from Playwright:
+
+```ts {1,4-5}
+import { expect, test } from "@allwright.dev/vitest";
+
+test("locator assertions", { timeout: 30000 }, async ({ page }) => {
+  await page.goto("https://themoderninternet.vercel.app");
+  await page.click("//*[@data-slot='card' and .//*[text()='Form Inputs']]//button")
+  await expect(page.locator("//h1[text()='Form Inputs']")).toBeVisible()
+});
+```
+
+A few things worth calling out:
+
+- **`{ page }` is injected for you.** `@allwright.dev/vitest` launches and
+  tears down the browser session around each test automatically — there's
+  no `browser.launch()` / `browser.close()` boilerplate to write yourself.
+- **Locators are plain XPath.** You can reach into structure (`.//*[text()=...]`)
+  the same way you'd query it by hand, without learning a new selector
+  syntax.
+- **`expect(...).toBeVisible()` retries.** allwright's `expect` polls the
+  locator until it matches or the timeout elapses, so you're not racing the
+  page's own render.
+
+## 6. Run it
+
+```bash
+npm test
+```
+
+For faster iteration while you're writing tests, run Vitest in watch mode
+instead:
+
+```bash
+npm run test:watch
+```
+
+The first run bootstraps the allwright engine and downloads a managed
+browser build if one isn't already available locally — expect that one to
+take a little longer than the ones after it.
+
+## Project structure, for reference
+
+```text
+.
+├── src/
+│   └── themoderninternet.test.ts
+├── package.json
+├── tsconfig.json
+└── vitest.config.ts
+```
+
+Five files, three of them config. That's deliberately the whole surface
+area — enough to be a real starting point, not a toy.
+
+## Where to go next
+
+- Point `page.goto()` at your own app and swap the locators for elements
+  that actually exist there.
+- Skim [Availability](/availability) for the exact set of page actions and
+  assertions that ship today, so you know what's real versus what's still
+  on the roadmap.
+- Read [How it works](/how-it-works) for the plugin model behind allwright,
+  and how web fits alongside mobile, desktop, and API testing as those ship.
+- TypeScript isn't the only option — Rust, Go, Java, and Python clients are
+  all published too, if your test suite lives somewhere else.

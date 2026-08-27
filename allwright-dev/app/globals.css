@@ -110,3 +110,32 @@ strong {
     transform: translate3d(-24px, -22px, 0);
   }
 }
+
+/* Blog code blocks (app/blog), rendered by rehype-pretty-code + Shiki. The
+   theme's own inline colors come through as-is; this only adds the card
+   chrome and the highlighted-line treatment that matches the site accent. */
+[data-rehype-pretty-code-figure] {
+  margin-top: 1.5rem;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+pre[data-language] {
+  margin: 0;
+}
+
+pre[data-language] code {
+  display: grid;
+  min-width: 100%;
+}
+
+pre[data-language] [data-line] {
+  padding: 0 1.25rem;
+  border-left: 2px solid transparent;
+}
+
+pre[data-language] [data-highlighted-line] {
+  background-color: var(--accent-soft);
+  border-left-color: var(--accent);
+}
