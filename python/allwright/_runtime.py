@@ -4,6 +4,7 @@ import os
 import threading
 from typing import Any
 
+from ._bootstrap import ensure_runtime_ready, shutdown_managed_server
 from ._browser import Browser
 from ._page import Page
 from ._proto import DEFAULT_SERVER_ADDR, SERVER_ADDR_ENV_VAR, engine_pb2, engine_pb2_grpc
@@ -75,6 +76,7 @@ def set_server_addr(server_addr: str) -> None:
         if _runtime_client is not None:
             _runtime_client.close()
             _runtime_client = None
+        shutdown_managed_server()
 
 
 def shutdown() -> None:
@@ -83,13 +85,16 @@ def shutdown() -> None:
         if _runtime_client is not None:
             _runtime_client.close()
             _runtime_client = None
+        shutdown_managed_server()
 
 
 def get_runtime() -> RuntimeClient:
     global _runtime_client
     with _runtime_lock:
         if _runtime_client is None:
-            _runtime_client = RuntimeClient(resolve_server_addr(), engine_pb2_grpc.EngineServiceStub)
+            server_addr = resolve_server_addr()
+            ensure_runtime_ready(server_addr)
+            _runtime_client = RuntimeClient(server_addr, engine_pb2_grpc.EngineServiceStub)
         return _runtime_client
 
 

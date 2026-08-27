@@ -1,0 +1,378 @@
+package dev.allwright.client;
+
+import dev.allwright.engine.v1.EngineServiceGrpc;
+import dev.allwright.engine.v1.PingRequest;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.StatusRuntimeException;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Objects;
+
+final class BootstrapSupport {
+    private static final String ALLWRIGHT_AUTO_INSTALL_ENV_VAR = "ALLWRIGHT_AUTO_INSTALL";
+    private static final String ALLWRIGHT_CLI_PATH_ENV_VAR = "ALLWRIGHT_CLI_PATH";
+    private static final String ALLWRIGHT_HOME_ENV_VAR = "ALLWRIGHT_HOME";
+    private static final String ALLWRIGHT_REPOSITORY_ENV_VAR = "ALLWRIGHT_REPOSITORY";
+    private static final String ALLWRIGHT_VERSION_ENV_VAR = "ALLWRIGHT_VERSION";
+    private static final String DEFAULT_RELEASE_REPOSITORY = "allwright-dev/allwright";
+    private static final String DEFAULT_RELEASE_VERSION = "0.0.7";
+    private static final Duration PING_TIMEOUT = Duration.ofSeconds(1);
+    private static final Duration STARTUP_TIMEOUT = Duration.ofSeconds(20);
+
+    private static Process managedServer;
+    private static String managedServerAddr;
+
+    private BootstrapSupport() {}
+
+    static synchronized void ensureRuntimeReady(String serverAddr) {
+        String normalized = Objects.requireNonNull(serverAddr, "serverAddr").trim();
+        if (pingServer(normalized)) {
+            return;
+        }
+        if (!isLocalServerAddr(normalized)) {
+            throw new AllwrightException(
+                    "allwright could not reach engine server at " + normalized
+                            + ". Automatic startup is only supported for local addresses."
+            );
+        }
+
+        if (managedServer != null && managedServer.isAlive() && normalized.equals(managedServerAddr)) {
+            waitForServer(normalized);
+            return;
+        }
+
+        shutdownManagedServer();
+
+        Path cliPath = ensureCliAvailable();
+        ensureWebPlugin(cliPath);
+
+        try {
+            managedServer = new ProcessBuilder(
+                    cliPath.toString(),
+                    "serve",
+                    "--listen-addr",
+                    cliListenAddr(normalized)
+            )
+                    .redirectInput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+        } catch (IOException exception) {
+            throw new AllwrightException("start allwright server with " + cliPath + ": " + exception.getMessage(), exception);
+        }
+        managedServerAddr = normalized;
+        waitForServer(normalized);
+    }
+
+    static synchronized void shutdownManagedServer() {
+        if (managedServer != null) {
+            managedServer.destroyForcibly();
+            managedServer = null;
+        }
+        managedServerAddr = null;
+    }
+
+    private static void waitForServer(String serverAddr) {
+        long deadline = System.nanoTime() + STARTUP_TIMEOUT.toNanos();
+        while (System.nanoTime() < deadline) {
+            if (pingServer(serverAddr)) {
+                return;
+            }
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new AllwrightException("interrupted while waiting for allwright server startup", exception);
+            }
+        }
+        shutdownManagedServer();
+        throw new AllwrightException("timed out waiting for allwright server at " + serverAddr + " to become ready");
+    }
+
+    private static boolean pingServer(String serverAddr) {
+        ManagedChannel channel = ManagedChannelBuilder.forTarget(serverAddr).usePlaintext().build();
+        try {
+            EngineServiceGrpc.newBlockingStub(channel)
+                    .withDeadlineAfter(PING_TIMEOUT.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .ping(PingRequest.newBuilder().build());
+            return true;
+        } catch (StatusRuntimeException ignored) {
+            return false;
+        } finally {
+            channel.shutdownNow();
+        }
+    }
+
+    private static Path ensureCliAvailable() {
+        String explicit = System.getenv(ALLWRIGHT_CLI_PATH_ENV_VAR);
+        if (explicit != null && !explicit.isBlank()) {
+            Path path = Path.of(explicit.trim());
+            if (Files.isRegularFile(path)) {
+                return path;
+            }
+        }
+
+        Path bundled = allwrightHome().resolve("bin").resolve(cliFilename());
+        if (Files.isRegularFile(bundled)) {
+            return bundled;
+        }
+
+        Path fromPath = resolveFromPath(cliFilename());
+        if (fromPath != null) {
+            return fromPath;
+        }
+
+        if (!autoInstallEnabled()) {
+            throw new AllwrightException("allwright CLI was not found. Install it first or set ALLWRIGHT_CLI_PATH.");
+        }
+
+        return installCli();
+    }
+
+    private static Path installCli() {
+        Path installDir = allwrightHome().resolve("bin");
+        try {
+            Files.createDirectories(installDir);
+        } catch (IOException exception) {
+            throw new AllwrightException("create allwright CLI install dir " + installDir + ": " + exception.getMessage(), exception);
+        }
+
+        String versionTag = resolveReleaseTag();
+        String assetName = cliAssetName(versionTag);
+        Path archivePath = installDir.resolve(assetName);
+        Path cliPath = installDir.resolve(cliFilename());
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://github.com/" + releaseRepository() + "/releases/download/" + versionTag + "/" + assetName))
+                .header("User-Agent", "allwright-java/" + DEFAULT_RELEASE_VERSION)
+                .timeout(Duration.ofSeconds(120))
+                .build();
+
+        try {
+            HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofFile(archivePath));
+            extractCliArchive(archivePath, installDir, cliPath);
+            Files.deleteIfExists(archivePath);
+            cliPath.toFile().setExecutable(true);
+            return cliPath;
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AllwrightException("install allwright CLI: " + exception.getMessage(), exception);
+        } catch (IOException exception) {
+            throw new AllwrightException("install allwright CLI: " + exception.getMessage(), exception);
+        }
+    }
+
+    private static void ensureWebPlugin(Path cliPath) {
+        Path pluginPath = allwrightHome().resolve("plugins").resolve("web").resolve("lib").resolve(webPluginFilename());
+        if (Files.isRegularFile(pluginPath)) {
+            return;
+        }
+        String version = System.getenv(ALLWRIGHT_VERSION_ENV_VAR);
+        if (version == null || version.isBlank()) {
+            version = DEFAULT_RELEASE_VERSION;
+        }
+        try {
+            Process process = new ProcessBuilder(
+                    cliPath.toString(),
+                    "plugin",
+                    "install",
+                    "web",
+                    "--version",
+                    normalizeReleaseVersion(version)
+            )
+                    .redirectInput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            int exitCode = process.waitFor();
+            if (exitCode != 0 || !Files.isRegularFile(pluginPath)) {
+                throw new AllwrightException(
+                        "allwright attempted to install the `web` plugin automatically, but the install did not complete successfully"
+                );
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AllwrightException("install allwright web plugin: " + exception.getMessage(), exception);
+        } catch (IOException exception) {
+            throw new AllwrightException("install allwright web plugin: " + exception.getMessage(), exception);
+        }
+    }
+
+    private static String resolveReleaseTag() {
+        String version = System.getenv(ALLWRIGHT_VERSION_ENV_VAR);
+        if (version == null || version.isBlank()) {
+            version = DEFAULT_RELEASE_VERSION;
+        }
+        if (!version.trim().equals("latest")) {
+            return normalizeReleaseTag(version);
+        }
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.github.com/repos/" + releaseRepository() + "/releases/latest"))
+                    .header("User-Agent", "allwright-java/" + DEFAULT_RELEASE_VERSION)
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
+            HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+            String marker = "\"tag_name\":\"";
+            int start = response.body().indexOf(marker);
+            if (start < 0) {
+                throw new AllwrightException("latest allwright release metadata did not include tag_name");
+            }
+            int end = response.body().indexOf('"', start + marker.length());
+            return response.body().substring(start + marker.length(), end);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AllwrightException("resolve latest allwright release: " + exception.getMessage(), exception);
+        } catch (IOException exception) {
+            throw new AllwrightException("resolve latest allwright release: " + exception.getMessage(), exception);
+        }
+    }
+
+    private static void extractCliArchive(Path archivePath, Path installDir, Path cliPath) throws IOException, InterruptedException {
+        if (archivePath.toString().endsWith(".zip")) {
+            Process process = new ProcessBuilder(
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    "Expand-Archive -Path '" + archivePath + "' -DestinationPath '" + installDir + "' -Force"
+            )
+                    .redirectInput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            if (process.waitFor() != 0) {
+                throw new IOException("failed to extract allwright CLI zip archive");
+            }
+        } else {
+            Process process = new ProcessBuilder(
+                    "tar",
+                    "-xzf",
+                    archivePath.toString(),
+                    "-C",
+                    installDir.toString(),
+                    "bin/" + cliFilename()
+            )
+                    .redirectInput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            if (process.waitFor() != 0) {
+                throw new IOException("failed to extract allwright CLI tar archive");
+            }
+        }
+
+        Path extracted = installDir.resolve("bin").resolve(cliFilename());
+        Files.copy(extracted, cliPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        if (!extracted.equals(cliPath)) {
+            Files.deleteIfExists(extracted);
+            Files.deleteIfExists(extracted.getParent());
+        }
+    }
+
+    private static String cliAssetName(String versionTag) {
+        String os = System.getProperty("os.name").toLowerCase();
+        String arch = System.getProperty("os.arch").toLowerCase();
+        String target;
+        if (os.contains("mac") && arch.contains("aarch64")) {
+            target = "aarch64-apple-darwin";
+        } else if (os.contains("mac") && (arch.contains("x86_64") || arch.contains("amd64"))) {
+            target = "x86_64-apple-darwin";
+        } else if (os.contains("linux") && arch.contains("aarch64")) {
+            target = "aarch64-unknown-linux-gnu";
+        } else if (os.contains("linux") && (arch.contains("x86_64") || arch.contains("amd64"))) {
+            target = "x86_64-unknown-linux-gnu";
+        } else if (os.contains("windows") && arch.contains("aarch64")) {
+            target = "aarch64-pc-windows-msvc";
+        } else if (os.contains("windows") && (arch.contains("x86_64") || arch.contains("amd64"))) {
+            target = "x86_64-pc-windows-msvc";
+        } else {
+            throw new AllwrightException("automatic allwright CLI install is not supported on " + os + "/" + arch);
+        }
+        String extension = os.contains("windows") ? "zip" : "tar.gz";
+        return "allwright-" + versionTag + "-" + target + "." + extension;
+    }
+
+    private static boolean autoInstallEnabled() {
+        String raw = System.getenv(ALLWRIGHT_AUTO_INSTALL_ENV_VAR);
+        if (raw == null) {
+            return true;
+        }
+        return switch (raw.trim().toLowerCase()) {
+            case "0", "false", "no" -> false;
+            default -> true;
+        };
+    }
+
+    private static Path allwrightHome() {
+        String configured = System.getenv(ALLWRIGHT_HOME_ENV_VAR);
+        if (configured != null && !configured.isBlank()) {
+            return Path.of(configured.trim());
+        }
+        return Path.of(System.getProperty("user.home"), ".allwright");
+    }
+
+    private static Path resolveFromPath(String filename) {
+        String path = System.getenv("PATH");
+        if (path == null || path.isBlank()) {
+            return null;
+        }
+        for (String entry : path.split(java.io.File.pathSeparator)) {
+            if (entry.isBlank()) {
+                continue;
+            }
+            Path candidate = Path.of(entry).resolve(filename);
+            if (Files.isRegularFile(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static String releaseRepository() {
+        String configured = System.getenv(ALLWRIGHT_REPOSITORY_ENV_VAR);
+        return configured == null || configured.isBlank() ? DEFAULT_RELEASE_REPOSITORY : configured.trim();
+    }
+
+    private static String normalizeReleaseTag(String version) {
+        String trimmed = version.trim();
+        return trimmed.startsWith("v") ? trimmed : "v" + trimmed;
+    }
+
+    private static String normalizeReleaseVersion(String version) {
+        return version.trim().replaceFirst("^v", "");
+    }
+
+    private static String cliListenAddr(String serverAddr) {
+        return serverAddr.replaceFirst("^https?://", "");
+    }
+
+    private static boolean isLocalServerAddr(String serverAddr) {
+        String listenAddr = cliListenAddr(serverAddr);
+        int separator = listenAddr.lastIndexOf(':');
+        String host = separator > 0 ? listenAddr.substring(0, separator) : listenAddr;
+        host = host.replace("[", "").replace("]", "");
+        return host.equals("127.0.0.1") || host.equals("localhost") || host.equals("::1");
+    }
+
+    private static String cliFilename() {
+        return System.getProperty("os.name").toLowerCase().contains("windows") ? "allwright.exe" : "allwright";
+    }
+
+    private static String webPluginFilename() {
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("windows")) {
+            return "allwright_surface_web.dll";
+        }
+        if (os.contains("mac")) {
+            return "liballwright_surface_web.dylib";
+        }
+        return "liballwright_surface_web.so";
+    }
+}

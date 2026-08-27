@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::proto::engine_service_client::EngineServiceClient;
 
+use super::bootstrap::{ensure_runtime_ready, shutdown_managed_server};
 use super::types::{Error, Result, RuntimeClient};
 
 const DEFAULT_SERVER_ADDR: &str = "http://127.0.0.1:50051";
@@ -29,6 +30,7 @@ pub fn set_server_addr(server_addr: impl Into<String>) -> Result<()> {
         .lock()
         .map_err(|_| Error::new("runtime singleton lock is poisoned"))?;
     *runtime = None;
+    shutdown_managed_server()?;
     Ok(())
 }
 
@@ -36,6 +38,7 @@ pub async fn shutdown() {
     if let Ok(mut runtime) = runtime_slot().lock() {
         *runtime = None;
     }
+    let _ = shutdown_managed_server();
 }
 
 pub(crate) async fn get_runtime() -> Result<Arc<RuntimeClient>> {
@@ -46,6 +49,7 @@ pub(crate) async fn get_runtime() -> Result<Arc<RuntimeClient>> {
     }
 
     let endpoint = configured_server_addr();
+    ensure_runtime_ready(&endpoint).await?;
     let engine = EngineServiceClient::connect(endpoint).await?;
     let runtime = Arc::new(RuntimeClient { engine });
 

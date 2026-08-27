@@ -37,14 +37,18 @@ version = "0.0.7"
 dependencies = [
  "allwright-plugin-sdk",
  "clap",
+ "flate2",
  "libloading",
  "prost",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_yaml",
+ "tar",
  "tokio",
  "tokio-stream",
  "tonic",
+ "zip",
 ]
 
 [[package]]

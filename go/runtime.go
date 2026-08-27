@@ -47,6 +47,7 @@ func Shutdown() error {
 
 	err := runtimeState.client.conn.Close()
 	runtimeState.client = nil
+	shutdownManagedServer()
 	return err
 }
 
@@ -61,6 +62,7 @@ func SetServerAddr(serverAddr string) error {
 
 	err := runtimeState.client.conn.Close()
 	runtimeState.client = nil
+	shutdownManagedServer()
 	return err
 }
 
@@ -73,6 +75,9 @@ func getRuntime(ctx context.Context) (*runtimeClient, error) {
 	}
 
 	serverAddr := resolveServerAddr()
+	if err := ensureRuntimeReady(ctx, serverAddr); err != nil {
+		return nil, err
+	}
 
 	conn, err := grpc.NewClient(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {

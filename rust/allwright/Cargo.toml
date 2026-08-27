@@ -24,14 +24,18 @@ required-features = ["client"]
 
 [dependencies]
 allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.7" }
+flate2 = { workspace = true }
 libloading = { workspace = true }
 prost = { workspace = true }
+reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+tar = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
 tokio-stream = { workspace = true }
+zip = { workspace = true }
 
 [dev-dependencies]
 clap = { workspace = true, features = ["derive"] }

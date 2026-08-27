@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import grpc from "@grpc/grpc-js";
 import protoLoader from "@grpc/proto-loader";
 
+import { ensureRuntimeReady, shutdownManagedServer } from "./bootstrap.js";
 import { EventQueue } from "./types.js";
 import type {
   BrowserSessionEvent,
@@ -29,6 +30,7 @@ let serverAddrOverride: string | null = null;
 export function setServerAddr(serverAddr: string): void {
   serverAddrOverride = normalizeServerAddr(serverAddr);
   runtimePromise = null;
+  void shutdownManagedServer();
 }
 
 export async function shutdown(): Promise<void> {
@@ -38,6 +40,7 @@ export async function shutdown(): Promise<void> {
   const runtime = await runtimePromise;
   runtime.client.close();
   runtimePromise = null;
+  await shutdownManagedServer();
 }
 
 export async function ping(): Promise<string> {
@@ -55,7 +58,7 @@ export async function ping(): Promise<string> {
 
 export async function getRuntime(): Promise<RuntimeClient> {
   if (!runtimePromise) {
-    runtimePromise = Promise.resolve(createRuntime());
+    runtimePromise = createRuntime();
   }
   return runtimePromise;
 }
@@ -106,7 +109,9 @@ export function resolveLaunchBrowserArgs(
   return browserKindOrOptions === undefined || typeof browserKindOrOptions !== "string";
 }
 
-function createRuntime(): RuntimeClient {
+async function createRuntime(): Promise<RuntimeClient> {
+  const serverAddr = configuredServerAddr();
+  await ensureRuntimeReady(serverAddr);
   const loaded = protoLoader.loadSync(ENGINE_PROTO_PATH, {
     includeDirs: [PROTO_ROOT],
     keepCase: false,
@@ -118,7 +123,7 @@ function createRuntime(): RuntimeClient {
   const proto = grpc.loadPackageDefinition(loaded) as unknown as EngineProtoRoot;
   const ClientCtor = proto.allwright.engine.v1.EngineService;
   const client = new ClientCtor(
-    configuredServerAddr(),
+    serverAddr,
     grpc.credentials.createInsecure(),
   ) as unknown as EngineServiceClientShape;
   return { client };

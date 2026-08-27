@@ -1,5 +1,7 @@
 #[path = "client_browser.rs"]
 mod browser;
+#[path = "client_bootstrap.rs"]
+mod bootstrap;
 #[path = "client_command.rs"]
 mod command;
 #[path = "client_config.rs"]

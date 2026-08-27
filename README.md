@@ -97,6 +97,8 @@ Release automation today:
 - that workflow publishes the npm workspace packages `@allwright.dev/core` and `@allwright.dev/vitest` using npm Trusted Publishing via GitHub Actions OIDC
 - that workflow builds both the `allwright` CLI and `allwright-surface-web` plugin for the current release matrix and uploads the archives to the matching GitHub Release
 - `allwright plugin install web` resolves the local OS and architecture, then downloads the matching release asset
+- the Rust, Go, Java, Python, and TypeScript clients now auto-bootstrap the matching `allwright` CLI and `web` plugin for their own version when they target a local server address and nothing is running yet
+- those clients also reuse an already-healthy local server when one exists, and only tear down the server process if that specific client started it
 - the release workflow syncs the Rust workspace version from the Git tag before building, so the tag is the release source of truth
 
 ## Quick Start
@@ -175,7 +177,7 @@ The practical path today is:
 
 - use the `allwright` CLI as the installable entrypoint
 - install the `web` plugin
-- use the Rust, Go, Java, Python, or TypeScript clients against the running engine server
+- use the Rust, Go, Java, Python, or TypeScript clients against the running engine server, or let the client auto-start a matching local server on first use
 
 At the moment, the `web` runtime path is wired through the installable plugin model and loaded into the core at runtime. The other surface crates and split proto ownership are in place, while additional plugin runtime activation is still follow-up work.
 
