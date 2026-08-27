@@ -4,6 +4,7 @@ import grpc from "@grpc/grpc-js";
 import protoLoader from "@grpc/proto-loader";
 
 import { ensureRuntimeReady, shutdownManagedServer } from "./bootstrap.js";
+import { formatStreamError } from "./errors.js";
 import { EventQueue } from "./types.js";
 import type {
   BrowserSessionEvent,
@@ -142,7 +143,7 @@ function bindStreamQueue<TEvent>(stream: grpc.ClientReadableStream<TEvent>): Eve
     queue.push(event);
   });
   stream.on("error", (error) => {
-    queue.fail(new Error(`grpc stream error: ${error.message}`));
+    queue.fail(formatStreamError(`grpc stream error: ${error.message}`));
   });
   stream.on("end", () => {
     queue.fail(new Error("grpc stream ended"));

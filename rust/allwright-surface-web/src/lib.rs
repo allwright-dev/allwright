@@ -2460,9 +2460,7 @@ impl CdpConnection {
             )
             .await?;
         if let Some(exception_details) = result.get("exceptionDetails") {
-            return Err(format!(
-                "Runtime.evaluate failed with exception details: {exception_details}"
-            ));
+            return Err(format_runtime_exception_message(exception_details));
         }
         Ok(result)
     }
@@ -2773,9 +2771,7 @@ impl CdpConnection {
                     return Err(format!("mapper Runtime.evaluate failed: {error}"));
                 }
                 if let Some(exception_details) = message.pointer("/result/exceptionDetails") {
-                    return Err(format!(
-                        "mapper Runtime.evaluate raised exception details: {exception_details}"
-                    ));
+                    return Err(format_mapper_runtime_exception_message(exception_details));
                 }
                 continue;
             }
@@ -3165,6 +3161,68 @@ fn json_string(value: &Value, pointer: &str) -> Result<String, String> {
 
 fn json_string_literal(value: &str, context: &str) -> Result<String, String> {
     serde_json::to_string(value).map_err(|error| format!("failed to serialize {context}: {error}"))
+}
+
+fn format_runtime_exception_message(exception_details: &Value) -> String {
+    format_exception_message(
+        "Runtime.evaluate failed",
+        exception_details,
+        "Runtime.evaluate failed with exception details",
+    )
+}
+
+fn format_mapper_runtime_exception_message(exception_details: &Value) -> String {
+    format_exception_message(
+        "mapper Runtime.evaluate failed",
+        exception_details,
+        "mapper Runtime.evaluate raised exception details",
+    )
+}
+
+fn format_exception_message(prefix: &str, exception_details: &Value, fallback_prefix: &str) -> String {
+    let message = exception_details
+        .pointer("/exception/preview/properties")
+        .and_then(Value::as_array)
+        .and_then(|properties| {
+            properties.iter().find_map(|property| {
+                let name = property.get("name").and_then(Value::as_str)?;
+                let value = property.get("value").and_then(Value::as_str)?;
+                (name == "message").then_some(value)
+            })
+        })
+        .or_else(|| {
+            exception_details
+                .pointer("/exception/message")
+                .and_then(Value::as_str)
+        })
+        .or_else(|| {
+            exception_details
+                .pointer("/exception/description")
+                .and_then(Value::as_str)
+        })
+        .unwrap_or_default();
+
+    let compact = message.split_whitespace().collect::<Vec<_>>().join(" ");
+    if let Some(selector) = extract_invalid_selector(&compact) {
+        return format!("{prefix}: invalid selector {selector}");
+    }
+    if !compact.is_empty() {
+        return format!(
+            "{prefix}: {}",
+            compact
+                .trim_start_matches("SyntaxError: ")
+                .trim_start_matches("DOMException: ")
+        );
+    }
+    format!("{fallback_prefix}: {exception_details}")
+}
+
+fn extract_invalid_selector(message: &str) -> Option<String> {
+    let prefix = "Failed to execute 'querySelectorAll' on 'Document': '";
+    let suffix = "' is not a valid selector.";
+    let start = message.find(prefix)? + prefix.len();
+    let end = message[start..].find(suffix)? + start;
+    Some(message[start..end].to_string())
 }
 
 fn block_on_plugin_future<T, F>(future: F) -> Result<T, String>

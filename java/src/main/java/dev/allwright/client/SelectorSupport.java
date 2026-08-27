@@ -4,6 +4,10 @@ final class SelectorSupport {
     private SelectorSupport() {}
 
     static String normalizeSelectorForTransport(String selector) {
+        String trimmed = selector == null ? "" : selector.trim();
+        if (isNormalizedTransportSelector(trimmed)) {
+            return trimmed;
+        }
         SelectorTransport parsed = parseSelectorForTransport(selector);
         return parsed.kind() + "=" + quoteJson(parsed.body());
     }
@@ -43,6 +47,74 @@ final class SelectorSupport {
             return new SelectorTransport("xpath", trimmed);
         }
         return new SelectorTransport("css", trimmed);
+    }
+
+    private static SelectorPrefix parseExplicitSelectorPrefix(String selector) {
+        String lowered = selector.toLowerCase();
+        if (lowered.startsWith("xpath=") || lowered.startsWith("xpath:")) {
+            return new SelectorPrefix("xpath", 6);
+        }
+        if (lowered.startsWith("css=") || lowered.startsWith("css:")) {
+            return new SelectorPrefix("css", 4);
+        }
+        return null;
+    }
+
+    private static int findJsonStringEnd(String value) {
+        if (!value.startsWith("\"")) {
+            return -1;
+        }
+        boolean escaped = false;
+        for (int index = 1; index < value.length(); index++) {
+            char ch = value.charAt(index);
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (ch == '\\') {
+                escaped = true;
+                continue;
+            }
+            if (ch == '"') {
+                return index + 1;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isNormalizedTransportSelector(String selector) {
+        if (selector == null || selector.isBlank()) {
+            return false;
+        }
+        int index = 0;
+        while (index < selector.length()) {
+            SelectorPrefix prefix = parseExplicitSelectorPrefix(selector.substring(index));
+            if (prefix == null) {
+                return false;
+            }
+            index += prefix.prefixLength();
+
+            int jsonEnd = findJsonStringEnd(selector.substring(index));
+            if (jsonEnd < 0) {
+                return false;
+            }
+            index += jsonEnd;
+            if (index == selector.length()) {
+                return true;
+            }
+
+            int whitespaceStart = index;
+            while (index < selector.length() && Character.isWhitespace(selector.charAt(index))) {
+                index++;
+            }
+            if (index == whitespaceStart) {
+                return false;
+            }
+            if (parseExplicitSelectorPrefix(selector.substring(index)) == null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static String decodeSelectorBody(String body) {
@@ -117,4 +189,6 @@ final class SelectorSupport {
     }
 
     private record SelectorTransport(String kind, String body) {}
+
+    private record SelectorPrefix(String kind, int prefixLength) {}
 }

@@ -1,4 +1,5 @@
 import { LocatorImpl } from "./locator.js";
+import { formatActionError } from "./errors.js";
 import { normalizeSelectorForTransport } from "./selectors.js";
 import { createPageHandle } from "./runtime.js";
 import type {
@@ -64,7 +65,7 @@ export class PageImpl implements Page {
         injection = event.chromiumBidiInjection;
       }
       if (event.error?.message) {
-        throw new Error(`page session error while navigating: ${event.error.message}`);
+        throw formatActionError("navigate", event.error.message);
       }
       if (event.closed) {
         handle.closed = true;
@@ -107,7 +108,7 @@ export class PageImpl implements Page {
         };
       }
       if (event.error?.message) {
-        throw new Error(`page session error while clicking: ${event.error.message}`);
+        throw formatActionError("click", event.error.message, selector);
       }
       if (event.closed) {
         handle.closed = true;
@@ -139,7 +140,7 @@ export class PageImpl implements Page {
         };
       }
       if (event.error?.message) {
-        throw new Error(`page session error while counting elements: ${event.error.message}`);
+        throw formatActionError("count elements", event.error.message, selector);
       }
       if (event.closed) {
         handle.closed = true;
@@ -172,7 +173,7 @@ export class PageImpl implements Page {
         };
       }
       if (event.error?.message) {
-        throw new Error(`page session error while highlighting elements: ${event.error.message}`);
+        throw formatActionError("highlight elements", event.error.message, selector);
       }
       if (event.closed) {
         handle.closed = true;
@@ -203,7 +204,7 @@ export class PageImpl implements Page {
         };
       }
       if (event.error?.message) {
-        throw new Error(`page session error while focusing: ${event.error.message}`);
+        throw formatActionError("focus", event.error.message, selector);
       }
       if (event.closed) {
         handle.closed = true;
@@ -236,7 +237,7 @@ export class PageImpl implements Page {
         };
       }
       if (event.error?.message) {
-        throw new Error(`page session error while filling: ${event.error.message}`);
+        throw formatActionError("fill", event.error.message, selector);
       }
       if (event.closed) {
         handle.closed = true;
@@ -267,7 +268,7 @@ export class PageImpl implements Page {
         };
       }
       if (event.error?.message) {
-        throw new Error(`page session error while hovering: ${event.error.message}`);
+        throw formatActionError("hover", event.error.message, selector);
       }
       if (event.closed) {
         handle.closed = true;
@@ -301,7 +302,7 @@ export class PageImpl implements Page {
         };
       }
       if (event.error?.message) {
-        throw new Error(`page session error while pressing key: ${event.error.message}`);
+        throw formatActionError("press key", event.error.message, selector);
       }
       if (event.closed) {
         handle.closed = true;
@@ -345,7 +346,7 @@ export class PageImpl implements Page {
         };
       }
       if (event.error?.message) {
-        throw new Error(`page session error while waiting for selector: ${event.error.message}`);
+        throw formatActionError("wait for selector", event.error.message, selector);
       }
       if (event.closed) {
         handle.closed = true;
@@ -374,7 +375,7 @@ export class PageImpl implements Page {
         return;
       }
       if (event.error?.message) {
-        throw new Error(`page session error while closing: ${event.error.message}`);
+        throw formatActionError("close page", event.error.message);
       }
     }
   }
@@ -396,7 +397,7 @@ export class PageImpl implements Page {
         return event.pong.message;
       }
       if (event.error?.message) {
-        throw new Error(`page session error while pinging: ${event.error.message}`);
+        throw formatActionError("ping page", event.error.message);
       }
       if (event.closed) {
         handle.closed = true;
@@ -461,7 +462,7 @@ export class PageImpl implements Page {
         };
       }
       if (event.error?.message) {
-        throw new Error(`page session error while reading text: ${event.error.message}`);
+        throw formatActionError("read text", event.error.message, selector);
       }
       if (event.closed) {
         handle.closed = true;
@@ -472,7 +473,7 @@ export class PageImpl implements Page {
 
   #ensureOpen(handle: PageHandle): void {
     if (handle.closed) {
-      throw new Error(`page session ${this.sessionId} is closed`);
+      throw formatActionError("use page", `page session ${this.sessionId} is closed`);
     }
   }
 

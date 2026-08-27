@@ -1,5 +1,7 @@
 import grpc from "@grpc/grpc-js";
 
+export { AllwrightError } from "./errors.js";
+
 export interface LaunchOptions {
   browserBinary?: string;
   timeoutMs?: number;

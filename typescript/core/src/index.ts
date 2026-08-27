@@ -1,4 +1,5 @@
 import { BrowserImpl, BrowserTypeImpl } from "./browser.js";
+import { formatActionError } from "./errors.js";
 import { findConfigFile, loadConfigFile, resolveConfig } from "./config.js";
 import { PageImpl } from "./page.js";
 import {
@@ -110,7 +111,7 @@ export async function launchBrowser(
       });
     }
     if (event.error?.message) {
-      throw new Error(`browser session error during launch: ${event.error.message}`);
+      throw formatActionError("launch browser", event.error.message);
     }
   }
 }

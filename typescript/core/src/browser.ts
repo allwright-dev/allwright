@@ -1,4 +1,5 @@
 import { PageImpl } from "./page.js";
+import { formatActionError } from "./errors.js";
 import type {
   Browser,
   BrowserInfo,
@@ -88,7 +89,7 @@ export class BrowserImpl implements Browser {
         return this.#createPage(event.tabOpened.tabSessionId);
       }
       if (event.error?.message) {
-        throw new Error(`browser session error while opening tab: ${event.error.message}`);
+        throw formatActionError("open tab", event.error.message);
       }
     }
   }
@@ -110,7 +111,7 @@ export class BrowserImpl implements Browser {
         return;
       }
       if (event.error?.message) {
-        throw new Error(`browser session error while closing: ${event.error.message}`);
+        throw formatActionError("close browser", event.error.message);
       }
     }
   }
@@ -129,7 +130,7 @@ export class BrowserImpl implements Browser {
         return event.pong.message;
       }
       if (event.error?.message) {
-        throw new Error(`browser session error while pinging: ${event.error.message}`);
+        throw formatActionError("ping browser", event.error.message);
       }
     }
   }
@@ -168,7 +169,7 @@ export class BrowserImpl implements Browser {
 
   #ensureOpen(): void {
     if (this.#closed) {
-      throw new Error(`browser session ${this.sessionId} is closed`);
+      throw formatActionError("use browser", `browser session ${this.sessionId} is closed`);
     }
   }
 }
