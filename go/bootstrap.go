@@ -36,14 +36,47 @@ const (
 )
 
 var bootstrapState struct {
-	mu                sync.Mutex
-	managedServerBase string
-	managedServerAddr string
-	managedServer     *exec.Cmd
+	mu                   sync.Mutex
+	managedServerBase    string
+	managedServerAddr    string
+	managedServer        *exec.Cmd
+	managedServerStdout  *tailBuffer
+	managedServerStderr  *tailBuffer
+	managedServerExited  bool
+	managedServerExitErr error
 }
 
 type pingStatus struct {
 	version string
+}
+
+type tailBuffer struct {
+	mu   sync.Mutex
+	data []byte
+}
+
+func (b *tailBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	const maxBytes = 8_000
+	if len(p) >= maxBytes {
+		b.data = append([]byte(nil), p[len(p)-maxBytes:]...)
+		return len(p), nil
+	}
+
+	combined := append(b.data, p...)
+	if len(combined) > maxBytes {
+		combined = combined[len(combined)-maxBytes:]
+	}
+	b.data = append([]byte(nil), combined...)
+	return len(p), nil
+}
+
+func (b *tailBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return strings.TrimSpace(string(b.data))
 }
 
 func ensureRuntimeReady(ctx context.Context, serverAddr string) (string, error) {
@@ -72,10 +105,13 @@ func ensureRuntimeReady(ctx context.Context, serverAddr string) (string, error) 
 	}
 	if managedServerAddr == "" && bootstrapState.managedServer != nil && bootstrapState.managedServer.Process != nil {
 		_ = bootstrapState.managedServer.Process.Kill()
-		_, _ = bootstrapState.managedServer.Process.Wait()
 		bootstrapState.managedServer = nil
 		bootstrapState.managedServerAddr = ""
 		bootstrapState.managedServerBase = ""
+		bootstrapState.managedServerStdout = nil
+		bootstrapState.managedServerStderr = nil
+		bootstrapState.managedServerExited = false
+		bootstrapState.managedServerExitErr = nil
 	}
 	bootstrapState.mu.Unlock()
 
@@ -101,8 +137,10 @@ func ensureRuntimeReady(ctx context.Context, serverAddr string) (string, error) 
 
 	cmd := exec.Command(cliPath, "serve", "--listen-addr", cliListenAddr(resolvedServerAddr))
 	cmd.Stdin = nil
-	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
+	stdoutBuf := &tailBuffer{}
+	stderrBuf := &tailBuffer{}
+	cmd.Stdout = stdoutBuf
+	cmd.Stderr = stderrBuf
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("start allwright server with %s: %w", cliPath, err)
 	}
@@ -111,32 +149,65 @@ func ensureRuntimeReady(ctx context.Context, serverAddr string) (string, error) 
 	bootstrapState.managedServerBase = serverAddr
 	bootstrapState.managedServer = cmd
 	bootstrapState.managedServerAddr = resolvedServerAddr
+	bootstrapState.managedServerStdout = stdoutBuf
+	bootstrapState.managedServerStderr = stderrBuf
+	bootstrapState.managedServerExited = false
+	bootstrapState.managedServerExitErr = nil
 	bootstrapState.mu.Unlock()
+
+	go func(cmd *exec.Cmd) {
+		err := cmd.Wait()
+		bootstrapState.mu.Lock()
+		defer bootstrapState.mu.Unlock()
+		if bootstrapState.managedServer == cmd {
+			bootstrapState.managedServerExited = true
+			bootstrapState.managedServerExitErr = err
+		}
+	}(cmd)
+
 	return waitForServer(ctx, resolvedServerAddr, expectedVersion)
 }
 
 func shutdownManagedServer() {
 	bootstrapState.mu.Lock()
-	defer bootstrapState.mu.Unlock()
-
-	if bootstrapState.managedServer != nil && bootstrapState.managedServer.Process != nil {
-		_ = bootstrapState.managedServer.Process.Kill()
-		_, _ = bootstrapState.managedServer.Process.Wait()
-	}
+	cmd := bootstrapState.managedServer
+	exited := bootstrapState.managedServerExited
 	bootstrapState.managedServerBase = ""
 	bootstrapState.managedServer = nil
 	bootstrapState.managedServerAddr = ""
+	bootstrapState.managedServerStdout = nil
+	bootstrapState.managedServerStderr = nil
+	bootstrapState.managedServerExited = false
+	bootstrapState.managedServerExitErr = nil
+	bootstrapState.mu.Unlock()
+
+	if cmd != nil && !exited && cmd.Process != nil {
+		_ = cmd.Process.Kill()
+	}
 }
 
 func waitForServer(ctx context.Context, serverAddr string, expectedVersion string) (string, error) {
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
+		if details := managedServerFailureDetails(); details != "" {
+			shutdownManagedServer()
+			return "", fmt.Errorf("allwright server exited before becoming ready at %s\n%s", serverAddr, details)
+		}
 		if status, err := pingServer(ctx, serverAddr); err == nil && status.version == expectedVersion {
 			return serverAddr, nil
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
+	details := managedServerFailureDetails()
 	shutdownManagedServer()
+	if details != "" {
+		return "", fmt.Errorf(
+			"timed out waiting for allwright server at %s to become ready with version %s\n%s",
+			serverAddr,
+			expectedVersion,
+			details,
+		)
+	}
 	return "", fmt.Errorf("timed out waiting for allwright server at %s to become ready with version %s", serverAddr, expectedVersion)
 }
 
@@ -532,6 +603,31 @@ func displayVersion(version string) string {
 		return "unknown"
 	}
 	return version
+}
+
+func managedServerFailureDetails() string {
+	bootstrapState.mu.Lock()
+	defer bootstrapState.mu.Unlock()
+
+	if !bootstrapState.managedServerExited && bootstrapState.managedServerExitErr == nil {
+		return ""
+	}
+
+	parts := make([]string, 0, 3)
+	if bootstrapState.managedServerExitErr != nil {
+		parts = append(parts, fmt.Sprintf("exit error: %v", bootstrapState.managedServerExitErr))
+	}
+	if bootstrapState.managedServerStdout != nil {
+		if stdout := bootstrapState.managedServerStdout.String(); stdout != "" {
+			parts = append(parts, "stdout:\n"+stdout)
+		}
+	}
+	if bootstrapState.managedServerStderr != nil {
+		if stderr := bootstrapState.managedServerStderr.String(); stderr != "" {
+			parts = append(parts, "stderr:\n"+stderr)
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 func cliVersionMatches(cliPath string, expectedVersion string) (bool, error) {
