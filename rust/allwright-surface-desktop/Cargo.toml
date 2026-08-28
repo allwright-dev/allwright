@@ -11,5 +11,5 @@ keywords = ["automation", "desktop", "plugin"]
 categories = ["development-tools::testing", "api-bindings"]
 
 [dependencies]
-allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.40" }
+allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.41" }
 tokio = { workspace = true }
