@@ -250,8 +250,8 @@ public final class Allwright {
         synchronized (RUNTIME_LOCK) {
             if (runtimeClient == null) {
                 String serverAddr = resolveServerAddr();
-                BootstrapSupport.ensureRuntimeReady(serverAddr);
-                ManagedChannel channel = ManagedChannelBuilder.forTarget(serverAddr)
+                String resolvedServerAddr = BootstrapSupport.ensureRuntimeReady(serverAddr);
+                ManagedChannel channel = ManagedChannelBuilder.forTarget(resolvedServerAddr)
                         .usePlaintext()
                         .build();
                 runtimeClient = new RuntimeSupport.RuntimeClient(

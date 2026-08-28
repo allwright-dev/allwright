@@ -93,8 +93,8 @@ def get_runtime() -> RuntimeClient:
     with _runtime_lock:
         if _runtime_client is None:
             server_addr = resolve_server_addr()
-            ensure_runtime_ready(server_addr)
-            _runtime_client = RuntimeClient(server_addr, engine_pb2_grpc.EngineServiceStub)
+            resolved_server_addr = ensure_runtime_ready(server_addr)
+            _runtime_client = RuntimeClient(resolved_server_addr, engine_pb2_grpc.EngineServiceStub)
         return _runtime_client
 
 

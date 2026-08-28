@@ -60,6 +60,7 @@ func (*PingRequest) Descriptor() ([]byte, []int) {
 type PingResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -97,6 +98,13 @@ func (*PingResponse) Descriptor() ([]byte, []int) {
 func (x *PingResponse) GetMessage() string {
 	if x != nil {
 		return x.Message
+	}
+	return ""
+}
+
+func (x *PingResponse) GetVersion() string {
+	if x != nil {
+		return x.Version
 	}
 	return ""
 }

@@ -28,6 +28,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `.github/workflows/ci.yml` now also runs the Java client tests through the checked-in Gradle wrapper on Java 21
 - `scripts/install.sh`: Linux/macOS installer script for downloading the published `allwright` CLI release asset directly from GitHub without cloning the repo
 - `scripts/install.ps1`: Windows PowerShell installer script for downloading the published `allwright` CLI release asset directly from GitHub without cloning the repo
+- `scripts/generate-go-proto.sh`: repo-level helper that installs pinned Go protobuf generators under `go/.bin/` and regenerates the checked-in Go bindings from the canonical top-level `proto/` tree
 - `scripts/generate-rust-proto.sh`: repo-level helper that regenerates Rust bindings from the canonical top-level `proto/` tree
 - `scripts/sync-version.sh`: helper script that rewrites the workspace and internal crate versions from a provided release version
 - `scripts/sync-npm-version.sh`: helper script that rewrites the npm workspace package versions from a provided release version and keeps `@allwright.dev/vitest` aligned to `@allwright.dev/core`
@@ -190,9 +191,9 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `@allwright.dev/vitest` provides ready-made Vitest fixtures (`browser`, `page`, `allwright`) plus a custom retrying `expect` surface aimed at Playwright-style ergonomics.
 - `@allwright.dev/vitest` is now the first consumer of that shared config model: it auto-resolves `allwright.config.yaml`, `allwright.config.yml`, or `allwright.config.json`, supports shared retry defaults plus per-suite selection through `allwright.suite`, and merges test-level overrides on top instead of inventing a Vitest-only config file shape.
 - The current retrying Vitest assertions support both `expect(page)` and `expect(page.locator(...))` forms for text, count, and visibility checks; they are intentionally implemented in the npm test helper layer rather than in the engine protocol for now.
-- Regenerating Go stubs currently requires local installation of `protoc-gen-go@v1.36.10` and `protoc-gen-go-grpc@v1.5.1`, then running `protoc` against `proto/engine/v1/engine.proto` with output rooted at `go/`.
+- Regenerating Go stubs should go through `./scripts/generate-go-proto.sh`, which installs pinned `protoc-gen-go@v1.36.10` and `protoc-gen-go-grpc@v1.5.1` into `go/.bin/` and rewrites the checked-in Go generated files under `go/gen/allwright/engine/v1/`.
 - Regenerating Rust stubs should go through `./scripts/generate-rust-proto.sh`, which runs `cargo run -p xtask -- generate-rust-proto` against the top-level `proto/` tree and rewrites the checked-in Rust generated files under `rust/allwright/src/`.
-- `.github/workflows/ci.yml` verifies Rust proto regeneration by rerunning `./scripts/generate-rust-proto.sh`; generated Rust files must stay committed and in sync.
+- `.github/workflows/ci.yml` verifies Go and Rust proto regeneration by rerunning `./scripts/generate-go-proto.sh` and `./scripts/generate-rust-proto.sh`; generated files must stay committed and in sync, including `rust/allwright/src/allwright.engine.v1.rs`.
 - Before finishing any change, review newly created local artifacts and update `.gitignore` when needed; this is especially important for Java/Gradle outputs such as `java/bin/`, `java/build/`, `.gradle-user-home/`, and similar generated directories.
 - Browser launch is being generalized away from Chrome-only protocol naming:
 - `proto/surfaces/web/v1/web.proto` now defines `BrowserKind`, `LaunchBrowserCommand`, and `BrowserLaunchedEvent`
@@ -262,7 +263,7 @@ xtask/
 
 - Keep `README.md` and `Codex.md` aligned.
 - Before finishing any change, review newly created local artifacts and update `.gitignore` when needed; this is especially important for Java/Gradle outputs such as `java/bin/`, `java/build/`, `.gradle-user-home/`, and similar generated directories.
-- Never hand-edit generated Rust proto files under `rust/allwright/src/`; regenerate them from the top-level `proto/` tree.
+- Never hand-edit generated Go proto files under `go/gen/allwright/engine/v1/` or generated Rust proto files under `rust/allwright/src/`; regenerate them from the top-level `proto/` tree.
 - The top-level `proto/` directory is the single source of truth for engine contracts; do not fork or hand-maintain parallel protocol definitions per language.
 - Prefer documenting ownership changes here at the same time as code changes.
 - Keep shared engine contracts and client-facing APIs in `rust/allwright`.

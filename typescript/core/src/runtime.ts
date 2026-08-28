@@ -112,7 +112,7 @@ export function resolveLaunchBrowserArgs(
 
 async function createRuntime(): Promise<RuntimeClient> {
   const serverAddr = configuredServerAddr();
-  await ensureRuntimeReady(serverAddr);
+  const resolvedServerAddr = await ensureRuntimeReady(serverAddr);
   const loaded = protoLoader.loadSync(ENGINE_PROTO_PATH, {
     includeDirs: [PROTO_ROOT],
     keepCase: false,
@@ -124,7 +124,7 @@ async function createRuntime(): Promise<RuntimeClient> {
   const proto = grpc.loadPackageDefinition(loaded) as unknown as EngineProtoRoot;
   const ClientCtor = proto.allwright.engine.v1.EngineService;
   const client = new ClientCtor(
-    serverAddr,
+    resolvedServerAddr,
     grpc.credentials.createInsecure(),
   ) as unknown as EngineServiceClientShape;
   return { client };

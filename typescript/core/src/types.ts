@@ -202,6 +202,7 @@ export interface ResolveConfigOptions {
 
 export interface PingResponse {
   message?: string;
+  version?: string;
 }
 
 export interface ChromeLaunchedPayload {

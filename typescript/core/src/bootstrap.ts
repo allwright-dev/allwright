@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -21,20 +22,30 @@ const ENGINE_PROTO_PATH = fileURLToPath(new URL("../proto/engine/v1/engine.proto
 
 let managedServer: ReturnType<typeof spawn> | null = null;
 let managedServerAddr: string | null = null;
+let managedServerBaseAddr: string | null = null;
 
 type PingClient = {
   Ping(
     request: object,
     metadata: grpc.Metadata,
     options: grpc.CallOptions,
-    callback: (error: grpc.ServiceError | null, response: { message?: string }) => void,
+    callback: (error: grpc.ServiceError | null, response: { message?: string; version?: string }) => void,
   ): void;
   close(): void;
 };
 
-export async function ensureRuntimeReady(serverAddr: string): Promise<void> {
-  if (await pingServer(serverAddr)) {
-    return;
+export async function ensureRuntimeReady(serverAddr: string): Promise<string> {
+  const expectedVersion = expectedRuntimeVersion();
+  const status = await pingServer(serverAddr);
+  if (status) {
+    if (status.version === expectedVersion) {
+      return serverAddr;
+    }
+    if (!isLocalServerAddr(serverAddr)) {
+      throw new Error(
+        `allwright server at ${serverAddr} is running version ${displayVersion(status.version)} but this client expects ${expectedVersion}`,
+      );
+    }
   }
 
   if (!isLocalServerAddr(serverAddr)) {
@@ -43,20 +54,31 @@ export async function ensureRuntimeReady(serverAddr: string): Promise<void> {
     );
   }
 
-  if (managedServer && !managedServer.killed && managedServer.exitCode === null && managedServerAddr === serverAddr) {
-    await waitForServer(serverAddr);
-    return;
+  if (managedServer && !managedServer.killed && managedServer.exitCode === null && managedServerBaseAddr === serverAddr && managedServerAddr) {
+    return waitForServer(managedServerAddr, expectedVersion);
+  }
+  if (managedServer && !managedServer.killed && managedServer.exitCode === null) {
+    managedServer.kill("SIGTERM");
+    managedServer = null;
+    managedServerAddr = null;
+    managedServerBaseAddr = null;
   }
 
-  const cliPath = await ensureCliAvailable();
-  ensureWebPlugin(cliPath);
+  const cliPath = await ensureCliAvailable(expectedVersion);
+  ensureWebPlugin(cliPath, expectedVersion);
 
-  managedServer = spawn(cliPath, ["serve", "--listen-addr", cliListenAddr(serverAddr)], {
+  let resolvedServerAddr = serverAddr;
+  if (status && status.version !== expectedVersion) {
+    resolvedServerAddr = await allocateManagedServerAddr(serverAddr);
+  }
+
+  managedServer = spawn(cliPath, ["serve", "--listen-addr", cliListenAddr(resolvedServerAddr)], {
     stdio: "ignore",
   });
-  managedServerAddr = serverAddr;
+  managedServerAddr = resolvedServerAddr;
+  managedServerBaseAddr = serverAddr;
 
-  await waitForServer(serverAddr);
+  return waitForServer(resolvedServerAddr, expectedVersion);
 }
 
 export async function shutdownManagedServer(): Promise<void> {
@@ -65,21 +87,23 @@ export async function shutdownManagedServer(): Promise<void> {
   }
   managedServer = null;
   managedServerAddr = null;
+  managedServerBaseAddr = null;
 }
 
-async function waitForServer(serverAddr: string): Promise<void> {
+async function waitForServer(serverAddr: string, expectedVersion: string): Promise<string> {
   const deadline = Date.now() + STARTUP_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    if (await pingServer(serverAddr)) {
-      return;
+    const status = await pingServer(serverAddr);
+    if (status?.version === expectedVersion) {
+      return serverAddr;
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   await shutdownManagedServer();
-  throw new Error(`timed out waiting for allwright server at ${serverAddr} to become ready`);
+  throw new Error(`timed out waiting for allwright server at ${serverAddr} to become ready with version ${expectedVersion}`);
 }
 
-async function pingServer(serverAddr: string): Promise<boolean> {
+async function pingServer(serverAddr: string): Promise<{ version: string } | null> {
   const loaded = protoLoader.loadSync(ENGINE_PROTO_PATH, {
     includeDirs: [PROTO_ROOT],
     keepCase: false,
@@ -96,27 +120,36 @@ async function pingServer(serverAddr: string): Promise<boolean> {
     grpc.credentials.createInsecure(),
   );
 
-  return await new Promise<boolean>((resolve) => {
-    client.Ping({}, new grpc.Metadata(), { deadline: new Date(Date.now() + PING_TIMEOUT_MS) }, (error) => {
+  return await new Promise<{ version: string } | null>((resolve) => {
+    client.Ping({}, new grpc.Metadata(), { deadline: new Date(Date.now() + PING_TIMEOUT_MS) }, (error, response) => {
       client.close();
-      resolve(!error);
+      if (error) {
+        resolve(null);
+        return;
+      }
+      resolve({ version: normalizeReleaseVersion(response.version ?? "") });
     });
   });
 }
 
-async function ensureCliAvailable(): Promise<string> {
+async function ensureCliAvailable(expectedVersion: string): Promise<string> {
   const envPath = process.env[ALLWRIGHT_CLI_PATH_ENV_VAR]?.trim();
-  if (envPath && isFile(envPath)) {
+  if (envPath && isFile(envPath) && cliVersionMatches(envPath, expectedVersion)) {
     return envPath;
   }
 
   const bundled = path.join(allwrightHome(), "bin", cliFilename());
-  if (isFile(bundled)) {
+  if (isFile(bundled) && cliVersionMatches(bundled, expectedVersion)) {
     return bundled;
   }
 
+  const repoLocal = repoLocalCliPath();
+  if (repoLocal && cliVersionMatches(repoLocal, expectedVersion)) {
+    return repoLocal;
+  }
+
   const fromPath = resolveFromPath(cliFilename());
-  if (fromPath) {
+  if (fromPath && cliVersionMatches(fromPath, expectedVersion)) {
     return fromPath;
   }
 
@@ -148,18 +181,20 @@ async function installCli(): Promise<string> {
   return cliPath;
 }
 
-function ensureWebPlugin(cliPath: string): void {
+function ensureWebPlugin(cliPath: string, expectedVersion: string): void {
   const pluginPath = path.join(allwrightHome(), "plugins", "web", "lib", webPluginFilename());
-  if (isFile(pluginPath)) {
+  if (isFile(pluginPath) && installedPluginVersion("web") === expectedVersion) {
     return;
   }
 
-  const version = process.env[ALLWRIGHT_VERSION_ENV_VAR]?.trim() || DEFAULT_RELEASE_VERSION;
-  const result = spawnSync(cliPath, ["plugin", "install", "web", "--version", normalizeReleaseVersion(version)], {
+  const result = spawnSync(cliPath, ["plugin", "install", "web", "--version", expectedVersion], {
     stdio: "ignore",
   });
   if (result.status !== 0 || !isFile(pluginPath)) {
     throw new Error("allwright attempted to install the `web` plugin automatically, but the install did not complete successfully");
+  }
+  if (installedPluginVersion("web") !== expectedVersion) {
+    throw new Error(`allwright attempted to install the \`web\` plugin automatically, but version ${expectedVersion} is still not active`);
   }
 }
 
@@ -237,13 +272,104 @@ function normalizeReleaseVersion(version: string): string {
   return version.replace(/^v/, "");
 }
 
+function expectedRuntimeVersion(): string {
+  return normalizeReleaseVersion(process.env[ALLWRIGHT_VERSION_ENV_VAR]?.trim() || DEFAULT_RELEASE_VERSION);
+}
+
 function cliListenAddr(serverAddr: string): string {
   return serverAddr.replace(/^https?:\/\//, "");
 }
 
 function isLocalServerAddr(serverAddr: string): boolean {
-  const host = cliListenAddr(serverAddr).split(":")[0]?.replace(/^\[|\]$/g, "") ?? "";
+  const host = parseServerHost(serverAddr);
   return host === "127.0.0.1" || host === "localhost" || host === "::1";
+}
+
+function installedPluginVersion(pluginId: string): string | null {
+  const manifestPath = path.join(allwrightHome(), "plugins.txt");
+  if (!isFile(manifestPath)) {
+    return null;
+  }
+  for (const line of fs.readFileSync(manifestPath, "utf8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+    const [id, , version] = trimmed.split("\t", 3);
+    if (id === pluginId && version) {
+      return normalizeReleaseVersion(version);
+    }
+  }
+  return null;
+}
+
+async function allocateManagedServerAddr(serverAddr: string): Promise<string> {
+  const host = localBindingHost(serverAddr);
+  const port = await new Promise<number>((resolve, reject) => {
+    const server = net.createServer();
+    server.unref();
+    server.on("error", reject);
+    server.listen(0, host, () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("failed to reserve a local port for allwright")));
+        return;
+      }
+      const { port } = address;
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(port);
+      });
+    });
+  });
+  return host.includes(":") ? `http://[${host}]:${port}` : `http://${host}:${port}`;
+}
+
+function localBindingHost(serverAddr: string): string {
+  const host = parseServerHost(serverAddr);
+  return host === "::1" ? "::1" : "127.0.0.1";
+}
+
+function displayVersion(version: string): string {
+  return version || "unknown";
+}
+
+function repoLocalCliPath(): string | null {
+  const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
+  for (const candidate of [
+    path.join(repoRoot, "target", "debug", cliFilename()),
+    path.join(repoRoot, "target", "release", cliFilename()),
+  ]) {
+    if (isFile(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function cliVersionMatches(cliPath: string, expectedVersion: string): boolean {
+  const result = spawnSync(cliPath, ["--version"], { stdio: ["ignore", "pipe", "ignore"], encoding: "utf8" });
+  if (result.status !== 0) {
+    return false;
+  }
+  for (const token of result.stdout.split(/\s+/)) {
+    if (/^\d/.test(token)) {
+      return normalizeReleaseVersion(token) === expectedVersion;
+    }
+  }
+  return false;
+}
+
+function parseServerHost(serverAddr: string): string {
+  const listenAddr = cliListenAddr(serverAddr);
+  const ipv6Match = listenAddr.match(/^\[([^\]]+)\]/);
+  if (ipv6Match) {
+    return ipv6Match[1] ?? "";
+  }
+  return listenAddr.split(":")[0] ?? "";
 }
 
 function allwrightHome(): string {

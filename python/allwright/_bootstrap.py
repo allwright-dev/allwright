@@ -4,6 +4,7 @@ import io
 import json
 import os
 import shutil
+import socket
 import subprocess
 import tarfile
 import tempfile
@@ -29,86 +30,110 @@ DEFAULT_RELEASE_VERSION = "0.0.1"
 _bootstrap_lock = threading.Lock()
 _managed_server: subprocess.Popen[bytes] | None = None
 _managed_server_addr: str | None = None
+_managed_server_base_addr: str | None = None
 
 
-def ensure_runtime_ready(server_addr: str) -> None:
+def ensure_runtime_ready(server_addr: str) -> str:
     normalized = (server_addr or DEFAULT_SERVER_ADDR).strip()
-    if ping_server(normalized):
-        return
+    expected_version = expected_runtime_version()
+    status = ping_server(normalized)
+    if status is not None:
+        if status["version"] == expected_version:
+            return normalized
+        if not is_local_server_addr(normalized):
+            raise AllwrightError(
+                f"allwright server at {normalized} is running version "
+                f"{display_version(status['version'])} but this client expects {expected_version}"
+            )
     if not is_local_server_addr(normalized):
         raise AllwrightError(
             f"allwright could not reach engine server at {normalized}. "
             "Automatic startup is only supported for local addresses."
         )
 
-    global _managed_server, _managed_server_addr
+    global _managed_server, _managed_server_addr, _managed_server_base_addr
     with _bootstrap_lock:
         if _managed_server is not None and _managed_server.poll() is None:
-            if _managed_server_addr == normalized:
-                wait_for_server(normalized)
-                return
+            if _managed_server_base_addr == normalized and _managed_server_addr is not None:
+                return wait_for_server(_managed_server_addr, expected_version)
+            _managed_server.kill()
+            _managed_server.wait(timeout=5)
         else:
             _managed_server = None
             _managed_server_addr = None
+            _managed_server_base_addr = None
 
-        cli_path = ensure_cli_available()
-        ensure_web_plugin(cli_path)
+        cli_path = ensure_cli_available(expected_version)
+        ensure_web_plugin(cli_path, expected_version)
+        resolved_server_addr = normalized
+        if status is not None and status["version"] != expected_version:
+            resolved_server_addr = allocate_managed_server_addr(normalized)
         _managed_server = subprocess.Popen(
-            [str(cli_path), "serve", "--listen-addr", cli_listen_addr(normalized)],
+            [str(cli_path), "serve", "--listen-addr", cli_listen_addr(resolved_server_addr)],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        _managed_server_addr = normalized
+        _managed_server_addr = resolved_server_addr
+        _managed_server_base_addr = normalized
 
-    wait_for_server(normalized)
+    return wait_for_server(resolved_server_addr, expected_version)
 
 
 def shutdown_managed_server() -> None:
-    global _managed_server, _managed_server_addr
+    global _managed_server, _managed_server_addr, _managed_server_base_addr
     with _bootstrap_lock:
         if _managed_server is not None and _managed_server.poll() is None:
             _managed_server.kill()
             _managed_server.wait(timeout=5)
         _managed_server = None
         _managed_server_addr = None
+        _managed_server_base_addr = None
 
 
-def wait_for_server(server_addr: str) -> None:
+def wait_for_server(server_addr: str, expected_version: str) -> str:
     deadline = time.time() + 20
     while time.time() < deadline:
-        if ping_server(server_addr):
-            return
+        status = ping_server(server_addr)
+        if status is not None and status["version"] == expected_version:
+            return server_addr
         time.sleep(0.25)
     shutdown_managed_server()
-    raise AllwrightError(f"timed out waiting for allwright server at {server_addr} to become ready")
+    raise AllwrightError(
+        f"timed out waiting for allwright server at {server_addr} "
+        f"to become ready with version {expected_version}"
+    )
 
 
-def ping_server(server_addr: str) -> bool:
+def ping_server(server_addr: str) -> dict[str, str] | None:
     channel = grpc.insecure_channel(server_addr)
     stub = engine_pb2_grpc.EngineServiceStub(channel)
     try:
-        stub.Ping(engine_pb2.PingRequest(), timeout=1)
-        return True
+        response = stub.Ping(engine_pb2.PingRequest(), timeout=1)
+        return {"version": normalize_release_version(getattr(response, "version", ""))}
     except grpc.RpcError:
-        return False
+        return None
     finally:
         channel.close()
 
 
-def ensure_cli_available() -> Path:
+def ensure_cli_available(expected_version: str) -> Path:
     env_path = os.getenv(ALLWRIGHT_CLI_PATH_ENV_VAR, "").strip()
     if env_path:
         path = Path(env_path)
-        if path.is_file():
+        if path.is_file() and cli_version_matches(path, expected_version):
             return path
 
     bundled = allwright_home() / "bin" / cli_filename()
-    if bundled.is_file():
+    if bundled.is_file() and cli_version_matches(bundled, expected_version):
         return bundled
 
+    repo_local = repo_local_cli_path()
+    if repo_local is not None and repo_local.is_file() and cli_version_matches(repo_local, expected_version):
+        return repo_local
+
     found = shutil.which(cli_filename())
-    if found:
+    if found and cli_version_matches(Path(found), expected_version):
         return Path(found)
 
     if not auto_install_enabled():
@@ -130,14 +155,13 @@ def install_cli() -> Path:
     return cli_path
 
 
-def ensure_web_plugin(cli_path: Path) -> None:
+def ensure_web_plugin(cli_path: Path, expected_version: str) -> None:
     plugin_path = allwright_home() / "plugins" / "web" / "lib" / web_plugin_filename()
-    if plugin_path.is_file():
+    if plugin_path.is_file() and installed_plugin_version("web") == expected_version:
         return
 
-    version = os.getenv(ALLWRIGHT_VERSION_ENV_VAR, "").strip() or DEFAULT_RELEASE_VERSION
     completed = subprocess.run(
-        [str(cli_path), "plugin", "install", "web", "--version", normalize_release_version(version)],
+        [str(cli_path), "plugin", "install", "web", "--version", expected_version],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -147,6 +171,11 @@ def ensure_web_plugin(cli_path: Path) -> None:
         raise AllwrightError(
             "allwright attempted to install the `web` plugin automatically, "
             "but the install did not complete successfully"
+        )
+    if installed_plugin_version("web") != expected_version:
+        raise AllwrightError(
+            "allwright attempted to install the `web` plugin automatically, "
+            f"but version {expected_version} is still not active"
         )
 
 
@@ -245,9 +274,81 @@ def normalize_release_version(version: str) -> str:
     return version.strip().removeprefix("v")
 
 
+def expected_runtime_version() -> str:
+    return normalize_release_version(
+        os.getenv(ALLWRIGHT_VERSION_ENV_VAR, "").strip() or DEFAULT_RELEASE_VERSION
+    )
+
+
 def is_local_server_addr(server_addr: str) -> bool:
     host = cli_listen_addr(server_addr).rsplit(":", 1)[0].strip("[]")
     return host in {"127.0.0.1", "localhost", "::1"}
+
+
+def installed_plugin_version(plugin_id: str) -> str | None:
+    manifest = allwright_home() / "plugins.txt"
+    if not manifest.is_file():
+        return None
+    for line in manifest.read_text().splitlines():
+        trimmed = line.strip()
+        if not trimmed or trimmed.startswith("#"):
+            continue
+        parts = trimmed.split("\t", 2)
+        if len(parts) < 3 or parts[0] != plugin_id:
+            continue
+        return normalize_release_version(parts[2])
+    return None
+
+
+def allocate_managed_server_addr(server_addr: str) -> str:
+    host = local_binding_host(server_addr)
+    with socket.create_server((host, 0), family=socket.AF_INET6 if ":" in host else socket.AF_INET) as listener:
+        port = listener.getsockname()[1]
+    if ":" in host:
+        return f"http://[{host}]:{port}"
+    return f"http://{host}:{port}"
+
+
+def local_binding_host(server_addr: str) -> str:
+    host = cli_listen_addr(server_addr).rsplit(":", 1)[0].strip("[]")
+    return "::1" if host == "::1" else "127.0.0.1"
+
+
+def display_version(version: str) -> str:
+    return version or "unknown"
+
+
+def repo_local_cli_path() -> Path | None:
+    repo_root = Path(__file__).resolve().parents[2]
+    for candidate in (
+        repo_root / "target" / "debug" / cli_filename(),
+        repo_root / "target" / "release" / cli_filename(),
+    ):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def cli_version_matches(cli_path: Path, expected_version: str) -> bool:
+    try:
+        completed = subprocess.run(
+            [str(cli_path), "--version"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=False,
+        )
+    except OSError as error:
+        raise AllwrightError(
+            f"inspect allwright CLI version via {cli_path}: {error}"
+        ) from error
+    if completed.returncode != 0:
+        return False
+    for token in completed.stdout.split():
+        if token and token[0].isdigit():
+            return normalize_release_version(token) == expected_version
+    return False
 
 
 def cli_filename() -> str:

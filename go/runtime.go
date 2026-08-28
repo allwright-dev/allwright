@@ -75,13 +75,14 @@ func getRuntime(ctx context.Context) (*runtimeClient, error) {
 	}
 
 	serverAddr := resolveServerAddr()
-	if err := ensureRuntimeReady(ctx, serverAddr); err != nil {
+	resolvedServerAddr, err := ensureRuntimeReady(ctx, serverAddr)
+	if err != nil {
 		return nil, err
 	}
 
-	conn, err := grpc.NewClient(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(resolvedServerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, fmt.Errorf("dial engine server at %s: %w", serverAddr, err)
+		return nil, fmt.Errorf("dial engine server at %s: %w", resolvedServerAddr, err)
 	}
 
 	runtimeState.client = &runtimeClient{

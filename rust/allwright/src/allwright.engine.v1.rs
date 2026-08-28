@@ -5,6 +5,8 @@ pub struct PingRequest {}
 pub struct PingResponse {
     #[prost(string, tag = "1")]
     pub message: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub version: ::prost::alloc::string::String,
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct CommandRetryOptions {

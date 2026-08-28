@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::io::{Cursor, Read};
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, OnceLock};
@@ -30,14 +31,30 @@ const PING_TIMEOUT: Duration = Duration::from_secs(1);
 #[derive(Default)]
 struct BootstrapState {
     managed_server_addr: Option<String>,
+    managed_server_requested_addr: Option<String>,
     managed_server: Option<Child>,
+}
+
+struct PingStatus {
+    version: String,
 }
 
 static BOOTSTRAP_STATE: OnceLock<Mutex<BootstrapState>> = OnceLock::new();
 
-pub(crate) async fn ensure_runtime_ready(server_addr: &str) -> Result<()> {
-    if ping_server(server_addr).await.is_ok() {
-        return Ok(());
+pub(crate) async fn ensure_runtime_ready(server_addr: &str) -> Result<String> {
+    let expected_version = expected_runtime_version();
+    if let Some(status) = ping_server(server_addr).await? {
+        if status.version == expected_version {
+            return Ok(server_addr.to_string());
+        }
+
+        if !is_local_server_addr(server_addr) {
+            return Err(Error::new(format!(
+                "allwright server at {server_addr} is running version {} but this client expects {}",
+                display_version(&status.version),
+                expected_version
+            )));
+        }
     }
 
     if !is_local_server_addr(server_addr) {
@@ -46,7 +63,7 @@ pub(crate) async fn ensure_runtime_ready(server_addr: &str) -> Result<()> {
         )));
     }
 
-    let mut already_managed = false;
+    let mut managed_addr = None;
     {
         let mut state = bootstrap_state()
             .lock()
@@ -57,15 +74,17 @@ pub(crate) async fn ensure_runtime_ready(server_addr: &str) -> Result<()> {
                 Ok(Some(_)) => {
                     state.managed_server = None;
                     state.managed_server_addr = None;
+                    state.managed_server_requested_addr = None;
                 }
                 Ok(None) => {
-                    if state.managed_server_addr.as_deref() == Some(server_addr) {
-                        already_managed = true;
+                    if state.managed_server_requested_addr.as_deref() == Some(server_addr) {
+                        managed_addr = state.managed_server_addr.clone();
                     } else {
                         let mut child = state.managed_server.take().expect("managed server child");
                         let _ = child.kill();
                         let _ = child.wait();
                         state.managed_server_addr = None;
+                        state.managed_server_requested_addr = None;
                     }
                 }
                 Err(error) => {
@@ -77,14 +96,26 @@ pub(crate) async fn ensure_runtime_ready(server_addr: &str) -> Result<()> {
         }
     }
 
-    if already_managed {
-        return wait_for_server(server_addr).await;
+    if let Some(managed_addr) = managed_addr {
+        return wait_for_server(&managed_addr, &expected_version).await;
     }
 
+    let initial_status = ping_server(server_addr).await?;
+    let resolved_addr = match initial_status {
+        Some(status) if status.version != expected_version => allocate_managed_server_addr(server_addr)?,
+        _ => server_addr.to_string(),
+    };
+
     {
-        let cli_path = ensure_cli_available()?;
-        ensure_web_plugin(&cli_path)?;
-        let listen_addr = cli_listen_addr(server_addr);
+        let expected_version_for_install = expected_version.clone();
+        let cli_path = tokio::task::spawn_blocking(move || {
+            let cli_path = ensure_cli_available(&expected_version_for_install)?;
+            ensure_web_plugin(&cli_path, &expected_version_for_install)?;
+            Ok::<PathBuf, Error>(cli_path)
+        })
+        .await
+        .map_err(|error| Error::new(format!("allwright bootstrap task failed: {error}")))??;
+        let listen_addr = cli_listen_addr(&resolved_addr);
         let child = Command::new(&cli_path)
             .arg("serve")
             .arg("--listen-addr")
@@ -104,10 +135,11 @@ pub(crate) async fn ensure_runtime_ready(server_addr: &str) -> Result<()> {
             .lock()
             .map_err(|_| Error::new("bootstrap state lock is poisoned"))?;
         state.managed_server = Some(child);
-        state.managed_server_addr = Some(server_addr.to_string());
+        state.managed_server_addr = Some(resolved_addr.clone());
+        state.managed_server_requested_addr = Some(server_addr.to_string());
     }
 
-    wait_for_server(server_addr).await
+    wait_for_server(&resolved_addr, &expected_version).await
 }
 
 pub(crate) fn shutdown_managed_server() -> Result<()> {
@@ -120,6 +152,7 @@ pub(crate) fn shutdown_managed_server() -> Result<()> {
         let _ = child.wait();
     }
     state.managed_server_addr = None;
+    state.managed_server_requested_addr = None;
     Ok(())
 }
 
@@ -127,39 +160,43 @@ fn bootstrap_state() -> &'static Mutex<BootstrapState> {
     BOOTSTRAP_STATE.get_or_init(|| Mutex::new(BootstrapState::default()))
 }
 
-async fn wait_for_server(server_addr: &str) -> Result<()> {
+async fn wait_for_server(server_addr: &str, expected_version: &str) -> Result<String> {
     let start = Instant::now();
     loop {
-        if ping_server(server_addr).await.is_ok() {
-            return Ok(());
+        if let Some(status) = ping_server(server_addr).await? {
+            if status.version == expected_version {
+                return Ok(server_addr.to_string());
+            }
         }
         if start.elapsed() >= STARTUP_TIMEOUT {
             let _ = shutdown_managed_server();
             return Err(Error::new(format!(
-                "timed out waiting for allwright server at {server_addr} to become ready"
+                "timed out waiting for allwright server at {server_addr} to become ready with version {expected_version}"
             )));
         }
         tokio::time::sleep(Duration::from_millis(250)).await;
     }
 }
 
-async fn ping_server(server_addr: &str) -> Result<()> {
+async fn ping_server(server_addr: &str) -> Result<Option<PingStatus>> {
     let endpoint = Endpoint::from_shared(server_addr.to_string())
         .map_err(|error| Error::new(format!("invalid allwright server address {server_addr}: {error}")))?;
-    let channel = tokio::time::timeout(PING_TIMEOUT, endpoint.connect())
-        .await
-        .map_err(|_| Error::new(format!("timed out connecting to allwright server at {server_addr}")))?
-        .map_err(Error::from)?;
+    let channel = match tokio::time::timeout(PING_TIMEOUT, endpoint.connect()).await {
+        Ok(Ok(channel)) => channel,
+        Ok(Err(_)) | Err(_) => return Ok(None),
+    };
     let mut engine = EngineServiceClient::new(channel);
-    tokio::time::timeout(PING_TIMEOUT, engine.ping(tonic::Request::new(PingRequest {})))
-        .await
-        .map_err(|_| Error::new(format!("timed out pinging allwright server at {server_addr}")))?
-        .map_err(Error::from)?;
-    Ok(())
+    let response = match tokio::time::timeout(PING_TIMEOUT, engine.ping(tonic::Request::new(PingRequest {}))).await {
+        Ok(Ok(response)) => response.into_inner(),
+        Ok(Err(_)) | Err(_) => return Ok(None),
+    };
+    Ok(Some(PingStatus {
+        version: normalize_release_version(&response.version),
+    }))
 }
 
-fn ensure_cli_available() -> Result<PathBuf> {
-    if let Some(cli_path) = resolve_existing_cli_path()? {
+fn ensure_cli_available(expected_version: &str) -> Result<PathBuf> {
+    if let Some(cli_path) = resolve_existing_cli_path(expected_version)? {
         return Ok(cli_path);
     }
     if !auto_install_enabled() {
@@ -170,20 +207,32 @@ fn ensure_cli_available() -> Result<PathBuf> {
     install_cli()
 }
 
-fn resolve_existing_cli_path() -> Result<Option<PathBuf>> {
+fn resolve_existing_cli_path(expected_version: &str) -> Result<Option<PathBuf>> {
     if let Ok(raw) = env::var(ALLWRIGHT_CLI_PATH_ENV_VAR) {
         let path = PathBuf::from(raw.trim());
-        if is_executable_file(&path) {
+        if is_executable_file(&path) && cli_version_matches(&path, expected_version)? {
             return Ok(Some(path));
         }
     }
 
     let bundled = allwright_home()?.join("bin").join(cli_filename());
-    if is_executable_file(&bundled) {
+    if is_executable_file(&bundled) && cli_version_matches(&bundled, expected_version)? {
         return Ok(Some(bundled));
     }
 
-    Ok(find_in_path(cli_filename()))
+    if let Some(candidate) = repo_local_cli_path() {
+        if cli_version_matches(&candidate, expected_version)? {
+            return Ok(Some(candidate));
+        }
+    }
+
+    if let Some(candidate) = find_in_path(cli_filename()) {
+        if cli_version_matches(&candidate, expected_version)? {
+            return Ok(Some(candidate));
+        }
+    }
+
+    Ok(None)
 }
 
 fn install_cli() -> Result<PathBuf> {
@@ -211,26 +260,22 @@ fn install_cli() -> Result<PathBuf> {
     Ok(cli_path)
 }
 
-fn ensure_web_plugin(cli_path: &Path) -> Result<()> {
+fn ensure_web_plugin(cli_path: &Path, expected_version: &str) -> Result<()> {
     let plugin_path = allwright_home()?
         .join("plugins")
         .join("web")
         .join("lib")
         .join(web_plugin_filename());
-    if plugin_path.exists() {
+    if plugin_path.exists() && installed_plugin_version("web")?.as_deref() == Some(expected_version) {
         return Ok(());
     }
 
-    let version = env::var(ALLWRIGHT_VERSION_ENV_VAR)
-        .ok()
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| DEFAULT_RELEASE_VERSION.to_string());
     let status = Command::new(cli_path)
         .arg("plugin")
         .arg("install")
         .arg("web")
         .arg("--version")
-        .arg(normalize_release_version(&version))
+        .arg(expected_version)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -383,6 +428,14 @@ fn normalize_release_version(raw: &str) -> String {
     raw.trim().trim_start_matches('v').to_string()
 }
 
+fn expected_runtime_version() -> String {
+    env::var(ALLWRIGHT_VERSION_ENV_VAR)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| normalize_release_version(&value))
+        .unwrap_or_else(|| normalize_release_version(DEFAULT_RELEASE_VERSION))
+}
+
 fn allwright_home() -> Result<PathBuf> {
     if let Ok(home) = env::var(ALLWRIGHT_HOME_ENV_VAR) {
         let trimmed = home.trim();
@@ -412,6 +465,40 @@ fn find_in_path(filename: &str) -> Option<PathBuf> {
     None
 }
 
+fn repo_local_cli_path() -> Option<PathBuf> {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let repo_root = manifest_dir.parent()?.parent()?;
+    ["target/debug", "target/release"]
+        .into_iter()
+        .map(|dir| repo_root.join(dir).join(cli_filename()))
+        .find(|candidate| is_executable_file(candidate))
+}
+
+fn cli_version_matches(cli_path: &Path, expected_version: &str) -> Result<bool> {
+    let output = Command::new(cli_path)
+        .arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+        .map_err(|error| {
+            Error::new(format!(
+                "failed to inspect allwright CLI version via {}: {error}",
+                cli_path.display()
+            ))
+        })?;
+    if !output.status.success() {
+        return Ok(false);
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let version = stdout
+        .split_whitespace()
+        .find(|token| token.chars().next().is_some_and(|ch| ch.is_ascii_digit()))
+        .map(normalize_release_version)
+        .unwrap_or_default();
+    Ok(version == expected_version)
+}
+
 fn is_local_server_addr(server_addr: &str) -> bool {
     let normalized = server_addr
         .strip_prefix("http://")
@@ -427,6 +514,80 @@ fn is_local_server_addr(server_addr: &str) -> bool {
         .unwrap_or(without_auth)
         .trim_matches(['[', ']']);
     matches!(host, "127.0.0.1" | "localhost" | "::1")
+}
+
+fn installed_plugin_version(plugin_id: &str) -> Result<Option<String>> {
+    let manifest = allwright_home()?.join("plugins.txt");
+    let contents = match fs::read_to_string(&manifest) {
+        Ok(contents) => contents,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(Error::new(format!(
+                "failed to read allwright plugin manifest {}: {error}",
+                manifest.display()
+            )))
+        }
+    };
+
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        let mut parts = trimmed.splitn(3, '\t');
+        let Some(id) = parts.next() else { continue };
+        let _package_name = parts.next();
+        let Some(version) = parts.next() else { continue };
+        if id == plugin_id {
+            return Ok(Some(normalize_release_version(version)));
+        }
+    }
+
+    Ok(None)
+}
+
+fn allocate_managed_server_addr(server_addr: &str) -> Result<String> {
+    let host = local_binding_host(server_addr);
+    let listener = TcpListener::bind((host.as_str(), 0)).map_err(|error| {
+        Error::new(format!(
+            "failed to reserve a local port for an allwright managed server on {host}: {error}"
+        ))
+    })?;
+    let port = listener
+        .local_addr()
+        .map_err(|error| Error::new(format!("failed to resolve a reserved local allwright port: {error}")))?
+        .port();
+    drop(listener);
+    if host.contains(':') {
+        Ok(format!("http://[{host}]:{port}"))
+    } else {
+        Ok(format!("http://{host}:{port}"))
+    }
+}
+
+fn local_binding_host(server_addr: &str) -> String {
+    let normalized = server_addr
+        .strip_prefix("http://")
+        .or_else(|| server_addr.strip_prefix("https://"))
+        .unwrap_or(server_addr);
+    let without_auth = normalized
+        .rsplit_once('@')
+        .map(|(_, tail)| tail)
+        .unwrap_or(normalized);
+    let host = without_auth
+        .rsplit_once(':')
+        .map(|(host, _)| host)
+        .unwrap_or(without_auth)
+        .trim_matches(['[', ']']);
+    if host == "::1" {
+        "::1".to_string()
+    } else {
+        "127.0.0.1".to_string()
+    }
+}
+
+fn display_version(version: &str) -> &str {
+    if version.is_empty() { "unknown" } else { version }
 }
 
 fn cli_filename() -> &'static str {

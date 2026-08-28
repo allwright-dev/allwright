@@ -7,6 +7,7 @@ message PingRequest {}
 
 message PingResponse {
   string message = 1;
+  string version = 2;
 }
 
 message CommandRetryOptions {

@@ -131,9 +131,13 @@ impl Tab {
                 _ => {}
             }
 
-            if let (Some(navigated_event), Some(injection_event)) =
-                (navigated.take(), injection.take())
-            {
+            if navigated.is_some() && injection.is_some() {
+                let navigated_event = navigated
+                    .take()
+                    .ok_or_else(|| Error::new("navigation event disappeared unexpectedly"))?;
+                let injection_event = injection
+                    .take()
+                    .ok_or_else(|| Error::new("bidi injection event disappeared unexpectedly"))?;
                 return Ok(NavigateResult {
                     url: navigated_event.url,
                     note: navigated_event.note,

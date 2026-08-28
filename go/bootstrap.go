@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -36,44 +37,76 @@ const (
 
 var bootstrapState struct {
 	mu                sync.Mutex
+	managedServerBase string
 	managedServerAddr string
 	managedServer     *exec.Cmd
 }
 
-func ensureRuntimeReady(ctx context.Context, serverAddr string) error {
-	if pingServer(ctx, serverAddr) == nil {
-		return nil
+type pingStatus struct {
+	version string
+}
+
+func ensureRuntimeReady(ctx context.Context, serverAddr string) (string, error) {
+	expectedVersion := expectedRuntimeVersion()
+	if status, err := pingServer(ctx, serverAddr); err == nil {
+		if status.version == expectedVersion {
+			return serverAddr, nil
+		}
+		if !isLocalServerAddr(serverAddr) {
+			return "", fmt.Errorf(
+				"allwright server at %s is running version %s but this client expects %s",
+				serverAddr,
+				displayVersion(status.version),
+				expectedVersion,
+			)
+		}
 	}
 	if !isLocalServerAddr(serverAddr) {
-		return fmt.Errorf("allwright could not reach engine server at %s; automatic startup is only supported for local addresses", serverAddr)
+		return "", fmt.Errorf("allwright could not reach engine server at %s; automatic startup is only supported for local addresses", serverAddr)
 	}
 
 	bootstrapState.mu.Lock()
 	defer bootstrapState.mu.Unlock()
 
-	if bootstrapState.managedServer != nil && bootstrapState.managedServer.ProcessState == nil && bootstrapState.managedServerAddr == serverAddr {
-		return waitForServer(ctx, serverAddr)
+	if bootstrapState.managedServer != nil && bootstrapState.managedServer.ProcessState == nil && bootstrapState.managedServerBase == serverAddr {
+		return waitForServer(ctx, bootstrapState.managedServerAddr, expectedVersion)
+	}
+	if bootstrapState.managedServer != nil && bootstrapState.managedServer.Process != nil {
+		_ = bootstrapState.managedServer.Process.Kill()
+		_, _ = bootstrapState.managedServer.Process.Wait()
+		bootstrapState.managedServer = nil
+		bootstrapState.managedServerAddr = ""
+		bootstrapState.managedServerBase = ""
 	}
 
-	cliPath, err := ensureCLIAvailable()
+	cliPath, err := ensureCLIAvailable(expectedVersion)
 	if err != nil {
-		return err
+		return "", err
 	}
-	if err := ensureWebPlugin(cliPath); err != nil {
-		return err
+	if err := ensureWebPlugin(cliPath, expectedVersion); err != nil {
+		return "", err
 	}
 
-	cmd := exec.Command(cliPath, "serve", "--listen-addr", cliListenAddr(serverAddr))
+	resolvedServerAddr := serverAddr
+	if status, err := pingServer(ctx, serverAddr); err == nil && status.version != expectedVersion {
+		resolvedServerAddr, err = allocateManagedServerAddr(serverAddr)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	cmd := exec.Command(cliPath, "serve", "--listen-addr", cliListenAddr(resolvedServerAddr))
 	cmd.Stdin = nil
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("start allwright server with %s: %w", cliPath, err)
+		return "", fmt.Errorf("start allwright server with %s: %w", cliPath, err)
 	}
 
+	bootstrapState.managedServerBase = serverAddr
 	bootstrapState.managedServer = cmd
-	bootstrapState.managedServerAddr = serverAddr
-	return waitForServer(ctx, serverAddr)
+	bootstrapState.managedServerAddr = resolvedServerAddr
+	return waitForServer(ctx, resolvedServerAddr, expectedVersion)
 }
 
 func shutdownManagedServer() {
@@ -84,40 +117,50 @@ func shutdownManagedServer() {
 		_ = bootstrapState.managedServer.Process.Kill()
 		_, _ = bootstrapState.managedServer.Process.Wait()
 	}
+	bootstrapState.managedServerBase = ""
 	bootstrapState.managedServer = nil
 	bootstrapState.managedServerAddr = ""
 }
 
-func waitForServer(ctx context.Context, serverAddr string) error {
+func waitForServer(ctx context.Context, serverAddr string, expectedVersion string) (string, error) {
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
-		if pingServer(ctx, serverAddr) == nil {
-			return nil
+		if status, err := pingServer(ctx, serverAddr); err == nil && status.version == expectedVersion {
+			return serverAddr, nil
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
 	shutdownManagedServer()
-	return fmt.Errorf("timed out waiting for allwright server at %s to become ready", serverAddr)
+	return "", fmt.Errorf("timed out waiting for allwright server at %s to become ready with version %s", serverAddr, expectedVersion)
 }
 
-func pingServer(ctx context.Context, serverAddr string) error {
+func pingServer(ctx context.Context, serverAddr string) (*pingStatus, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
 	conn, err := grpc.NewClient(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer conn.Close()
 
-	_, err = enginev1.NewEngineServiceClient(conn).Ping(timeoutCtx, &enginev1.PingRequest{})
-	return err
+	response, err := enginev1.NewEngineServiceClient(conn).Ping(timeoutCtx, &enginev1.PingRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return &pingStatus{version: normalizeReleaseVersion(response.GetVersion())}, nil
 }
 
-func ensureCLIAvailable() (string, error) {
+func ensureCLIAvailable(expectedVersion string) (string, error) {
 	if cliPath := strings.TrimSpace(os.Getenv(allwrightCLIPathEnvVar)); cliPath != "" {
 		if isFile(cliPath) {
-			return cliPath, nil
+			matches, err := cliVersionMatches(cliPath, expectedVersion)
+			if err != nil {
+				return "", err
+			}
+			if matches {
+				return cliPath, nil
+			}
 		}
 	}
 
@@ -127,10 +170,31 @@ func ensureCLIAvailable() (string, error) {
 	}
 	bundled := filepath.Join(home, "bin", cliFilename())
 	if isFile(bundled) {
-		return bundled, nil
+		matches, err := cliVersionMatches(bundled, expectedVersion)
+		if err != nil {
+			return "", err
+		}
+		if matches {
+			return bundled, nil
+		}
+	}
+	if cliPath, ok := repoLocalCLIPath(); ok {
+		matches, err := cliVersionMatches(cliPath, expectedVersion)
+		if err != nil {
+			return "", err
+		}
+		if matches {
+			return cliPath, nil
+		}
 	}
 	if cliPath, err := exec.LookPath(cliFilename()); err == nil {
-		return cliPath, nil
+		matches, err := cliVersionMatches(cliPath, expectedVersion)
+		if err != nil {
+			return "", err
+		}
+		if matches {
+			return cliPath, nil
+		}
 	}
 	if !autoInstallEnabled() {
 		return "", fmt.Errorf("allwright CLI was not found; install it first or set %s", allwrightCLIPathEnvVar)
@@ -166,21 +230,23 @@ func installCLI() (string, error) {
 	return cliPath, nil
 }
 
-func ensureWebPlugin(cliPath string) error {
+func ensureWebPlugin(cliPath string, expectedVersion string) error {
 	home, err := allwrightHome()
 	if err != nil {
 		return err
 	}
 	pluginPath := filepath.Join(home, "plugins", "web", "lib", webPluginFilename())
 	if isFile(pluginPath) {
-		return nil
+		if version, err := installedPluginVersion(home, "web"); err == nil && version == expectedVersion {
+			return nil
+		}
 	}
 
-	version := strings.TrimSpace(os.Getenv(allwrightVersionEnvVar))
-	if version == "" {
-		version = defaultReleaseVersion
+	if expectedVersion == "" {
+		expectedVersion = normalizeReleaseVersion(defaultReleaseVersion)
 	}
-	cmd := exec.Command(cliPath, "plugin", "install", "web", "--version", normalizeReleaseVersion(version))
+
+	cmd := exec.Command(cliPath, "plugin", "install", "web", "--version", expectedVersion)
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 	if err := cmd.Run(); err != nil {
@@ -189,7 +255,10 @@ func ensureWebPlugin(cliPath string) error {
 	if !isFile(pluginPath) {
 		return fmt.Errorf("allwright attempted to install the web plugin automatically, but the runtime library is still missing")
 	}
-	return nil
+	if version, err := installedPluginVersion(home, "web"); err == nil && version == expectedVersion {
+		return nil
+	}
+	return fmt.Errorf("allwright attempted to install the web plugin automatically, but version %s is still not active", expectedVersion)
 }
 
 func resolveReleaseTag() (string, error) {
@@ -370,6 +439,14 @@ func normalizeReleaseVersion(version string) string {
 	return strings.TrimPrefix(strings.TrimSpace(version), "v")
 }
 
+func expectedRuntimeVersion() string {
+	version := strings.TrimSpace(os.Getenv(allwrightVersionEnvVar))
+	if version == "" {
+		version = defaultReleaseVersion
+	}
+	return normalizeReleaseVersion(version)
+}
+
 func isLocalServerAddr(serverAddr string) bool {
 	trimmed := cliListenAddr(serverAddr)
 	host := trimmed
@@ -378,6 +455,90 @@ func isLocalServerAddr(serverAddr string) bool {
 	}
 	host = strings.Trim(host, "[]")
 	return host == "127.0.0.1" || host == "localhost" || host == "::1"
+}
+
+func installedPluginVersion(home string, pluginID string) (string, error) {
+	manifestPath := filepath.Join(home, "plugins.txt")
+	contents, err := os.ReadFile(manifestPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	for _, line := range strings.Split(string(contents), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		parts := strings.SplitN(trimmed, "\t", 3)
+		if len(parts) < 3 || parts[0] != pluginID {
+			continue
+		}
+		return normalizeReleaseVersion(parts[2]), nil
+	}
+	return "", nil
+}
+
+func allocateManagedServerAddr(serverAddr string) (string, error) {
+	host := localBindingHost(serverAddr)
+	listener, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
+	if err != nil {
+		return "", fmt.Errorf("reserve local port for managed allwright server on %s: %w", host, err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	_ = listener.Close()
+	return "http://" + net.JoinHostPort(host, fmt.Sprintf("%d", port)), nil
+}
+
+func repoLocalCLIPath() (string, bool) {
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", false
+	}
+	repoRoot := filepath.Dir(filepath.Dir(currentFile))
+	for _, candidate := range []string{
+		filepath.Join(repoRoot, "target", "debug", cliFilename()),
+		filepath.Join(repoRoot, "target", "release", cliFilename()),
+	} {
+		if isFile(candidate) {
+			return candidate, true
+		}
+	}
+	return "", false
+}
+
+func localBindingHost(serverAddr string) string {
+	trimmed := cliListenAddr(serverAddr)
+	host := trimmed
+	if strings.LastIndex(host, ":") > 0 {
+		host = host[:strings.LastIndex(host, ":")]
+	}
+	host = strings.Trim(host, "[]")
+	if host == "::1" {
+		return "::1"
+	}
+	return "127.0.0.1"
+}
+
+func displayVersion(version string) string {
+	if strings.TrimSpace(version) == "" {
+		return "unknown"
+	}
+	return version
+}
+
+func cliVersionMatches(cliPath string, expectedVersion string) (bool, error) {
+	output, err := exec.Command(cliPath, "--version").Output()
+	if err != nil {
+		return false, fmt.Errorf("inspect allwright CLI version via %s: %w", cliPath, err)
+	}
+	for _, token := range strings.Fields(string(output)) {
+		if token != "" && token[0] >= '0' && token[0] <= '9' {
+			return normalizeReleaseVersion(token) == expectedVersion, nil
+		}
+	}
+	return false, nil
 }
 
 func cliFilename() string {

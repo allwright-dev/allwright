@@ -61,7 +61,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             println!("Starting allwright engine on {}", listen_addr);
             allwright::serve(listen_addr).await?;
         }
-        CliCommand::Plugin { command } => handle_plugin_command(command)?,
+        CliCommand::Plugin { command } => {
+            tokio::task::block_in_place(|| handle_plugin_command(command))?;
+        }
     }
 
     Ok(())
@@ -187,7 +189,6 @@ fn install_plugin_package(
     plugin_id: &str,
 ) -> Result<(), Box<dyn Error>> {
     let install_root = plugin_install_root(plugin_id)?;
-    let asset_name = plugin_asset_name(plugin_id, version)?;
     let runtime_artifact = plugin_runtime_artifact_filename(plugin_id);
 
     println!(
@@ -206,6 +207,23 @@ fn install_plugin_package(
     println!("Preparing install directory {}...", install_root.display());
     fs::create_dir_all(&install_root)?;
 
+    if let Some(local_artifact) = repo_local_plugin_artifact_path(plugin_id) {
+        println!(
+            "Using local plugin artifact {} for `{plugin_id}`...",
+            local_artifact.display()
+        );
+        let destination = install_root
+            .join(plugin_runtime_artifact_dir(plugin_id))
+            .join(&runtime_artifact);
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::copy(&local_artifact, &destination)?;
+        println!("Verified runtime artifact `{runtime_artifact}`.");
+        return Ok(());
+    }
+
+    let asset_name = plugin_asset_name(plugin_id, version)?;
     let asset_bytes = download_plugin_release_asset(version, &asset_name)?;
     println!("Unpacking {asset_name} into {}...", install_root.display());
     unpack_plugin_release_asset(&asset_name, &asset_bytes, &install_root)?;
@@ -221,6 +239,15 @@ fn install_plugin_package(
     println!("Verified runtime artifact `{runtime_artifact}`.");
 
     Ok(())
+}
+
+fn repo_local_plugin_artifact_path(plugin_id: &str) -> Option<PathBuf> {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent()?.parent()?;
+    let filename = plugin_runtime_artifact_filename(plugin_id);
+    ["target/debug", "target/release"]
+        .into_iter()
+        .map(|dir| repo_root.join(dir).join(&filename))
+        .find(|candidate| candidate.is_file())
 }
 
 fn plugin_runtime_artifact_path(plugin_id: &str) -> PathBuf {

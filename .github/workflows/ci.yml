@@ -10,6 +10,30 @@ permissions:
   contents: read
 
 jobs:
+  verify-go-proto:
+    name: Verify Go proto output
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+
+      - name: Set up protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "35.1"
+
+      - name: Regenerate Go proto bindings
+        run: ./scripts/generate-go-proto.sh
+
+      - name: Ensure generated Go proto is committed
+        run: git diff --exit-code -- go/gen/allwright/engine/v1
+
   verify-rust-proto:
     name: Verify Rust proto output
     runs-on: ubuntu-latest
@@ -25,7 +49,7 @@ jobs:
         run: ./scripts/generate-rust-proto.sh
 
       - name: Ensure generated Rust proto is committed
-        run: git diff --exit-code -- rust/allwright/src/proto_generated.rs
+        run: git diff --exit-code -- rust/allwright/src/proto_generated.rs rust/allwright/src/allwright.engine.v1.rs
 
   test-java-client:
     name: Test Java client

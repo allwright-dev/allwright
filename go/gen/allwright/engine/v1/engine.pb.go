@@ -29,7 +29,8 @@ const file_engine_v1_engine_proto_rawDesc = "" +
 	"\x04Ping\x12 .allwright.engine.v1.PingRequest\x1a!.allwright.engine.v1.PingResponse\x12j\n" +
 	"\x0eBrowserSession\x12*.allwright.engine.v1.BrowserSessionCommand\x1a(.allwright.engine.v1.BrowserSessionEvent(\x010\x01\x12^\n" +
 	"\n" +
-	"TabSession\x12&.allwright.engine.v1.TabSessionCommand\x1a$.allwright.engine.v1.TabSessionEvent(\x010\x01B0Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
+	"TabSession\x12&.allwright.engine.v1.TabSessionCommand\x1a$.allwright.engine.v1.TabSessionEvent(\x010\x01BK\n" +
+	"\x17dev.allwright.engine.v1P\x01Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
 
 var file_engine_v1_engine_proto_goTypes = []any{
 	(*PingRequest)(nil),           // 0: allwright.engine.v1.PingRequest

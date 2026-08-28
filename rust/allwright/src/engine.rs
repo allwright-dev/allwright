@@ -841,6 +841,7 @@ impl EngineService for EngineGrpcService {
     async fn ping(&self, _request: Request<PingRequest>) -> Result<Response<PingResponse>, Status> {
         Ok(Response::new(PingResponse {
             message: "pong".to_string(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
         }))
     }
 

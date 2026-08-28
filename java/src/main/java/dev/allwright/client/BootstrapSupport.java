@@ -7,6 +7,8 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.net.URI;
+import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -28,13 +30,24 @@ final class BootstrapSupport {
 
     private static Process managedServer;
     private static String managedServerAddr;
+    private static String managedServerBaseAddr;
 
     private BootstrapSupport() {}
 
-    static synchronized void ensureRuntimeReady(String serverAddr) {
+    static synchronized String ensureRuntimeReady(String serverAddr) {
         String normalized = Objects.requireNonNull(serverAddr, "serverAddr").trim();
-        if (pingServer(normalized)) {
-            return;
+        String expectedVersion = expectedRuntimeVersion();
+        PingStatus status = pingServer(normalized);
+        if (status != null) {
+            if (status.version().equals(expectedVersion)) {
+                return normalized;
+            }
+            if (!isLocalServerAddr(normalized)) {
+                throw new AllwrightException(
+                        "allwright server at " + normalized + " is running version "
+                                + displayVersion(status.version()) + " but this client expects " + expectedVersion
+                );
+            }
         }
         if (!isLocalServerAddr(normalized)) {
             throw new AllwrightException(
@@ -43,22 +56,31 @@ final class BootstrapSupport {
             );
         }
 
-        if (managedServer != null && managedServer.isAlive() && normalized.equals(managedServerAddr)) {
-            waitForServer(normalized);
-            return;
+        if (managedServer != null && managedServer.isAlive() && normalized.equals(managedServerBaseAddr) && managedServerAddr != null) {
+            return waitForServer(managedServerAddr, expectedVersion);
+        }
+        if (managedServer != null) {
+            managedServer.destroyForcibly();
+            managedServer = null;
+            managedServerAddr = null;
+            managedServerBaseAddr = null;
         }
 
         shutdownManagedServer();
 
-        Path cliPath = ensureCliAvailable();
-        ensureWebPlugin(cliPath);
+        Path cliPath = ensureCliAvailable(expectedVersion);
+        ensureWebPlugin(cliPath, expectedVersion);
+        String resolvedServerAddr = normalized;
+        if (status != null && !status.version().equals(expectedVersion)) {
+            resolvedServerAddr = allocateManagedServerAddr(normalized);
+        }
 
         try {
             managedServer = new ProcessBuilder(
                     cliPath.toString(),
                     "serve",
                     "--listen-addr",
-                    cliListenAddr(normalized)
+                    cliListenAddr(resolvedServerAddr)
             )
                     .redirectInput(ProcessBuilder.Redirect.DISCARD)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
@@ -67,8 +89,9 @@ final class BootstrapSupport {
         } catch (IOException exception) {
             throw new AllwrightException("start allwright server with " + cliPath + ": " + exception.getMessage(), exception);
         }
-        managedServerAddr = normalized;
-        waitForServer(normalized);
+        managedServerBaseAddr = normalized;
+        managedServerAddr = resolvedServerAddr;
+        return waitForServer(resolvedServerAddr, expectedVersion);
     }
 
     static synchronized void shutdownManagedServer() {
@@ -77,13 +100,15 @@ final class BootstrapSupport {
             managedServer = null;
         }
         managedServerAddr = null;
+        managedServerBaseAddr = null;
     }
 
-    private static void waitForServer(String serverAddr) {
+    private static String waitForServer(String serverAddr, String expectedVersion) {
         long deadline = System.nanoTime() + STARTUP_TIMEOUT.toNanos();
         while (System.nanoTime() < deadline) {
-            if (pingServer(serverAddr)) {
-                return;
+            PingStatus status = pingServer(serverAddr);
+            if (status != null && status.version().equals(expectedVersion)) {
+                return serverAddr;
             }
             try {
                 Thread.sleep(250);
@@ -93,39 +118,46 @@ final class BootstrapSupport {
             }
         }
         shutdownManagedServer();
-        throw new AllwrightException("timed out waiting for allwright server at " + serverAddr + " to become ready");
+        throw new AllwrightException(
+                "timed out waiting for allwright server at " + serverAddr + " to become ready with version " + expectedVersion
+        );
     }
 
-    private static boolean pingServer(String serverAddr) {
+    private static PingStatus pingServer(String serverAddr) {
         ManagedChannel channel = ManagedChannelBuilder.forTarget(serverAddr).usePlaintext().build();
         try {
-            EngineServiceGrpc.newBlockingStub(channel)
+            var response = EngineServiceGrpc.newBlockingStub(channel)
                     .withDeadlineAfter(PING_TIMEOUT.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)
                     .ping(PingRequest.newBuilder().build());
-            return true;
+            return new PingStatus(normalizeReleaseVersion(response.getVersion()));
         } catch (StatusRuntimeException ignored) {
-            return false;
+            return null;
         } finally {
             channel.shutdownNow();
         }
     }
 
-    private static Path ensureCliAvailable() {
+    private static Path ensureCliAvailable(String expectedVersion) {
         String explicit = System.getenv(ALLWRIGHT_CLI_PATH_ENV_VAR);
         if (explicit != null && !explicit.isBlank()) {
             Path path = Path.of(explicit.trim());
-            if (Files.isRegularFile(path)) {
+            if (Files.isRegularFile(path) && cliVersionMatches(path, expectedVersion)) {
                 return path;
             }
         }
 
         Path bundled = allwrightHome().resolve("bin").resolve(cliFilename());
-        if (Files.isRegularFile(bundled)) {
+        if (Files.isRegularFile(bundled) && cliVersionMatches(bundled, expectedVersion)) {
             return bundled;
         }
 
+        Path repoLocal = repoLocalCliPath();
+        if (repoLocal != null && Files.isRegularFile(repoLocal) && cliVersionMatches(repoLocal, expectedVersion)) {
+            return repoLocal;
+        }
+
         Path fromPath = resolveFromPath(cliFilename());
-        if (fromPath != null) {
+        if (fromPath != null && cliVersionMatches(fromPath, expectedVersion)) {
             return fromPath;
         }
 
@@ -169,14 +201,10 @@ final class BootstrapSupport {
         }
     }
 
-    private static void ensureWebPlugin(Path cliPath) {
+    private static void ensureWebPlugin(Path cliPath, String expectedVersion) {
         Path pluginPath = allwrightHome().resolve("plugins").resolve("web").resolve("lib").resolve(webPluginFilename());
-        if (Files.isRegularFile(pluginPath)) {
+        if (Files.isRegularFile(pluginPath) && expectedVersion.equals(installedPluginVersion("web"))) {
             return;
-        }
-        String version = System.getenv(ALLWRIGHT_VERSION_ENV_VAR);
-        if (version == null || version.isBlank()) {
-            version = DEFAULT_RELEASE_VERSION;
         }
         try {
             Process process = new ProcessBuilder(
@@ -185,7 +213,7 @@ final class BootstrapSupport {
                     "install",
                     "web",
                     "--version",
-                    normalizeReleaseVersion(version)
+                    expectedVersion
             )
                     .redirectInput(ProcessBuilder.Redirect.DISCARD)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
@@ -195,6 +223,12 @@ final class BootstrapSupport {
             if (exitCode != 0 || !Files.isRegularFile(pluginPath)) {
                 throw new AllwrightException(
                         "allwright attempted to install the `web` plugin automatically, but the install did not complete successfully"
+                );
+            }
+            if (!expectedVersion.equals(installedPluginVersion("web"))) {
+                throw new AllwrightException(
+                        "allwright attempted to install the `web` plugin automatically, but version "
+                                + expectedVersion + " is still not active"
                 );
             }
         } catch (InterruptedException exception) {
@@ -349,6 +383,14 @@ final class BootstrapSupport {
         return version.trim().replaceFirst("^v", "");
     }
 
+    private static String expectedRuntimeVersion() {
+        String configured = System.getenv(ALLWRIGHT_VERSION_ENV_VAR);
+        if (configured == null || configured.isBlank()) {
+            configured = DEFAULT_RELEASE_VERSION;
+        }
+        return normalizeReleaseVersion(configured);
+    }
+
     private static String cliListenAddr(String serverAddr) {
         return serverAddr.replaceFirst("^https?://", "");
     }
@@ -359,6 +401,91 @@ final class BootstrapSupport {
         String host = separator > 0 ? listenAddr.substring(0, separator) : listenAddr;
         host = host.replace("[", "").replace("]", "");
         return host.equals("127.0.0.1") || host.equals("localhost") || host.equals("::1");
+    }
+
+    private static String installedPluginVersion(String pluginId) {
+        Path manifestPath = allwrightHome().resolve("plugins.txt");
+        if (!Files.isRegularFile(manifestPath)) {
+            return null;
+        }
+        try {
+            for (String line : Files.readAllLines(manifestPath)) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                    continue;
+                }
+                String[] parts = trimmed.split("\t", 3);
+                if (parts.length < 3 || !parts[0].equals(pluginId)) {
+                    continue;
+                }
+                return normalizeReleaseVersion(parts[2]);
+            }
+        } catch (IOException exception) {
+            throw new AllwrightException("read allwright plugin manifest " + manifestPath + ": " + exception.getMessage(), exception);
+        }
+        return null;
+    }
+
+    private static String allocateManagedServerAddr(String serverAddr) {
+        String host = localBindingHost(serverAddr);
+        try (ServerSocket socket = new ServerSocket(0, 0, InetAddress.getByName(host))) {
+            int port = socket.getLocalPort();
+            if (host.contains(":")) {
+                return "http://[" + host + "]:" + port;
+            }
+            return "http://" + host + ":" + port;
+        } catch (IOException exception) {
+            throw new AllwrightException("reserve local port for managed allwright server on " + host + ": " + exception.getMessage(), exception);
+        }
+    }
+
+    private static String localBindingHost(String serverAddr) {
+        String listenAddr = cliListenAddr(serverAddr);
+        int separator = listenAddr.lastIndexOf(':');
+        String host = separator > 0 ? listenAddr.substring(0, separator) : listenAddr;
+        host = host.replace("[", "").replace("]", "");
+        return host.equals("::1") ? "::1" : "127.0.0.1";
+    }
+
+    private static String displayVersion(String version) {
+        return version == null || version.isBlank() ? "unknown" : version;
+    }
+
+    private static Path repoLocalCliPath() {
+        Path repoRoot = Path.of("").toAbsolutePath().normalize();
+        for (Path candidate : new Path[] {
+                repoRoot.resolve("target").resolve("debug").resolve(cliFilename()),
+                repoRoot.resolve("target").resolve("release").resolve(cliFilename())
+        }) {
+            if (Files.isRegularFile(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static boolean cliVersionMatches(Path cliPath, String expectedVersion) {
+        try {
+            Process process = new ProcessBuilder(cliPath.toString(), "--version")
+                    .redirectInput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            String output = new String(process.getInputStream().readAllBytes());
+            if (process.waitFor() != 0) {
+                return false;
+            }
+            for (String token : output.split("\\s+")) {
+                if (!token.isEmpty() && Character.isDigit(token.charAt(0))) {
+                    return normalizeReleaseVersion(token).equals(expectedVersion);
+                }
+            }
+            return false;
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AllwrightException("inspect allwright CLI version via " + cliPath + ": " + exception.getMessage(), exception);
+        } catch (IOException exception) {
+            throw new AllwrightException("inspect allwright CLI version via " + cliPath + ": " + exception.getMessage(), exception);
+        }
     }
 
     private static String cliFilename() {
@@ -375,4 +502,6 @@ final class BootstrapSupport {
         }
         return "liballwright_surface_web.so";
     }
+
+    private record PingStatus(String version) {}
 }

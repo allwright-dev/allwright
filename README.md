@@ -280,6 +280,14 @@ browser.close()
 
 ## Releasing Plugins
 
+Maintainers can run this locally from their own machine to prepare a release commit and push the matching tag:
+
+```bash
+./scripts/prepare-release.sh X.Y.Z
+```
+
+The script is a local maintainer helper, not a CI/CD step. It requires a clean local `main` checkout, syncs every checked-in package version to `X.Y.Z`, pushes the release-prep commit to `origin/main`, then creates and pushes the root tag as `vX.Y.Z`.
+
 Create and push a version tag:
 
 ```bash
@@ -406,11 +414,20 @@ The release workflow syncs both package versions to `X.Y.Z`, updates `@allwright
 
 - `scripts/install.sh`: installs the latest or requested `allwright` CLI release on Linux and macOS
 - `scripts/install.ps1`: installs the latest or requested `allwright` CLI release on Windows PowerShell
+- `scripts/generate-go-proto.sh`: installs pinned Go protobuf generators locally under `go/.bin/` and regenerates the checked-in Go bindings from the canonical top-level `proto/` tree
 - `scripts/generate-rust-proto.sh`: regenerates `rust/allwright/src/proto_generated.rs` from the canonical top-level `proto/` tree
 - `scripts/sync-version.sh`: syncs the Rust workspace and internal crate versions from a release version string such as `X.Y.Z`
 - `scripts/sync-npm-version.sh`: syncs the npm workspace package versions from a release version string such as `X.Y.Z`
 - `scripts/sync-python-version.sh`: syncs the Python package version from a release version string such as `X.Y.Z`
 - users do not need to clone the repo; both scripts can be run directly from GitHub with `curl`, `wget`, or PowerShell `irm`
+
+Go proto regeneration:
+
+```bash
+./scripts/generate-go-proto.sh
+```
+
+This keeps `proto/` as the single source of truth while regenerating the checked-in Go bindings in `go/gen/allwright/engine/v1`.
 
 Rust proto regeneration:
 
@@ -418,8 +435,8 @@ Rust proto regeneration:
 ./scripts/generate-rust-proto.sh
 ```
 
-This keeps `proto/` as the single source of truth while regenerating the checked-in Rust bindings in `rust/allwright/src/proto_generated.rs`.
-CI also verifies that `rust/allwright/src/proto_generated.rs` is up to date on pushes to `main` and on pull requests.
+This keeps `proto/` as the single source of truth while regenerating the checked-in Rust bindings in `rust/allwright/src/proto_generated.rs` and `rust/allwright/src/allwright.engine.v1.rs`.
+CI also verifies that the checked-in Go and Rust generated proto outputs are up to date on pushes to `main` and on pull requests.
 
 Both scripts support:
 

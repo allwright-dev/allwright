@@ -49,8 +49,8 @@ pub(crate) async fn get_runtime() -> Result<Arc<RuntimeClient>> {
     }
 
     let endpoint = configured_server_addr();
-    ensure_runtime_ready(&endpoint).await?;
-    let engine = EngineServiceClient::connect(endpoint).await?;
+    let resolved_endpoint = ensure_runtime_ready(&endpoint).await?;
+    let engine = EngineServiceClient::connect(resolved_endpoint).await?;
     let runtime = Arc::new(RuntimeClient { engine });
 
     let mut slot = runtime_slot()
