@@ -48,9 +48,9 @@ if git ls-remote --tags --exit-code origin "refs/tags/${tag}" >/dev/null 2>&1; t
   exit 1
 fi
 
-"$repo_root/scripts/sync-version.sh" "$version"
-"$repo_root/scripts/sync-npm-version.sh" "$version"
-"$repo_root/scripts/sync-python-version.sh" "$version"
+bash "$repo_root/scripts/sync-version.sh" "$version"
+bash "$repo_root/scripts/sync-npm-version.sh" "$version"
+bash "$repo_root/scripts/sync-python-version.sh" "$version"
 
 if [[ -n "$(git status --porcelain)" ]]; then
   git add -A

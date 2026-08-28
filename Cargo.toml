@@ -16,7 +16,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.0.7"
+version = "0.0.38"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/allwright-dev/allwright"
