@@ -10,7 +10,7 @@ plugins {
 group = "dev.allwright"
 version = providers.gradleProperty("allwrightVersion")
     .orElse(providers.environmentVariable("ALLWRIGHT_VERSION"))
-    .orElse("0.0.43")
+    .orElse("0.0.44")
     .get()
 description = "Playwright-style Java client for the allwright engine."
 

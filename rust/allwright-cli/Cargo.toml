@@ -15,7 +15,7 @@ name = "allwright"
 path = "src/main.rs"
 
 [dependencies]
-allwright = { package = "allwright-core", path = "../allwright", version = "0.0.43", features = ["server"] }
+allwright = { package = "allwright-core", path = "../allwright", version = "0.0.44", features = ["server"] }
 clap = { workspace = true, features = ["derive"] }
 flate2 = { workspace = true }
 reqwest = { workspace = true }
