@@ -34,7 +34,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::ClickElement(ClickElementCommand {
-                    css_selector,
+                    css_selector: css_selector.clone(),
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
             })
@@ -59,8 +59,9 @@ impl Tab {
                 }
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
-                        "tab session error while clicking: {}",
-                        error.message
+                        "tab session error while clicking locator {:?}: {}",
+                        css_selector,
+                        error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {
@@ -95,7 +96,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::FocusElement(FocusElementCommand {
-                    css_selector,
+                    css_selector: css_selector.clone(),
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
             })
@@ -118,8 +119,9 @@ impl Tab {
                 }
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
-                        "tab session error while focusing: {}",
-                        error.message
+                        "tab session error while focusing locator {:?}: {}",
+                        css_selector,
+                        error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {
@@ -160,7 +162,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::FillElement(FillElementCommand {
-                    css_selector,
+                    css_selector: css_selector.clone(),
                     value: value.into(),
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
@@ -184,8 +186,9 @@ impl Tab {
                 }
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
-                        "tab session error while filling: {}",
-                        error.message
+                        "tab session error while filling locator {:?}: {}",
+                        css_selector,
+                        error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {
@@ -219,7 +222,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::HoverElement(HoverElementCommand {
-                    css_selector,
+                    css_selector: css_selector.clone(),
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
             })
@@ -241,8 +244,9 @@ impl Tab {
                 }
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
-                        "tab session error while hovering: {}",
-                        error.message
+                        "tab session error while hovering locator {:?}: {}",
+                        css_selector,
+                        error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {

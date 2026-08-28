@@ -36,7 +36,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::CountElements(CountElementsCommand {
-                    css_selector,
+                    css_selector: css_selector.clone(),
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
             })
@@ -57,8 +57,9 @@ impl Tab {
                 }
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
-                        "tab session error while counting elements: {}",
-                        error.message
+                        "tab session error while counting locator {:?}: {}",
+                        css_selector,
+                        error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {
@@ -94,7 +95,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::HighlightElements(HighlightElementsCommand {
-                    css_selector,
+                    css_selector: css_selector.clone(),
                     duration_ms: options.duration_ms,
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
@@ -116,8 +117,9 @@ impl Tab {
                 }
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
-                        "tab session error while highlighting elements: {}",
-                        error.message
+                        "tab session error while highlighting locator {:?}: {}",
+                        css_selector,
+                        error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {
@@ -183,7 +185,7 @@ impl Tab {
                 browser_session_id: self.inner.browser_session_id.clone(),
                 tab_session_id: self.inner.session_id.clone(),
                 command: Some(TabCommand::WaitForSelector(WaitForSelectorCommand {
-                    css_selector,
+                    css_selector: css_selector.clone(),
                     visible: options.visible,
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
@@ -207,8 +209,9 @@ impl Tab {
                 }
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
-                        "tab session error while waiting for selector: {}",
-                        error.message
+                        "tab session error while waiting for locator {:?}: {}",
+                        css_selector,
+                        error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {
