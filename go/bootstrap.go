@@ -65,18 +65,22 @@ func ensureRuntimeReady(ctx context.Context, serverAddr string) (string, error) 
 		return "", fmt.Errorf("allwright could not reach engine server at %s; automatic startup is only supported for local addresses", serverAddr)
 	}
 
+	var managedServerAddr string
 	bootstrapState.mu.Lock()
-	defer bootstrapState.mu.Unlock()
-
 	if bootstrapState.managedServer != nil && bootstrapState.managedServer.ProcessState == nil && bootstrapState.managedServerBase == serverAddr {
-		return waitForServer(ctx, bootstrapState.managedServerAddr, expectedVersion)
+		managedServerAddr = bootstrapState.managedServerAddr
 	}
-	if bootstrapState.managedServer != nil && bootstrapState.managedServer.Process != nil {
+	if managedServerAddr == "" && bootstrapState.managedServer != nil && bootstrapState.managedServer.Process != nil {
 		_ = bootstrapState.managedServer.Process.Kill()
 		_, _ = bootstrapState.managedServer.Process.Wait()
 		bootstrapState.managedServer = nil
 		bootstrapState.managedServerAddr = ""
 		bootstrapState.managedServerBase = ""
+	}
+	bootstrapState.mu.Unlock()
+
+	if managedServerAddr != "" {
+		return waitForServer(ctx, managedServerAddr, expectedVersion)
 	}
 
 	cliPath, err := ensureCLIAvailable(expectedVersion)
@@ -103,9 +107,11 @@ func ensureRuntimeReady(ctx context.Context, serverAddr string) (string, error) 
 		return "", fmt.Errorf("start allwright server with %s: %w", cliPath, err)
 	}
 
+	bootstrapState.mu.Lock()
 	bootstrapState.managedServerBase = serverAddr
 	bootstrapState.managedServer = cmd
 	bootstrapState.managedServerAddr = resolvedServerAddr
+	bootstrapState.mu.Unlock()
 	return waitForServer(ctx, resolvedServerAddr, expectedVersion)
 }
 
