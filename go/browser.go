@@ -85,6 +85,9 @@ func (b *Browser) InitialPage() *Page {
 }
 
 func (b *Browser) NewTab(ctx context.Context, options ...CommandOptions) (*Tab, error) {
+	if b == nil {
+		return nil, fmt.Errorf("browser is nil")
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -124,10 +127,16 @@ func (b *Browser) NewTab(ctx context.Context, options ...CommandOptions) (*Tab, 
 }
 
 func (b *Browser) NewPage(ctx context.Context, options ...CommandOptions) (*Page, error) {
+	if b == nil {
+		return nil, fmt.Errorf("browser is nil")
+	}
 	return b.NewTab(ctx, options...)
 }
 
 func (b *Browser) Ping(ctx context.Context, message string) (string, error) {
+	if b == nil {
+		return "", fmt.Errorf("browser is nil")
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -161,6 +170,9 @@ func (b *Browser) Ping(ctx context.Context, message string) (string, error) {
 }
 
 func (b *Browser) Close(ctx context.Context) error {
+	if b == nil {
+		return nil
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

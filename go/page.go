@@ -15,10 +15,16 @@ func (t *Tab) SessionID() string {
 }
 
 func (t *Tab) Goto(ctx context.Context, url string, options ...CommandOptions) (*NavigateResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
 	return t.Navigate(ctx, url, options...)
 }
 
 func (t *Tab) Navigate(ctx context.Context, url string, options ...CommandOptions) (*NavigateResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -72,6 +78,9 @@ func (t *Tab) Navigate(ctx context.Context, url string, options ...CommandOption
 }
 
 func (t *Tab) Click(ctx context.Context, cssSelector string, options ...CommandOptions) (*ClickResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -122,6 +131,9 @@ func (t *Tab) Click(ctx context.Context, cssSelector string, options ...CommandO
 }
 
 func (t *Tab) Count(ctx context.Context, cssSelector string, options ...CommandOptions) (*CountResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -171,6 +183,9 @@ func (t *Tab) Count(ctx context.Context, cssSelector string, options ...CommandO
 }
 
 func (t *Tab) Highlight(ctx context.Context, cssSelector string, options ...HighlightOptions) (*HighlightResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -221,6 +236,9 @@ func (t *Tab) Highlight(ctx context.Context, cssSelector string, options ...High
 }
 
 func (t *Tab) Focus(ctx context.Context, cssSelector string, options ...CommandOptions) (*ElementResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -269,6 +287,9 @@ func (t *Tab) Focus(ctx context.Context, cssSelector string, options ...CommandO
 }
 
 func (t *Tab) Fill(ctx context.Context, cssSelector string, value string, options ...CommandOptions) (*FillResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 

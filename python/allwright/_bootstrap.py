@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import platform
 import shutil
 import socket
 import subprocess
@@ -25,7 +26,7 @@ ALLWRIGHT_HOME_ENV_VAR = "ALLWRIGHT_HOME"
 ALLWRIGHT_REPOSITORY_ENV_VAR = "ALLWRIGHT_REPOSITORY"
 ALLWRIGHT_VERSION_ENV_VAR = "ALLWRIGHT_VERSION"
 DEFAULT_RELEASE_REPOSITORY = "allwright-dev/allwright"
-DEFAULT_RELEASE_VERSION = "0.0.1"
+DEFAULT_RELEASE_VERSION = "0.0.38"
 
 _bootstrap_lock = threading.Lock()
 _managed_server: subprocess.Popen[bytes] | None = None
@@ -198,16 +199,26 @@ def resolve_release_tag() -> str:
 
 
 def cli_asset_name(version_tag: str) -> str:
-    platform_key = (os.uname().sysname, os.uname().machine)
+    system = platform.system()
+    machine = platform.machine()
+    normalized_machine = {
+        "amd64": "x86_64",
+        "arm64": "aarch64",
+    }.get(machine.lower(), machine)
+    platform_key = (system, normalized_machine)
     targets = {
         ("Darwin", "arm64"): "aarch64-apple-darwin",
+        ("Darwin", "aarch64"): "aarch64-apple-darwin",
         ("Darwin", "x86_64"): "x86_64-apple-darwin",
         ("Linux", "aarch64"): "aarch64-unknown-linux-gnu",
         ("Linux", "x86_64"): "x86_64-unknown-linux-gnu",
     }
     target = targets.get(platform_key)
     if target is None and os.name == "nt":
-        target = "x86_64-pc-windows-msvc"
+        if normalized_machine == "aarch64":
+            target = "aarch64-pc-windows-msvc"
+        else:
+            target = "x86_64-pc-windows-msvc"
     if target is None:
         raise AllwrightError(
             f"automatic allwright CLI install is not supported on {platform_key[0]}/{platform_key[1]}"
@@ -229,17 +240,39 @@ def download_release_asset(version_tag: str, asset_name: str) -> bytes:
 def unpack_cli_archive(asset_name: str, asset_bytes: bytes, destination: Path) -> None:
     if asset_name.endswith(".zip"):
         with zipfile.ZipFile(io.BytesIO(asset_bytes)) as archive:
-            with archive.open(f"bin/{cli_filename()}") as source, destination.open("wb") as target:
-                shutil.copyfileobj(source, target)
+            for member_name in archive.namelist():
+                if normalize_archive_path(member_name) != f"bin/{cli_filename()}":
+                    continue
+                with archive.open(member_name) as source, destination.open("wb") as target:
+                    shutil.copyfileobj(source, target)
+                return
+        raise AllwrightError("allwright CLI archive did not contain the expected binary")
         return
 
     with tarfile.open(fileobj=io.BytesIO(asset_bytes), mode="r:gz") as archive:
-        member = archive.getmember(f"bin/{cli_filename()}")
-        source = archive.extractfile(member)
-        if source is None:
-            raise AllwrightError("allwright CLI archive did not contain the expected binary")
-        with source, destination.open("wb") as target:
-            shutil.copyfileobj(source, target)
+        for member in archive.getmembers():
+            if normalize_archive_path(member.name) != f"bin/{cli_filename()}":
+                continue
+            source = archive.extractfile(member)
+            if source is None:
+                break
+            with source, destination.open("wb") as target:
+                shutil.copyfileobj(source, target)
+            return
+    raise AllwrightError("allwright CLI archive did not contain the expected binary")
+
+
+def normalize_archive_path(name: str) -> str | None:
+    parts: list[str] = []
+    for part in Path(name).parts:
+        if part in {"", "."}:
+            continue
+        if part == "..":
+            return None
+        parts.append(part)
+    if not parts:
+        return None
+    return "/".join(parts)
 
 
 def allwright_home() -> Path:

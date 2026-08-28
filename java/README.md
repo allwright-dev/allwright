@@ -41,7 +41,7 @@ For local testing without waiting on a tagged release:
 ```bash
 cd java
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
-ALLWRIGHT_VERSION=0.0.7 ./gradlew publishToMavenLocal
+ALLWRIGHT_VERSION=X.Y.Z ./gradlew publishToMavenLocal
 ```
 
 For Sonatype publishing, provide:

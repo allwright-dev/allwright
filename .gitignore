@@ -30,6 +30,7 @@ node_modules/
 /java/out/
 /java/bin/
 /.gradle-user-home/
+/.gradle-local/
 
 # Next.js site artifacts
 /allwright.dev/node_modules/

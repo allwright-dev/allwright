@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 use std::io::{Cursor, Read};
 use std::net::TcpListener;
+use std::path::Component;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, OnceLock};
@@ -372,7 +373,7 @@ fn unpack_cli_archive(asset_name: &str, asset_bytes: &[u8], destination: &Path) 
             let entry_path = entry
                 .path()
                 .map_err(|error| Error::new(format!("failed to read CLI archive entry path: {error}")))?;
-            if entry_path == Path::new("bin").join(cli_filename()) {
+            if normalized_archive_path(&entry_path).as_deref() == Some(Path::new("bin").join(cli_filename()).as_path()) {
                 entry.unpack(destination).map_err(|error| {
                     Error::new(format!(
                         "failed to unpack the allwright CLI into {}: {error}",
@@ -388,15 +389,40 @@ fn unpack_cli_archive(asset_name: &str, asset_bytes: &[u8], destination: &Path) 
 
     let mut archive =
         ZipArchive::new(Cursor::new(asset_bytes)).map_err(|error| Error::new(format!("failed to open CLI zip archive: {error}")))?;
-    let mut file = archive
-        .by_name(&format!("bin/{}", cli_filename()))
-        .map_err(|error| Error::new(format!("failed to find the allwright CLI in the downloaded zip archive: {error}")))?;
-    let mut output = fs::File::create(destination)
-        .map_err(|error| Error::new(format!("failed to create {}: {error}", destination.display())))?;
-    std::io::copy(&mut file, &mut output)
-        .map_err(|error| Error::new(format!("failed to extract the allwright CLI: {error}")))?;
-    set_executable(destination)?;
-    Ok(())
+    let expected = Path::new("bin").join(cli_filename());
+    for index in 0..archive.len() {
+        let mut file = archive
+            .by_index(index)
+            .map_err(|error| Error::new(format!("failed to inspect the downloaded CLI zip archive: {error}")))?;
+        if normalized_archive_path(Path::new(file.name())).as_deref() != Some(expected.as_path()) {
+            continue;
+        }
+
+        let mut output = fs::File::create(destination)
+            .map_err(|error| Error::new(format!("failed to create {}: {error}", destination.display())))?;
+        std::io::copy(&mut file, &mut output)
+            .map_err(|error| Error::new(format!("failed to extract the allwright CLI: {error}")))?;
+        set_executable(destination)?;
+        return Ok(());
+    }
+
+    Err(Error::new("allwright CLI zip archive did not contain bin/allwright"))
+}
+
+fn normalized_archive_path(path: &Path) -> Option<PathBuf> {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::Normal(segment) => normalized.push(segment),
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return None,
+        }
+    }
+    if normalized.as_os_str().is_empty() {
+        None
+    } else {
+        Some(normalized)
+    }
 }
 
 fn release_client() -> Result<Client> {

@@ -8,6 +8,9 @@ import (
 )
 
 func (t *Tab) Hover(ctx context.Context, cssSelector string, options ...CommandOptions) (*ElementResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -56,6 +59,9 @@ func (t *Tab) Hover(ctx context.Context, cssSelector string, options ...CommandO
 }
 
 func (t *Tab) Press(ctx context.Context, cssSelector string, key string, options ...PressOptions) (*PressResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -107,14 +113,23 @@ func (t *Tab) Press(ctx context.Context, cssSelector string, key string, options
 }
 
 func (t *Tab) TextContent(ctx context.Context, cssSelector string, options ...CommandOptions) (*TextResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
 	return t.readText(ctx, cssSelector, true, firstCommandOptions(options))
 }
 
 func (t *Tab) InnerText(ctx context.Context, cssSelector string, options ...CommandOptions) (*TextResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
 	return t.readText(ctx, cssSelector, false, firstCommandOptions(options))
 }
 
 func (t *Tab) WaitForSelector(ctx context.Context, cssSelector string, options ...WaitForSelectorOptions) (*WaitForSelectorResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -165,6 +180,9 @@ func (t *Tab) WaitForSelector(ctx context.Context, cssSelector string, options .
 }
 
 func (t *Tab) Ping(ctx context.Context, message string) (string, error) {
+	if t == nil {
+		return "", fmt.Errorf("tab is nil")
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -206,6 +224,9 @@ func (t *Tab) Ping(ctx context.Context, message string) (string, error) {
 }
 
 func (t *Tab) Close(ctx context.Context) error {
+	if t == nil {
+		return nil
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -250,6 +271,12 @@ func (t *Tab) Close(ctx context.Context) error {
 }
 
 func (t *Tab) ensureStream(ctx context.Context) error {
+	if t == nil {
+		return fmt.Errorf("tab is nil")
+	}
+	if t.runtime == nil {
+		return fmt.Errorf("tab runtime is nil")
+	}
 	if t.stream != nil {
 		return nil
 	}
@@ -263,6 +290,9 @@ func (t *Tab) ensureStream(ctx context.Context) error {
 }
 
 func (t *Tab) readText(ctx context.Context, cssSelector string, textContent bool, options CommandOptions) (*TextResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 

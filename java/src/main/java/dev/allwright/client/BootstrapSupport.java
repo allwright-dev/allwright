@@ -12,8 +12,10 @@ import java.net.ServerSocket;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.Objects;
 
@@ -24,9 +26,12 @@ final class BootstrapSupport {
     private static final String ALLWRIGHT_REPOSITORY_ENV_VAR = "ALLWRIGHT_REPOSITORY";
     private static final String ALLWRIGHT_VERSION_ENV_VAR = "ALLWRIGHT_VERSION";
     private static final String DEFAULT_RELEASE_REPOSITORY = "allwright-dev/allwright";
-    private static final String DEFAULT_RELEASE_VERSION = "0.0.7";
+    private static final String DEFAULT_RELEASE_VERSION = "0.0.38";
     private static final Duration PING_TIMEOUT = Duration.ofSeconds(1);
     private static final Duration STARTUP_TIMEOUT = Duration.ofSeconds(20);
+    private static final HttpClient RELEASE_HTTP_CLIENT = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
 
     private static Process managedServer;
     private static String managedServerAddr;
@@ -188,7 +193,13 @@ final class BootstrapSupport {
                 .build();
 
         try {
-            HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofFile(archivePath));
+            HttpResponse<Path> response = RELEASE_HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofFile(archivePath));
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                Files.deleteIfExists(archivePath);
+                throw new AllwrightException(
+                        "failed to download allwright CLI asset " + assetName + ": HTTP " + response.statusCode()
+                );
+            }
             extractCliArchive(archivePath, installDir, cliPath);
             Files.deleteIfExists(archivePath);
             cliPath.toFile().setExecutable(true);
@@ -253,7 +264,7 @@ final class BootstrapSupport {
                     .header("User-Agent", "allwright-java/" + DEFAULT_RELEASE_VERSION)
                     .timeout(Duration.ofSeconds(30))
                     .build();
-            HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = RELEASE_HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             String marker = "\"tag_name\":\"";
             int start = response.body().indexOf(marker);
             if (start < 0) {
@@ -270,19 +281,21 @@ final class BootstrapSupport {
     }
 
     private static void extractCliArchive(Path archivePath, Path installDir, Path cliPath) throws IOException, InterruptedException {
+        Path extractRoot = Files.createTempDirectory(installDir, "extract-");
         if (archivePath.toString().endsWith(".zip")) {
             Process process = new ProcessBuilder(
                     "powershell",
                     "-NoProfile",
                     "-Command",
-                    "Expand-Archive -Path '" + archivePath + "' -DestinationPath '" + installDir + "' -Force"
+                    "Expand-Archive -Path '" + archivePath + "' -DestinationPath '" + extractRoot + "' -Force"
             )
                     .redirectInput(ProcessBuilder.Redirect.DISCARD)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.PIPE)
                     .start();
             if (process.waitFor() != 0) {
-                throw new IOException("failed to extract allwright CLI zip archive");
+                String errorOutput = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+                throw new IOException("failed to extract allwright CLI zip archive" + (errorOutput.isEmpty() ? "" : ": " + errorOutput));
             }
         } else {
             Process process = new ProcessBuilder(
@@ -290,23 +303,26 @@ final class BootstrapSupport {
                     "-xzf",
                     archivePath.toString(),
                     "-C",
-                    installDir.toString(),
-                    "bin/" + cliFilename()
+                    extractRoot.toString()
             )
                     .redirectInput(ProcessBuilder.Redirect.DISCARD)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.PIPE)
                     .start();
             if (process.waitFor() != 0) {
-                throw new IOException("failed to extract allwright CLI tar archive");
+                String errorOutput = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+                throw new IOException("failed to extract allwright CLI tar archive" + (errorOutput.isEmpty() ? "" : ": " + errorOutput));
             }
         }
 
-        Path extracted = installDir.resolve("bin").resolve(cliFilename());
-        Files.copy(extracted, cliPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        if (!extracted.equals(cliPath)) {
-            Files.deleteIfExists(extracted);
-            Files.deleteIfExists(extracted.getParent());
+        try {
+            Path extracted = findExtractedCli(extractRoot);
+            if (extracted == null) {
+                throw new IOException("allwright CLI archive did not contain bin/" + cliFilename());
+            }
+            Files.copy(extracted, cliPath, StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            deleteRecursively(extractRoot);
         }
     }
 
@@ -501,6 +517,35 @@ final class BootstrapSupport {
             return "liballwright_surface_web.dylib";
         }
         return "liballwright_surface_web.so";
+    }
+
+    private static Path findExtractedCli(Path extractRoot) throws IOException {
+        try (var paths = Files.walk(extractRoot)) {
+            return paths
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().equals(cliFilename()))
+                    .filter(path -> {
+                        Path relative = extractRoot.relativize(path);
+                        return relative.getNameCount() >= 2 && relative.getName(relative.getNameCount() - 2).toString().equals("bin");
+                    })
+                    .findFirst()
+                    .orElse(null);
+        }
+    }
+
+    private static void deleteRecursively(Path root) throws IOException {
+        if (!Files.exists(root)) {
+            return;
+        }
+        try (var paths = Files.walk(root)) {
+            paths.sorted((left, right) -> right.getNameCount() - left.getNameCount())
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException ignored) {
+                        }
+                    });
+        }
     }
 
     private record PingStatus(String version) {}

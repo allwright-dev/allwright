@@ -52,6 +52,9 @@ bash "$repo_root/scripts/sync-version.sh" "$version"
 bash "$repo_root/scripts/sync-npm-version.sh" "$version"
 bash "$repo_root/scripts/sync-python-version.sh" "$version"
 
+(cd "$repo_root/typescript/core" && bun run build)
+(cd "$repo_root/typescript/vitest" && bun run build)
+
 if [[ -n "$(git status --porcelain)" ]]; then
   git add -A
   git commit -m "chore: prepare release ${tag}"
