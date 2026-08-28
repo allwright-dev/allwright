@@ -87,7 +87,6 @@ final class BootstrapSupport {
                     "--listen-addr",
                     cliListenAddr(resolvedServerAddr)
             )
-                    .redirectInput(ProcessBuilder.Redirect.DISCARD)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start();
@@ -226,7 +225,6 @@ final class BootstrapSupport {
                     "--version",
                     expectedVersion
             )
-                    .redirectInput(ProcessBuilder.Redirect.DISCARD)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start();
@@ -289,7 +287,6 @@ final class BootstrapSupport {
                     "-Command",
                     "Expand-Archive -Path '" + archivePath + "' -DestinationPath '" + extractRoot + "' -Force"
             )
-                    .redirectInput(ProcessBuilder.Redirect.DISCARD)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .redirectError(ProcessBuilder.Redirect.PIPE)
                     .start();
@@ -305,7 +302,6 @@ final class BootstrapSupport {
                     "-C",
                     extractRoot.toString()
             )
-                    .redirectInput(ProcessBuilder.Redirect.DISCARD)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .redirectError(ProcessBuilder.Redirect.PIPE)
                     .start();
@@ -483,7 +479,6 @@ final class BootstrapSupport {
     private static boolean cliVersionMatches(Path cliPath, String expectedVersion) {
         try {
             Process process = new ProcessBuilder(cliPath.toString(), "--version")
-                    .redirectInput(ProcessBuilder.Redirect.DISCARD)
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start();
             String output = new String(process.getInputStream().readAllBytes());
