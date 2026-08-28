@@ -43,9 +43,22 @@ export function LogoMark({ size = 32 }: { size?: number }) {
   );
 }
 
-// Shared 1200x630 social-preview card, used by both app/opengraph-image.tsx
-// and app/twitter-image.tsx so link unfurls on every platform match.
-export function SocialCard() {
+// Shared 1200x630 social-preview card. Defaults to the homepage pitch (used
+// by app/opengraph-image.tsx and app/twitter-image.tsx as-is), but every
+// other marketing page (how-it-works, availability, the blog index) passes
+// its own eyebrow/title/description/pills so its link unfurl isn't just a
+// copy of the homepage's.
+export function SocialCard({
+  eyebrow,
+  title = "One automation engine for everything you test.",
+  description = "Web, mobile, desktop, and API. One small core, one plugin per surface.",
+  pills = ["Web", "Mobile", "Desktop", "API"],
+}: {
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+  pills?: string[];
+}) {
   return (
     <div
       style={{
@@ -71,6 +84,21 @@ export function SocialCard() {
         >
           allwright
         </span>
+        {eyebrow ? (
+          <span
+            style={{
+              display: "flex",
+              padding: "8px 22px",
+              borderRadius: 999,
+              fontSize: 26,
+              color: "#eaf7f3",
+              background: `linear-gradient(120deg, ${BRAND_FROM}33, ${BRAND_TO}33)`,
+              border: "1px solid rgba(234,247,243,0.18)",
+            }}
+          >
+            {eyebrow}
+          </span>
+        ) : null}
       </div>
 
       <div
@@ -85,7 +113,7 @@ export function SocialCard() {
           maxWidth: 980,
         }}
       >
-        One automation engine for everything you test.
+        {title}
       </div>
 
       <div
@@ -97,27 +125,29 @@ export function SocialCard() {
           maxWidth: 880,
         }}
       >
-        Web, mobile, desktop, and API — one small core, one plugin per surface.
+        {description}
       </div>
 
-      <div style={{ display: "flex", gap: 16, marginTop: 48 }}>
-        {["Web", "Mobile", "Desktop", "API"].map((label) => (
-          <div
-            key={label}
-            style={{
-              display: "flex",
-              padding: "10px 24px",
-              borderRadius: 999,
-              fontSize: 24,
-              color: "#eaf7f3",
-              background: `linear-gradient(120deg, ${BRAND_FROM}33, ${BRAND_TO}33)`,
-              border: "1px solid rgba(234,247,243,0.18)",
-            }}
-          >
-            {label}
-          </div>
-        ))}
-      </div>
+      {pills.length > 0 && (
+        <div style={{ display: "flex", gap: 16, marginTop: 48 }}>
+          {pills.map((label) => (
+            <div
+              key={label}
+              style={{
+                display: "flex",
+                padding: "10px 24px",
+                borderRadius: 999,
+                fontSize: 24,
+                color: "#eaf7f3",
+                background: `linear-gradient(120deg, ${BRAND_FROM}33, ${BRAND_TO}33)`,
+                border: "1px solid rgba(234,247,243,0.18)",
+              }}
+            >
+              {label}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

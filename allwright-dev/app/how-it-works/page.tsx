@@ -5,10 +5,24 @@ import { languages, surfaceStatus } from "../availability-data";
 import { GITHUB_URL } from "../brand";
 import { StatusPill } from "../status-pill";
 
+const description =
+  "allwright is a small core engine plus installable plugins for web, mobile, desktop, and API testing: à la carte, not a buffet. See what's installable today and which client languages are published.";
+
 export const metadata: Metadata = {
   title: "How it works",
-  description:
-    "allwright is a small core engine plus installable plugins for web, mobile, desktop, and API testing — à la carte, not a buffet. See what's installable today and which client languages are published.",
+  description,
+  alternates: { canonical: "/how-it-works" },
+  openGraph: {
+    type: "website",
+    url: "/how-it-works",
+    title: "How it works: à la carte, not a buffet",
+    description,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "How it works: à la carte, not a buffet",
+    description,
+  },
 };
 
 // The real plugin catalog: one entry per installable surface plugin, laid

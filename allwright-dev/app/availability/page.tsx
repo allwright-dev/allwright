@@ -5,10 +5,24 @@ import { languages, surfaceStatus } from "../availability-data";
 import { GITHUB_URL } from "../brand";
 import { StatusPill } from "../status-pill";
 
+const description =
+  "The honest, current picture of allwright: what web automation can do today, what mobile, desktop, and API testing still need, and which client languages are published versus build-from-source.";
+
 export const metadata: Metadata = {
   title: "Availability",
-  description:
-    "The honest, current picture of allwright: what web automation can do today, what mobile, desktop, and API testing still need, and which client languages are published versus build-from-source.",
+  description,
+  alternates: { canonical: "/availability" },
+  openGraph: {
+    type: "website",
+    url: "/availability",
+    title: "Availability: what's real today, what isn't yet",
+    description,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Availability: what's real today, what isn't yet",
+    description,
+  },
 };
 
 const webAvailable = [

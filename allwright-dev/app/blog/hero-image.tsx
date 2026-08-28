@@ -107,6 +107,112 @@ function TypeScriptHero({ variant }: { variant?: HeroVariant }) {
   );
 }
 
+// Left panel: four disconnected, dashed tool boxes (the fragmented status
+// quo). Right panel: the same four surfaces, but fanned out from one core:
+// solid for the plugin that's actually installed today (web), dashed for
+// the rest, matching the real install status from /how-it-works.
+function EngineHero({ variant }: { variant?: HeroVariant }) {
+  const rowYs = [96, 178, 260, 342];
+  const rowHeight = 64;
+  const surfaces = [
+    { label: "Web", ready: true },
+    { label: "Mobile", ready: false },
+    { label: "Desktop", ready: false },
+    { label: "API", ready: false },
+  ];
+  const core = { cx: 860, cy: 230, r: 70 };
+
+  return (
+    <HeroFrame
+      variant={variant}
+      label="Left: four separate, disconnected automation tools for web, mobile, desktop, and API, each learned and maintained on its own. Right: the same four surfaces reached from one allwright core, with a solid line to web for the plugin that's installed today and dashed lines to mobile, desktop, and API for plugins still to come."
+    >
+      <defs>
+        <ArrowMarker id="hero-engine-arrow" />
+      </defs>
+
+      <text x={290} y={54} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--muted)">
+        Without one engine
+      </text>
+      {rowYs.map((y, i) => (
+        <g key={`left-${surfaces[i].label}`}>
+          <rect
+            x={60}
+            y={y}
+            width={460}
+            height={rowHeight}
+            rx={14}
+            fill="var(--card)"
+            stroke="currentColor"
+            strokeWidth="1"
+            strokeDasharray="4 3"
+          />
+          <text x={290} y={y + rowHeight / 2 + 5} textAnchor="middle" fontSize="15" fill="var(--muted)">
+            {surfaces[i].label} tool
+          </text>
+        </g>
+      ))}
+
+      <line x1={600} y1={40} x2={600} y2={420} stroke="currentColor" strokeWidth="1" opacity="0.3" strokeDasharray="2 6" />
+
+      <text x={890} y={54} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--muted)">
+        One core, one plugin per surface
+      </text>
+      {surfaces.map((surface, i) => {
+        const boxCenterY = rowYs[i] + rowHeight / 2;
+        return (
+          <line
+            key={`line-${surface.label}`}
+            x1={core.cx + core.r}
+            y1={core.cy}
+            x2={990}
+            y2={boxCenterY}
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeDasharray={surface.ready ? undefined : "4 3"}
+            markerEnd="url(#hero-engine-arrow)"
+          />
+        );
+      })}
+      <circle cx={core.cx} cy={core.cy} r={core.r} fill="var(--accent-soft)" stroke="var(--accent-2)" strokeWidth="1.6" />
+      <text x={core.cx} y={core.cy - 4} textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--accent-2)">
+        allwright
+      </text>
+      <text x={core.cx} y={core.cy + 18} textAnchor="middle" fontSize="13" fill="var(--accent-2)">
+        core
+      </text>
+
+      {surfaces.map((surface, i) => (
+        <g key={`right-${surface.label}`}>
+          <rect
+            x={990}
+            y={rowYs[i]}
+            width={170}
+            height={rowHeight}
+            rx={14}
+            fill="var(--card)"
+            stroke="currentColor"
+            strokeWidth={surface.ready ? 1.4 : 1}
+            strokeDasharray={surface.ready ? undefined : "4 3"}
+          />
+          <text x={1075} y={rowYs[i] + rowHeight / 2 - 4} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--ink)">
+            {surface.label}
+          </text>
+          <text
+            x={1075}
+            y={rowYs[i] + rowHeight / 2 + 15}
+            textAnchor="middle"
+            fontSize="10.5"
+            fill={surface.ready ? "var(--accent)" : "var(--muted)"}
+          >
+            {surface.ready ? "● installed" : "○ not yet"}
+          </text>
+        </g>
+      ))}
+    </HeroFrame>
+  );
+}
+
 function DefaultHero({ variant }: { variant?: HeroVariant }) {
   return (
     <HeroFrame variant={variant} label="The allwright logo mark on a gradient card">
@@ -130,6 +236,7 @@ function DefaultHero({ variant }: { variant?: HeroVariant }) {
 
 const heroRegistry: Record<string, (props: { variant?: HeroVariant }) => React.ReactElement> = {
   "get-started-with-typescript": TypeScriptHero,
+  "why-allwright-if-playwright-exists": EngineHero,
 };
 
 export function HeroImage({ slug, variant }: { slug: string; variant?: HeroVariant }) {

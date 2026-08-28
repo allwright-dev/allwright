@@ -1,0 +1,126 @@
+---
+title: "Why allwright, when Playwright already exists?"
+description: "Playwright already solves web automation extremely well. Here's the actual gap allwright is built to close, and why 'Playwright-style' was never the pitch."
+date: "2026-08-29"
+author: "The allwright team"
+published: true
+tags: ["architecture", "playwright", "test automation", "opinion"]
+keywords:
+  [
+    "allwright vs playwright",
+    "playwright alternative",
+    "cross platform test automation",
+    "web mobile desktop api testing",
+    "test automation engine architecture",
+    "why allwright",
+  ]
+---
+
+Playwright is a mature, well-engineered answer to browser automation:
+TypeScript support, real Chromium/Firefox/WebKit control, locators that
+auto-wait, retrying assertions, no Selenium-style driver binaries to
+babysit. Given all of that already exists, it's a fair question to ask why
+allwright exists at all, and why our own examples describe allwright's web
+API as "Playwright-style." This post is that explanation.
+
+## For web alone, Playwright already wins
+
+If your test architecture is "automate a web app," Playwright is the
+stronger choice today. allwright isn't trying to out-web it, and won't
+pretend a project at [v0.0.43](https://github.com/allwright-dev/allwright)
+out-engineers a tool hardened across years of production use by a much
+larger team.
+
+So if the comparison stops at "browser automation for a web app,"
+Playwright wins, and that's fine. That was never where the two projects
+were meant to compete.
+
+## The problem isn't inside web. It's across surfaces.
+
+Most real product test suites aren't just web. A typical team ends up with:
+
+- Playwright or Cypress for the web app
+- Appium, Espresso, or XCUITest for mobile
+- A separate desktop automation tool (or nothing, and manual QA) for the
+  desktop client
+- A different library again for API contract checks
+
+Each of those has its own locator syntax, its own retry/wait semantics, its
+own session lifecycle, its own flakiness quirks, and its own CI wiring. None
+of that knowledge transfers between them. A test engineer who's excellent at
+Playwright locators starts from zero on Appium's locator strategies, and
+from zero again on whatever the desktop tool wants. The org doesn't
+maintain one testing practice: it maintains four, wearing four different
+hats, retried and reported four different ways.
+
+That fragmentation is the pain allwright is built against, not "Playwright
+is bad at web," but "there's no single engine underneath web, mobile,
+desktop, and API today."
+
+## What's actually different underneath
+
+allwright is a small [Rust core engine](https://github.com/allwright-dev/allwright)
+that speaks one gRPC contract, plus a plugin per automation surface:
+
+```bash
+allwright serve --listen-addr 127.0.0.1:50051
+allwright plugin install web
+```
+
+`web` is the first plugin, and it's real today: driverless, using CDP plus
+Chromium BiDi for Chromium and Firefox's native WebDriver BiDi Remote Agent
+for Firefox. `mobile-android`, `mobile-ios`, `desktop-mac`,
+`desktop-windows`, and `desktop-linux` already exist as crate boundaries in
+the workspace, but they're not installable runtimes yet. That's the honest
+current-status line, not marketing copy.
+
+The bet is the plugin boundary itself: the core owns sessions, lifecycle,
+and the shared automation model, and every surface plugs into that same
+model instead of being a bolted-on separate tool. When mobile and desktop
+ship, they won't be new products with new APIs to learn: they'll be
+`allwright plugin install mobile-android` against the same core, driven by
+the same client libraries you already have.
+
+On top of the engine, five client libraries speak the exact same command
+set: Rust, Go, Java, Python, and TypeScript. Same session lifecycle, same
+locator model, same retrying assertions, regardless of which language your
+suite is written in or which surface it's pointed at.
+
+## "Playwright-style" is about familiarity, not the pitch
+
+This is worth being precise about. Making allwright's web API read like
+Playwright's (`page.goto()`, `page.click()`, `expect(locator).toBeVisible()`)
+costs your team nothing to adopt if you already think in that shape. But
+it's sugar over the actual architecture, not the reason the project exists.
+If "Playwright-style syntax" were the whole value proposition, the honest
+answer to "why not just use Playwright" would be "no reason at all." The
+actual proposition is one level down: the same retrying-locator, same
+session model, carried by one engine across surfaces Playwright was never
+built to reach.
+
+## Where that leaves you today
+
+| | Playwright | allwright |
+|---|---|---|
+| Web automation maturity | Production-hardened, feature-complete | Early, driverless, functional for core flows |
+| Mobile / desktop / API | Out of scope | Reserved plugin slots, not yet installable |
+| Automation model | One per surface you bolt on separately | One core model, extended by plugins |
+| Client languages | JS/TS, Python, Java, .NET | Rust, Go, Java, Python, TypeScript |
+
+If you only test a web app, that table doesn't tell you to switch: it tells
+you allwright hasn't earned that yet, and says so plainly. If your suite
+already spans web plus mobile plus desktop plus API, and you're tired of
+four different testing philosophies duct-taped together, that's the gap
+this project is actually aimed at closing, and the web plugin is the first
+proof that the plugin model holds up in practice before we lean on it for
+the rest.
+
+## Where to go next
+
+- Read [How it works](/how-it-works) for the full plugin model and today's
+  install status per surface.
+- Try the [TypeScript getting-started guide](/blog/get-started-with-typescript)
+  if you want to feel the web plugin firsthand.
+- Star or watch [the repo](https://github.com/allwright-dev/allwright) to
+  see mobile and desktop plugins land. That's the point where this argument
+  stops being a bet and starts being a track record.

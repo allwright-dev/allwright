@@ -5,10 +5,12 @@ import { SITE_URL } from "../brand";
 import { formatPostDate, getAllPosts } from "./blog-data";
 import { HeroImage } from "./hero-image";
 
+const description =
+  "The allwright blog: guides, release notes, and engineering deep-dives on test automation for web, mobile, desktop, and API, across every client language allwright ships.";
+
 export const metadata: Metadata = {
   title: "Blog",
-  description:
-    "The allwright blog: guides, release notes, and engineering deep-dives on test automation for web, mobile, desktop, and API — across every client language allwright ships.",
+  description,
   keywords: [
     "allwright blog",
     "test automation blog",
@@ -18,6 +20,18 @@ export const metadata: Metadata = {
     "TypeScript testing",
     "browser automation",
   ],
+  alternates: { canonical: "/blog" },
+  openGraph: {
+    type: "website",
+    url: "/blog",
+    title: "The allwright blog",
+    description,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "The allwright blog",
+    description,
+  },
 };
 
 export default function BlogIndex() {
