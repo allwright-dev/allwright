@@ -36,11 +36,15 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
-git fetch origin main --tags
 git pull --ff-only origin main
 
 if git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null; then
   echo "error: tag ${tag} already exists locally" >&2
+  exit 1
+fi
+
+if git ls-remote --tags --exit-code origin "refs/tags/${tag}" >/dev/null 2>&1; then
+  echo "error: tag ${tag} already exists on origin" >&2
   exit 1
 fi
 
