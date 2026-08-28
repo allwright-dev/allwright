@@ -494,7 +494,7 @@ func allocateManagedServerAddr(serverAddr string) (string, error) {
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
 	_ = listener.Close()
-	return "http://" + net.JoinHostPort(host, fmt.Sprintf("%d", port)), nil
+	return net.JoinHostPort(host, fmt.Sprintf("%d", port)), nil
 }
 
 func repoLocalCLIPath() (string, bool) {

@@ -338,8 +338,8 @@ def allocate_managed_server_addr(server_addr: str) -> str:
     with socket.create_server((host, 0), family=socket.AF_INET6 if ":" in host else socket.AF_INET) as listener:
         port = listener.getsockname()[1]
     if ":" in host:
-        return f"http://[{host}]:{port}"
-    return f"http://{host}:{port}"
+        return f"[{host}]:{port}"
+    return f"{host}:{port}"
 
 
 def local_binding_host(server_addr: str) -> str:

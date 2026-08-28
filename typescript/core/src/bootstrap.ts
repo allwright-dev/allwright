@@ -23,6 +23,9 @@ const ENGINE_PROTO_PATH = fileURLToPath(new URL("../proto/engine/v1/engine.proto
 let managedServer: ReturnType<typeof spawn> | null = null;
 let managedServerAddr: string | null = null;
 let managedServerBaseAddr: string | null = null;
+let managedServerStdout = "";
+let managedServerStderr = "";
+let managedServerSpawnError: string | null = null;
 
 type PingClient = {
   Ping(
@@ -62,6 +65,9 @@ export async function ensureRuntimeReady(serverAddr: string): Promise<string> {
     managedServer = null;
     managedServerAddr = null;
     managedServerBaseAddr = null;
+    managedServerStdout = "";
+    managedServerStderr = "";
+    managedServerSpawnError = null;
   }
 
   const cliPath = await ensureCliAvailable(expectedVersion);
@@ -73,7 +79,19 @@ export async function ensureRuntimeReady(serverAddr: string): Promise<string> {
   }
 
   managedServer = spawn(cliPath, ["serve", "--listen-addr", cliListenAddr(resolvedServerAddr)], {
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  managedServerStdout = "";
+  managedServerStderr = "";
+  managedServerSpawnError = null;
+  managedServer.stdout?.on("data", (chunk: Buffer | string) => {
+    managedServerStdout = appendManagedServerOutput(managedServerStdout, chunk);
+  });
+  managedServer.stderr?.on("data", (chunk: Buffer | string) => {
+    managedServerStderr = appendManagedServerOutput(managedServerStderr, chunk);
+  });
+  managedServer.on("error", (error) => {
+    managedServerSpawnError = error.message;
   });
   managedServerAddr = resolvedServerAddr;
   managedServerBaseAddr = serverAddr;
@@ -88,19 +106,33 @@ export async function shutdownManagedServer(): Promise<void> {
   managedServer = null;
   managedServerAddr = null;
   managedServerBaseAddr = null;
+  managedServerStdout = "";
+  managedServerStderr = "";
+  managedServerSpawnError = null;
 }
 
 async function waitForServer(serverAddr: string, expectedVersion: string): Promise<string> {
   const deadline = Date.now() + STARTUP_TIMEOUT_MS;
   while (Date.now() < deadline) {
+    if (managedServer && managedServer.exitCode !== null) {
+      const details = formatManagedServerFailure(managedServer.exitCode, managedServer.signalCode);
+      await shutdownManagedServer();
+      throw new Error(`allwright server exited before becoming ready at ${serverAddr}${details}`);
+    }
+    if (managedServerSpawnError) {
+      const details = formatManagedServerFailure(null, null);
+      await shutdownManagedServer();
+      throw new Error(`failed to start allwright server at ${serverAddr}${details}`);
+    }
     const status = await pingServer(serverAddr);
     if (status?.version === expectedVersion) {
       return serverAddr;
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
+  const details = formatManagedServerFailure(managedServer?.exitCode ?? null, managedServer?.signalCode ?? null);
   await shutdownManagedServer();
-  throw new Error(`timed out waiting for allwright server at ${serverAddr} to become ready with version ${expectedVersion}`);
+  throw new Error(`timed out waiting for allwright server at ${serverAddr} to become ready with version ${expectedVersion}${details}`);
 }
 
 async function pingServer(serverAddr: string): Promise<{ version: string } | null> {
@@ -357,7 +389,7 @@ async function allocateManagedServerAddr(serverAddr: string): Promise<string> {
       });
     });
   });
-  return host.includes(":") ? `http://[${host}]:${port}` : `http://${host}:${port}`;
+  return host.includes(":") ? `[${host}]:${port}` : `${host}:${port}`;
 }
 
 function localBindingHost(serverAddr: string): string {
@@ -410,6 +442,31 @@ function allwrightHome(): string {
 
 function cliFilename(): string {
   return process.platform === "win32" ? "allwright.exe" : "allwright";
+}
+
+function appendManagedServerOutput(current: string, chunk: Buffer | string): string {
+  const next = `${current}${typeof chunk === "string" ? chunk : chunk.toString("utf8")}`;
+  return next.length > 8_000 ? next.slice(-8_000) : next;
+}
+
+function formatManagedServerFailure(exitCode: number | null, signalCode: NodeJS.Signals | null): string {
+  const parts: string[] = [];
+  if (managedServerSpawnError) {
+    parts.push(`spawn error: ${managedServerSpawnError}`);
+  }
+  if (exitCode !== null) {
+    parts.push(`exit code: ${exitCode}`);
+  }
+  if (signalCode) {
+    parts.push(`signal: ${signalCode}`);
+  }
+  if (managedServerStdout.trim()) {
+    parts.push(`stdout:\n${managedServerStdout.trim()}`);
+  }
+  if (managedServerStderr.trim()) {
+    parts.push(`stderr:\n${managedServerStderr.trim()}`);
+  }
+  return parts.length > 0 ? `\n${parts.join("\n")}` : "";
 }
 
 function findExtractedCli(extractRoot: string): string | null {

@@ -447,9 +447,9 @@ final class BootstrapSupport {
         try (ServerSocket socket = new ServerSocket(0, 0, InetAddress.getByName(host))) {
             int port = socket.getLocalPort();
             if (host.contains(":")) {
-                return "http://[" + host + "]:" + port;
+                return "[" + host + "]:" + port;
             }
-            return "http://" + host + ":" + port;
+            return host + ":" + port;
         } catch (IOException exception) {
             throw new AllwrightException("reserve local port for managed allwright server on " + host + ": " + exception.getMessage(), exception);
         }
