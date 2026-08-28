@@ -188,10 +188,22 @@ function ensureWebPlugin(cliPath: string, expectedVersion: string): void {
   }
 
   const result = spawnSync(cliPath, ["plugin", "install", "web", "--version", expectedVersion], {
-    stdio: "ignore",
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
   });
+  if (result.error) {
+    throw new Error(`failed to install allwright web plugin with ${cliPath}: ${result.error.message}`);
+  }
   if (result.status !== 0 || !isFile(pluginPath)) {
-    throw new Error("allwright attempted to install the `web` plugin automatically, but the install did not complete successfully");
+    const details = [result.stdout, result.stderr]
+      .map((value) => value?.trim())
+      .filter((value): value is string => !!value)
+      .join("\n");
+    throw new Error(
+      details
+        ? `allwright attempted to install the \`web\` plugin automatically, but the install did not complete successfully:\n${details}`
+        : "allwright attempted to install the `web` plugin automatically, but the install did not complete successfully",
+    );
   }
   if (installedPluginVersion("web") !== expectedVersion) {
     throw new Error(`allwright attempted to install the \`web\` plugin automatically, but version ${expectedVersion} is still not active`);
@@ -217,18 +229,29 @@ async function resolveReleaseTag(): Promise<string> {
 }
 
 function extractCliArchive(archivePath: string, cliPath: string): void {
+  const extractRoot = fs.mkdtempSync(path.join(os.tmpdir(), "allwright-cli-"));
   if (archivePath.endsWith(".zip")) {
     const result = spawnSync("powershell", [
       "-NoProfile",
       "-Command",
-      `Expand-Archive -Path '${archivePath.replaceAll("'", "''")}' -DestinationPath '${path.dirname(cliPath).replaceAll("'", "''")}' -Force`,
-    ], { stdio: "ignore" });
-    if (result.status !== 0) {
-      throw new Error("failed to extract allwright CLI zip archive");
+      `Expand-Archive -Path '${archivePath.replaceAll("'", "''")}' -DestinationPath '${extractRoot.replaceAll("'", "''")}' -Force`,
+    ], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    if (result.error) {
+      fs.rmSync(extractRoot, { recursive: true, force: true });
+      throw new Error(`failed to extract allwright CLI zip archive: ${result.error.message}`);
     }
-    const extracted = path.join(path.dirname(cliPath), "bin", cliFilename());
+    if (result.status !== 0) {
+      const details = [result.stdout, result.stderr].map((value) => value?.trim()).filter(Boolean).join("\n");
+      fs.rmSync(extractRoot, { recursive: true, force: true });
+      throw new Error(details ? `failed to extract allwright CLI zip archive:\n${details}` : "failed to extract allwright CLI zip archive");
+    }
+    const extracted = findExtractedCli(extractRoot);
+    if (!extracted) {
+      fs.rmSync(extractRoot, { recursive: true, force: true });
+      throw new Error(`allwright CLI zip archive did not contain bin/${cliFilename()}`);
+    }
     fs.copyFileSync(extracted, cliPath);
-    fs.rmSync(path.join(path.dirname(cliPath), "bin"), { recursive: true, force: true });
+    fs.rmSync(extractRoot, { recursive: true, force: true });
     return;
   }
 
@@ -236,15 +259,24 @@ function extractCliArchive(archivePath: string, cliPath: string): void {
     "-xzf",
     archivePath,
     "-C",
-    path.dirname(cliPath),
-    `bin/${cliFilename()}`,
-  ], { stdio: "ignore" });
-  if (result.status !== 0) {
-    throw new Error("failed to extract allwright CLI tar archive");
+    extractRoot,
+  ], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  if (result.error) {
+    fs.rmSync(extractRoot, { recursive: true, force: true });
+    throw new Error(`failed to extract allwright CLI tar archive: ${result.error.message}`);
   }
-  const extracted = path.join(path.dirname(cliPath), "bin", cliFilename());
+  if (result.status !== 0) {
+    const details = [result.stdout, result.stderr].map((value) => value?.trim()).filter(Boolean).join("\n");
+    fs.rmSync(extractRoot, { recursive: true, force: true });
+    throw new Error(details ? `failed to extract allwright CLI tar archive:\n${details}` : "failed to extract allwright CLI tar archive");
+  }
+  const extracted = findExtractedCli(extractRoot);
+  if (!extracted) {
+    fs.rmSync(extractRoot, { recursive: true, force: true });
+    throw new Error(`allwright CLI archive did not contain bin/${cliFilename()}`);
+  }
   fs.copyFileSync(extracted, cliPath);
-  fs.rmSync(path.join(path.dirname(cliPath), "bin"), { recursive: true, force: true });
+  fs.rmSync(extractRoot, { recursive: true, force: true });
 }
 
 function cliAssetName(versionTag: string): string {
@@ -378,6 +410,27 @@ function allwrightHome(): string {
 
 function cliFilename(): string {
   return process.platform === "win32" ? "allwright.exe" : "allwright";
+}
+
+function findExtractedCli(extractRoot: string): string | null {
+  const queue = [extractRoot];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const entryPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        queue.push(entryPath);
+        continue;
+      }
+      if (entry.isFile() && entry.name === cliFilename() && path.basename(path.dirname(entryPath)) === "bin") {
+        return entryPath;
+      }
+    }
+  }
+  return null;
 }
 
 function webPluginFilename(): string {
