@@ -1,6 +1,6 @@
 [project]
 name = "allwright"
-version = "0.0.1"
+version = "0.0.38"
 description = "High-level Python client for the allwright engine"
 readme = "README.md"
 requires-python = ">=3.10"
