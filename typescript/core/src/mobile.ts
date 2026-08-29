@@ -1,4 +1,5 @@
 import { ensurePluginsInstalled, invokePlugin } from "./bootstrap.js";
+import { chainMobileSelectorForTransport, normalizeMobileSelectorForTransport } from "./mobileSelectors.js";
 import type {
   ClickResult,
   CommandOptions,
@@ -6,6 +7,7 @@ import type {
   MobileAndroidConnectOptions,
   MobileAndroidDevice,
   MobileAndroidLaunchOptions,
+  MobileAndroidLocator,
   MobileAndroidPage,
   MobileSurfaceNamespace,
 } from "./types.js";
@@ -77,6 +79,10 @@ class MobileAndroidPageImpl implements MobileAndroidPage {
     return this.pageSession.page_id;
   }
 
+  locator(selector: string): MobileAndroidLocator {
+    return new MobileAndroidLocatorImpl(this, normalizeMobileSelectorForTransport(selector));
+  }
+
   async click(selector: string, options: CommandOptions = {}): Promise<ClickResult> {
     const result = await invokeAndroidExpected<{
       result: "click_element";
@@ -87,7 +93,7 @@ class MobileAndroidPageImpl implements MobileAndroidPage {
       command: "click_element",
       browser_session: this.browserSession,
       page_session: this.pageSession,
-      selector,
+      selector: normalizeMobileSelectorForTransport(selector),
       timeout_ms: timeoutMsOf(options),
     });
     return {
@@ -107,7 +113,7 @@ class MobileAndroidPageImpl implements MobileAndroidPage {
       command: "fill_element",
       browser_session: this.browserSession,
       page_session: this.pageSession,
-      selector,
+      selector: normalizeMobileSelectorForTransport(selector),
       value,
       timeout_ms: timeoutMsOf(options),
     });
@@ -116,6 +122,25 @@ class MobileAndroidPageImpl implements MobileAndroidPage {
       value: result.value,
       note: result.note,
     };
+  }
+}
+
+class MobileAndroidLocatorImpl implements MobileAndroidLocator {
+  constructor(
+    readonly page: MobileAndroidPage,
+    readonly selector: string,
+  ) {}
+
+  async click(options: CommandOptions = {}): Promise<ClickResult> {
+    return this.page.click(this.selector, options);
+  }
+
+  async fill(value: string, options: CommandOptions = {}): Promise<FillResult> {
+    return this.page.fill(this.selector, value, options);
+  }
+
+  locator(selector: string): MobileAndroidLocator {
+    return new MobileAndroidLocatorImpl(this.page, chainMobileSelectorForTransport(this.selector, selector));
   }
 }
 

@@ -13,8 +13,10 @@ use regex::Regex;
 use std::env;
 use std::ffi::{CStr, CString, c_char};
 use std::fmt;
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct MobileAndroidPlugin;
@@ -323,21 +325,20 @@ pub fn launch_app(
     options: &LaunchOptions,
 ) -> Result<MobilePageInfo, String> {
     let device_id = browser_session.device.device_id.as_str();
+    let mut resolved_apk = None;
 
     if let Some(apk_path) = options.apk_path.as_deref() {
-        let apk = Path::new(apk_path);
-        if !apk.is_file() {
-            return Err(format!("APK path does not exist: {}", apk.display()));
-        }
-        let apk_owned = apk.to_string_lossy().into_owned();
+        let apk = resolve_apk_source(apk_path)?;
+        let apk_owned = apk.path.to_string_lossy().into_owned();
         let _ = run_adb_for_device(device_id, &["install", "-r", &apk_owned])?;
+        resolved_apk = Some(apk);
     }
 
     let package_name = match options.app_id.clone() {
         Some(package_name) => package_name,
         None => {
-            if let Some(apk_path) = options.apk_path.as_deref() {
-                resolve_package_name_from_apk(apk_path)?
+            if let Some(apk) = resolved_apk.as_ref() {
+                resolve_package_name_from_apk_path(apk.path.as_path())?
             } else {
                 return Err(
                     "launch_app requires `app_id`, or an APK path whose package name can be resolved"
@@ -660,14 +661,72 @@ fn run_command(command: &str, args: &[&str]) -> Result<String, String> {
     ))
 }
 
-fn resolve_package_name_from_apk(apk_path: &str) -> Result<String, String> {
-    if let Ok(output) = run_command("aapt", &["dump", "badging", apk_path]) {
+#[derive(Debug)]
+struct ResolvedApkSource {
+    path: PathBuf,
+    _downloaded_file: Option<PathBuf>,
+}
+
+fn resolve_apk_source(apk_path_or_url: &str) -> Result<ResolvedApkSource, String> {
+    if is_remote_apk_source(apk_path_or_url) {
+        let downloaded_path = download_apk_to_temp(apk_path_or_url)?;
+        return Ok(ResolvedApkSource {
+            path: downloaded_path.clone(),
+            _downloaded_file: Some(downloaded_path),
+        });
+    }
+
+    let apk = Path::new(apk_path_or_url);
+    if !apk.is_file() {
+        return Err(format!("APK path does not exist: {}", apk.display()));
+    }
+    Ok(ResolvedApkSource {
+        path: apk.to_path_buf(),
+        _downloaded_file: None,
+    })
+}
+
+fn is_remote_apk_source(apk_path_or_url: &str) -> bool {
+    let lowered = apk_path_or_url.trim().to_ascii_lowercase();
+    lowered.starts_with("http://") || lowered.starts_with("https://")
+}
+
+fn download_apk_to_temp(url: &str) -> Result<PathBuf, String> {
+    let response = reqwest::blocking::get(url)
+        .map_err(|error| format!("failed to download APK from `{url}`: {error}"))?;
+    if !response.status().is_success() {
+        return Err(format!(
+            "failed to download APK from `{url}`: HTTP {}",
+            response.status()
+        ));
+    }
+
+    let bytes = response
+        .bytes()
+        .map_err(|error| format!("failed to read APK download from `{url}`: {error}"))?;
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("failed to resolve system time for APK download: {error}"))?
+        .as_millis();
+    let path = env::temp_dir().join(format!("allwright-mobile-android-{timestamp}.apk"));
+    fs::write(&path, bytes.as_ref()).map_err(|error| {
+        format!(
+            "failed to write downloaded APK to {}: {error}",
+            path.display()
+        )
+    })?;
+    Ok(path)
+}
+
+fn resolve_package_name_from_apk_path(apk_path: &Path) -> Result<String, String> {
+    let apk_path = apk_path.to_string_lossy().into_owned();
+    if let Ok(output) = run_command("aapt", &["dump", "badging", &apk_path]) {
         if let Some(package_name) = parse_package_name_from_aapt_badging(&output) {
             return Ok(package_name);
         }
     }
 
-    if let Ok(output) = run_command("apkanalyzer", &["manifest", "application-id", apk_path]) {
+    if let Ok(output) = run_command("apkanalyzer", &["manifest", "application-id", &apk_path]) {
         let package_name = output.trim();
         if !package_name.is_empty() {
             return Ok(package_name.to_string());
@@ -749,7 +808,10 @@ fn adb_fill(
         device_id,
         &["shell", "input", "tap", &x.to_string(), &y.to_string()],
     )?;
-    let _ = run_adb_for_device(device_id, &["shell", "input", "keyevent", "KEYCODE_MOVE_END"])?;
+    let _ = run_adb_for_device(
+        device_id,
+        &["shell", "input", "keyevent", "KEYCODE_MOVE_END"],
+    )?;
     let existing_text = snapshot.node.text.as_deref().unwrap_or("");
     for _ in existing_text.chars() {
         let _ = run_adb_for_device(device_id, &["shell", "input", "keyevent", "KEYCODE_DEL"])?;
@@ -805,9 +867,7 @@ fn resolve_selector_snapshot(
     let node = find_node_by_selector(&nodes, selector).ok_or_else(|| {
         let package_name = source.current_package.as_deref().unwrap_or("<unknown>");
         let activity_name = source.current_activity.as_deref().unwrap_or("<unknown>");
-        format!(
-            "selector not found: {selector} (current app: {package_name}/{activity_name})"
-        )
+        format!("selector not found: {selector} (current app: {package_name}/{activity_name})")
     })?;
     Ok(ResolvedSelectorSnapshot {
         selector: selector.to_string(),
@@ -878,17 +938,33 @@ fn parse_android_ui_nodes(xml: &str) -> Result<Vec<AndroidUiNode>, String> {
                 package_name: attributes.get("package").cloned(),
                 text: attributes.get("text").cloned(),
                 content_desc: attributes.get("content-desc").cloned(),
-                checkable: attributes.get("checkable").and_then(|value| parse_bool(value)),
-                checked: attributes.get("checked").and_then(|value| parse_bool(value)),
-                clickable: attributes.get("clickable").and_then(|value| parse_bool(value)),
+                checkable: attributes
+                    .get("checkable")
+                    .and_then(|value| parse_bool(value)),
+                checked: attributes
+                    .get("checked")
+                    .and_then(|value| parse_bool(value)),
+                clickable: attributes
+                    .get("clickable")
+                    .and_then(|value| parse_bool(value)),
                 long_clickable: attributes
                     .get("long-clickable")
                     .and_then(|value| parse_bool(value)),
-                scrollable: attributes.get("scrollable").and_then(|value| parse_bool(value)),
-                enabled: attributes.get("enabled").and_then(|value| parse_bool(value)),
-                focusable: attributes.get("focusable").and_then(|value| parse_bool(value)),
-                focused: attributes.get("focused").and_then(|value| parse_bool(value)),
-                selected: attributes.get("selected").and_then(|value| parse_bool(value)),
+                scrollable: attributes
+                    .get("scrollable")
+                    .and_then(|value| parse_bool(value)),
+                enabled: attributes
+                    .get("enabled")
+                    .and_then(|value| parse_bool(value)),
+                focusable: attributes
+                    .get("focusable")
+                    .and_then(|value| parse_bool(value)),
+                focused: attributes
+                    .get("focused")
+                    .and_then(|value| parse_bool(value)),
+                selected: attributes
+                    .get("selected")
+                    .and_then(|value| parse_bool(value)),
                 index: attributes.get("index").and_then(|value| value.parse().ok()),
                 bounds: attributes
                     .get("bounds")
@@ -1119,34 +1195,54 @@ fn node_matches_criteria(node: &AndroidUiNode, criteria: &NodeCriteria) -> bool 
     {
         return false;
     }
-    if let Some(expected) = criteria.checkable && node.checkable != Some(expected) {
+    if let Some(expected) = criteria.checkable
+        && node.checkable != Some(expected)
+    {
         return false;
     }
-    if let Some(expected) = criteria.checked && node.checked != Some(expected) {
+    if let Some(expected) = criteria.checked
+        && node.checked != Some(expected)
+    {
         return false;
     }
-    if let Some(expected) = criteria.clickable && node.clickable != Some(expected) {
+    if let Some(expected) = criteria.clickable
+        && node.clickable != Some(expected)
+    {
         return false;
     }
-    if let Some(expected) = criteria.long_clickable && node.long_clickable != Some(expected) {
+    if let Some(expected) = criteria.long_clickable
+        && node.long_clickable != Some(expected)
+    {
         return false;
     }
-    if let Some(expected) = criteria.scrollable && node.scrollable != Some(expected) {
+    if let Some(expected) = criteria.scrollable
+        && node.scrollable != Some(expected)
+    {
         return false;
     }
-    if let Some(expected) = criteria.enabled && node.enabled != Some(expected) {
+    if let Some(expected) = criteria.enabled
+        && node.enabled != Some(expected)
+    {
         return false;
     }
-    if let Some(expected) = criteria.focusable && node.focusable != Some(expected) {
+    if let Some(expected) = criteria.focusable
+        && node.focusable != Some(expected)
+    {
         return false;
     }
-    if let Some(expected) = criteria.focused && node.focused != Some(expected) {
+    if let Some(expected) = criteria.focused
+        && node.focused != Some(expected)
+    {
         return false;
     }
-    if let Some(expected) = criteria.selected && node.selected != Some(expected) {
+    if let Some(expected) = criteria.selected
+        && node.selected != Some(expected)
+    {
         return false;
     }
-    if let Some(expected) = criteria.index && node.index != Some(expected) {
+    if let Some(expected) = criteria.index
+        && node.index != Some(expected)
+    {
         return false;
     }
     true
@@ -1171,7 +1267,9 @@ fn parse_selector_segments(selector: &str) -> Result<Vec<SelectorSegment>, Strin
         index += prefix_len;
         let bytes = trimmed.as_bytes();
         if bytes.get(index).copied() != Some(b'"') {
-            return Err(format!("selector segment must use JSON string syntax: `{trimmed}`"));
+            return Err(format!(
+                "selector segment must use JSON string syntax: `{trimmed}`"
+            ));
         }
         let start = index;
         index += 1;
@@ -1361,7 +1459,9 @@ fn parse_xpath_criteria(selector: &str) -> Result<NodeCriteria, String> {
 
     let path = path.trim();
     let (node_pattern, predicates) = if let Some(start) = path.find('[') {
-        let end = path.rfind(']').ok_or_else(|| format!("unterminated XPath in `{selector}`"))?;
+        let end = path
+            .rfind(']')
+            .ok_or_else(|| format!("unterminated XPath in `{selector}`"))?;
         (&path[..start], Some(&path[start + 1..end]))
     } else {
         (path, None)
@@ -1695,6 +1795,25 @@ mod tests {
     }
 
     #[test]
+    fn detects_remote_apk_sources() {
+        assert!(is_remote_apk_source("https://example.com/app.apk"));
+        assert!(is_remote_apk_source("http://example.com/app.apk"));
+        assert!(!is_remote_apk_source("/tmp/app.apk"));
+    }
+
+    #[test]
+    fn resolves_local_apk_source() {
+        let apk_path = env::temp_dir().join("allwright-mobile-android-local-test.apk");
+        fs::write(&apk_path, b"apk").expect("write local apk fixture");
+
+        let resolved =
+            resolve_apk_source(apk_path.to_string_lossy().as_ref()).expect("resolve local apk");
+        assert_eq!(resolved.path, apk_path);
+
+        fs::remove_file(&apk_path).expect("remove local apk fixture");
+    }
+
+    #[test]
     fn dump_source_keeps_page_context_separate() {
         let page_session = MobilePageSessionHandle {
             page_id: "emulator-5554:dev.allwright.sample".to_string(),
@@ -1748,11 +1867,9 @@ mod tests {
             Some("com.example.airticket:id/bottom_nav_account")
         );
 
-        let by_resource = find_node_by_selector(
-            &nodes,
-            "resourceIdMatches=.*bottom_nav_.*,selected=true",
-        )
-        .expect("resource regex selector");
+        let by_resource =
+            find_node_by_selector(&nodes, "resourceIdMatches=.*bottom_nav_.*,selected=true")
+                .expect("resource regex selector");
         assert_eq!(
             by_resource.resource_id.as_deref(),
             Some("com.example.airticket:id/bottom_nav_account")

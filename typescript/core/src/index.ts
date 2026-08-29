@@ -41,6 +41,7 @@ export type {
   MobileAndroidConnectOptions,
   MobileAndroidDevice,
   MobileAndroidLaunchOptions,
+  MobileAndroidLocator,
   MobileAndroidPage,
   Locator,
   LocatorInfo,

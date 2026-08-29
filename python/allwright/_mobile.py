@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from ._bootstrap import ensure_plugins_installed, invoke_plugin
+from ._mobile_selectors import (
+    chain_mobile_selector_for_transport,
+    normalize_mobile_selector_for_transport,
+)
 from ._types import AllwrightError, ClickResult, CommandOptions, FillResult
 
 
@@ -46,6 +50,12 @@ class AndroidPage:
     def session_id(self) -> str:
         return str(self._page_session.get("page_id") or "")
 
+    def locator(self, selector: str) -> AndroidLocator:
+        return AndroidLocator(
+            page=self,
+            selector=normalize_mobile_selector_for_transport(selector),
+        )
+
     def click(self, selector: str, options: CommandOptions | None = None) -> ClickResult:
         payload = invoke_plugin(
             "mobile-android",
@@ -53,7 +63,7 @@ class AndroidPage:
                 "command": "click_element",
                 "browser_session": self._browser_session,
                 "page_session": self._page_session,
-                "selector": selector,
+                "selector": normalize_mobile_selector_for_transport(selector),
                 "timeout_ms": (options or CommandOptions()).timeout_ms,
             },
         )
@@ -76,7 +86,7 @@ class AndroidPage:
                 "command": "fill_element",
                 "browser_session": self._browser_session,
                 "page_session": self._page_session,
-                "selector": selector,
+                "selector": normalize_mobile_selector_for_transport(selector),
                 "value": value,
                 "timeout_ms": (options or CommandOptions()).timeout_ms,
             },
@@ -87,6 +97,24 @@ class AndroidPage:
             value=str(result.get("value") or ""),
             note=str(result.get("note") or ""),
         )
+
+
+@dataclass(slots=True)
+class AndroidLocator:
+    page: AndroidPage
+    selector: str
+
+    def locator(self, selector: str) -> AndroidLocator:
+        return AndroidLocator(
+            page=self.page,
+            selector=chain_mobile_selector_for_transport(self.selector, selector),
+        )
+
+    def click(self, options: CommandOptions | None = None) -> ClickResult:
+        return self.page.click(self.selector, options)
+
+    def fill(self, value: str, options: CommandOptions | None = None) -> FillResult:
+        return self.page.fill(self.selector, value, options)
 
 
 class AndroidDevice:

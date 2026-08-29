@@ -16,6 +16,10 @@ public final class AndroidPage {
         return String.valueOf(pageSession.getOrDefault("page_id", ""));
     }
 
+    public AndroidLocator locator(String selector) {
+        return new AndroidLocator(this, AndroidSelectorSupport.normalizeSelectorForTransport(selector));
+    }
+
     public ClickResult click(String selector) {
         return click(selector, new CommandOptions());
     }
@@ -25,7 +29,7 @@ public final class AndroidPage {
         payload.put("command", "click_element");
         payload.put("browser_session", browserSession);
         payload.put("page_session", pageSession);
-        payload.put("selector", selector);
+        payload.put("selector", AndroidSelectorSupport.normalizeSelectorForTransport(selector));
         payload.put("timeout_ms", options == null ? null : options.timeoutMs());
         String response = BootstrapSupport.invokePlugin("mobile-android", MobileJsonSupport.toJson(payload));
         Map<String, Object> result = AndroidSurface.mobileResult("click", response);
@@ -45,7 +49,7 @@ public final class AndroidPage {
         payload.put("command", "fill_element");
         payload.put("browser_session", browserSession);
         payload.put("page_session", pageSession);
-        payload.put("selector", selector);
+        payload.put("selector", AndroidSelectorSupport.normalizeSelectorForTransport(selector));
         payload.put("value", value);
         payload.put("timeout_ms", options == null ? null : options.timeoutMs());
         String response = BootstrapSupport.invokePlugin("mobile-android", MobileJsonSupport.toJson(payload));

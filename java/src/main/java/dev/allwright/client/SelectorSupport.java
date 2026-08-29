@@ -129,7 +129,7 @@ final class SelectorSupport {
         return candidate;
     }
 
-    private static String quoteJson(String value) {
+    static String quoteJson(String value) {
         StringBuilder builder = new StringBuilder(value.length() + 2);
         builder.append('"');
         for (int index = 0; index < value.length(); index++) {
@@ -155,7 +155,7 @@ final class SelectorSupport {
         return builder.toString();
     }
 
-    private static String unescapeJsonString(String value) {
+    static String unescapeJsonString(String value) {
         StringBuilder builder = new StringBuilder(value.length());
         for (int index = 0; index < value.length(); index++) {
             char ch = value.charAt(index);

@@ -152,8 +152,17 @@ export interface MobileAndroidLaunchOptions {
   timeoutMs?: number;
 }
 
+export interface MobileAndroidLocator {
+  readonly page: MobileAndroidPage;
+  readonly selector: string;
+  click(options?: CommandOptions): Promise<ClickResult>;
+  fill(value: string, options?: CommandOptions): Promise<FillResult>;
+  locator(selector: string): MobileAndroidLocator;
+}
+
 export interface MobileAndroidPage {
   readonly sessionId: string;
+  locator(selector: string): MobileAndroidLocator;
   click(selector: string, options?: CommandOptions): Promise<ClickResult>;
   fill(selector: string, value: string, options?: CommandOptions): Promise<FillResult>;
 }

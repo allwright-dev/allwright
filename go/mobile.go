@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 type MobileAndroidConnectOptions struct {
@@ -21,9 +22,34 @@ type MobileAndroidLaunchOptions struct {
 	Timeout          uint32
 }
 
+type mobileSelectorFlavor string
+
+const (
+	mobileSelectorFlavorCSS   mobileSelectorFlavor = "css"
+	mobileSelectorFlavorXPath mobileSelectorFlavor = "xpath"
+	mobileSelectorFlavorUIA   mobileSelectorFlavor = "uia"
+)
+
+var uiAutomatorSelectorKeys = map[string]struct{}{
+	"text": {}, "textcontains": {}, "textmatches": {}, "textstartswith": {},
+	"classname": {}, "classnamematches": {},
+	"description": {}, "desc": {}, "descriptioncontains": {}, "desccontains": {},
+	"descriptionmatches": {}, "descmatches": {}, "descriptionstartswith": {}, "descstartswith": {},
+	"checkable": {}, "checked": {}, "clickable": {}, "longclickable": {}, "scrollable": {},
+	"enabled": {}, "focusable": {}, "focused": {}, "selected": {},
+	"packagename": {}, "package": {}, "packagenamematches": {},
+	"resourceid": {}, "resourceidmatches": {},
+	"index": {}, "instance": {},
+}
+
 type AndroidPage struct {
 	browserSession map[string]any
 	pageSession    map[string]any
+}
+
+type AndroidLocator struct {
+	page     *AndroidPage
+	selector string
 }
 
 type AndroidDevice struct {
@@ -48,6 +74,16 @@ func (p *AndroidPage) SessionID() string {
 	return stringValueFromMap(p.pageSession, "page_id")
 }
 
+func (p *AndroidPage) Locator(selector string) *AndroidLocator {
+	if p == nil {
+		return nil
+	}
+	return &AndroidLocator{
+		page:     p,
+		selector: normalizeMobileSelectorForTransport(selector),
+	}
+}
+
 func (p *AndroidPage) Click(ctx context.Context, selector string, options ...CommandOptions) (*ClickResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("android page is nil")
@@ -56,7 +92,7 @@ func (p *AndroidPage) Click(ctx context.Context, selector string, options ...Com
 		"command":         "click_element",
 		"browser_session": p.browserSession,
 		"page_session":    p.pageSession,
-		"selector":        selector,
+		"selector":        normalizeMobileSelectorForTransport(selector),
 		"timeout_ms":      commandOptionsTimeoutMs(firstCommandOptions(options)),
 	})
 	if err != nil {
@@ -85,7 +121,7 @@ func (p *AndroidPage) Fill(ctx context.Context, selector string, value string, o
 		"command":         "fill_element",
 		"browser_session": p.browserSession,
 		"page_session":    p.pageSession,
-		"selector":        selector,
+		"selector":        normalizeMobileSelectorForTransport(selector),
 		"value":           value,
 		"timeout_ms":      commandOptionsTimeoutMs(firstCommandOptions(options)),
 	})
@@ -197,6 +233,162 @@ func newAndroidPage(browserSession map[string]any, pageSession map[string]any) *
 		browserSession: browserSession,
 		pageSession:    pageSession,
 	}
+}
+
+func (l *AndroidLocator) Page() *AndroidPage {
+	if l == nil {
+		return nil
+	}
+	return l.page
+}
+
+func (l *AndroidLocator) Selector() string {
+	if l == nil {
+		return ""
+	}
+	return l.selector
+}
+
+func (l *AndroidLocator) Locator(selector string) *AndroidLocator {
+	if l == nil {
+		return nil
+	}
+	return &AndroidLocator{
+		page:     l.page,
+		selector: chainMobileSelectorForTransport(l.selector, selector),
+	}
+}
+
+func (l *AndroidLocator) Click(ctx context.Context, options ...CommandOptions) (*ClickResult, error) {
+	if l == nil || l.page == nil {
+		return nil, fmt.Errorf("android locator page is nil")
+	}
+	return l.page.Click(ctx, l.selector, options...)
+}
+
+func (l *AndroidLocator) Fill(ctx context.Context, value string, options ...CommandOptions) (*FillResult, error) {
+	if l == nil || l.page == nil {
+		return nil, fmt.Errorf("android locator page is nil")
+	}
+	return l.page.Fill(ctx, l.selector, value, options...)
+}
+
+func parseExplicitMobileSelectorPrefix(selector string) (mobileSelectorFlavor, int, bool) {
+	lowered := strings.ToLower(selector)
+	if strings.HasPrefix(lowered, "xpath=") || strings.HasPrefix(lowered, "xpath:") {
+		return mobileSelectorFlavorXPath, 6, true
+	}
+	if strings.HasPrefix(lowered, "css=") || strings.HasPrefix(lowered, "css:") {
+		return mobileSelectorFlavorCSS, 4, true
+	}
+	if strings.HasPrefix(lowered, "uia=") || strings.HasPrefix(lowered, "uia:") {
+		return mobileSelectorFlavorUIA, 4, true
+	}
+	return "", 0, false
+}
+
+func parseUiAutomatorSelectorPrefix(selector string) int {
+	for index, char := range selector {
+		if char != '=' && char != ':' {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(selector[:index]))
+		if _, ok := uiAutomatorSelectorKeys[key]; ok {
+			return index + 1
+		}
+		return -1
+	}
+	return -1
+}
+
+func isNormalizedMobileTransportSelector(selector string) bool {
+	trimmed := strings.TrimSpace(selector)
+	if trimmed == "" {
+		return false
+	}
+
+	for index := 0; index < len(trimmed); {
+		_, prefixLen, ok := parseExplicitMobileSelectorPrefix(trimmed[index:])
+		if !ok {
+			return false
+		}
+		index += prefixLen
+
+		remainder := trimmed[index:]
+		jsonEnd := findJSONStringEnd(remainder)
+		if jsonEnd < 0 {
+			return false
+		}
+		index += jsonEnd
+		if index == len(trimmed) {
+			return true
+		}
+
+		whitespaceStart := index
+		for index < len(trimmed) && (trimmed[index] == ' ' || trimmed[index] == '\t' || trimmed[index] == '\n' || trimmed[index] == '\r') {
+			index++
+		}
+		if index == whitespaceStart {
+			return false
+		}
+		if _, _, ok := parseExplicitMobileSelectorPrefix(trimmed[index:]); !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+func parseMobileSelectorForTransport(selector string) (mobileSelectorFlavor, string) {
+	trimmed := strings.TrimSpace(selector)
+	if flavor, prefixLen, ok := parseExplicitMobileSelectorPrefix(trimmed); ok {
+		return flavor, decodeSelectorBody(trimmed[prefixLen:])
+	}
+	if prefixLen := parseUiAutomatorSelectorPrefix(trimmed); prefixLen > 0 {
+		return mobileSelectorFlavorUIA, trimmed[:prefixLen-1] + "=" + trimmed[prefixLen:]
+	}
+	if strings.HasPrefix(trimmed, "//") ||
+		strings.HasPrefix(trimmed, ".//") ||
+		strings.HasPrefix(trimmed, "../") ||
+		strings.HasPrefix(trimmed, "/") ||
+		strings.HasPrefix(trimmed, "(") {
+		return mobileSelectorFlavorXPath, trimmed
+	}
+	return mobileSelectorFlavorCSS, trimmed
+}
+
+func normalizeMobileSelectorForTransport(selector string) string {
+	trimmed := strings.TrimSpace(selector)
+	if trimmed == "" {
+		return ""
+	}
+	if isNormalizedMobileTransportSelector(trimmed) {
+		return trimmed
+	}
+	flavor, body := parseMobileSelectorForTransport(selector)
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Sprintf("%s=%q", flavor, body)
+	}
+	return fmt.Sprintf("%s=%s", flavor, encoded)
+}
+
+func chainMobileSelectorForTransport(parent string, child string) string {
+	parentSelector := ""
+	childSelector := ""
+	if strings.TrimSpace(parent) != "" {
+		parentSelector = normalizeMobileSelectorForTransport(parent)
+	}
+	if strings.TrimSpace(child) != "" {
+		childSelector = normalizeMobileSelectorForTransport(child)
+	}
+	if parentSelector == "" {
+		return childSelector
+	}
+	if childSelector == "" {
+		return parentSelector
+	}
+	return parentSelector + " " + childSelector
 }
 
 func decodeMobileResult(payload []byte, commandName string) (map[string]any, error) {

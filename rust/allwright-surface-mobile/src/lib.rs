@@ -462,7 +462,12 @@ pub fn parse_selector_for_transport(selector: &str) -> (SelectorFlavor, String) 
         );
     }
     if let Some(prefix_len) = uiautomator_selector_prefix_len(&lowered) {
-        return (SelectorFlavor::UiAutomator, trimmed[..prefix_len - 1].to_string() + "=" + &decode_selector_body(&trimmed[prefix_len..]));
+        return (
+            SelectorFlavor::UiAutomator,
+            trimmed[..prefix_len - 1].to_string()
+                + "="
+                + &decode_selector_body(&trimmed[prefix_len..]),
+        );
     }
     if lowered.starts_with("text=") || lowered.starts_with("text:") {
         let body = decode_selector_body(&trimmed[5..]);
