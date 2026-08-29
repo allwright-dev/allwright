@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ._bootstrap import ensure_plugins_installed, invoke_plugin
+from ._bootstrap import invoke_plugin
 from ._mobile_selectors import (
     chain_mobile_selector_for_transport,
     normalize_mobile_selector_for_transport,
@@ -162,7 +162,6 @@ class AndroidDevice:
 
 class AndroidSurface:
     def connect(self, options: MobileAndroidConnectOptions | None = None) -> AndroidDevice:
-        ensure_plugins_installed(["mobile-android"])
         resolved = options or MobileAndroidConnectOptions()
         payload = invoke_plugin(
             "mobile-android",

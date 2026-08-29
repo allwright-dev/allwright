@@ -1,146 +1,34 @@
-use crate::plugins::package;
+use crate::plugins::invoke_plugin;
 use allwright_plugin_sdk::{
-    ALLWRIGHT_PLUGIN_API_VERSION, BrowserKind, BrowserLaunchInfo, BrowserSessionHandle,
-    ChromeLaunchInfo, ChromeTabInfo, ChromiumBidiMapperInfo, ClickInfo, ElementCountInfo, FillInfo,
-    FocusInfo, HighlightElementsInfo, HoverInfo, PageInfo, PageSessionHandle, PluginCommand,
-    PluginEnvelope, PluginResult, PressKeyInfo, TabNavigationInfo, TextInfo, WaitForSelectorInfo,
+    BrowserKind, BrowserLaunchInfo, BrowserSessionHandle, ChromeLaunchInfo, ChromeTabInfo,
+    ChromiumBidiMapperInfo, ClickInfo, ElementCountInfo, FillInfo, FocusInfo,
+    HighlightElementsInfo, HoverInfo, PageInfo, PageSessionHandle, PluginCommand, PluginEnvelope,
+    PluginResult, PressKeyInfo, TabNavigationInfo, TextInfo, WaitForSelectorInfo,
 };
-use libloading::{Library, Symbol};
-use std::env;
-use std::ffi::{CStr, CString, c_char};
-use std::path::PathBuf;
-
-type PluginApiVersionFn = unsafe extern "C" fn() -> u32;
-type PluginIdFn = unsafe extern "C" fn() -> *const c_char;
-type PluginInvokeFn = unsafe extern "C" fn(*const c_char) -> *mut c_char;
-type PluginFreeStringFn = unsafe extern "C" fn(*mut c_char);
-
-fn plugin_home() -> Result<PathBuf, String> {
-    if let Ok(home) = env::var("ALLWRIGHT_HOME") {
-        return Ok(PathBuf::from(home));
-    }
-
-    let home =
-        env::var("HOME").map_err(|_| "HOME is not set and ALLWRIGHT_HOME was not provided")?;
-    Ok(PathBuf::from(home).join(".allwright"))
-}
-
-fn web_plugin_library_filename() -> &'static str {
-    match env::consts::OS {
-        "macos" => "liballwright_surface_web.dylib",
-        "linux" => "liballwright_surface_web.so",
-        "windows" => "allwright_surface_web.dll",
-        _ => "allwright_surface_web.unknown",
-    }
-}
-
-fn web_plugin_library_path() -> Result<PathBuf, String> {
-    Ok(plugin_home()?
-        .join("plugins")
-        .join("web")
-        .join("lib")
-        .join(web_plugin_library_filename()))
-}
 
 fn invoke_web(command: PluginCommand) -> Result<PluginResult, String> {
-    let library_path = web_plugin_library_path()?;
-    if !library_path.exists() {
-        return Err("web plugin is not installed".to_string());
-    }
-
     let request_json = serde_json::to_string(&command)
         .map_err(|error| format!("failed to encode plugin request: {error}"))?;
-    let request_cstr = CString::new(request_json)
-        .map_err(|error| format!("plugin request contains NUL: {error}"))?;
+    let response_json = invoke_plugin("web", &request_json)?;
+    let envelope: PluginEnvelope = serde_json::from_str(&response_json)
+        .map_err(|error| format!("failed to decode plugin response: {error}"))?;
 
-    let library = unsafe { Library::new(&library_path) }.map_err(|error| {
-        format!(
-            "failed to load web plugin library {:?}: {error}",
-            library_path
-        )
-    })?;
-
-    unsafe {
-        let api_version: Symbol<'_, PluginApiVersionFn> = library
-            .get(b"allwright_plugin_api_version")
-            .map_err(|error| format!("failed to load web plugin api version symbol: {error}"))?;
-        if api_version() != ALLWRIGHT_PLUGIN_API_VERSION {
-            return Err(format!(
-                "web plugin ABI version mismatch: expected {}, got {}",
-                ALLWRIGHT_PLUGIN_API_VERSION,
-                api_version()
-            ));
-        }
-
-        let plugin_id: Symbol<'_, PluginIdFn> = library
-            .get(b"allwright_plugin_id")
-            .map_err(|error| format!("failed to load web plugin id symbol: {error}"))?;
-        let raw_id = plugin_id();
-        if raw_id.is_null() {
-            return Err("web plugin returned a null plugin id".to_string());
-        }
-        let plugin_id = CStr::from_ptr(raw_id)
-            .to_str()
-            .map_err(|error| format!("web plugin id is not valid UTF-8: {error}"))?;
-        if plugin_id != "web" {
-            return Err(format!(
-                "unexpected plugin id `{plugin_id}` loaded for web surface"
-            ));
-        }
-
-        let invoke: Symbol<'_, PluginInvokeFn> = library
-            .get(b"allwright_plugin_invoke")
-            .map_err(|error| format!("failed to load web plugin invoke symbol: {error}"))?;
-        let free_string: Symbol<'_, PluginFreeStringFn> = library
-            .get(b"allwright_plugin_free_string")
-            .map_err(|error| format!("failed to load web plugin free-string symbol: {error}"))?;
-
-        let response_ptr = invoke(request_cstr.as_ptr());
-        if response_ptr.is_null() {
-            return Err("web plugin returned a null response".to_string());
-        }
-
-        let response_json = CStr::from_ptr(response_ptr)
-            .to_str()
-            .map_err(|error| format!("web plugin response is not valid UTF-8: {error}"))?
-            .to_string();
-        free_string(response_ptr);
-
-        let envelope: PluginEnvelope = serde_json::from_str(&response_json)
-            .map_err(|error| format!("failed to decode plugin response: {error}"))?;
-
-        if envelope.ok {
-            envelope
-                .result
-                .ok_or_else(|| "web plugin returned success without a result payload".to_string())
-        } else {
-            Err(envelope
-                .error
-                .unwrap_or_else(|| "web plugin returned an unknown error".to_string()))
-        }
+    if envelope.ok {
+        envelope
+            .result
+            .ok_or_else(|| "web plugin returned success without a result payload".to_string())
+    } else {
+        Err(envelope
+            .error
+            .unwrap_or_else(|| "web plugin returned an unknown error".to_string()))
     }
-}
-
-fn plugin_required_error(plugin_id: &str, command_name: &str) -> String {
-    let package_name = package(plugin_id)
-        .map(|package| package.package_name)
-        .unwrap_or("plugin");
-    format!(
-        "{command_name} requires the `{plugin_id}` surface plugin. Install it with `allwright plugin install {plugin_id}` to download `{package_name}`."
-    )
 }
 
 async fn invoke_web_expected(
-    command_name: &str,
+    _command_name: &str,
     command: PluginCommand,
 ) -> Result<PluginResult, String> {
-    tokio::task::block_in_place(move || match invoke_web(command) {
-        Ok(result) => Ok(result),
-        Err(error) if error == "web plugin is not installed" => {
-            Err(plugin_required_error("web", command_name))
-        }
-        Err(error) => Err(error),
-    })
+    tokio::task::block_in_place(move || invoke_web(command))
 }
 
 pub async fn open_chrome_window(chrome_binary: Option<&str>) -> Result<ChromeLaunchInfo, String> {
@@ -467,14 +355,7 @@ pub async fn open_chrome_tab(cdp_websocket_url: &str) -> Result<ChromeTabInfo, S
 
 pub fn close_browser_process(process_id: u32) -> Result<(), String> {
     match tokio::task::block_in_place(|| {
-        let command = PluginCommand::CloseBrowserProcess { process_id };
-        match invoke_web(command) {
-            Ok(result) => Ok(result),
-            Err(error) if error == "web plugin is not installed" => {
-                Err(plugin_required_error("web", "CloseBrowserSessionCommand"))
-            }
-            Err(error) => Err(error),
-        }
+        invoke_web(PluginCommand::CloseBrowserProcess { process_id })
     })? {
         PluginResult::CloseBrowserProcess => Ok(()),
         _ => Err("web plugin returned an unexpected response for CloseBrowserProcess".to_string()),

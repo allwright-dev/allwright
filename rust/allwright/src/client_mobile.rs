@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::bootstrap::{ensure_plugins_installed, invoke_plugin};
+use super::bootstrap::invoke_plugin;
 use super::types::{ClickResult, CommandOptions, Error, FillResult, Result};
 
 #[derive(Debug, Clone, Default)]
@@ -82,7 +82,6 @@ pub mod android {
     use super::*;
 
     pub fn connect(options: MobileAndroidConnectOptions) -> Result<AndroidDevice> {
-        ensure_plugins_installed(&["mobile-android"])?;
         let request = serde_json::json!({
             "command": "connect",
             "platform": "android",

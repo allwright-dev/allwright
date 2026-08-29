@@ -197,9 +197,6 @@ func (d *AndroidDevice) Launch(ctx context.Context, options MobileAndroidLaunchO
 }
 
 func (AndroidSurface) Connect(ctx context.Context, options MobileAndroidConnectOptions) (*AndroidDevice, error) {
-	if err := ensurePluginsInstalled([]string{"mobile-android"}); err != nil {
-		return nil, err
-	}
 	request, err := json.Marshal(map[string]any{
 		"command":            "connect",
 		"platform":           "android",

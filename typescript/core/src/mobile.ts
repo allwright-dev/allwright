@@ -1,4 +1,4 @@
-import { ensurePluginsInstalled, invokePlugin } from "./bootstrap.js";
+import { invokePlugin } from "./bootstrap.js";
 import { chainMobileSelectorForTransport, normalizeMobileSelectorForTransport } from "./mobileSelectors.js";
 import type {
   ClickResult,
@@ -187,7 +187,6 @@ class MobileAndroidDeviceImpl implements MobileAndroidDevice {
 
 class MobileAndroidSurfaceImpl {
   async connect(options: MobileAndroidConnectOptions = {}): Promise<MobileAndroidDevice> {
-    await ensurePluginsInstalled(["mobile-android"]);
     const connectInfo = await invokeAndroidExpected<MobileConnectInfo>("connect", {
       command: "connect",
       platform: "android",

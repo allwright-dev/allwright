@@ -64,8 +64,6 @@ def ensure_runtime_ready(server_addr: str) -> str:
             _managed_server_addr = None
             _managed_server_base_addr = None
 
-        cli_path = ensure_cli_available(expected_version)
-        ensure_plugins_installed_with_cli(cli_path, expected_version, ["web"])
         resolved_server_addr = normalized
         if status is not None and status["version"] != expected_version:
             resolved_server_addr = allocate_managed_server_addr(normalized)

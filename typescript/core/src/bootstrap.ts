@@ -70,14 +70,12 @@ export async function ensureRuntimeReady(serverAddr: string): Promise<string> {
     managedServerSpawnError = null;
   }
 
-  const cliPath = await ensureCliAvailable(expectedVersion);
-  ensurePluginsInstalledWithCli(cliPath, expectedVersion, ["web"]);
-
   let resolvedServerAddr = serverAddr;
   if (status && status.version !== expectedVersion) {
     resolvedServerAddr = await allocateManagedServerAddr(serverAddr);
   }
 
+  const cliPath = await ensureCliAvailable(expectedVersion);
   managedServer = spawn(cliPath, ["serve", "--listen-addr", cliListenAddr(resolvedServerAddr)], {
     stdio: ["ignore", "pipe", "pipe"],
   });

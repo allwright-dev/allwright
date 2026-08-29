@@ -81,6 +81,13 @@ func (b *tailBuffer) String() string {
 
 func ensureRuntimeReady(ctx context.Context, serverAddr string) (string, error) {
 	expectedVersion := expectedRuntimeVersion()
+	cliPath, err := ensureCLIAvailable(expectedVersion)
+	if err != nil {
+		return "", err
+	}
+	if err := ensurePluginsInstalledWithCLI(cliPath, expectedVersion, []string{"web"}); err != nil {
+		return "", err
+	}
 	if status, err := pingServer(ctx, serverAddr); err == nil {
 		if status.version == expectedVersion {
 			return serverAddr, nil
@@ -117,14 +124,6 @@ func ensureRuntimeReady(ctx context.Context, serverAddr string) (string, error) 
 
 	if managedServerAddr != "" {
 		return waitForServer(ctx, managedServerAddr, expectedVersion)
-	}
-
-	cliPath, err := ensureCLIAvailable(expectedVersion)
-	if err != nil {
-		return "", err
-	}
-	if err := ensurePluginsInstalledWithCLI(cliPath, expectedVersion, []string{"web"}); err != nil {
-		return "", err
 	}
 
 	resolvedServerAddr := serverAddr

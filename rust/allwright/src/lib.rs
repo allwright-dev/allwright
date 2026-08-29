@@ -5,6 +5,8 @@ mod client;
 mod engine_lib;
 #[cfg(feature = "server")]
 mod plugin_loader;
+#[cfg(feature = "server")]
+mod plugin_runtime;
 
 pub mod proto {
     include!("proto_generated.rs");
@@ -12,6 +14,11 @@ pub mod proto {
 }
 
 pub mod plugins {
+    #[cfg(feature = "server")]
+    pub use crate::plugin_runtime::{
+        InstalledPlugin, ensure_plugin_available, install_plugin, installed_plugins, invoke_plugin,
+        plugin_runtime_artifact_path,
+    };
     pub use allwright_plugin_sdk::{SurfaceFamily, SurfacePluginDescriptor};
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]

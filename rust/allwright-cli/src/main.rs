@@ -82,7 +82,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 fn handle_plugin_command(command: PluginCommand) -> Result<(), Box<dyn Error>> {
     match command {
         PluginCommand::List => {
-            let installed = read_installed_plugins()?;
+            let installed = allwright::plugins::installed_plugins()
+                .map_err(|error| -> Box<dyn Error> { error.into() })?;
             for plugin in allwright::plugins::catalog() {
                 let status = installed
                     .iter()
@@ -105,38 +106,22 @@ fn handle_plugin_command(command: PluginCommand) -> Result<(), Box<dyn Error>> {
                 vec![plugin.as_str()]
             };
 
-            let mut installed = read_installed_plugins()?;
             for plugin_id in targets {
-                let package = allwright::plugins::package(plugin_id).ok_or_else(|| {
-                    let supported = allwright::plugins::catalog()
-                        .iter()
-                        .map(|plugin| plugin.id)
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    format!("unknown plugin `{plugin_id}`. Supported plugins: {supported}, all")
-                })?;
-                ensure_plugin_install_supported(package.id)?;
-                let target_version = version.as_deref().unwrap_or(package.version);
-                install_plugin_package(package.package_name, target_version, package.id)?;
-                upsert_plugin(
-                    &mut installed,
-                    package.id,
-                    package.package_name,
-                    target_version,
-                );
+                let installed = allwright::plugins::install_plugin(plugin_id, version.as_deref())
+                    .map_err(|error| -> Box<dyn Error> { error.into() })?;
                 println!(
                     "Installed plugin `{}` -> {}@{}",
-                    package.id, package.package_name, target_version
+                    installed.id, installed.package_name, installed.version
                 );
             }
-            write_installed_plugins(&installed)?;
             println!("Plugin manifest: {}", plugin_manifest_path()?.display());
         }
         PluginCommand::Invoke {
             plugin,
             request_json,
         } => {
-            let response = invoke_installed_plugin(&plugin, &request_json)?;
+            let response = allwright::plugins::invoke_plugin(&plugin, &request_json)
+                .map_err(|error| -> Box<dyn Error> { error.into() })?;
             print!("{response}");
             std::io::stdout().flush()?;
         }

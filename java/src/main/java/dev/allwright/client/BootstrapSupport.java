@@ -74,12 +74,11 @@ final class BootstrapSupport {
 
         shutdownManagedServer();
 
-        Path cliPath = ensureCliAvailable(expectedVersion);
-        ensurePluginsInstalledWithCli(cliPath, expectedVersion, "web");
         String resolvedServerAddr = normalized;
         if (status != null && !status.version().equals(expectedVersion)) {
             resolvedServerAddr = allocateManagedServerAddr(normalized);
         }
+        Path cliPath = ensureCliAvailable(expectedVersion);
 
         try {
             managedServer = new ProcessBuilder(

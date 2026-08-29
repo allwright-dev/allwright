@@ -12,7 +12,6 @@ public final class AndroidSurface {
     }
 
     public AndroidDevice connect(MobileAndroidConnectOptions options) {
-        BootstrapSupport.ensurePluginsInstalled("mobile-android");
         MobileAndroidConnectOptions resolved = options == null ? new MobileAndroidConnectOptions() : options;
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("command", "connect");

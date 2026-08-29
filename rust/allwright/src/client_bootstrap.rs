@@ -110,14 +110,13 @@ pub(crate) async fn ensure_runtime_ready(server_addr: &str) -> Result<String> {
     };
 
     {
-        let expected_version_for_install = expected_version.clone();
-        let cli_path = tokio::task::spawn_blocking(move || {
-            let cli_path = ensure_cli_available(&expected_version_for_install)?;
-            ensure_plugins_installed_with_cli(&cli_path, &expected_version_for_install, &["web"])?;
-            Ok::<PathBuf, Error>(cli_path)
-        })
-        .await
-        .map_err(|error| Error::new(format!("allwright bootstrap task failed: {error}")))??;
+        let expected_version_for_cli = expected_version.clone();
+        let cli_path =
+            tokio::task::spawn_blocking(move || ensure_cli_available(&expected_version_for_cli))
+                .await
+                .map_err(|error| {
+                    Error::new(format!("allwright bootstrap task failed: {error}"))
+                })??;
         let listen_addr = cli_listen_addr(&resolved_addr);
         let child = Command::new(&cli_path)
             .arg("serve")
