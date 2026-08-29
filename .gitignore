@@ -44,6 +44,12 @@ node_modules/
 /allwright-dev/out/
 /allwright-dev/*.tsbuildinfo
 .allwright-dev/
+
+# env files (never commit secrets/config; .env.example files are kept)
+.env
+.env.local
+.env.*.local
+
 # Editor and OS noise
 .DS_Store
 .idea/

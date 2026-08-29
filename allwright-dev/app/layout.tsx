@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
+import { GoogleAnalytics } from "@next/third-parties/google";
 
 import "./globals.css";
 import {
@@ -79,6 +80,12 @@ export const viewport: Viewport = {
   ],
 };
 
+// Single env var drives Google Analytics: set NEXT_PUBLIC_GA_ID (a GA4
+// measurement ID, e.g. "G-XXXXXXXXXX") to turn it on. Unset it — locally,
+// in preview deploys, wherever — and analytics stays off with no code
+// changes.
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -98,6 +105,7 @@ export default function RootLayout({
           </div>
         </ThemeProvider>
       </body>
+      {GA_ID ? <GoogleAnalytics gaId={GA_ID} /> : null}
     </html>
   );
 }
