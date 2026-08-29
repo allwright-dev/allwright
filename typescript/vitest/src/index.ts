@@ -38,6 +38,9 @@ export interface AllwrightVitestFixtures {
   androidPage: MobileAndroidPage;
 }
 
+const DEFAULT_ANDROID_CONNECT_TIMEOUT_MS = 30_000;
+const DEFAULT_ANDROID_LAUNCH_TIMEOUT_MS = 60_000;
+
 export interface RetryExpectationOptions {
   timeoutMs?: number;
   intervalMs?: number;
@@ -161,7 +164,9 @@ function resolveAndroidConnectOptions(
     device: options.android?.connectOptions?.device ?? config.mobile.android?.device,
     adbEndpoint: options.android?.connectOptions?.adbEndpoint,
     preserveAppState: options.android?.connectOptions?.preserveAppState ?? false,
-    timeoutMs: options.android?.connectOptions?.timeoutMs,
+    timeoutMs:
+      options.android?.connectOptions?.timeoutMs ??
+      DEFAULT_ANDROID_CONNECT_TIMEOUT_MS,
   };
 }
 
@@ -175,7 +180,9 @@ function resolveAndroidLaunchOptions(
     launchActivity:
       options.android?.launchOptions?.launchActivity ?? config.mobile.android?.appActivity,
     stopBeforeLaunch: options.android?.launchOptions?.stopBeforeLaunch ?? false,
-    timeoutMs: options.android?.launchOptions?.timeoutMs,
+    timeoutMs:
+      options.android?.launchOptions?.timeoutMs ??
+      DEFAULT_ANDROID_LAUNCH_TIMEOUT_MS,
   };
 
   if (!launchOptions.apkPath && !launchOptions.appId) {
