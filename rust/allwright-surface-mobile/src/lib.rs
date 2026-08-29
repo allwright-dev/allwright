@@ -136,6 +136,7 @@ pub struct MobileConnectInfo {
 pub enum SelectorFlavor {
     Css,
     XPath,
+    UiAutomator,
 }
 
 impl SelectorFlavor {
@@ -143,9 +144,43 @@ impl SelectorFlavor {
         match self {
             Self::Css => "css",
             Self::XPath => "xpath",
+            Self::UiAutomator => "uia",
         }
     }
 }
+
+const UIAUTOMATOR_SELECTOR_KEYS: &[&str] = &[
+    "text",
+    "textcontains",
+    "textmatches",
+    "textstartswith",
+    "classname",
+    "classnamematches",
+    "description",
+    "desc",
+    "descriptioncontains",
+    "desccontains",
+    "descriptionmatches",
+    "descmatches",
+    "descriptionstartswith",
+    "descstartswith",
+    "checkable",
+    "checked",
+    "clickable",
+    "longclickable",
+    "scrollable",
+    "enabled",
+    "focusable",
+    "focused",
+    "selected",
+    "packagename",
+    "package",
+    "packagenamematches",
+    "resourceid",
+    "resourceidmatches",
+    "index",
+    "instance",
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MobileLocator {
@@ -287,6 +322,15 @@ fn parse_explicit_selector_prefix(selector: &str) -> Option<(SelectorFlavor, usi
     if lowered.starts_with("xpath=") || lowered.starts_with("xpath:") {
         return Some((SelectorFlavor::XPath, 6));
     }
+    if lowered.starts_with("uia=") || lowered.starts_with("uia:") {
+        return Some((SelectorFlavor::UiAutomator, 4));
+    }
+    if let Some(prefix_len) = uiautomator_selector_prefix_len(&lowered) {
+        return Some((SelectorFlavor::UiAutomator, prefix_len));
+    }
+    if lowered.starts_with("text=") || lowered.starts_with("text:") {
+        return Some((SelectorFlavor::UiAutomator, 5));
+    }
     if lowered.starts_with("id=") || lowered.starts_with("id:") {
         return Some((SelectorFlavor::Css, 3));
     }
@@ -294,6 +338,18 @@ fn parse_explicit_selector_prefix(selector: &str) -> Option<(SelectorFlavor, usi
         return Some((SelectorFlavor::Css, 4));
     }
     None
+}
+
+fn uiautomator_selector_prefix_len(lowered: &str) -> Option<usize> {
+    UIAUTOMATOR_SELECTOR_KEYS.iter().find_map(|key| {
+        if lowered.starts_with(key) {
+            let separator = lowered.as_bytes().get(key.len()).copied()?;
+            if separator == b'=' || separator == b':' {
+                return Some(key.len() + 1);
+            }
+        }
+        None
+    })
 }
 
 fn find_json_string_end(value: &str) -> Option<usize> {
@@ -399,6 +455,19 @@ pub fn parse_selector_for_transport(selector: &str) -> (SelectorFlavor, String) 
     if lowered.starts_with("xpath=") || lowered.starts_with("xpath:") {
         return (SelectorFlavor::XPath, decode_selector_body(&trimmed[6..]));
     }
+    if lowered.starts_with("uia=") || lowered.starts_with("uia:") {
+        return (
+            SelectorFlavor::UiAutomator,
+            decode_selector_body(&trimmed[4..]),
+        );
+    }
+    if let Some(prefix_len) = uiautomator_selector_prefix_len(&lowered) {
+        return (SelectorFlavor::UiAutomator, trimmed[..prefix_len - 1].to_string() + "=" + &decode_selector_body(&trimmed[prefix_len..]));
+    }
+    if lowered.starts_with("text=") || lowered.starts_with("text:") {
+        let body = decode_selector_body(&trimmed[5..]);
+        return (SelectorFlavor::UiAutomator, format!("text={body}"));
+    }
     if lowered.starts_with("id=") || lowered.starts_with("id:") {
         let body = decode_selector_body(&trimmed[3..]);
         let normalized = if body.starts_with('#') {
@@ -486,6 +555,30 @@ mod tests {
         assert_eq!(
             normalize_selector_for_transport(r"Id=bottom\_nav\_account"),
             "css=\"#bottom_nav_account\""
+        );
+        assert_eq!(
+            normalize_selector_for_transport("text=Account"),
+            "uia=\"text=Account\""
+        );
+        assert_eq!(
+            normalize_selector_for_transport("textContains=Account"),
+            "uia=\"textContains=Account\""
+        );
+        assert_eq!(
+            normalize_selector_for_transport("resourceId=com.example:id/login"),
+            "uia=\"resourceId=com.example:id/login\""
+        );
+        assert_eq!(
+            normalize_selector_for_transport("descriptionContains=Account"),
+            "uia=\"descriptionContains=Account\""
+        );
+        assert_eq!(
+            normalize_selector_for_transport("selected=true"),
+            "uia=\"selected=true\""
+        );
+        assert_eq!(
+            normalize_selector_for_transport("classNameMatches=android\\.widget\\..*"),
+            "uia=\"classNameMatches=android\\\\.widget\\\\..*\""
         );
     }
 

@@ -10,6 +10,7 @@ Current design direction:
 - Resolve `connect` through ADB device discovery: use the requested device name or serial when provided, otherwise attach to the first available Android device or emulator.
 - Keep page-scoped commands aligned with `web`. The first implemented cut is `connect`, `launch_app`, `click_element`, and `fill_element`.
 - Reuse the same selector transport convention clients already know: `css=...` and `xpath=...`, including chained locator segments.
+- Accept UiAutomator2-style selector strategies directly from clients, including `text=...`, `textContains=...`, `textStartsWith=...`, `textMatches=...`, `description=...`, `descriptionContains=...`, `descriptionStartsWith=...`, `descriptionMatches=...`, `className=...`, `classNameMatches=...`, `resourceId=...`, `resourceIdMatches=...`, `packageName=...`, `packageNameMatches=...`, state flags such as `clickable=true` or `selected=true`, plus `index=` and `instance=`.
 - Bootstrap sessions through connected devices or emulators discovered over ADB.
 - Ship a standalone runtime artifact so `allwright plugin install mobile-android` can download the plugin library from GitHub Releases.
 

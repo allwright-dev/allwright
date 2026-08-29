@@ -112,6 +112,7 @@ version = "0.0.46"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
+ "regex",
  "serde",
  "serde_json",
  "tokio",

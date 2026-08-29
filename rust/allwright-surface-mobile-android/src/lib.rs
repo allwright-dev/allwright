@@ -9,6 +9,7 @@ use allwright_surface_mobile::{
     MobileRuntimeReadiness, MobileSurfaceProfile, RuntimeMaturity, boot_surface,
     normalize_selector_for_transport,
 };
+use regex::Regex;
 use std::env;
 use std::ffi::{CStr, CString, c_char};
 use std::fmt;
@@ -99,8 +100,19 @@ struct ForegroundAppInfo {
 struct AndroidUiNode {
     class_name: Option<String>,
     resource_id: Option<String>,
+    package_name: Option<String>,
     text: Option<String>,
     content_desc: Option<String>,
+    checkable: Option<bool>,
+    checked: Option<bool>,
+    clickable: Option<bool>,
+    long_clickable: Option<bool>,
+    scrollable: Option<bool>,
+    enabled: Option<bool>,
+    focusable: Option<bool>,
+    focused: Option<bool>,
+    selected: Option<bool>,
+    index: Option<usize>,
     bounds: Option<AndroidBounds>,
     parent_index: Option<usize>,
 }
@@ -123,6 +135,7 @@ impl AndroidBounds {
 enum SelectorFlavorInternal {
     Css,
     XPath,
+    UiAutomator,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -134,10 +147,31 @@ struct SelectorSegment {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct NodeCriteria {
     class_name: Option<String>,
+    class_name_matches: Option<String>,
     resource_id_exact: Option<String>,
     resource_id_suffix: Option<String>,
+    resource_id_matches: Option<String>,
+    package_name: Option<String>,
+    package_name_matches: Option<String>,
     text: Option<String>,
+    text_contains: Option<String>,
+    text_starts_with: Option<String>,
+    text_matches: Option<String>,
     content_desc: Option<String>,
+    content_desc_contains: Option<String>,
+    content_desc_starts_with: Option<String>,
+    content_desc_matches: Option<String>,
+    checkable: Option<bool>,
+    checked: Option<bool>,
+    clickable: Option<bool>,
+    long_clickable: Option<bool>,
+    scrollable: Option<bool>,
+    enabled: Option<bool>,
+    focusable: Option<bool>,
+    focused: Option<bool>,
+    selected: Option<bool>,
+    index: Option<usize>,
+    instance: Option<usize>,
 }
 
 impl SurfacePlugin for MobileAndroidPlugin {
@@ -841,8 +875,21 @@ fn parse_android_ui_nodes(xml: &str) -> Result<Vec<AndroidUiNode>, String> {
             let node = AndroidUiNode {
                 class_name: attributes.get("class").cloned(),
                 resource_id: attributes.get("resource-id").cloned(),
+                package_name: attributes.get("package").cloned(),
                 text: attributes.get("text").cloned(),
                 content_desc: attributes.get("content-desc").cloned(),
+                checkable: attributes.get("checkable").and_then(|value| parse_bool(value)),
+                checked: attributes.get("checked").and_then(|value| parse_bool(value)),
+                clickable: attributes.get("clickable").and_then(|value| parse_bool(value)),
+                long_clickable: attributes
+                    .get("long-clickable")
+                    .and_then(|value| parse_bool(value)),
+                scrollable: attributes.get("scrollable").and_then(|value| parse_bool(value)),
+                enabled: attributes.get("enabled").and_then(|value| parse_bool(value)),
+                focusable: attributes.get("focusable").and_then(|value| parse_bool(value)),
+                focused: attributes.get("focused").and_then(|value| parse_bool(value)),
+                selected: attributes.get("selected").and_then(|value| parse_bool(value)),
+                index: attributes.get("index").and_then(|value| value.parse().ok()),
                 bounds: attributes
                     .get("bounds")
                     .and_then(|value| parse_bounds(value)),
@@ -917,6 +964,14 @@ fn decode_xml_entities(value: &str) -> String {
         .replace("&amp;", "&")
 }
 
+fn parse_bool(value: &str) -> Option<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
+    }
+}
+
 fn parse_bounds(value: &str) -> Option<AndroidBounds> {
     let trimmed = value.trim();
     let trimmed = trimmed.strip_prefix('[')?;
@@ -942,16 +997,20 @@ fn find_node_by_selector<'a>(
         .map(selector_segment_to_criteria)
         .collect::<Result<Vec<_>, _>>()
         .ok()?;
-
-    nodes.iter().enumerate().find_map(|(index, node)| {
-        if !node_matches_criteria(node, criteria.last()?) {
-            return None;
+    let last = criteria.last()?;
+    let mut matches = Vec::new();
+    for (index, node) in nodes.iter().enumerate() {
+        if !node_matches_criteria(node, last) {
+            continue;
         }
         if ancestor_chain_matches(nodes, index, &criteria[..criteria.len().saturating_sub(1)]) {
-            return Some(node);
+            matches.push(node);
         }
-        None
-    })
+    }
+    if let Some(instance) = last.instance {
+        return matches.get(instance).copied();
+    }
+    matches.into_iter().next()
 }
 
 fn ancestor_chain_matches(
@@ -987,6 +1046,11 @@ fn node_matches_criteria(node: &AndroidUiNode, criteria: &NodeCriteria) -> bool 
     {
         return false;
     }
+    if let Some(pattern) = criteria.class_name_matches.as_deref()
+        && !matches_regex(node.class_name.as_deref(), pattern)
+    {
+        return false;
+    }
     if let Some(expected) = criteria.resource_id_exact.as_deref()
         && node.resource_id.as_deref() != Some(expected)
     {
@@ -1000,14 +1064,89 @@ fn node_matches_criteria(node: &AndroidUiNode, criteria: &NodeCriteria) -> bool 
             return false;
         }
     }
+    if let Some(pattern) = criteria.resource_id_matches.as_deref()
+        && !matches_regex(node.resource_id.as_deref(), pattern)
+    {
+        return false;
+    }
+    if let Some(expected) = criteria.package_name.as_deref()
+        && node.package_name.as_deref() != Some(expected)
+    {
+        return false;
+    }
+    if let Some(pattern) = criteria.package_name_matches.as_deref()
+        && !matches_regex(node.package_name.as_deref(), pattern)
+    {
+        return false;
+    }
     if let Some(expected) = criteria.text.as_deref()
         && node.text.as_deref() != Some(expected)
+    {
+        return false;
+    }
+    if let Some(expected) = criteria.text_contains.as_deref()
+        && !contains_text(node.text.as_deref(), expected)
+    {
+        return false;
+    }
+    if let Some(expected) = criteria.text_starts_with.as_deref()
+        && !starts_with_text(node.text.as_deref(), expected)
+    {
+        return false;
+    }
+    if let Some(pattern) = criteria.text_matches.as_deref()
+        && !matches_regex(node.text.as_deref(), pattern)
     {
         return false;
     }
     if let Some(expected) = criteria.content_desc.as_deref()
         && node.content_desc.as_deref() != Some(expected)
     {
+        return false;
+    }
+    if let Some(expected) = criteria.content_desc_contains.as_deref()
+        && !contains_text(node.content_desc.as_deref(), expected)
+    {
+        return false;
+    }
+    if let Some(expected) = criteria.content_desc_starts_with.as_deref()
+        && !starts_with_text(node.content_desc.as_deref(), expected)
+    {
+        return false;
+    }
+    if let Some(pattern) = criteria.content_desc_matches.as_deref()
+        && !matches_regex(node.content_desc.as_deref(), pattern)
+    {
+        return false;
+    }
+    if let Some(expected) = criteria.checkable && node.checkable != Some(expected) {
+        return false;
+    }
+    if let Some(expected) = criteria.checked && node.checked != Some(expected) {
+        return false;
+    }
+    if let Some(expected) = criteria.clickable && node.clickable != Some(expected) {
+        return false;
+    }
+    if let Some(expected) = criteria.long_clickable && node.long_clickable != Some(expected) {
+        return false;
+    }
+    if let Some(expected) = criteria.scrollable && node.scrollable != Some(expected) {
+        return false;
+    }
+    if let Some(expected) = criteria.enabled && node.enabled != Some(expected) {
+        return false;
+    }
+    if let Some(expected) = criteria.focusable && node.focusable != Some(expected) {
+        return false;
+    }
+    if let Some(expected) = criteria.focused && node.focused != Some(expected) {
+        return false;
+    }
+    if let Some(expected) = criteria.selected && node.selected != Some(expected) {
+        return false;
+    }
+    if let Some(expected) = criteria.index && node.index != Some(expected) {
         return false;
     }
     true
@@ -1024,6 +1163,8 @@ fn parse_selector_segments(selector: &str) -> Result<Vec<SelectorSegment>, Strin
             (SelectorFlavorInternal::Css, 4usize)
         } else if remainder.starts_with("xpath=") {
             (SelectorFlavorInternal::XPath, 6usize)
+        } else if remainder.starts_with("uia=") {
+            (SelectorFlavorInternal::UiAutomator, 4usize)
         } else {
             return Err(format!("unsupported selector segment in `{trimmed}`"));
         };
@@ -1065,7 +1206,102 @@ fn selector_segment_to_criteria(segment: &SelectorSegment) -> Result<NodeCriteri
     match segment.flavor {
         SelectorFlavorInternal::Css => parse_css_criteria(&segment.value),
         SelectorFlavorInternal::XPath => parse_xpath_criteria(&segment.value),
+        SelectorFlavorInternal::UiAutomator => parse_uiautomator_criteria(&segment.value),
     }
+}
+
+fn parse_uiautomator_criteria(selector: &str) -> Result<NodeCriteria, String> {
+    let mut criteria = NodeCriteria::default();
+    for token in split_uiautomator_tokens(selector) {
+        let (raw_key, raw_value) = split_uiautomator_token(&token)?;
+        let key = raw_key.to_ascii_lowercase();
+        match key.as_str() {
+            "text" => criteria.text = Some(raw_value.to_string()),
+            "textcontains" => criteria.text_contains = Some(raw_value.to_string()),
+            "textstartswith" => criteria.text_starts_with = Some(raw_value.to_string()),
+            "textmatches" => criteria.text_matches = Some(raw_value.to_string()),
+            "classname" => criteria.class_name = Some(raw_value.to_string()),
+            "classnamematches" => criteria.class_name_matches = Some(raw_value.to_string()),
+            "description" | "desc" => criteria.content_desc = Some(raw_value.to_string()),
+            "descriptioncontains" | "desccontains" => {
+                criteria.content_desc_contains = Some(raw_value.to_string())
+            }
+            "descriptionstartswith" | "descstartswith" => {
+                criteria.content_desc_starts_with = Some(raw_value.to_string())
+            }
+            "descriptionmatches" | "descmatches" => {
+                criteria.content_desc_matches = Some(raw_value.to_string())
+            }
+            "packagename" | "package" => criteria.package_name = Some(raw_value.to_string()),
+            "packagenamematches" => criteria.package_name_matches = Some(raw_value.to_string()),
+            "resourceid" => criteria.resource_id_exact = Some(raw_value.to_string()),
+            "resourceidmatches" => criteria.resource_id_matches = Some(raw_value.to_string()),
+            "checkable" => criteria.checkable = Some(parse_selector_bool(raw_value, &token)?),
+            "checked" => criteria.checked = Some(parse_selector_bool(raw_value, &token)?),
+            "clickable" => criteria.clickable = Some(parse_selector_bool(raw_value, &token)?),
+            "longclickable" => {
+                criteria.long_clickable = Some(parse_selector_bool(raw_value, &token)?)
+            }
+            "scrollable" => criteria.scrollable = Some(parse_selector_bool(raw_value, &token)?),
+            "enabled" => criteria.enabled = Some(parse_selector_bool(raw_value, &token)?),
+            "focusable" => criteria.focusable = Some(parse_selector_bool(raw_value, &token)?),
+            "focused" => criteria.focused = Some(parse_selector_bool(raw_value, &token)?),
+            "selected" => criteria.selected = Some(parse_selector_bool(raw_value, &token)?),
+            "index" => criteria.index = Some(parse_selector_usize(raw_value, &token)?),
+            "instance" => criteria.instance = Some(parse_selector_usize(raw_value, &token)?),
+            other => return Err(format!("unsupported UiAutomator selector key `{other}`")),
+        }
+    }
+    Ok(criteria)
+}
+
+fn split_uiautomator_tokens(selector: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut in_single = false;
+    let mut in_double = false;
+    for ch in selector.chars() {
+        match ch {
+            '\'' if !in_double => {
+                in_single = !in_single;
+                current.push(ch);
+            }
+            '"' if !in_single => {
+                in_double = !in_double;
+                current.push(ch);
+            }
+            ',' | ';' if !in_single && !in_double => {
+                let trimmed = current.trim();
+                if !trimmed.is_empty() {
+                    tokens.push(trimmed.to_string());
+                }
+                current.clear();
+            }
+            _ => current.push(ch),
+        }
+    }
+    let trimmed = current.trim();
+    if !trimmed.is_empty() {
+        tokens.push(trimmed.to_string());
+    }
+    tokens
+}
+
+fn split_uiautomator_token(token: &str) -> Result<(&str, &str), String> {
+    let Some((key, value)) = token.split_once(['=', ':']) else {
+        return Err(format!("invalid UiAutomator selector token `{token}`"));
+    };
+    Ok((key.trim(), value.trim()))
+}
+
+fn parse_selector_bool(value: &str, token: &str) -> Result<bool, String> {
+    parse_bool(value).ok_or_else(|| format!("invalid boolean value in `{token}`"))
+}
+
+fn parse_selector_usize(value: &str, token: &str) -> Result<usize, String> {
+    value
+        .parse()
+        .map_err(|_| format!("invalid integer value in `{token}`"))
 }
 
 fn parse_css_criteria(selector: &str) -> Result<NodeCriteria, String> {
@@ -1188,6 +1424,21 @@ fn parse_xpath_resource_suffix(predicate: &str) -> Option<String> {
     let start = predicate.find(suffix_marker)?;
     let candidate = &predicate[start - 1..];
     parse_quoted_value(candidate).ok()
+}
+
+fn contains_text(actual: Option<&str>, expected: &str) -> bool {
+    actual.is_some_and(|value| value.contains(expected))
+}
+
+fn starts_with_text(actual: Option<&str>, expected: &str) -> bool {
+    actual.is_some_and(|value| value.starts_with(expected))
+}
+
+fn matches_regex(actual: Option<&str>, pattern: &str) -> bool {
+    let Some(actual) = actual else {
+        return false;
+    };
+    Regex::new(pattern).is_ok_and(|regex| regex.is_match(actual))
 }
 
 fn parse_quoted_value(input: &str) -> Result<String, String> {
@@ -1452,5 +1703,80 @@ mod tests {
             webview_context: None,
         };
         assert_eq!(page_session.page_id, "emulator-5554:dev.allwright.sample");
+    }
+
+    #[test]
+    fn parses_uiautomator_selector_strategies() {
+        let criteria = parse_uiautomator_criteria(
+            "textContains=Account,descriptionStartsWith=Open,classNameMatches=android\\.widget\\..*,clickable=true,index=2,instance=1,resourceIdMatches=.*bottom_nav.*,packageName=com.example.airticket",
+        )
+        .expect("uia criteria should parse");
+
+        assert_eq!(criteria.text_contains.as_deref(), Some("Account"));
+        assert_eq!(criteria.content_desc_starts_with.as_deref(), Some("Open"));
+        assert_eq!(
+            criteria.class_name_matches.as_deref(),
+            Some("android\\.widget\\..*")
+        );
+        assert_eq!(criteria.clickable, Some(true));
+        assert_eq!(criteria.index, Some(2));
+        assert_eq!(criteria.instance, Some(1));
+        assert_eq!(
+            criteria.resource_id_matches.as_deref(),
+            Some(".*bottom_nav.*")
+        );
+        assert_eq!(
+            criteria.package_name.as_deref(),
+            Some("com.example.airticket")
+        );
+    }
+
+    #[test]
+    fn matches_uiautomator_selectors_against_dumped_nodes() {
+        let nodes = parse_android_ui_nodes(sample_ui_hierarchy()).expect("xml should parse");
+
+        let account = find_node_by_selector(&nodes, "text=Account").expect("text selector");
+        assert_eq!(
+            account.resource_id.as_deref(),
+            Some("com.example.airticket:id/bottom_nav_account")
+        );
+
+        let by_desc =
+            find_node_by_selector(&nodes, "descriptionContains=Account").expect("desc selector");
+        assert_eq!(
+            by_desc.resource_id.as_deref(),
+            Some("com.example.airticket:id/bottom_nav_account")
+        );
+
+        let by_resource = find_node_by_selector(
+            &nodes,
+            "resourceIdMatches=.*bottom_nav_.*,selected=true",
+        )
+        .expect("resource regex selector");
+        assert_eq!(
+            by_resource.resource_id.as_deref(),
+            Some("com.example.airticket:id/bottom_nav_account")
+        );
+
+        let by_class = find_node_by_selector(
+            &nodes,
+            "classNameMatches=android\\.widget\\..*,packageNameMatches=com\\.example\\..*,clickable=true,instance=1",
+        )
+        .expect("class/package/instance selector");
+        assert_eq!(
+            by_class.resource_id.as_deref(),
+            Some("com.example.airticket:id/bottom_nav_account")
+        );
+    }
+
+    fn sample_ui_hierarchy() -> &'static str {
+        r#"<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example.airticket" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2400]">
+    <node index="0" text="Home" resource-id="com.example.airticket:id/bottom_nav_home" class="android.widget.TextView" package="com.example.airticket" content-desc="Home" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,2100][360,2400]" />
+    <node index="1" text="Account" resource-id="com.example.airticket:id/bottom_nav_account" class="android.widget.TextView" package="com.example.airticket" content-desc="Open Account" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="true" bounds="[360,2100][720,2400]" />
+    <node index="2" text="Email" resource-id="com.example.airticket:id/email" class="android.widget.EditText" package="com.example.airticket" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="true" scrollable="false" long-clickable="true" password="false" selected="false" bounds="[80,600][1000,720]" />
+  </node>
+</hierarchy>"#
     }
 }
