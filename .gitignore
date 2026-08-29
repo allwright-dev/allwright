@@ -32,6 +32,13 @@ node_modules/
 /.gradle-user-home/
 /.gradle-local/
 
+# Swift/Xcode local artifacts
+/swift/**/.git/
+/swift/**/xcuserdata/
+/swift/**/*.xcuserstate
+/swift/.build/
+/swift/DerivedData/
+
 # Next.js site artifacts
 /allwright.dev/node_modules/
 /allwright.dev/.next/
