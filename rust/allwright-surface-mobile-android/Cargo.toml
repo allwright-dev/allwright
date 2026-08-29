@@ -14,8 +14,8 @@ categories = ["development-tools::testing", "api-bindings"]
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.52" }
-allwright-surface-mobile = { path = "../allwright-surface-mobile", version = "0.0.52" }
+allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.53" }
+allwright-surface-mobile = { path = "../allwright-surface-mobile", version = "0.0.53" }
 reqwest = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }

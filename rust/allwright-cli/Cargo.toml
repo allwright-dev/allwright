@@ -15,8 +15,8 @@ name = "allwright"
 path = "src/main.rs"
 
 [dependencies]
-allwright = { package = "allwright-core", path = "../allwright", version = "0.0.52", features = ["server"] }
-allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.52" }
+allwright = { package = "allwright-core", path = "../allwright", version = "0.0.53", features = ["server"] }
+allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.53" }
 clap = { workspace = true, features = ["derive"] }
 flate2 = { workspace = true }
 libloading = { workspace = true }
