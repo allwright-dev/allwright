@@ -45,6 +45,16 @@ enum SelectorKind {
     XPath,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct DiscoveryRequirements {
+    require_match: bool,
+    require_visible: bool,
+    require_pointer_interactable: bool,
+    require_editable: bool,
+    focus_first_match: bool,
+    require_focus: bool,
+}
+
 #[derive(Debug, Clone)]
 struct ParsedSelector<'a> {
     raw: &'a str,
@@ -491,8 +501,18 @@ pub async fn click_element_via_cdp(
 
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
-    let discovered =
-        discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, true).await?;
+    let discovered = discover_elements_via_cdp(
+        &mut cdp,
+        &session_id,
+        css_selector,
+        DiscoveryRequirements {
+            require_match: true,
+            require_visible: true,
+            require_pointer_interactable: true,
+            ..DiscoveryRequirements::default()
+        },
+    )
+    .await?;
     let center = discovered.first_center.ok_or_else(|| {
         format!(
             "element discovery did not return a clickable center for {} {}",
@@ -524,8 +544,13 @@ pub async fn count_elements_via_cdp(
 
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
-    let discovered =
-        discover_elements_via_cdp(&mut cdp, &session_id, css_selector, false, false).await?;
+    let discovered = discover_elements_via_cdp(
+        &mut cdp,
+        &session_id,
+        css_selector,
+        DiscoveryRequirements::default(),
+    )
+    .await?;
     cdp.detach_from_target(&session_id).await?;
 
     Ok(ElementCountInfo {
@@ -550,8 +575,13 @@ pub async fn highlight_elements_via_cdp(
 
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
-    let discovered =
-        discover_elements_via_cdp(&mut cdp, &session_id, css_selector, false, false).await?;
+    let discovered = discover_elements_via_cdp(
+        &mut cdp,
+        &session_id,
+        css_selector,
+        DiscoveryRequirements::default(),
+    )
+    .await?;
 
     let selector_literal = serde_json::to_string(&parsed.value)
         .map_err(|error| format!("failed to serialize selector for highlight: {error}"))?;
@@ -609,7 +639,19 @@ pub async fn focus_element_via_cdp(
     let parsed = parse_selector("focus_element", css_selector)?;
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
-    discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, true).await?;
+    discover_elements_via_cdp(
+        &mut cdp,
+        &session_id,
+        css_selector,
+        DiscoveryRequirements {
+            require_match: true,
+            require_visible: true,
+            focus_first_match: true,
+            require_focus: true,
+            ..DiscoveryRequirements::default()
+        },
+    )
+    .await?;
     cdp.detach_from_target(&session_id).await?;
 
     Ok(FocusInfo {
@@ -631,7 +673,20 @@ pub async fn fill_element_via_cdp(
     let parsed = parse_selector("fill_element", css_selector)?;
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
-    discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, true).await?;
+    discover_elements_via_cdp(
+        &mut cdp,
+        &session_id,
+        css_selector,
+        DiscoveryRequirements {
+            require_match: true,
+            require_visible: true,
+            require_editable: true,
+            focus_first_match: true,
+            require_focus: true,
+            ..DiscoveryRequirements::default()
+        },
+    )
+    .await?;
     let selector_literal = json_string_literal(&parsed.value, "fill selector")?;
     let value_literal = json_string_literal(value, "fill value")?;
     cdp.evaluate_expression(
@@ -661,8 +716,18 @@ pub async fn hover_element_via_cdp(
     let parsed = parse_selector("hover_element", css_selector)?;
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
-    let discovered =
-        discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, false).await?;
+    let discovered = discover_elements_via_cdp(
+        &mut cdp,
+        &session_id,
+        css_selector,
+        DiscoveryRequirements {
+            require_match: true,
+            require_visible: true,
+            require_pointer_interactable: true,
+            ..DiscoveryRequirements::default()
+        },
+    )
+    .await?;
     let center = discovered.first_center.ok_or_else(|| {
         format!(
             "element discovery did not return a hover center for {} {}",
@@ -698,7 +763,19 @@ pub async fn press_key_via_cdp(
 
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
-    discover_elements_via_cdp(&mut cdp, &session_id, css_selector, true, true).await?;
+    discover_elements_via_cdp(
+        &mut cdp,
+        &session_id,
+        css_selector,
+        DiscoveryRequirements {
+            require_match: true,
+            require_visible: true,
+            focus_first_match: true,
+            require_focus: true,
+            ..DiscoveryRequirements::default()
+        },
+    )
+    .await?;
     cdp.dispatch_key_press(&session_id, key, text).await?;
     cdp.detach_from_target(&session_id).await?;
 
@@ -760,8 +837,16 @@ pub async fn wait_for_selector_via_cdp(
     let parsed = parse_selector("wait_for_selector", css_selector)?;
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
-    let discovered =
-        discover_elements_via_cdp(&mut cdp, &session_id, css_selector, false, false).await?;
+    let discovered = discover_elements_via_cdp(
+        &mut cdp,
+        &session_id,
+        css_selector,
+        DiscoveryRequirements {
+            require_visible: visible,
+            ..DiscoveryRequirements::default()
+        },
+    )
+    .await?;
     let success = if visible {
         discovered.first_center.is_some()
     } else {
@@ -836,18 +921,20 @@ pub async fn click_element(
                 &format!(
                     "(() => {{
                         const selector = {};
+                        const requirements = {};
+                        {}
                         const element = {query_first_js};
-                        if (!element) {{
-                            throw new Error(`No element matches {}: ${{selector}}`);
-                        }}
-                        if (!(element instanceof HTMLElement)) {{
-                            throw new Error(`Element matched by {} is not clickable: ${{selector}}`);
-                        }}
-                        element.scrollIntoView({{ block: 'center', inline: 'center', behavior: 'instant' }});
-                        element.click();
+                        const prepared = allwrightPrepareElement(element, selector, '{}', requirements);
+                        prepared.element.click();
                     }})()",
                     json_string_literal(&parsed.value, "click selector")?,
-                    selector_kind_label(parsed.kind),
+                    discovery_requirements_literal(DiscoveryRequirements {
+                        require_match: true,
+                        require_visible: true,
+                        require_pointer_interactable: true,
+                        ..DiscoveryRequirements::default()
+                    }),
+                    actionability_helpers_js(),
                     selector_kind_label(parsed.kind),
                 ),
             )
@@ -1022,18 +1109,20 @@ pub async fn focus_element(
                 &format!(
                     "(() => {{
                         const selector = {};
+                        const requirements = {};
+                        {}
                         const element = {query_first_js};
-                        if (!element) {{
-                            throw new Error(`No element matches {}: ${{selector}}`);
-                        }}
-                        if (!(element instanceof HTMLElement)) {{
-                            throw new Error(`Element matched by {} is not focusable: ${{selector}}`);
-                        }}
-                        element.scrollIntoView({{ block: 'center', inline: 'center', behavior: 'instant' }});
-                        element.focus();
+                        allwrightPrepareElement(element, selector, '{}', requirements);
                     }})()",
                     json_string_literal(&parsed.value, "focus selector")?,
-                    selector_kind_label(parsed.kind),
+                    discovery_requirements_literal(DiscoveryRequirements {
+                        require_match: true,
+                        require_visible: true,
+                        focus_first_match: true,
+                        require_focus: true,
+                        ..DiscoveryRequirements::default()
+                    }),
+                    actionability_helpers_js(),
                     selector_kind_label(parsed.kind),
                 ),
             )
@@ -1127,20 +1216,22 @@ pub async fn hover_element(
                 &format!(
                     "(() => {{
                         const selector = {};
+                        const requirements = {};
+                        {}
                         const element = {query_first_js};
-                        if (!element) {{
-                            throw new Error(`No element matches {}: ${{selector}}`);
-                        }}
-                        if (!(element instanceof HTMLElement)) {{
-                            throw new Error(`Element matched by {} is not hoverable: ${{selector}}`);
-                        }}
-                        element.scrollIntoView({{ block: 'center', inline: 'center', behavior: 'instant' }});
+                        const prepared = allwrightPrepareElement(element, selector, '{}', requirements);
                         for (const type of ['pointerover', 'mouseover', 'mouseenter', 'mousemove']) {{
-                            element.dispatchEvent(new MouseEvent(type, {{ bubbles: true, cancelable: true, view: window }}));
+                            prepared.element.dispatchEvent(new MouseEvent(type, {{ bubbles: true, cancelable: true, view: window }}));
                         }}
                     }})()",
                     json_string_literal(&parsed.value, "hover selector")?,
-                    selector_kind_label(parsed.kind),
+                    discovery_requirements_literal(DiscoveryRequirements {
+                        require_match: true,
+                        require_visible: true,
+                        require_pointer_interactable: true,
+                        ..DiscoveryRequirements::default()
+                    }),
+                    actionability_helpers_js(),
                     selector_kind_label(parsed.kind),
                 ),
             )
@@ -1194,26 +1285,29 @@ pub async fn press_key(
                         const selector = {};
                         const key = {};
                         const text = {};
+                        const requirements = {};
+                        {}
                         const element = {query_first_js};
-                        if (!element) {{
-                            throw new Error(`No element matches {}: ${{selector}}`);
+                        const prepared = allwrightPrepareElement(element, selector, '{}', requirements);
+                        prepared.element.dispatchEvent(new KeyboardEvent('keydown', {{ key, bubbles: true }}));
+                        if (text && 'value' in prepared.element) {{
+                            prepared.element.value += text;
+                            prepared.element.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            prepared.element.dispatchEvent(new Event('change', {{ bubbles: true }}));
                         }}
-                        if (!(element instanceof HTMLElement)) {{
-                            throw new Error(`Element matched by {} is not keyboard-targetable: ${{selector}}`);
-                        }}
-                        element.focus();
-                        element.dispatchEvent(new KeyboardEvent('keydown', {{ key, bubbles: true }}));
-                        if (text && 'value' in element) {{
-                            element.value += text;
-                            element.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                            element.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                        }}
-                        element.dispatchEvent(new KeyboardEvent('keyup', {{ key, bubbles: true }}));
+                        prepared.element.dispatchEvent(new KeyboardEvent('keyup', {{ key, bubbles: true }}));
                     }})()",
                     json_string_literal(&parsed.value, "press selector")?,
                     json_string_literal(key, "press key")?,
                     json_string_literal(text.unwrap_or(""), "press text")?,
-                    selector_kind_label(parsed.kind),
+                    discovery_requirements_literal(DiscoveryRequirements {
+                        require_match: true,
+                        require_visible: true,
+                        focus_first_match: true,
+                        require_focus: true,
+                        ..DiscoveryRequirements::default()
+                    }),
+                    actionability_helpers_js(),
                     selector_kind_label(parsed.kind),
                 ),
             )
@@ -1318,6 +1412,8 @@ pub async fn wait_for_selector(
                 &format!(
                     "(() => {{
                         const selector = {};
+                        const requirements = {};
+                        {}
                         const element = {query_first_js};
                         if (!element) {{
                             return false;
@@ -1325,14 +1421,20 @@ pub async fn wait_for_selector(
                         if (!{}) {{
                             return true;
                         }}
-                        if (!(element instanceof Element)) {{
+                        try {{
+                            return !!allwrightPrepareElement(element, selector, '{}', requirements);
+                        }} catch (_error) {{
                             return false;
                         }}
-                        const rect = element.getBoundingClientRect();
-                        return !!(rect.width && rect.height);
                     }})()",
                     json_string_literal(&parsed.value, "wait selector")?,
+                    discovery_requirements_literal(DiscoveryRequirements {
+                        require_visible: visible,
+                        ..DiscoveryRequirements::default()
+                    }),
+                    actionability_helpers_js(),
                     if visible { "true" } else { "false" },
+                    selector_kind_label(parsed.kind),
                 ),
             )
             .await?;
@@ -1377,13 +1479,13 @@ async fn discover_elements_via_cdp(
     cdp: &mut CdpConnection,
     session_id: &str,
     selector: &str,
-    require_match: bool,
-    focus_first_match: bool,
+    requirements: DiscoveryRequirements,
 ) -> Result<DiscoveredElements, String> {
     let selector_literal = json_string_literal(selector, "selector for discovery")?;
     let selector_segments_literal = selector_segments_literal("discover_elements", selector)?;
     let selector_kind_label = selector_chain_kind_label("discover_elements", selector)?;
     let query_all_js = selector_chain_query_all_js();
+    let requirements_literal = discovery_requirements_literal(requirements);
     let expression = format!(
         "(() => {{
             const selector = {selector_literal};
@@ -1391,30 +1493,20 @@ async fn discover_elements_via_cdp(
             const selectorChainQueryAll = () => {query_all_js};
             const elements = {query_all_js};
             const first = elements[0] ?? null;
-            if (first) {{
-                first.scrollIntoView({{ block: 'center', inline: 'center', behavior: 'instant' }});
-                if ({focus_first_match} && first instanceof HTMLElement) {{
-                    first.focus();
-                }}
-            }}
-            if ({require_match} && !first) {{
+            const requirements = {requirements_literal};
+            {actionability_helpers_js}
+            if (requirements.requireMatch && !first) {{
                 throw new Error(`No element matches {selector_kind_label}: ${{selector}}`);
             }}
-            if (first && !(first instanceof Element)) {{
-                throw new Error(`{selector_kind_label} did not resolve to a DOM Element: ${{selector}}`);
-            }}
-            const rect = first ? first.getBoundingClientRect() : null;
-            if (first && (!rect.width || !rect.height)) {{
-                throw new Error(`Element matched by {selector_kind_label} has zero size: ${{selector}}`);
-            }}
+            const prepared = first
+                ? allwrightPrepareElement(first, selector, '{selector_kind_label}', requirements)
+                : null;
             return {{
                 count: elements.length,
-                first: rect ? {{
-                    x: rect.left + (rect.width / 2),
-                    y: rect.top + (rect.height / 2)
-                }} : null
+                first: prepared?.center ?? null
             }};
-        }})()"
+        }})()",
+        actionability_helpers_js = actionability_helpers_js(),
     );
     let result = cdp
         .evaluate_expression(session_id, &expression, true)
@@ -1448,7 +1540,16 @@ async fn get_text_via_cdp(
     let parsed = parse_selector("get_text", selector)?;
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
-    discover_elements_via_cdp(&mut cdp, &session_id, selector, true, false).await?;
+    discover_elements_via_cdp(
+        &mut cdp,
+        &session_id,
+        selector,
+        DiscoveryRequirements {
+            require_match: true,
+            ..DiscoveryRequirements::default()
+        },
+    )
+    .await?;
     let selector_literal = json_string_literal(selector, "text selector")?;
     let selector_segments_literal = selector_segments_literal("get_text", selector)?;
     let property_literal = json_string_literal(property, "text property")?;
@@ -1495,18 +1596,19 @@ fn dom_set_value_and_dispatch_events_js(
         "(() => {{
             const selector = {selector_literal};
             const nextValue = {value_literal};
+            const requirements = {requirements_literal};
+            {actionability_helpers_js}
             const element = {query_first_js};
-            if (!element) {{
-                throw new Error(`No element matches {selector_kind_label}: ${{selector}}`);
-            }}
-            if (!(element instanceof HTMLElement)) {{
-                throw new Error(`Element matched by {selector_kind_label} is not editable: ${{selector}}`);
-            }}
+            const prepared = allwrightPrepareElement(
+                element,
+                selector,
+                '{selector_kind_label}',
+                requirements,
+            );
+            const editableElement = prepared.element;
 
-            element.focus();
-
-            if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {{
-                const prototype = element instanceof HTMLInputElement
+            if (editableElement instanceof HTMLInputElement || editableElement instanceof HTMLTextAreaElement) {{
+                const prototype = editableElement instanceof HTMLInputElement
                     ? HTMLInputElement.prototype
                     : HTMLTextAreaElement.prototype;
                 const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
@@ -1514,9 +1616,9 @@ fn dom_set_value_and_dispatch_events_js(
                 if (!setter) {{
                     throw new Error(`Element value setter is unavailable for {selector_kind_label}: ${{selector}}`);
                 }}
-                setter.call(element, nextValue);
-            }} else if (element.isContentEditable) {{
-                element.textContent = nextValue;
+                setter.call(editableElement, nextValue);
+            }} else if (editableElement.isContentEditable) {{
+                editableElement.textContent = nextValue;
             }} else {{
                 throw new Error(`Element matched by {selector_kind_label} does not support fill: ${{selector}}`);
             }}
@@ -1529,11 +1631,122 @@ fn dom_set_value_and_dispatch_events_js(
                     inputType: 'insertText'
                 }})
                 : new Event('input', {{ bubbles: true, composed: true }});
-            element.dispatchEvent(inputEvent);
-            element.dispatchEvent(new Event('change', {{ bubbles: true, composed: true }}));
+            editableElement.dispatchEvent(inputEvent);
+            editableElement.dispatchEvent(new Event('change', {{ bubbles: true, composed: true }}));
             return true;
-        }})()"
+        }})()",
+        requirements_literal = discovery_requirements_literal(DiscoveryRequirements {
+            require_match: true,
+            require_visible: true,
+            require_editable: true,
+            focus_first_match: true,
+            require_focus: true,
+            ..DiscoveryRequirements::default()
+        }),
+        actionability_helpers_js = actionability_helpers_js(),
     )
+}
+
+fn discovery_requirements_literal(requirements: DiscoveryRequirements) -> String {
+    format!(
+        "{{ requireMatch: {}, requireVisible: {}, requirePointerInteractable: {}, requireEditable: {}, focusFirstMatch: {}, requireFocus: {} }}",
+        requirements.require_match,
+        requirements.require_visible,
+        requirements.require_pointer_interactable,
+        requirements.require_editable,
+        requirements.focus_first_match,
+        requirements.require_focus,
+    )
+}
+
+fn actionability_helpers_js() -> &'static str {
+    r#"
+            const allwrightCanFocusElement = (element) => {
+                if (!(element instanceof HTMLElement)) {
+                    return false;
+                }
+                if (typeof element.matches === 'function' && element.matches(':disabled')) {
+                    return false;
+                }
+                return !element.closest('[inert]');
+            };
+            const allwrightIsEditableElement = (element) => {
+                if (!(element instanceof HTMLElement)) {
+                    return false;
+                }
+                if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+                    return !element.disabled && !element.readOnly;
+                }
+                return element.isContentEditable && !element.closest('[inert]');
+            };
+            const allwrightIsVisibleElement = (rect, style) => {
+                if (!rect || rect.width <= 0 || rect.height <= 0) {
+                    return false;
+                }
+                if (!style) {
+                    return false;
+                }
+                if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') {
+                    return false;
+                }
+                const opacity = Number.parseFloat(style.opacity ?? '1');
+                if (!Number.isNaN(opacity) && opacity <= 0) {
+                    return false;
+                }
+                return true;
+            };
+            const allwrightReceivesPointerEvents = (element, center, style) => {
+                if (style.pointerEvents === 'none') {
+                    return false;
+                }
+                const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+                const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+                if (center.x < 0 || center.y < 0 || center.x > viewportWidth || center.y > viewportHeight) {
+                    return false;
+                }
+                const hit = document.elementFromPoint(center.x, center.y);
+                return !!hit && (hit === element || element.contains(hit) || hit.contains(element));
+            };
+            const allwrightPrepareElement = (element, selector, selectorKindLabel, requirements) => {
+                if (!element) {
+                    throw new Error(`No element matches ${selectorKindLabel}: ${selector}`);
+                }
+                if (!(element instanceof Element)) {
+                    throw new Error(`${selectorKindLabel} did not resolve to a DOM Element: ${selector}`);
+                }
+                if (!element.isConnected) {
+                    throw new Error(`Element matched by ${selectorKindLabel} is detached from the live DOM: ${selector}`);
+                }
+                element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+                const rect = element.getBoundingClientRect();
+                const style = window.getComputedStyle(element);
+                if (requirements.requireVisible && !allwrightIsVisibleElement(rect, style)) {
+                    throw new Error(`Element matched by ${selectorKindLabel} is not visible yet: ${selector}`);
+                }
+                const center = rect.width > 0 && rect.height > 0
+                    ? { x: rect.left + (rect.width / 2), y: rect.top + (rect.height / 2) }
+                    : null;
+                if (requirements.requirePointerInteractable) {
+                    if (!center || !allwrightReceivesPointerEvents(element, center, style)) {
+                        throw new Error(`Element matched by ${selectorKindLabel} is not clickable yet: ${selector}`);
+                    }
+                }
+                if (requirements.requireEditable && !allwrightIsEditableElement(element)) {
+                    throw new Error(`Element matched by ${selectorKindLabel} is not editable yet: ${selector}`);
+                }
+                if (requirements.focusFirstMatch || requirements.requireFocus) {
+                    if (!allwrightCanFocusElement(element)) {
+                        throw new Error(`Element matched by ${selectorKindLabel} is not focusable yet: ${selector}`);
+                    }
+                    element.focus();
+                    const activeElement = document.activeElement;
+                    if (requirements.requireFocus && activeElement !== element && !element.contains(activeElement)) {
+                        throw new Error(`Element matched by ${selectorKindLabel} did not receive focus yet: ${selector}`);
+                    }
+                }
+                return { element, rect, center, style };
+            };
+    "#
 }
 
 pub async fn resolve_bidi_context_for_tab(
