@@ -137,6 +137,40 @@ export interface Page extends PageInfo {
   pageInfo(): PageInfo;
 }
 
+export interface MobileAndroidConnectOptions {
+  device?: string;
+  adbEndpoint?: string;
+  preserveAppState?: boolean;
+  timeoutMs?: number;
+}
+
+export interface MobileAndroidLaunchOptions {
+  apkPath?: string;
+  appId?: string;
+  launchActivity?: string;
+  stopBeforeLaunch?: boolean;
+  timeoutMs?: number;
+}
+
+export interface MobileAndroidPage {
+  readonly sessionId: string;
+  click(selector: string, options?: CommandOptions): Promise<ClickResult>;
+  fill(selector: string, value: string, options?: CommandOptions): Promise<FillResult>;
+}
+
+export interface MobileAndroidDevice {
+  readonly sessionId: string;
+  page(): MobileAndroidPage;
+  initialPage(): MobileAndroidPage;
+  launch(options?: MobileAndroidLaunchOptions): Promise<MobileAndroidPage>;
+}
+
+export interface MobileSurfaceNamespace {
+  android: {
+    connect(options?: MobileAndroidConnectOptions): Promise<MobileAndroidDevice>;
+  };
+}
+
 export interface Locator {
   readonly page: Page;
   readonly selector: string;
@@ -158,11 +192,9 @@ export interface AllwrightConfig {
   server?: {
     addr?: string;
   };
-  browser?: {
-    name?: BrowserKind;
-    binary?: string;
-    launchOptions?: LaunchOptions;
-  };
+  web?: WebConfig;
+  mobile?: MobileConfig;
+  desktop?: DesktopConfig;
   expect?: RetryConfig;
   suites?: Record<string, AllwrightSuiteConfig>;
 }
@@ -171,12 +203,44 @@ export interface AllwrightSuiteConfig {
   server?: {
     addr?: string;
   };
+  web?: WebConfig;
+  mobile?: MobileConfig;
+  desktop?: DesktopConfig;
+  expect?: RetryConfig;
+}
+
+export interface WebConfig {
   browser?: {
     name?: BrowserKind;
     binary?: string;
     launchOptions?: LaunchOptions;
   };
-  expect?: RetryConfig;
+}
+
+export interface SurfaceAppConfig {
+  id?: string;
+  binary?: string;
+  activity?: string;
+}
+
+export interface SurfaceMobileTargetConfig {
+  device?: string;
+  app?: SurfaceAppConfig;
+}
+
+export interface SurfaceDesktopTargetConfig {
+  app?: SurfaceAppConfig;
+}
+
+export interface MobileConfig {
+  android?: SurfaceMobileTargetConfig;
+  ios?: SurfaceMobileTargetConfig;
+}
+
+export interface DesktopConfig {
+  mac?: SurfaceDesktopTargetConfig;
+  windows?: SurfaceDesktopTargetConfig;
+  linux?: SurfaceDesktopTargetConfig;
 }
 
 export interface RetryConfig {
@@ -184,14 +248,43 @@ export interface RetryConfig {
   intervalMs?: number;
 }
 
+export interface ResolvedWebSurfaceConfig {
+  browserName?: BrowserKind;
+  browserBinary?: string;
+  launchOptions: LaunchOptions;
+}
+
+export interface ResolvedMobileTargetConfig {
+  device?: string;
+  appId?: string;
+  appBinary?: string;
+  appActivity?: string;
+}
+
+export interface ResolvedDesktopTargetConfig {
+  appId?: string;
+  appBinary?: string;
+  appActivity?: string;
+}
+
 export interface ResolvedAllwrightConfig {
   configFilePath: string | null;
   suiteName: string | null;
   serverAddr?: string;
-  browserName: BrowserKind;
+  browserName?: BrowserKind;
   browserBinary?: string;
   launchOptions: LaunchOptions;
   expect: RetryConfig;
+  web?: ResolvedWebSurfaceConfig;
+  mobile: {
+    android?: ResolvedMobileTargetConfig;
+    ios?: ResolvedMobileTargetConfig;
+  };
+  desktop: {
+    mac?: ResolvedDesktopTargetConfig;
+    windows?: ResolvedDesktopTargetConfig;
+    linux?: ResolvedDesktopTargetConfig;
+  };
 }
 
 export interface ResolveConfigOptions {

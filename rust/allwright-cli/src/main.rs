@@ -1,8 +1,10 @@
 use clap::{Parser, Subcommand};
 use flate2::read::GzDecoder;
+use libloading::{Library, Symbol};
 use reqwest::blocking::Client;
 use std::env;
 use std::error::Error;
+use std::ffi::{CStr, CString, c_char};
 use std::fs;
 use std::io::{Cursor, Read, Write};
 use std::net::SocketAddr;
@@ -47,6 +49,14 @@ enum PluginCommand {
         /// Override the registered plugin version
         #[arg(long)]
         version: Option<String>,
+    },
+    /// Invoke one installed plugin command with a JSON request payload
+    Invoke {
+        /// Plugin id such as `web` or `mobile-android`
+        plugin: String,
+        /// Raw JSON request payload for the plugin command
+        #[arg(long)]
+        request_json: String,
     },
 }
 
@@ -122,9 +132,92 @@ fn handle_plugin_command(command: PluginCommand) -> Result<(), Box<dyn Error>> {
             write_installed_plugins(&installed)?;
             println!("Plugin manifest: {}", plugin_manifest_path()?.display());
         }
+        PluginCommand::Invoke {
+            plugin,
+            request_json,
+        } => {
+            let response = invoke_installed_plugin(&plugin, &request_json)?;
+            print!("{response}");
+            std::io::stdout().flush()?;
+        }
     }
 
     Ok(())
+}
+
+type PluginApiVersionFn = unsafe extern "C" fn() -> u32;
+type PluginIdFn = unsafe extern "C" fn() -> *const c_char;
+type PluginInvokeFn = unsafe extern "C" fn(*const c_char) -> *mut c_char;
+type PluginFreeStringFn = unsafe extern "C" fn(*mut c_char);
+
+fn invoke_installed_plugin(plugin_id: &str, request_json: &str) -> Result<String, Box<dyn Error>> {
+    let library_path = plugin_runtime_artifact_path(plugin_id);
+    if !library_path.is_file() {
+        return Err(format!(
+            "plugin `{plugin_id}` is not installed. Run `allwright plugin install {plugin_id}` first."
+        )
+        .into());
+    }
+
+    let request_cstr = CString::new(request_json)
+        .map_err(|error| format!("plugin request contains NUL: {error}"))?;
+    let library = unsafe { Library::new(&library_path) }.map_err(|error| {
+        format!(
+            "failed to load plugin `{plugin_id}` from {}: {error}",
+            library_path.display()
+        )
+    })?;
+
+    unsafe {
+        let api_version: Symbol<'_, PluginApiVersionFn> = library
+            .get(b"allwright_plugin_api_version")
+            .map_err(|error| format!("failed to load plugin api version symbol: {error}"))?;
+        let actual_api_version = api_version();
+        if actual_api_version != allwright_plugin_sdk::ALLWRIGHT_PLUGIN_API_VERSION {
+            return Err(format!(
+                "plugin `{plugin_id}` ABI version mismatch: expected {}, got {}",
+                allwright_plugin_sdk::ALLWRIGHT_PLUGIN_API_VERSION,
+                actual_api_version
+            )
+            .into());
+        }
+
+        let loaded_plugin_id: Symbol<'_, PluginIdFn> = library
+            .get(b"allwright_plugin_id")
+            .map_err(|error| format!("failed to load plugin id symbol: {error}"))?;
+        let raw_plugin_id = loaded_plugin_id();
+        if raw_plugin_id.is_null() {
+            return Err(format!("plugin `{plugin_id}` returned a null plugin id").into());
+        }
+        let loaded_plugin_id = CStr::from_ptr(raw_plugin_id)
+            .to_str()
+            .map_err(|error| format!("plugin id is not valid UTF-8: {error}"))?;
+        if loaded_plugin_id != plugin_id {
+            return Err(format!(
+                "loaded plugin id `{loaded_plugin_id}` does not match requested plugin `{plugin_id}`"
+            )
+            .into());
+        }
+
+        let invoke: Symbol<'_, PluginInvokeFn> = library
+            .get(b"allwright_plugin_invoke")
+            .map_err(|error| format!("failed to load plugin invoke symbol: {error}"))?;
+        let free_string: Symbol<'_, PluginFreeStringFn> = library
+            .get(b"allwright_plugin_free_string")
+            .map_err(|error| format!("failed to load plugin free-string symbol: {error}"))?;
+
+        let response_ptr = invoke(request_cstr.as_ptr());
+        if response_ptr.is_null() {
+            return Err(format!("plugin `{plugin_id}` returned a null response").into());
+        }
+
+        let response = CStr::from_ptr(response_ptr)
+            .to_str()
+            .map_err(|error| format!("plugin response is not valid UTF-8: {error}"))?
+            .to_string();
+        free_string(response_ptr);
+        Ok(response)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -260,6 +353,7 @@ fn plugin_runtime_artifact_path(plugin_id: &str) -> PathBuf {
 fn plugin_runtime_artifact_stem(plugin_id: &str) -> &'static str {
     match plugin_id {
         "web" => "allwright-surface-web",
+        "mobile-android" => "allwright-surface-mobile-android",
         _ => "allwright-plugin",
     }
 }
@@ -291,9 +385,9 @@ fn plugin_runtime_artifact_filename(plugin_id: &str) -> String {
 
 fn ensure_plugin_install_supported(plugin_id: &str) -> Result<(), Box<dyn Error>> {
     match plugin_id {
-        "web" => Ok(()),
+        "web" | "mobile-android" => Ok(()),
         _ => Err(format!(
-            "plugin `{plugin_id}` is not yet installable. Only `web` currently ships a standalone runtime artifact."
+            "plugin `{plugin_id}` is not yet installable. Supported standalone runtime artifacts currently ship for `web` and `mobile-android`."
         )
         .into()),
     }

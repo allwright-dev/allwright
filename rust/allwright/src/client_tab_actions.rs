@@ -15,7 +15,8 @@ use super::types::{
 
 impl Tab {
     pub async fn click(&self, css_selector: impl Into<String>) -> Result<ClickResult> {
-        self.click_with_options(css_selector, CommandOptions::default()).await
+        self.click_with_options(css_selector, CommandOptions::default())
+            .await
     }
 
     pub async fn click_with_options(
@@ -42,11 +43,10 @@ impl Tab {
             .map_err(|_| Error::new("failed to send ClickElementCommand"))?;
 
         loop {
-            let event = handle
-                .events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("tab session closed while waiting for click result"))?;
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("tab session closed while waiting for click result")
+                })?;
 
             match event.event {
                 Some(TabEvent::Attached(_)) => {}
@@ -60,8 +60,7 @@ impl Tab {
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while clicking locator {:?}: {}",
-                        css_selector,
-                        error.message,
+                        css_selector, error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {
@@ -77,7 +76,8 @@ impl Tab {
     }
 
     pub async fn focus(&self, css_selector: impl Into<String>) -> Result<ElementResult> {
-        self.focus_with_options(css_selector, CommandOptions::default()).await
+        self.focus_with_options(css_selector, CommandOptions::default())
+            .await
     }
 
     pub async fn focus_with_options(
@@ -104,11 +104,10 @@ impl Tab {
             .map_err(|_| Error::new("failed to send FocusElementCommand"))?;
 
         loop {
-            let event = handle
-                .events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("tab session closed while waiting for focus result"))?;
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("tab session closed while waiting for focus result")
+                })?;
             match event.event {
                 Some(TabEvent::Attached(_)) => {}
                 Some(TabEvent::ElementFocused(focused)) => {
@@ -120,8 +119,7 @@ impl Tab {
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while focusing locator {:?}: {}",
-                        css_selector,
-                        error.message,
+                        css_selector, error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {
@@ -170,11 +168,10 @@ impl Tab {
             .await
             .map_err(|_| Error::new("failed to send FillElementCommand"))?;
         loop {
-            let event = handle
-                .events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("tab session closed while waiting for fill result"))?;
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("tab session closed while waiting for fill result")
+                })?;
             match event.event {
                 Some(TabEvent::Attached(_)) => {}
                 Some(TabEvent::ElementFilled(filled)) => {
@@ -187,8 +184,7 @@ impl Tab {
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while filling locator {:?}: {}",
-                        css_selector,
-                        error.message,
+                        css_selector, error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {
@@ -204,7 +200,8 @@ impl Tab {
     }
 
     pub async fn hover(&self, css_selector: impl Into<String>) -> Result<ElementResult> {
-        self.hover_with_options(css_selector, CommandOptions::default()).await
+        self.hover_with_options(css_selector, CommandOptions::default())
+            .await
     }
 
     pub async fn hover_with_options(
@@ -229,11 +226,10 @@ impl Tab {
             .await
             .map_err(|_| Error::new("failed to send HoverElementCommand"))?;
         loop {
-            let event = handle
-                .events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("tab session closed while waiting for hover result"))?;
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("tab session closed while waiting for hover result")
+                })?;
             match event.event {
                 Some(TabEvent::Attached(_)) => {}
                 Some(TabEvent::ElementHovered(hovered)) => {
@@ -245,8 +241,7 @@ impl Tab {
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while hovering locator {:?}: {}",
-                        css_selector,
-                        error.message,
+                        css_selector, error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {
@@ -295,11 +290,10 @@ impl Tab {
             .await
             .map_err(|_| Error::new("failed to send PressKeyCommand"))?;
         loop {
-            let event = handle
-                .events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("tab session closed while waiting for press result"))?;
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("tab session closed while waiting for press result")
+                })?;
             match event.event {
                 Some(TabEvent::Attached(_)) => {}
                 Some(TabEvent::KeyPressed(pressed)) => {

@@ -29,9 +29,10 @@ schemaVersion: 1
 server:
   addr: 127.0.0.1:50051
 
-browser:
-  name: firefox
-  binary: /Applications/Firefox.app/Contents/MacOS/firefox
+web:
+  browser:
+    name: firefox
+    binary: /Applications/Firefox.app/Contents/MacOS/firefox
 
 expect:
   timeoutMs: 7000
@@ -39,8 +40,9 @@ expect:
 
 suites:
   smoke:
-    browser:
-      name: chromium
+    web:
+      browser:
+        name: chromium
 ```
 
 Vitest can override or select from that shared config without switching to a Vitest-specific file:

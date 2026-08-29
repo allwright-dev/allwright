@@ -86,6 +86,9 @@ export async function launchConfiguredBrowser(
   config: ResolvedAllwrightConfig,
   launchBrowserKind: (browserKind: BrowserKind, options?: LaunchOptions) => Promise<Browser>,
 ): Promise<Browser> {
+  if (!config.browserName) {
+    throw new Error("resolved config does not define web.browser.name and includes only non-web surfaces");
+  }
   return launchBrowserKind(config.browserName, {
     ...config.launchOptions,
     browserBinary: config.browserBinary ?? config.launchOptions.browserBinary,

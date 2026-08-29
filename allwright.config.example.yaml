@@ -3,11 +3,20 @@ schemaVersion: 1
 server:
   addr: 127.0.0.1:50051
 
-browser:
-  name: firefox
-  binary: /Applications/Firefox.app/Contents/MacOS/firefox
-  launchOptions:
-    timeoutMs: 30000
+web:
+  browser:
+    name: firefox
+    binary: /Applications/Firefox.app/Contents/MacOS/firefox
+    launchOptions:
+      timeoutMs: 30000
+
+mobile:
+  android:
+    device: emulator-5554
+    app:
+      id: com.example.airticket
+      binary: /path/to/Flights.apk
+      activity: .MainActivity
 
 expect:
   timeoutMs: 5000
@@ -15,9 +24,25 @@ expect:
 
 suites:
   smoke:
-    browser:
-      name: chromium
+    web:
+      browser:
+        name: chromium
   firefox-dev:
-    browser:
-      name: firefox
-      binary: /Applications/Firefox.app/Contents/MacOS/firefox
+    web:
+      browser:
+        name: firefox
+        binary: /Applications/Firefox.app/Contents/MacOS/firefox
+  hybrid-booking:
+    web:
+      browser:
+        name: chromium
+    mobile:
+      android:
+        app:
+          id: com.example.airticket
+
+desktop:
+  mac:
+    app:
+      id: com.example.desktop
+      binary: /Applications/Allwright.app

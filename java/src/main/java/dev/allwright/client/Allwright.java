@@ -35,6 +35,7 @@ public final class Allwright {
     private static String serverAddrOverride;
     private static final BrowserType CHROMIUM = new BrowserType(BrowserKind.BROWSER_KIND_CHROMIUM);
     private static final BrowserType FIREFOX = new BrowserType(BrowserKind.BROWSER_KIND_FIREFOX);
+    private static final Mobile MOBILE = new Mobile();
 
     private Allwright() {}
 
@@ -44,6 +45,10 @@ public final class Allwright {
 
     public static BrowserType firefox() {
         return FIREFOX;
+    }
+
+    public static Mobile mobile() {
+        return MOBILE;
     }
 
     public static Browser launchChrome() {
@@ -164,7 +169,9 @@ public final class Allwright {
             return new AllwrightConfig(
                     ConfigSupport.integerValue(root.get("schemaVersion")),
                     ConfigSupport.mapValue(root.get("server")),
-                    ConfigSupport.mapValue(root.get("browser")),
+                    ConfigSupport.mapValue(root.get("web")),
+                    ConfigSupport.mapValue(root.get("mobile")),
+                    ConfigSupport.mapValue(root.get("desktop")),
                     ConfigSupport.retryConfigValue(root.get("expect")),
                     ConfigSupport.suiteMapValue(root.get("suites"))
             );
@@ -196,25 +203,40 @@ public final class Allwright {
             }
         }
 
+        Map<String, Object> resolvedWeb = ConfigSupport.mergeSurfaceMap(
+                fileConfig.web(),
+                ConfigSupport.mapValue(suiteConfig == null ? null : suiteConfig.get("web"))
+        );
+        Map<String, Object> resolvedMobile = ConfigSupport.mergeSurfaceMap(
+                fileConfig.mobile(),
+                ConfigSupport.mapValue(suiteConfig == null ? null : suiteConfig.get("mobile"))
+        );
+        Map<String, Object> resolvedDesktop = ConfigSupport.mergeSurfaceMap(
+                fileConfig.desktop(),
+                ConfigSupport.mapValue(suiteConfig == null ? null : suiteConfig.get("desktop"))
+        );
+
         String browserName = ConfigSupport.firstNonBlank(
-                ConfigSupport.browserNameValue(ConfigSupport.mapValue(suiteConfig == null ? null : suiteConfig.get("browser"))),
-                ConfigSupport.browserNameValue(fileConfig.browser()),
-                "chromium"
+                ConfigSupport.browserNameValue(ConfigSupport.browserMapValue(ConfigSupport.mapValue(suiteConfig == null ? null : suiteConfig.get("web")))),
+                ConfigSupport.browserNameValue(ConfigSupport.browserMapValue(fileConfig.web()))
         );
         String browserBinary = ConfigSupport.firstNonBlank(
-                ConfigSupport.browserBinaryValue(ConfigSupport.mapValue(suiteConfig == null ? null : suiteConfig.get("browser"))),
-                ConfigSupport.browserBinaryValue(fileConfig.browser())
+                ConfigSupport.browserBinaryValue(ConfigSupport.browserMapValue(ConfigSupport.mapValue(suiteConfig == null ? null : suiteConfig.get("web")))),
+                ConfigSupport.browserBinaryValue(ConfigSupport.browserMapValue(fileConfig.web()))
         );
         String serverAddr = ConfigSupport.firstNonBlank(
                 ConfigSupport.serverAddrValue(ConfigSupport.mapValue(suiteConfig == null ? null : suiteConfig.get("server"))),
                 ConfigSupport.serverAddrValue(fileConfig.server())
         );
         LaunchOptions launchOptions = ConfigSupport.mergeLaunchOptions(
-                ConfigSupport.launchOptionsValue(fileConfig.browser()),
-                ConfigSupport.launchOptionsValue(ConfigSupport.mapValue(suiteConfig == null ? null : suiteConfig.get("browser")))
+                ConfigSupport.launchOptionsValue(ConfigSupport.browserMapValue(fileConfig.web())),
+                ConfigSupport.launchOptionsValue(ConfigSupport.browserMapValue(ConfigSupport.mapValue(suiteConfig == null ? null : suiteConfig.get("web"))))
         );
         if (browserBinary != null) {
             launchOptions = new LaunchOptions(browserBinary, launchOptions.timeoutMs());
+        }
+        if (browserName == null && resolvedMobile == null && resolvedDesktop == null) {
+            browserName = "chromium";
         }
         RetryConfig expect = ConfigSupport.mergeRetryConfig(
                 fileConfig.expect(),
@@ -228,7 +250,10 @@ public final class Allwright {
                 browserName,
                 browserBinary,
                 launchOptions,
-                expect
+                expect,
+                resolvedWeb,
+                resolvedMobile,
+                resolvedDesktop
         );
     }
 
@@ -236,6 +261,12 @@ public final class Allwright {
         Objects.requireNonNull(config, "config");
         if (config.serverAddr() != null && !config.serverAddr().isBlank()) {
             setServerAddr(config.serverAddr());
+        }
+        if ((config.browserName() == null || config.browserName().isBlank())
+                && (config.mobile() != null || config.desktop() != null)) {
+            throw new AllwrightException(
+                    "resolved config does not define web.browser.name and includes only non-web surfaces"
+            );
         }
         return switch (config.browserName()) {
             case "firefox" -> launchFirefox(config.launchOptions());

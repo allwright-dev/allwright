@@ -2,11 +2,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::command::merge_retry_config;
-use super::runtime::set_server_addr;
 use super::launch::launch_browser;
+use super::runtime::set_server_addr;
 use super::types::{
-    AllwrightConfig, BrowserKind, Error, LaunchOptions, ResolveConfigOptions, ResolvedConfig,
-    Result,
+    AllwrightConfig, BrowserKind, ConfigApp, ConfigDesktop, ConfigDesktopTarget, ConfigMobile,
+    ConfigMobileTarget, Error, LaunchOptions, ResolveConfigOptions, ResolvedAppConfig,
+    ResolvedConfig, ResolvedDesktopConfig, ResolvedDesktopTargetConfig, ResolvedMobileConfig,
+    ResolvedMobileTargetConfig, Result,
 };
 
 const CONFIG_FILENAMES: [&str; 6] = [
@@ -81,11 +83,13 @@ pub fn load_config_file(config_file: impl AsRef<Path>) -> Result<AllwrightConfig
 }
 
 pub fn resolve_config(options: ResolveConfigOptions) -> Result<ResolvedConfig> {
-    let cwd = options.cwd.unwrap_or(std::env::current_dir().map_err(|error| {
-        Error::new(format!(
-            "failed to determine current working directory: {error}"
-        ))
-    })?);
+    let cwd = options
+        .cwd
+        .unwrap_or(std::env::current_dir().map_err(|error| {
+            Error::new(format!(
+                "failed to determine current working directory: {error}"
+            ))
+        })?);
     let config_file_path = match options.config_file {
         Some(path) => Some(path),
         None => find_config_file(cwd),
@@ -136,33 +140,38 @@ pub fn resolve_config(options: ResolveConfigOptions) -> Result<ResolvedConfig> {
         });
     let browser_name = suite_config
         .as_ref()
-        .and_then(|suite| suite.browser.as_ref())
+        .and_then(|suite| suite.web.as_ref())
+        .and_then(|web| web.browser.as_ref())
         .and_then(|browser| browser.name)
         .or_else(|| {
             file_config
-                .browser
+                .web
                 .as_ref()
+                .and_then(|web| web.browser.as_ref())
                 .and_then(|browser| browser.name)
-        })
-        .unwrap_or(BrowserKind::Chromium);
+        });
     let browser_binary = suite_config
         .as_ref()
-        .and_then(|suite| suite.browser.as_ref())
+        .and_then(|suite| suite.web.as_ref())
+        .and_then(|web| web.browser.as_ref())
         .and_then(|browser| browser.binary.clone())
         .or_else(|| {
             file_config
-                .browser
+                .web
                 .as_ref()
+                .and_then(|web| web.browser.as_ref())
                 .and_then(|browser| browser.binary.clone())
         });
     let mut launch_options = merge_launch_options(
         file_config
-            .browser
+            .web
             .as_ref()
+            .and_then(|web| web.browser.as_ref())
             .and_then(|browser| browser.launch_options.clone()),
         suite_config
             .as_ref()
-            .and_then(|suite| suite.browser.as_ref())
+            .and_then(|suite| suite.web.as_ref())
+            .and_then(|web| web.browser.as_ref())
             .and_then(|browser| browser.launch_options.clone()),
     );
     if let Some(binary) = &browser_binary {
@@ -170,8 +179,32 @@ pub fn resolve_config(options: ResolveConfigOptions) -> Result<ResolvedConfig> {
     }
     let expect = merge_retry_config(
         file_config.expect.clone(),
-        suite_config.and_then(|suite| suite.expect),
+        suite_config.as_ref().and_then(|suite| suite.expect.clone()),
     );
+    let mobile = resolve_mobile_config(
+        file_config.mobile.as_ref(),
+        suite_config
+            .as_ref()
+            .and_then(|suite| suite.mobile.as_ref()),
+    );
+    let desktop = resolve_desktop_config(
+        file_config.desktop.as_ref(),
+        suite_config
+            .as_ref()
+            .and_then(|suite| suite.desktop.as_ref()),
+    );
+    let browser_name = browser_name.or_else(|| {
+        if mobile.android.is_some()
+            || mobile.ios.is_some()
+            || desktop.mac.is_some()
+            || desktop.windows.is_some()
+            || desktop.linux.is_some()
+        {
+            None
+        } else {
+            Some(BrowserKind::Chromium)
+        }
+    });
 
     Ok(ResolvedConfig {
         config_file_path,
@@ -181,6 +214,8 @@ pub fn resolve_config(options: ResolveConfigOptions) -> Result<ResolvedConfig> {
         browser_binary,
         launch_options,
         expect,
+        mobile,
+        desktop,
     })
 }
 
@@ -188,7 +223,12 @@ pub async fn launch_configured_browser(config: &ResolvedConfig) -> Result<super:
     if let Some(server_addr) = &config.server_addr {
         set_server_addr(server_addr.clone())?;
     }
-    launch_browser(config.browser_name, config.launch_options.clone()).await
+    let browser_name = config.browser_name.ok_or_else(|| {
+        Error::new(
+            "resolved config does not define web.browser.name and includes only non-web surfaces",
+        )
+    })?;
+    launch_browser(browser_name, config.launch_options.clone()).await
 }
 
 fn merge_launch_options(
@@ -218,4 +258,100 @@ fn validate_config_shape(config: &AllwrightConfig, source: &Path) -> Result<()> 
         }
     }
     Ok(())
+}
+
+fn resolve_mobile_config(
+    base: Option<&ConfigMobile>,
+    override_config: Option<&ConfigMobile>,
+) -> ResolvedMobileConfig {
+    ResolvedMobileConfig {
+        android: resolve_mobile_target(
+            base.and_then(|mobile| mobile.android.as_ref()),
+            override_config.and_then(|mobile| mobile.android.as_ref()),
+        ),
+        ios: resolve_mobile_target(
+            base.and_then(|mobile| mobile.ios.as_ref()),
+            override_config.and_then(|mobile| mobile.ios.as_ref()),
+        ),
+    }
+}
+
+fn resolve_desktop_config(
+    base: Option<&ConfigDesktop>,
+    override_config: Option<&ConfigDesktop>,
+) -> ResolvedDesktopConfig {
+    ResolvedDesktopConfig {
+        mac: resolve_desktop_target(
+            base.and_then(|desktop| desktop.mac.as_ref()),
+            override_config.and_then(|desktop| desktop.mac.as_ref()),
+        ),
+        windows: resolve_desktop_target(
+            base.and_then(|desktop| desktop.windows.as_ref()),
+            override_config.and_then(|desktop| desktop.windows.as_ref()),
+        ),
+        linux: resolve_desktop_target(
+            base.and_then(|desktop| desktop.linux.as_ref()),
+            override_config.and_then(|desktop| desktop.linux.as_ref()),
+        ),
+    }
+}
+
+fn resolve_mobile_target(
+    base: Option<&ConfigMobileTarget>,
+    override_config: Option<&ConfigMobileTarget>,
+) -> Option<ResolvedMobileTargetConfig> {
+    let app = resolve_app_config(
+        base.and_then(|target| target.app.as_ref()),
+        override_config.and_then(|target| target.app.as_ref()),
+    );
+    let resolved = ResolvedMobileTargetConfig {
+        device: override_config
+            .and_then(|target| target.device.clone())
+            .or_else(|| base.and_then(|target| target.device.clone())),
+        app,
+    };
+    if resolved.device.is_some() || resolved.app.is_some() {
+        Some(resolved)
+    } else {
+        None
+    }
+}
+
+fn resolve_desktop_target(
+    base: Option<&ConfigDesktopTarget>,
+    override_config: Option<&ConfigDesktopTarget>,
+) -> Option<ResolvedDesktopTargetConfig> {
+    let resolved = ResolvedDesktopTargetConfig {
+        app: resolve_app_config(
+            base.and_then(|target| target.app.as_ref()),
+            override_config.and_then(|target| target.app.as_ref()),
+        ),
+    };
+    if resolved.app.is_some() {
+        Some(resolved)
+    } else {
+        None
+    }
+}
+
+fn resolve_app_config(
+    base: Option<&ConfigApp>,
+    override_config: Option<&ConfigApp>,
+) -> Option<ResolvedAppConfig> {
+    let resolved = ResolvedAppConfig {
+        id: override_config
+            .and_then(|app| app.id.clone())
+            .or_else(|| base.and_then(|app| app.id.clone())),
+        binary: override_config
+            .and_then(|app| app.binary.clone())
+            .or_else(|| base.and_then(|app| app.binary.clone())),
+        activity: override_config
+            .and_then(|app| app.activity.clone())
+            .or_else(|| base.and_then(|app| app.activity.clone())),
+    };
+    if resolved.id.is_some() || resolved.binary.is_some() || resolved.activity.is_some() {
+        Some(resolved)
+    } else {
+        None
+    }
 }

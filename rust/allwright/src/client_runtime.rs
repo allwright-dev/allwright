@@ -14,7 +14,9 @@ static SERVER_ADDR_OVERRIDE: OnceLock<Mutex<Option<String>>> = OnceLock::new();
 pub async fn ping() -> Result<String> {
     let runtime = get_runtime().await?;
     let mut engine = runtime.engine.clone();
-    let response = engine.ping(tonic::Request::new(crate::proto::PingRequest {})).await?;
+    let response = engine
+        .ping(tonic::Request::new(crate::proto::PingRequest {}))
+        .await?;
     Ok(response.into_inner().message)
 }
 

@@ -225,6 +225,10 @@ jobs:
         shell: bash
         run: ./scripts/publish-crates.sh publish web
 
+      - name: Publish crates.io Android plugin profile
+        shell: bash
+        run: ./scripts/publish-crates.sh publish mobile-android
+
   release-allwright-cli:
     name: Release allwright CLI (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
@@ -346,6 +350,77 @@ jobs:
           set -euo pipefail
 
           asset_name="allwright-surface-web-${TAG_NAME}-${TARGET}.${ARCHIVE_EXT}"
+          package_root="dist/package"
+          asset_path="dist/${asset_name}"
+
+          rm -rf "$package_root" dist
+          mkdir -p "$package_root/lib"
+          cp "target/${TARGET}/release/${LIBRARY_NAME}" "$package_root/lib/${LIBRARY_NAME}"
+
+          if [[ "$ARCHIVE_EXT" == "zip" ]]; then
+            powershell -Command "Compress-Archive -Path 'dist/package/*' -DestinationPath 'dist/${asset_name}'"
+          else
+            tar -C "$package_root" -czf "$asset_path" .
+          fi
+
+          echo "asset_name=${asset_name}" >> "$GITHUB_OUTPUT"
+          echo "asset_path=${asset_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.package.outputs.asset_path }}
+
+  release-mobile-android-plugin:
+    name: Release mobile-android plugin (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive_ext: tar.gz
+            library_name: liballwright_surface_mobile_android.so
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive_ext: zip
+            library_name: allwright_surface_mobile_android.dll
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            archive_ext: tar.gz
+            library_name: liballwright_surface_mobile_android.dylib
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Sync workspace version from tag
+        shell: bash
+        run: |
+          chmod +x ./scripts/sync-version.sh
+          ./scripts/sync-version.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build mobile-android plugin library
+        run: cargo build -p allwright-surface-mobile-android --release --target ${{ matrix.target }}
+
+      - name: Package release asset
+        id: package
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          ARCHIVE_EXT: ${{ matrix.archive_ext }}
+          LIBRARY_NAME: ${{ matrix.library_name }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          asset_name="allwright-surface-mobile-android-${TAG_NAME}-${TARGET}.${ARCHIVE_EXT}"
           package_root="dist/package"
           asset_path="dist/${asset_name}"
 

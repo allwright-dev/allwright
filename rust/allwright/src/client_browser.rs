@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use crate::proto::browser_session_command::Command as BrowserCommand;
 use crate::proto::browser_session_event::Event as BrowserEvent;
-use crate::proto::{BrowserSessionCommand, CloseBrowserSessionCommand, OpenTabCommand, SessionPingCommand};
+use crate::proto::{
+    BrowserSessionCommand, CloseBrowserSessionCommand, OpenTabCommand, SessionPingCommand,
+};
 use tokio::sync::Mutex as AsyncMutex;
 
 use super::command::command_retry_options;
@@ -66,11 +68,10 @@ impl Browser {
             .map_err(|_| Error::new("failed to send OpenTabCommand to browser session"))?;
 
         loop {
-            let event = state
-                .events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("browser session closed while waiting for new tab"))?;
+            let event =
+                state.events.message().await?.ok_or_else(|| {
+                    Error::new("browser session closed while waiting for new tab")
+                })?;
 
             match event.event {
                 Some(BrowserEvent::TabOpened(opened)) => {
@@ -143,11 +144,10 @@ impl Browser {
             .map_err(|_| Error::new("failed to send CloseBrowserSessionCommand"))?;
 
         loop {
-            let event = state
-                .events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("browser session closed before close confirmation"))?;
+            let event =
+                state.events.message().await?.ok_or_else(|| {
+                    Error::new("browser session closed before close confirmation")
+                })?;
 
             match event.event {
                 Some(BrowserEvent::Closed(_)) => {
@@ -168,7 +168,10 @@ impl Browser {
 
 fn ensure_browser_open(state: &BrowserState, session_id: &str) -> Result<()> {
     if state.closed {
-        return Err(Error::new(format!("browser session {} is closed", session_id)));
+        return Err(Error::new(format!(
+            "browser session {} is closed",
+            session_id
+        )));
     }
     Ok(())
 }

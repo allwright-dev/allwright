@@ -90,6 +90,10 @@ func LaunchConfiguredBrowser(ctx context.Context, config *ResolvedConfig) (*Brow
 		}
 	}
 
+	if strings.TrimSpace(config.BrowserName) == "" && (config.Mobile != nil || config.Desktop != nil) {
+		return nil, fmt.Errorf("resolved config does not define web.browser.name and includes only non-web surfaces")
+	}
+
 	switch strings.ToLower(strings.TrimSpace(config.BrowserName)) {
 	case "", "chromium":
 		return LaunchChrome(ctx, config.LaunchOptions)

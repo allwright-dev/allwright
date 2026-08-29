@@ -1,7 +1,7 @@
-#[path = "client_browser.rs"]
-mod browser;
 #[path = "client_bootstrap.rs"]
 mod bootstrap;
+#[path = "client_browser.rs"]
+mod browser;
 #[path = "client_command.rs"]
 mod command;
 #[path = "client_config.rs"]
@@ -10,6 +10,8 @@ mod config;
 mod launch;
 #[path = "client_locator.rs"]
 mod locator;
+#[path = "client_mobile.rs"]
+pub mod mobile;
 #[path = "client_runtime.rs"]
 mod runtime;
 #[path = "client_selectors.rs"]

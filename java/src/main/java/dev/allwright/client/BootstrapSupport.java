@@ -18,6 +18,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 final class BootstrapSupport {
     private static final String ALLWRIGHT_AUTO_INSTALL_ENV_VAR = "ALLWRIGHT_AUTO_INSTALL";
@@ -74,7 +75,7 @@ final class BootstrapSupport {
         shutdownManagedServer();
 
         Path cliPath = ensureCliAvailable(expectedVersion);
-        ensureWebPlugin(cliPath, expectedVersion);
+        ensurePluginsInstalledWithCli(cliPath, expectedVersion, "web");
         String resolvedServerAddr = normalized;
         if (status != null && !status.version().equals(expectedVersion)) {
             resolvedServerAddr = allocateManagedServerAddr(normalized);
@@ -211,40 +212,91 @@ final class BootstrapSupport {
         }
     }
 
-    private static void ensureWebPlugin(Path cliPath, String expectedVersion) {
-        Path pluginPath = allwrightHome().resolve("plugins").resolve("web").resolve("lib").resolve(webPluginFilename());
-        if (Files.isRegularFile(pluginPath) && expectedVersion.equals(installedPluginVersion("web"))) {
-            return;
-        }
+    static void ensurePluginsInstalled(String... pluginIds) {
+        String expectedVersion = expectedRuntimeVersion();
+        Path cliPath = ensureCliAvailable(expectedVersion);
+        ensurePluginsInstalledWithCli(cliPath, expectedVersion, pluginIds);
+    }
+
+    static String invokePlugin(String pluginId, String requestJson) {
+        String expectedVersion = expectedRuntimeVersion();
+        Path cliPath = ensureCliAvailable(expectedVersion);
+        Process process;
         try {
-            Process process = new ProcessBuilder(
+            process = new ProcessBuilder(
                     cliPath.toString(),
                     "plugin",
-                    "install",
-                    "web",
-                    "--version",
-                    expectedVersion
-            )
-                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
-                    .start();
+                    "invoke",
+                    pluginId,
+                    "--request-json",
+                    requestJson
+            ).start();
+        } catch (IOException exception) {
+            throw new AllwrightException("invoke allwright " + pluginId + " plugin: " + exception.getMessage(), exception);
+        }
+
+        try {
             int exitCode = process.waitFor();
-            if (exitCode != 0 || !Files.isRegularFile(pluginPath)) {
+            String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+            String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+            if (exitCode != 0) {
+                String details = java.util.stream.Stream.of(stdout, stderr)
+                        .filter(value -> value != null && !value.isBlank())
+                        .collect(Collectors.joining(System.lineSeparator()));
                 throw new AllwrightException(
-                        "allwright attempted to install the `web` plugin automatically, but the install did not complete successfully"
+                        details.isBlank() ? "allwright " + pluginId + " plugin invocation failed" : details
                 );
             }
-            if (!expectedVersion.equals(installedPluginVersion("web"))) {
-                throw new AllwrightException(
-                        "allwright attempted to install the `web` plugin automatically, but version "
-                                + expectedVersion + " is still not active"
-                );
-            }
+            return stdout;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new AllwrightException("install allwright web plugin: " + exception.getMessage(), exception);
+            throw new AllwrightException("invoke allwright " + pluginId + " plugin: " + exception.getMessage(), exception);
         } catch (IOException exception) {
-            throw new AllwrightException("install allwright web plugin: " + exception.getMessage(), exception);
+            throw new AllwrightException("read allwright " + pluginId + " plugin output: " + exception.getMessage(), exception);
+        }
+    }
+
+    private static void ensurePluginsInstalledWithCli(Path cliPath, String expectedVersion, String... pluginIds) {
+        for (String pluginId : java.util.Arrays.stream(pluginIds)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .distinct()
+                .toList()) {
+            Path pluginPath = allwrightHome().resolve("plugins").resolve(pluginId).resolve("lib").resolve(pluginLibraryFilename(pluginId));
+            if (Files.isRegularFile(pluginPath) && expectedVersion.equals(installedPluginVersion(pluginId))) {
+                continue;
+            }
+            try {
+                Process process = new ProcessBuilder(
+                        cliPath.toString(),
+                        "plugin",
+                        "install",
+                        pluginId,
+                        "--version",
+                        expectedVersion
+                )
+                        .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                        .redirectError(ProcessBuilder.Redirect.DISCARD)
+                        .start();
+                int exitCode = process.waitFor();
+                if (exitCode != 0 || !Files.isRegularFile(pluginPath)) {
+                    throw new AllwrightException(
+                            "allwright attempted to install the `" + pluginId + "` plugin automatically, but the install did not complete successfully"
+                    );
+                }
+                if (!expectedVersion.equals(installedPluginVersion(pluginId))) {
+                    throw new AllwrightException(
+                            "allwright attempted to install the `" + pluginId + "` plugin automatically, but version "
+                                    + expectedVersion + " is still not active"
+                    );
+                }
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new AllwrightException("install allwright " + pluginId + " plugin: " + exception.getMessage(), exception);
+            } catch (IOException exception) {
+                throw new AllwrightException("install allwright " + pluginId + " plugin: " + exception.getMessage(), exception);
+            }
         }
     }
 
@@ -503,15 +555,26 @@ final class BootstrapSupport {
         return System.getProperty("os.name").toLowerCase().contains("windows") ? "allwright.exe" : "allwright";
     }
 
-    private static String webPluginFilename() {
+    private static String pluginLibraryFilename(String pluginId) {
+        String stem = pluginLibraryStem(pluginId);
         String os = System.getProperty("os.name").toLowerCase();
         if (os.contains("windows")) {
-            return "allwright_surface_web.dll";
+            return stem + ".dll";
         }
         if (os.contains("mac")) {
-            return "liballwright_surface_web.dylib";
+            return "lib" + stem + ".dylib";
         }
-        return "liballwright_surface_web.so";
+        return "lib" + stem + ".so";
+    }
+
+    private static String pluginLibraryStem(String pluginId) {
+        return switch (pluginId) {
+            case "web" -> "allwright_surface_web";
+            case "mobile-android" -> "allwright_surface_mobile_android";
+            default -> throw new AllwrightException(
+                    "automatic install is not supported for allwright plugin `" + pluginId + "`"
+            );
+        };
     }
 
     private static Path findExtractedCli(Path extractRoot) throws IOException {

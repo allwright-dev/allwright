@@ -5,6 +5,13 @@ from typing import overload
 from ._browser import Browser, BrowserType
 from ._config import find_config_file, load_config_file, resolve_config
 from ._locator import Locator
+from ._mobile import (
+    AndroidDevice,
+    AndroidPage,
+    MobileAndroidConnectOptions,
+    MobileAndroidLaunchOptions,
+    mobile,
+)
 from ._page import Page
 from ._proto import engine_pb2
 from ._runtime import launch_browser_with_kind, ping, set_server_addr, shutdown
@@ -66,6 +73,8 @@ def launch_configured_browser(config: ResolvedConfig) -> Browser:
         return launch_firefox(config.launch_options)
     if config.browser_name == "chromium":
         return launch_chrome(config.launch_options)
+    if config.browser_name is None:
+        raise ValueError("resolved config does not define web.browser.name and includes only non-web surfaces")
     raise ValueError(
         f'unsupported browser.name "{config.browser_name}"; use "chromium" or "firefox"'
     )

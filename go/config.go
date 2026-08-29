@@ -112,24 +112,27 @@ func ResolveConfig(options ResolveConfigOptions) (*ResolvedConfig, error) {
 		suite = &selected
 	}
 
-	browserName := "chromium"
-	if config.Browser != nil && strings.TrimSpace(config.Browser.Name) != "" {
-		browserName = strings.TrimSpace(config.Browser.Name)
-	}
-	if suite != nil && suite.Browser != nil && strings.TrimSpace(suite.Browser.Name) != "" {
-		browserName = strings.TrimSpace(suite.Browser.Name)
+	web := mergeWebConfig(config.Web, suiteWeb(suite))
+	mobile := mergeMobileConfig(config.Mobile, suiteMobile(suite))
+	desktop := mergeDesktopConfig(config.Desktop, suiteDesktop(suite))
+	browserName := firstNonEmpty(
+		configBrowserNameFromWeb(suiteWeb(suite)),
+		configBrowserNameFromWeb(config.Web),
+	)
+	if browserName == "" && mobile == nil && desktop == nil {
+		browserName = "chromium"
 	}
 
 	browserBinary := firstNonEmpty(
-		configBrowserBinaryFromSuite(suite),
-		configBrowserBinary(config.Browser),
+		configBrowserBinaryFromWeb(suiteWeb(suite)),
+		configBrowserBinaryFromWeb(config.Web),
 	)
 	serverAddr := firstNonEmpty(
 		configServerAddrFromSuite(suite),
 		configServerAddr(config.Server),
 	)
 	launchOptions := mergeLaunchOptions(
-		launchOptionsFromConfig(config.Browser),
+		launchOptionsFromWeb(config.Web),
 		launchOptionsFromSuite(suite),
 	)
 	if browserBinary != "" {
@@ -145,6 +148,9 @@ func ResolveConfig(options ResolveConfigOptions) (*ResolvedConfig, error) {
 		BrowserBinary:  browserBinary,
 		LaunchOptions:  launchOptions,
 		Expect:         expect,
+		Web:            web,
+		Mobile:         mobile,
+		Desktop:        desktop,
 	}, nil
 }
 
@@ -156,11 +162,11 @@ func validateConfig(config *AllwrightConfig, source string) error {
 		return fmt.Errorf("allwright config %s has unsupported schemaVersion %d; expected 1", source, config.SchemaVersion)
 	}
 
-	if err := validateBrowserName(source, configBrowserName(config.Browser)); err != nil {
+	if err := validateBrowserName(source, configBrowserNameFromWeb(config.Web)); err != nil {
 		return err
 	}
 	for suiteName, suite := range config.Suites {
-		if err := validateBrowserName(source, configBrowserName(suite.Browser)); err != nil {
+		if err := validateBrowserName(source, configBrowserNameFromWeb(suite.Web)); err != nil {
 			return fmt.Errorf("suite %q: %w", suiteName, err)
 		}
 	}
@@ -183,6 +189,13 @@ func configBrowserName(browser *configBrowser) string {
 	return strings.TrimSpace(browser.Name)
 }
 
+func configBrowserNameFromWeb(web *configWeb) string {
+	if web == nil {
+		return ""
+	}
+	return configBrowserName(web.Browser)
+}
+
 func configBrowserBinary(browser *configBrowser) string {
 	if browser == nil {
 		return ""
@@ -190,11 +203,11 @@ func configBrowserBinary(browser *configBrowser) string {
 	return strings.TrimSpace(browser.Binary)
 }
 
-func configBrowserBinaryFromSuite(suite *suiteConfig) string {
-	if suite == nil {
+func configBrowserBinaryFromWeb(web *configWeb) string {
+	if web == nil {
 		return ""
 	}
-	return configBrowserBinary(suite.Browser)
+	return configBrowserBinary(web.Browser)
 }
 
 func configServerAddr(server *configServer) string {
@@ -225,11 +238,18 @@ func launchOptionsFromConfig(browser *configBrowser) LaunchOptions {
 	return options
 }
 
+func launchOptionsFromWeb(web *configWeb) LaunchOptions {
+	if web == nil {
+		return LaunchOptions{}
+	}
+	return launchOptionsFromConfig(web.Browser)
+}
+
 func launchOptionsFromSuite(suite *suiteConfig) LaunchOptions {
 	if suite == nil {
 		return LaunchOptions{}
 	}
-	return launchOptionsFromConfig(suite.Browser)
+	return launchOptionsFromWeb(suite.Web)
 }
 
 func mergeLaunchOptions(base LaunchOptions, override LaunchOptions) LaunchOptions {
@@ -248,6 +268,91 @@ func suiteExpect(suite *suiteConfig) *RetryConfig {
 		return nil
 	}
 	return suite.Expect
+}
+
+func suiteWeb(suite *suiteConfig) *configWeb {
+	if suite == nil {
+		return nil
+	}
+	return suite.Web
+}
+
+func suiteMobile(suite *suiteConfig) *configMobile {
+	if suite == nil {
+		return nil
+	}
+	return suite.Mobile
+}
+
+func suiteDesktop(suite *suiteConfig) *configDesktop {
+	if suite == nil {
+		return nil
+	}
+	return suite.Desktop
+}
+
+func mergeWebConfig(base *configWeb, override *configWeb) *configWeb {
+	if base == nil && override == nil {
+		return nil
+	}
+	merged := &configWeb{}
+	if base != nil {
+		*merged = *base
+	}
+	if override != nil && override.Browser != nil {
+		merged.Browser = override.Browser
+	}
+	if merged.Browser == nil {
+		return nil
+	}
+	return merged
+}
+
+func mergeMobileConfig(base *configMobile, override *configMobile) *configMobile {
+	if base == nil && override == nil {
+		return nil
+	}
+	merged := &configMobile{}
+	if base != nil {
+		*merged = *base
+	}
+	if override != nil {
+		if override.Android != nil {
+			merged.Android = override.Android
+		}
+		if override.IOS != nil {
+			merged.IOS = override.IOS
+		}
+	}
+	if merged.Android == nil && merged.IOS == nil {
+		return nil
+	}
+	return merged
+}
+
+func mergeDesktopConfig(base *configDesktop, override *configDesktop) *configDesktop {
+	if base == nil && override == nil {
+		return nil
+	}
+	merged := &configDesktop{}
+	if base != nil {
+		*merged = *base
+	}
+	if override != nil {
+		if override.Mac != nil {
+			merged.Mac = override.Mac
+		}
+		if override.Windows != nil {
+			merged.Windows = override.Windows
+		}
+		if override.Linux != nil {
+			merged.Linux = override.Linux
+		}
+	}
+	if merged.Mac == nil && merged.Windows == nil && merged.Linux == nil {
+		return nil
+	}
+	return merged
 }
 
 func mergeRetryConfig(base *RetryConfig, override *RetryConfig) RetryConfig {

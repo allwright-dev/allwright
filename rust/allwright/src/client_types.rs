@@ -79,9 +79,53 @@ pub(crate) struct ConfigBrowser {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct ConfigWeb {
+    pub(crate) browser: Option<ConfigBrowser>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ConfigApp {
+    pub(crate) id: Option<String>,
+    pub(crate) binary: Option<String>,
+    pub(crate) activity: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ConfigMobileTarget {
+    pub(crate) device: Option<String>,
+    pub(crate) app: Option<ConfigApp>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ConfigMobile {
+    pub(crate) android: Option<ConfigMobileTarget>,
+    pub(crate) ios: Option<ConfigMobileTarget>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ConfigDesktopTarget {
+    pub(crate) app: Option<ConfigApp>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ConfigDesktop {
+    pub(crate) mac: Option<ConfigDesktopTarget>,
+    pub(crate) windows: Option<ConfigDesktopTarget>,
+    pub(crate) linux: Option<ConfigDesktopTarget>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct SuiteConfig {
     pub(crate) server: Option<ConfigServer>,
-    pub(crate) browser: Option<ConfigBrowser>,
+    pub(crate) web: Option<ConfigWeb>,
+    pub(crate) mobile: Option<ConfigMobile>,
+    pub(crate) desktop: Option<ConfigDesktop>,
     pub(crate) expect: Option<RetryConfig>,
 }
 
@@ -90,9 +134,42 @@ pub(crate) struct SuiteConfig {
 pub struct AllwrightConfig {
     pub(crate) schema_version: Option<u32>,
     pub(crate) server: Option<ConfigServer>,
-    pub(crate) browser: Option<ConfigBrowser>,
+    pub(crate) web: Option<ConfigWeb>,
+    pub(crate) mobile: Option<ConfigMobile>,
+    pub(crate) desktop: Option<ConfigDesktop>,
     pub(crate) expect: Option<RetryConfig>,
     pub(crate) suites: Option<std::collections::BTreeMap<String, SuiteConfig>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedAppConfig {
+    pub id: Option<String>,
+    pub binary: Option<String>,
+    pub activity: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedMobileTargetConfig {
+    pub device: Option<String>,
+    pub app: Option<ResolvedAppConfig>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ResolvedMobileConfig {
+    pub android: Option<ResolvedMobileTargetConfig>,
+    pub ios: Option<ResolvedMobileTargetConfig>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedDesktopTargetConfig {
+    pub app: Option<ResolvedAppConfig>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ResolvedDesktopConfig {
+    pub mac: Option<ResolvedDesktopTargetConfig>,
+    pub windows: Option<ResolvedDesktopTargetConfig>,
+    pub linux: Option<ResolvedDesktopTargetConfig>,
 }
 
 #[derive(Debug, Clone)]
@@ -100,10 +177,12 @@ pub struct ResolvedConfig {
     pub config_file_path: Option<PathBuf>,
     pub suite_name: Option<String>,
     pub server_addr: Option<String>,
-    pub browser_name: BrowserKind,
+    pub browser_name: Option<BrowserKind>,
     pub browser_binary: Option<String>,
     pub launch_options: LaunchOptions,
     pub expect: RetryConfig,
+    pub mobile: ResolvedMobileConfig,
+    pub desktop: ResolvedDesktopConfig,
 }
 
 #[derive(Debug, Clone, Default)]

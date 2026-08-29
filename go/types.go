@@ -36,21 +36,55 @@ type configBrowser struct {
 	LaunchOptions *configLaunch `json:"launchOptions,omitempty" yaml:"launchOptions,omitempty"`
 }
 
+type configWeb struct {
+	Browser *configBrowser `json:"browser,omitempty" yaml:"browser,omitempty"`
+}
+
 type configLaunch struct {
 	BrowserBinary string `json:"browserBinary,omitempty" yaml:"browserBinary,omitempty"`
 	TimeoutMs     uint32 `json:"timeoutMs,omitempty" yaml:"timeoutMs,omitempty"`
 }
 
+type configApp struct {
+	ID       string `json:"id,omitempty" yaml:"id,omitempty"`
+	Binary   string `json:"binary,omitempty" yaml:"binary,omitempty"`
+	Activity string `json:"activity,omitempty" yaml:"activity,omitempty"`
+}
+
+type configMobileTarget struct {
+	Device string     `json:"device,omitempty" yaml:"device,omitempty"`
+	App    *configApp `json:"app,omitempty" yaml:"app,omitempty"`
+}
+
+type configMobile struct {
+	Android *configMobileTarget `json:"android,omitempty" yaml:"android,omitempty"`
+	IOS     *configMobileTarget `json:"ios,omitempty" yaml:"ios,omitempty"`
+}
+
+type configDesktopTarget struct {
+	App *configApp `json:"app,omitempty" yaml:"app,omitempty"`
+}
+
+type configDesktop struct {
+	Mac     *configDesktopTarget `json:"mac,omitempty" yaml:"mac,omitempty"`
+	Windows *configDesktopTarget `json:"windows,omitempty" yaml:"windows,omitempty"`
+	Linux   *configDesktopTarget `json:"linux,omitempty" yaml:"linux,omitempty"`
+}
+
 type suiteConfig struct {
 	Server  *configServer  `json:"server,omitempty" yaml:"server,omitempty"`
-	Browser *configBrowser `json:"browser,omitempty" yaml:"browser,omitempty"`
+	Web     *configWeb     `json:"web,omitempty" yaml:"web,omitempty"`
+	Mobile  *configMobile  `json:"mobile,omitempty" yaml:"mobile,omitempty"`
+	Desktop *configDesktop `json:"desktop,omitempty" yaml:"desktop,omitempty"`
 	Expect  *RetryConfig   `json:"expect,omitempty" yaml:"expect,omitempty"`
 }
 
 type AllwrightConfig struct {
 	SchemaVersion uint32                 `json:"schemaVersion,omitempty" yaml:"schemaVersion,omitempty"`
 	Server        *configServer          `json:"server,omitempty" yaml:"server,omitempty"`
-	Browser       *configBrowser         `json:"browser,omitempty" yaml:"browser,omitempty"`
+	Web           *configWeb             `json:"web,omitempty" yaml:"web,omitempty"`
+	Mobile        *configMobile          `json:"mobile,omitempty" yaml:"mobile,omitempty"`
+	Desktop       *configDesktop         `json:"desktop,omitempty" yaml:"desktop,omitempty"`
 	Expect        *RetryConfig           `json:"expect,omitempty" yaml:"expect,omitempty"`
 	Suites        map[string]suiteConfig `json:"suites,omitempty" yaml:"suites,omitempty"`
 }
@@ -69,6 +103,9 @@ type ResolvedConfig struct {
 	BrowserBinary  string
 	LaunchOptions  LaunchOptions
 	Expect         RetryConfig
+	Web            *configWeb
+	Mobile         *configMobile
+	Desktop        *configDesktop
 }
 
 type CommandOptions struct {

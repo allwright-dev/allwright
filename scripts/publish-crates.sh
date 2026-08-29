@@ -12,6 +12,12 @@ web_crates=(
   allwright
 )
 
+mobile_android_crates=(
+  allwright-plugin-sdk
+  allwright-surface-mobile
+  allwright-surface-mobile-android
+)
+
 full_crates=(
   allwright-plugin-sdk
   allwright-core
@@ -34,24 +40,26 @@ allow_dirty="${CARGO_PUBLISH_ALLOW_DIRTY:-0}"
 dependency_retry_seconds="${DEPENDENCY_RETRY_SECONDS:-20}"
 
 if [[ "$mode" != "publish" && "$mode" != "dry-run" ]]; then
-  echo "usage: $0 [publish|dry-run] [web|full]" >&2
+  echo "usage: $0 [publish|dry-run] [web|mobile-android|full]" >&2
   exit 1
 fi
 
-if [[ "$profile" != "web" && "$profile" != "full" ]]; then
-  echo "usage: $0 [publish|dry-run] [web|full]" >&2
+if [[ "$profile" != "web" && "$profile" != "mobile-android" && "$profile" != "full" ]]; then
+  echo "usage: $0 [publish|dry-run] [web|mobile-android|full]" >&2
   exit 1
 fi
 
 if [[ "$profile" == "web" ]]; then
   crates=("${web_crates[@]}")
+elif [[ "$profile" == "mobile-android" ]]; then
+  crates=("${mobile_android_crates[@]}")
 else
   if [[ "$allow_experimental_surfaces" != "1" ]]; then
     cat >&2 <<'EOF'
 refusing to publish the `full` profile by default.
 
-only the web plugin path is currently release-backed and runtime-ready.
-if you intentionally want to publish the experimental mobile/desktop surface crates too,
+only the web and mobile-android plugin paths are currently release-backed enough to publish individually.
+if you intentionally want to publish the remaining experimental mobile/desktop surface crates too,
 rerun with:
 
   ALLOW_EXPERIMENTAL_SURFACES=1 ./scripts/publish-crates.sh publish full
@@ -157,6 +165,9 @@ echo "dependency retry interval: ${dependency_retry_seconds}s"
 if [[ "$profile" == "web" ]]; then
   echo "this publishes Rust crates for the lightweight core + CLI + web plugin path."
   echo "release archives for end users still come from GitHub Releases."
+elif [[ "$profile" == "mobile-android" ]]; then
+  echo "this publishes the shared mobile crate plus the Android plugin crate to crates.io."
+  echo "standalone runtime artifacts for CLI installs still come from GitHub Releases."
 fi
 
 for i in "${!crates[@]}"; do

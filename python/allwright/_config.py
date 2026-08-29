@@ -59,7 +59,9 @@ def load_config_file(config_file: str | Path) -> AllwrightConfig:
     return AllwrightConfig(
         schema_version=parsed.get("schemaVersion"),
         server=parsed.get("server"),
-        browser=parsed.get("browser"),
+        web=parsed.get("web"),
+        mobile=parsed.get("mobile"),
+        desktop=parsed.get("desktop"),
         expect=retry_config_from_mapping(parsed.get("expect")),
         suites=parsed.get("suites"),
     )
@@ -88,20 +90,25 @@ def resolve_config(options: ResolveConfigOptions | None = None) -> ResolvedConfi
         server_addr_from_mapping(suite_config.get("server") if suite_config else None),
         server_addr_from_mapping(file_config.server),
     )
+    resolved_web = merge_surface_mapping(file_config.web, suite_config.get("web") if suite_config else None)
+    resolved_mobile = merge_surface_mapping(file_config.mobile, suite_config.get("mobile") if suite_config else None)
+    resolved_desktop = merge_surface_mapping(file_config.desktop, suite_config.get("desktop") if suite_config else None)
     browser_name = first_non_empty(
-        browser_name_from_mapping(suite_config.get("browser") if suite_config else None),
-        browser_name_from_mapping(file_config.browser),
-    ) or "chromium"
+        browser_name_from_mapping(browser_mapping_from_web(suite_config.get("web") if suite_config else None)),
+        browser_name_from_mapping(browser_mapping_from_web(file_config.web)),
+    )
     browser_binary = first_non_empty(
-        browser_binary_from_mapping(suite_config.get("browser") if suite_config else None),
-        browser_binary_from_mapping(file_config.browser),
+        browser_binary_from_mapping(browser_mapping_from_web(suite_config.get("web") if suite_config else None)),
+        browser_binary_from_mapping(browser_mapping_from_web(file_config.web)),
     )
     launch_options = merge_launch_options(
-        launch_options_from_mapping(file_config.browser),
-        launch_options_from_mapping(suite_config.get("browser") if suite_config else None),
+        launch_options_from_mapping(browser_mapping_from_web(file_config.web)),
+        launch_options_from_mapping(browser_mapping_from_web(suite_config.get("web") if suite_config else None)),
     )
     if browser_binary:
         launch_options.browser_binary = browser_binary
+    if not browser_name and not resolved_mobile and not resolved_desktop:
+        browser_name = "chromium"
     expect = merge_retry_config(
         file_config.expect,
         retry_config_from_mapping(suite_config.get("expect") if suite_config else None),
@@ -115,6 +122,9 @@ def resolve_config(options: ResolveConfigOptions | None = None) -> ResolvedConfi
         browser_binary=browser_binary,
         launch_options=launch_options,
         expect=expect,
+        web=resolved_web,
+        mobile=resolved_mobile,
+        desktop=resolved_desktop,
     )
 
 
@@ -125,11 +135,18 @@ def validate_config_shape(config: dict[str, Any], source: Path) -> None:
             f"allwright config {source} has unsupported schemaVersion {schema_version}; expected 1"
         )
 
-    browser_name = browser_name_from_mapping(config.get("browser"))
+    browser_name = browser_name_from_mapping(browser_mapping_from_web(config.get("web")))
     if browser_name and browser_name not in {"chromium", "firefox"}:
         raise AllwrightError(
             f'allwright config {source} has unsupported browser.name "{browser_name}"; use "chromium" or "firefox"'
         )
+
+
+def browser_mapping_from_web(web: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(web, dict):
+        return None
+    browser = web.get("browser")
+    return browser if isinstance(browser, dict) else None
 
 
 def browser_name_from_mapping(browser: dict[str, Any] | None) -> str | None:
@@ -179,6 +196,23 @@ def merge_launch_options(base: LaunchOptions, override: LaunchOptions) -> Launch
         browser_binary=override.browser_binary or base.browser_binary,
         timeout_ms=override.timeout_ms if override.timeout_ms is not None else base.timeout_ms,
     )
+
+
+def merge_surface_mapping(
+    base: dict[str, Any] | None,
+    override: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not isinstance(base, dict) and not isinstance(override, dict):
+        return None
+    merged: dict[str, Any] = {}
+    for source in (base, override):
+        if isinstance(source, dict):
+            for key, value in source.items():
+                if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                    merged[key] = {**merged[key], **value}
+                else:
+                    merged[key] = value
+    return merged
 
 
 def merge_retry_config(base: RetryConfig | None, override: RetryConfig | None) -> RetryConfig:

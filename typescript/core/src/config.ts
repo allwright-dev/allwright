@@ -3,9 +3,17 @@ import path from "node:path";
 
 import type {
   AllwrightConfig,
+  DesktopConfig,
   LaunchOptions,
+  MobileConfig,
   ResolveConfigOptions,
   ResolvedAllwrightConfig,
+  ResolvedDesktopTargetConfig,
+  ResolvedMobileTargetConfig,
+  SurfaceAppConfig,
+  SurfaceDesktopTargetConfig,
+  SurfaceMobileTargetConfig,
+  WebConfig,
 } from "./types.js";
 
 const CONFIG_FILENAMES = [
@@ -58,12 +66,12 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedAllwr
   }
 
   const serverAddr = suiteConfig?.server?.addr ?? fileConfig.server?.addr;
-  const browserName = suiteConfig?.browser?.name ?? fileConfig.browser?.name ?? "chromium";
-  const browserBinary = suiteConfig?.browser?.binary ?? fileConfig.browser?.binary;
-  const launchOptions = mergeLaunchOptions(
-    fileConfig.browser?.launchOptions,
-    suiteConfig?.browser?.launchOptions,
-  );
+  const web = resolveWebSurface(fileConfig.web, suiteConfig?.web);
+  const mobile = resolveMobileSurface(fileConfig.mobile, suiteConfig?.mobile);
+  const desktop = resolveDesktopSurface(fileConfig.desktop, suiteConfig?.desktop);
+  const browserName = web?.browserName ?? defaultBrowserNameForResolvedSurfaces(mobile, desktop);
+  const browserBinary = web?.browserBinary;
+  const launchOptions = web?.launchOptions ?? {};
   const expect = {
     ...(fileConfig.expect ?? {}),
     ...(suiteConfig?.expect ?? {}),
@@ -77,6 +85,9 @@ export function resolveConfig(options: ResolveConfigOptions = {}): ResolvedAllwr
     browserBinary,
     launchOptions: browserBinary ? { ...launchOptions, browserBinary } : launchOptions,
     expect,
+    web,
+    mobile,
+    desktop,
   };
 }
 
@@ -102,13 +113,102 @@ function validateConfigShape(value: unknown, source: string): void {
     );
   }
 
-  const browserName =
-    (config.browser as { name?: unknown } | undefined)?.name;
+  const browserName = (((config.web as { browser?: { name?: unknown } } | undefined)?.browser)?.name);
   if (browserName !== undefined && browserName !== "chromium" && browserName !== "firefox") {
     throw new Error(
       `allwright config ${source} has unsupported browser.name ${String(browserName)}; use "chromium" or "firefox"`,
     );
   }
+}
+
+function resolveMobileSurface(base?: MobileConfig, override?: MobileConfig) {
+  return {
+    android: resolveMobileTarget(base?.android, override?.android),
+    ios: resolveMobileTarget(base?.ios, override?.ios),
+  };
+}
+
+function resolveDesktopSurface(base?: DesktopConfig, override?: DesktopConfig) {
+  return {
+    mac: resolveDesktopTarget(base?.mac, override?.mac),
+    windows: resolveDesktopTarget(base?.windows, override?.windows),
+    linux: resolveDesktopTarget(base?.linux, override?.linux),
+  };
+}
+
+function resolveWebSurface(base?: WebConfig, override?: WebConfig) {
+  const browser = override?.browser ?? base?.browser;
+  const browserName = override?.browser?.name ?? base?.browser?.name;
+  const browserBinary = override?.browser?.binary ?? base?.browser?.binary;
+  const launchOptions = mergeLaunchOptions(
+    base?.browser?.launchOptions,
+    override?.browser?.launchOptions,
+  );
+  if (!browser && !browserName && !browserBinary && !Object.keys(launchOptions).length) {
+    return undefined;
+  }
+  return {
+    browserName,
+    browserBinary,
+    launchOptions: browserBinary ? { ...launchOptions, browserBinary } : launchOptions,
+  };
+}
+
+function resolveMobileTarget(
+  base?: SurfaceMobileTargetConfig,
+  override?: SurfaceMobileTargetConfig,
+): ResolvedMobileTargetConfig | undefined {
+  const app = mergeAppConfig(base?.app, override?.app);
+  const resolved: ResolvedMobileTargetConfig = {
+    device: override?.device ?? base?.device,
+    appId: app?.id,
+    appBinary: app?.binary,
+    appActivity: app?.activity,
+  };
+  return hasResolvedValues(resolved) ? resolved : undefined;
+}
+
+function resolveDesktopTarget(
+  base?: SurfaceDesktopTargetConfig,
+  override?: SurfaceDesktopTargetConfig,
+): ResolvedDesktopTargetConfig | undefined {
+  const app = mergeAppConfig(base?.app, override?.app);
+  const resolved: ResolvedDesktopTargetConfig = {
+    appId: app?.id,
+    appBinary: app?.binary,
+    appActivity: app?.activity,
+  };
+  return hasResolvedValues(resolved) ? resolved : undefined;
+}
+
+function mergeAppConfig(
+  base?: SurfaceAppConfig,
+  override?: SurfaceAppConfig,
+): SurfaceAppConfig | undefined {
+  const resolved: SurfaceAppConfig = {
+    id: override?.id ?? base?.id,
+    binary: override?.binary ?? base?.binary,
+    activity: override?.activity ?? base?.activity,
+  };
+  return hasResolvedValues(resolved) ? resolved : undefined;
+}
+
+function hasResolvedValues(value: object): boolean {
+  return Object.values(value).some((entry) => entry !== undefined && entry !== null && entry !== "");
+}
+
+function defaultBrowserNameForResolvedSurfaces(
+  mobile: { android?: ResolvedMobileTargetConfig; ios?: ResolvedMobileTargetConfig },
+  desktop: {
+    mac?: ResolvedDesktopTargetConfig;
+    windows?: ResolvedDesktopTargetConfig;
+    linux?: ResolvedDesktopTargetConfig;
+  },
+) {
+  if (mobile.android || mobile.ios || desktop.mac || desktop.windows || desktop.linux) {
+    return undefined;
+  }
+  return "chromium";
 }
 
 function parseConfigContents(raw: string, source: string): unknown {

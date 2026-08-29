@@ -1,6 +1,7 @@
 import { BrowserImpl, BrowserTypeImpl } from "./browser.js";
 import { formatActionError } from "./errors.js";
 import { findConfigFile, loadConfigFile, resolveConfig } from "./config.js";
+import { mobile } from "./mobile.js";
 import { PageImpl } from "./page.js";
 import {
   createBrowserSessionHandle,
@@ -16,6 +17,7 @@ import type {
   BrowserKind,
   BrowserType,
   LaunchOptions,
+  MobileSurfaceNamespace,
   Page,
   ResolveConfigOptions,
   ResolvedAllwrightConfig,
@@ -36,8 +38,13 @@ export type {
   HighlightOptions,
   HighlightResult,
   LaunchOptions,
+  MobileAndroidConnectOptions,
+  MobileAndroidDevice,
+  MobileAndroidLaunchOptions,
+  MobileAndroidPage,
   Locator,
   LocatorInfo,
+  MobileSurfaceNamespace,
   NavigateResult,
   Page,
   PageInfo,
@@ -53,6 +60,7 @@ export type {
 
 export const chromium: BrowserType = new BrowserTypeImpl("chromium");
 export const firefox: BrowserType = new BrowserTypeImpl("firefox");
+export { mobile };
 
 export type Tab = Page;
 

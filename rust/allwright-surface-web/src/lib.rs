@@ -3179,7 +3179,11 @@ fn format_mapper_runtime_exception_message(exception_details: &Value) -> String 
     )
 }
 
-fn format_exception_message(prefix: &str, exception_details: &Value, fallback_prefix: &str) -> String {
+fn format_exception_message(
+    prefix: &str,
+    exception_details: &Value,
+    fallback_prefix: &str,
+) -> String {
     let message = exception_details
         .pointer("/exception/preview/properties")
         .and_then(Value::as_array)
@@ -3636,8 +3640,8 @@ mod tests {
 
     #[test]
     fn parse_selector_detects_xpath_heuristically() {
-        let parsed =
-            parse_selector("click_element", "//div[@role='dialog']").expect("selector should parse");
+        let parsed = parse_selector("click_element", "//div[@role='dialog']")
+            .expect("selector should parse");
         assert_eq!(parsed.kind, SelectorKind::XPath);
     }
 

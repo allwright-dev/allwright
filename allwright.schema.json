@@ -18,8 +18,14 @@
         }
       }
     },
-    "browser": {
-      "$ref": "#/$defs/browserConfig"
+    "web": {
+      "$ref": "#/$defs/webConfig"
+    },
+    "mobile": {
+      "$ref": "#/$defs/mobileConfig"
+    },
+    "desktop": {
+      "$ref": "#/$defs/desktopConfig"
     },
     "expect": {
       "$ref": "#/$defs/retryConfig"
@@ -61,6 +67,78 @@
         }
       }
     },
+    "mobileAppConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "binary": {
+          "type": "string"
+        },
+        "activity": {
+          "type": "string"
+        }
+      }
+    },
+    "mobileTargetConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "device": {
+          "type": "string"
+        },
+        "app": {
+          "$ref": "#/$defs/mobileAppConfig"
+        }
+      }
+    },
+    "desktopTargetConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "app": {
+          "$ref": "#/$defs/mobileAppConfig"
+        }
+      }
+    },
+    "webConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "browser": {
+          "$ref": "#/$defs/browserConfig"
+        }
+      }
+    },
+    "mobileConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "android": {
+          "$ref": "#/$defs/mobileTargetConfig"
+        },
+        "ios": {
+          "$ref": "#/$defs/mobileTargetConfig"
+        }
+      }
+    },
+    "desktopConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mac": {
+          "$ref": "#/$defs/desktopTargetConfig"
+        },
+        "windows": {
+          "$ref": "#/$defs/desktopTargetConfig"
+        },
+        "linux": {
+          "$ref": "#/$defs/desktopTargetConfig"
+        }
+      }
+    },
     "retryConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -88,8 +166,14 @@
             }
           }
         },
-        "browser": {
-          "$ref": "#/$defs/browserConfig"
+        "web": {
+          "$ref": "#/$defs/webConfig"
+        },
+        "mobile": {
+          "$ref": "#/$defs/mobileConfig"
+        },
+        "desktop": {
+          "$ref": "#/$defs/desktopConfig"
         },
         "expect": {
           "$ref": "#/$defs/retryConfig"

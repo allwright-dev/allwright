@@ -22,8 +22,10 @@ name = "allwright"
 version = "0.0.44"
 dependencies = [
  "allwright-core",
+ "allwright-plugin-sdk",
  "clap",
  "flate2",
+ "libloading",
  "reqwest",
  "tar",
  "tokio",
@@ -99,6 +101,8 @@ name = "allwright-surface-mobile"
 version = "0.0.44"
 dependencies = [
  "allwright-plugin-sdk",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
@@ -108,6 +112,8 @@ version = "0.0.44"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 

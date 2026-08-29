@@ -15,7 +15,7 @@ final class ConfigSupport {
             );
         }
 
-        String browserName = browserNameValue(mapValue(root.get("browser")));
+        String browserName = browserNameValue(browserMapValue(mapValue(root.get("web"))));
         if (browserName != null && !browserName.equals("chromium") && !browserName.equals("firefox")) {
             throw new AllwrightException(
                     "allwright config " + source + " has unsupported browser.name \"" + browserName
@@ -72,6 +72,35 @@ final class ConfigSupport {
                 trimToNull(stringValue(launchOptions.get("browserBinary"))),
                 integerValue(launchOptions.get("timeoutMs"))
         );
+    }
+
+    static Map<String, Object> browserMapValue(Map<String, Object> web) {
+        return mapValue(web == null ? null : web.get("browser"));
+    }
+
+    static Map<String, Object> mergeSurfaceMap(Map<String, Object> base, Map<String, Object> override) {
+        if (base == null && override == null) {
+            return null;
+        }
+        Map<String, Object> merged = new LinkedHashMap<>();
+        if (base != null) {
+            merged.putAll(base);
+        }
+        if (override != null) {
+            for (Map.Entry<String, Object> entry : override.entrySet()) {
+                if (entry.getValue() instanceof Map<?, ?> overrideChild && merged.get(entry.getKey()) instanceof Map<?, ?> baseChild) {
+                    Map<String, Object> child = mapValue(baseChild);
+                    Map<String, Object> overrideMap = mapValue(overrideChild);
+                    if (child != null && overrideMap != null) {
+                        child.putAll(overrideMap);
+                        merged.put(entry.getKey(), child);
+                        continue;
+                    }
+                }
+                merged.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return merged;
     }
 
     static LaunchOptions mergeLaunchOptions(LaunchOptions base, LaunchOptions override) {

@@ -103,7 +103,9 @@ pub(crate) async fn ensure_runtime_ready(server_addr: &str) -> Result<String> {
 
     let initial_status = ping_server(server_addr).await?;
     let resolved_addr = match initial_status {
-        Some(status) if status.version != expected_version => allocate_managed_server_addr(server_addr)?,
+        Some(status) if status.version != expected_version => {
+            allocate_managed_server_addr(server_addr)?
+        }
         _ => server_addr.to_string(),
     };
 
@@ -111,7 +113,7 @@ pub(crate) async fn ensure_runtime_ready(server_addr: &str) -> Result<String> {
         let expected_version_for_install = expected_version.clone();
         let cli_path = tokio::task::spawn_blocking(move || {
             let cli_path = ensure_cli_available(&expected_version_for_install)?;
-            ensure_web_plugin(&cli_path, &expected_version_for_install)?;
+            ensure_plugins_installed_with_cli(&cli_path, &expected_version_for_install, &["web"])?;
             Ok::<PathBuf, Error>(cli_path)
         })
         .await
@@ -179,15 +181,60 @@ async fn wait_for_server(server_addr: &str, expected_version: &str) -> Result<St
     }
 }
 
+pub(crate) fn ensure_plugins_installed(plugin_ids: &[&str]) -> Result<()> {
+    let expected_version = expected_runtime_version();
+    let cli_path = ensure_cli_available(&expected_version)?;
+    ensure_plugins_installed_with_cli(&cli_path, &expected_version, plugin_ids)
+}
+
+pub(crate) fn invoke_plugin(plugin_id: &str, request_json: &str) -> Result<String> {
+    let expected_version = expected_runtime_version();
+    let cli_path = ensure_cli_available(&expected_version)?;
+    let output = Command::new(&cli_path)
+        .arg("plugin")
+        .arg("invoke")
+        .arg(plugin_id)
+        .arg("--request-json")
+        .arg(request_json)
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|error| {
+            Error::new(format!(
+                "failed to invoke allwright {plugin_id} plugin with {}: {error}",
+                cli_path.display()
+            ))
+        })?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let detail = if !stderr.is_empty() { stderr } else { stdout };
+        return Err(Error::new(if detail.is_empty() {
+            format!("allwright {plugin_id} plugin invocation failed")
+        } else {
+            detail
+        }));
+    }
+    String::from_utf8(output.stdout)
+        .map_err(|error| Error::new(format!("plugin response is not valid UTF-8: {error}")))
+}
+
 async fn ping_server(server_addr: &str) -> Result<Option<PingStatus>> {
-    let endpoint = Endpoint::from_shared(server_addr.to_string())
-        .map_err(|error| Error::new(format!("invalid allwright server address {server_addr}: {error}")))?;
+    let endpoint = Endpoint::from_shared(server_addr.to_string()).map_err(|error| {
+        Error::new(format!(
+            "invalid allwright server address {server_addr}: {error}"
+        ))
+    })?;
     let channel = match tokio::time::timeout(PING_TIMEOUT, endpoint.connect()).await {
         Ok(Ok(channel)) => channel,
         Ok(Err(_)) | Err(_) => return Ok(None),
     };
     let mut engine = EngineServiceClient::new(channel);
-    let response = match tokio::time::timeout(PING_TIMEOUT, engine.ping(tonic::Request::new(PingRequest {}))).await {
+    let response = match tokio::time::timeout(
+        PING_TIMEOUT,
+        engine.ping(tonic::Request::new(PingRequest {})),
+    )
+    .await
+    {
         Ok(Ok(response)) => response.into_inner(),
         Ok(Err(_)) | Err(_) => return Ok(None),
     };
@@ -261,37 +308,49 @@ fn install_cli() -> Result<PathBuf> {
     Ok(cli_path)
 }
 
-fn ensure_web_plugin(cli_path: &Path, expected_version: &str) -> Result<()> {
-    let plugin_path = allwright_home()?
-        .join("plugins")
-        .join("web")
-        .join("lib")
-        .join(web_plugin_filename());
-    if plugin_path.exists() && installed_plugin_version("web")?.as_deref() == Some(expected_version) {
-        return Ok(());
-    }
+fn ensure_plugins_installed_with_cli(
+    cli_path: &Path,
+    expected_version: &str,
+    plugin_ids: &[&str],
+) -> Result<()> {
+    for plugin_id in plugin_ids
+        .iter()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+    {
+        let plugin_path = allwright_home()?
+            .join("plugins")
+            .join(plugin_id)
+            .join("lib")
+            .join(plugin_library_filename(plugin_id)?);
+        if plugin_path.exists()
+            && installed_plugin_version(plugin_id)?.as_deref() == Some(expected_version)
+        {
+            continue;
+        }
 
-    let status = Command::new(cli_path)
-        .arg("plugin")
-        .arg("install")
-        .arg("web")
-        .arg("--version")
-        .arg(expected_version)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map_err(|error| {
-            Error::new(format!(
-                "failed to install the allwright `web` plugin with {}: {error}",
-                cli_path.display()
-            ))
-        })?;
+        let status = Command::new(cli_path)
+            .arg("plugin")
+            .arg("install")
+            .arg(plugin_id)
+            .arg("--version")
+            .arg(expected_version)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map_err(|error| {
+                Error::new(format!(
+                    "failed to install the allwright `{plugin_id}` plugin with {}: {error}",
+                    cli_path.display()
+                ))
+            })?;
 
-    if !status.success() || !plugin_path.exists() {
-        return Err(Error::new(
-            "allwright attempted to install the `web` plugin automatically, but the install did not complete successfully",
-        ));
+        if !status.success() || !plugin_path.exists() {
+            return Err(Error::new(format!(
+                "allwright attempted to install the `{plugin_id}` plugin automatically, but the install did not complete successfully",
+            )));
+        }
     }
 
     Ok(())
@@ -316,9 +375,16 @@ fn fetch_latest_release_tag() -> Result<String> {
         .get(url)
         .send()
         .and_then(|response| response.error_for_status())
-        .map_err(|error| Error::new(format!("failed to resolve latest allwright release: {error}")))?;
-    let payload: Value = serde_json::from_reader(response)
-        .map_err(|error| Error::new(format!("failed to decode latest allwright release metadata: {error}")))?;
+        .map_err(|error| {
+            Error::new(format!(
+                "failed to resolve latest allwright release: {error}"
+            ))
+        })?;
+    let payload: Value = serde_json::from_reader(response).map_err(|error| {
+        Error::new(format!(
+            "failed to decode latest allwright release metadata: {error}"
+        ))
+    })?;
     let tag = payload
         .get("tag_name")
         .and_then(Value::as_str)
@@ -337,7 +403,7 @@ fn cli_asset_name(version_tag: &str) -> Result<String> {
         (os, arch) => {
             return Err(Error::new(format!(
                 "automatic allwright CLI install is not supported on os={os}, arch={arch}"
-            )))
+            )));
         }
     };
     let extension = if env::consts::OS == "windows" {
@@ -351,16 +417,23 @@ fn cli_asset_name(version_tag: &str) -> Result<String> {
 fn download_release_asset(version_tag: &str, asset_name: &str) -> Result<Vec<u8>> {
     let repository = env::var(ALLWRIGHT_REPOSITORY_ENV_VAR)
         .unwrap_or_else(|_| DEFAULT_RELEASE_REPOSITORY.to_string());
-    let url = format!("https://github.com/{repository}/releases/download/{version_tag}/{asset_name}");
+    let url =
+        format!("https://github.com/{repository}/releases/download/{version_tag}/{asset_name}");
     let mut response = release_client()?
         .get(url)
         .send()
         .and_then(|response| response.error_for_status())
-        .map_err(|error| Error::new(format!("failed to download allwright CLI asset {asset_name}: {error}")))?;
+        .map_err(|error| {
+            Error::new(format!(
+                "failed to download allwright CLI asset {asset_name}: {error}"
+            ))
+        })?;
     let mut bytes = Vec::new();
-    response
-        .read_to_end(&mut bytes)
-        .map_err(|error| Error::new(format!("failed to read allwright CLI asset {asset_name}: {error}")))?;
+    response.read_to_end(&mut bytes).map_err(|error| {
+        Error::new(format!(
+            "failed to read allwright CLI asset {asset_name}: {error}"
+        ))
+    })?;
     Ok(bytes)
 }
 
@@ -368,12 +441,19 @@ fn unpack_cli_archive(asset_name: &str, asset_bytes: &[u8], destination: &Path) 
     if asset_name.ends_with(".tar.gz") {
         let decoder = GzDecoder::new(Cursor::new(asset_bytes));
         let mut archive = Archive::new(decoder);
-        for entry in archive.entries().map_err(|error| Error::new(format!("failed to read CLI archive entries: {error}")))? {
-            let mut entry = entry.map_err(|error| Error::new(format!("failed to open CLI archive entry: {error}")))?;
-            let entry_path = entry
-                .path()
-                .map_err(|error| Error::new(format!("failed to read CLI archive entry path: {error}")))?;
-            if normalized_archive_path(&entry_path).as_deref() == Some(Path::new("bin").join(cli_filename()).as_path()) {
+        for entry in archive
+            .entries()
+            .map_err(|error| Error::new(format!("failed to read CLI archive entries: {error}")))?
+        {
+            let mut entry = entry.map_err(|error| {
+                Error::new(format!("failed to open CLI archive entry: {error}"))
+            })?;
+            let entry_path = entry.path().map_err(|error| {
+                Error::new(format!("failed to read CLI archive entry path: {error}"))
+            })?;
+            if normalized_archive_path(&entry_path).as_deref()
+                == Some(Path::new("bin").join(cli_filename()).as_path())
+            {
                 entry.unpack(destination).map_err(|error| {
                     Error::new(format!(
                         "failed to unpack the allwright CLI into {}: {error}",
@@ -384,29 +464,39 @@ fn unpack_cli_archive(asset_name: &str, asset_bytes: &[u8], destination: &Path) 
                 return Ok(());
             }
         }
-        return Err(Error::new("allwright CLI archive did not contain bin/allwright"));
+        return Err(Error::new(
+            "allwright CLI archive did not contain bin/allwright",
+        ));
     }
 
-    let mut archive =
-        ZipArchive::new(Cursor::new(asset_bytes)).map_err(|error| Error::new(format!("failed to open CLI zip archive: {error}")))?;
+    let mut archive = ZipArchive::new(Cursor::new(asset_bytes))
+        .map_err(|error| Error::new(format!("failed to open CLI zip archive: {error}")))?;
     let expected = Path::new("bin").join(cli_filename());
     for index in 0..archive.len() {
-        let mut file = archive
-            .by_index(index)
-            .map_err(|error| Error::new(format!("failed to inspect the downloaded CLI zip archive: {error}")))?;
+        let mut file = archive.by_index(index).map_err(|error| {
+            Error::new(format!(
+                "failed to inspect the downloaded CLI zip archive: {error}"
+            ))
+        })?;
         if normalized_archive_path(Path::new(file.name())).as_deref() != Some(expected.as_path()) {
             continue;
         }
 
-        let mut output = fs::File::create(destination)
-            .map_err(|error| Error::new(format!("failed to create {}: {error}", destination.display())))?;
+        let mut output = fs::File::create(destination).map_err(|error| {
+            Error::new(format!(
+                "failed to create {}: {error}",
+                destination.display()
+            ))
+        })?;
         std::io::copy(&mut file, &mut output)
             .map_err(|error| Error::new(format!("failed to extract the allwright CLI: {error}")))?;
         set_executable(destination)?;
         return Ok(());
     }
 
-    Err(Error::new("allwright CLI zip archive did not contain bin/allwright"))
+    Err(Error::new(
+        "allwright CLI zip archive did not contain bin/allwright",
+    ))
 }
 
 fn normalized_archive_path(path: &Path) -> Option<PathBuf> {
@@ -469,14 +559,19 @@ fn allwright_home() -> Result<PathBuf> {
             return Ok(PathBuf::from(trimmed));
         }
     }
-    let home =
-        env::var("HOME").map_err(|_| Error::new("HOME is not set and ALLWRIGHT_HOME was not provided"))?;
+    let home = env::var("HOME")
+        .map_err(|_| Error::new("HOME is not set and ALLWRIGHT_HOME was not provided"))?;
     Ok(PathBuf::from(home).join(".allwright"))
 }
 
 fn auto_install_enabled() -> bool {
     env::var(ALLWRIGHT_AUTO_INSTALL_ENV_VAR)
-        .map(|value| !matches!(value.trim().to_ascii_lowercase().as_str(), "0" | "false" | "no"))
+        .map(|value| {
+            !matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "0" | "false" | "no"
+            )
+        })
         .unwrap_or(true)
 }
 
@@ -551,7 +646,7 @@ fn installed_plugin_version(plugin_id: &str) -> Result<Option<String>> {
             return Err(Error::new(format!(
                 "failed to read allwright plugin manifest {}: {error}",
                 manifest.display()
-            )))
+            )));
         }
     };
 
@@ -563,7 +658,9 @@ fn installed_plugin_version(plugin_id: &str) -> Result<Option<String>> {
         let mut parts = trimmed.splitn(3, '\t');
         let Some(id) = parts.next() else { continue };
         let _package_name = parts.next();
-        let Some(version) = parts.next() else { continue };
+        let Some(version) = parts.next() else {
+            continue;
+        };
         if id == plugin_id {
             return Ok(Some(normalize_release_version(version)));
         }
@@ -581,7 +678,11 @@ fn allocate_managed_server_addr(server_addr: &str) -> Result<String> {
     })?;
     let port = listener
         .local_addr()
-        .map_err(|error| Error::new(format!("failed to resolve a reserved local allwright port: {error}")))?
+        .map_err(|error| {
+            Error::new(format!(
+                "failed to resolve a reserved local allwright port: {error}"
+            ))
+        })?
         .port();
     drop(listener);
     if host.contains(':') {
@@ -613,7 +714,11 @@ fn local_binding_host(server_addr: &str) -> String {
 }
 
 fn display_version(version: &str) -> &str {
-    if version.is_empty() { "unknown" } else { version }
+    if version.is_empty() {
+        "unknown"
+    } else {
+        version
+    }
 }
 
 fn cli_filename() -> &'static str {
@@ -624,12 +729,18 @@ fn cli_filename() -> &'static str {
     }
 }
 
-fn web_plugin_filename() -> &'static str {
-    match env::consts::OS {
-        "macos" => "liballwright_surface_web.dylib",
-        "linux" => "liballwright_surface_web.so",
-        "windows" => "allwright_surface_web.dll",
-        _ => "allwright_surface_web.unknown",
+fn plugin_library_filename(plugin_id: &str) -> Result<&'static str> {
+    match (plugin_id, env::consts::OS) {
+        ("web", "macos") => Ok("liballwright_surface_web.dylib"),
+        ("web", "linux") => Ok("liballwright_surface_web.so"),
+        ("web", "windows") => Ok("allwright_surface_web.dll"),
+        ("mobile-android", "macos") => Ok("liballwright_surface_mobile_android.dylib"),
+        ("mobile-android", "linux") => Ok("liballwright_surface_mobile_android.so"),
+        ("mobile-android", "windows") => Ok("allwright_surface_mobile_android.dll"),
+        _ => Err(Error::new(format!(
+            "automatic install is not supported for allwright plugin `{plugin_id}` on {}",
+            env::consts::OS
+        ))),
     }
 }
 
@@ -645,8 +756,12 @@ fn set_executable(path: &Path) -> Result<()> {
         .map_err(|error| Error::new(format!("failed to inspect {}: {error}", path.display())))?
         .permissions();
     permissions.set_mode(0o755);
-    fs::set_permissions(path, permissions)
-        .map_err(|error| Error::new(format!("failed to mark {} executable: {error}", path.display())))
+    fs::set_permissions(path, permissions).map_err(|error| {
+        Error::new(format!(
+            "failed to mark {} executable: {error}",
+            path.display()
+        ))
+    })
 }
 
 #[cfg(not(unix))]

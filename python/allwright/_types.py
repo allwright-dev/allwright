@@ -25,7 +25,9 @@ class RetryConfig:
 class AllwrightConfig:
     schema_version: int | None = None
     server: dict[str, Any] | None = None
-    browser: dict[str, Any] | None = None
+    web: dict[str, Any] | None = None
+    mobile: dict[str, Any] | None = None
+    desktop: dict[str, Any] | None = None
     expect: RetryConfig | None = None
     suites: dict[str, dict[str, Any]] | None = None
 
@@ -42,10 +44,13 @@ class ResolvedConfig:
     config_file_path: Path | None
     suite_name: str | None
     server_addr: str | None
-    browser_name: str
+    browser_name: str | None
     browser_binary: str | None
     launch_options: LaunchOptions
     expect: RetryConfig
+    web: dict[str, Any] | None = None
+    mobile: dict[str, Any] | None = None
+    desktop: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)

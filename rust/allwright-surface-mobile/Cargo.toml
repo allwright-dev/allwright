@@ -12,4 +12,6 @@ categories = ["development-tools::testing", "api-bindings"]
 
 [dependencies]
 allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.44" }
+serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }

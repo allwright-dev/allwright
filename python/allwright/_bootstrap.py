@@ -65,7 +65,7 @@ def ensure_runtime_ready(server_addr: str) -> str:
             _managed_server_base_addr = None
 
         cli_path = ensure_cli_available(expected_version)
-        ensure_web_plugin(cli_path, expected_version)
+        ensure_plugins_installed_with_cli(cli_path, expected_version, ["web"])
         resolved_server_addr = normalized
         if status is not None and status["version"] != expected_version:
             resolved_server_addr = allocate_managed_server_addr(normalized)
@@ -156,28 +156,72 @@ def install_cli() -> Path:
     return cli_path
 
 
-def ensure_web_plugin(cli_path: Path, expected_version: str) -> None:
-    plugin_path = allwright_home() / "plugins" / "web" / "lib" / web_plugin_filename()
-    if plugin_path.is_file() and installed_plugin_version("web") == expected_version:
-        return
+def ensure_plugins_installed(plugin_ids: list[str]) -> None:
+    expected_version = expected_runtime_version()
+    cli_path = ensure_cli_available(expected_version)
+    ensure_plugins_installed_with_cli(cli_path, expected_version, plugin_ids)
 
+
+def invoke_plugin(plugin_id: str, request: object) -> dict[str, object]:
+    expected_version = expected_runtime_version()
+    cli_path = ensure_cli_available(expected_version)
     completed = subprocess.run(
-        [str(cli_path), "plugin", "install", "web", "--version", expected_version],
+        [str(cli_path), "plugin", "invoke", plugin_id, "--request-json", json.dumps(request)],
         stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
         check=False,
     )
-    if completed.returncode != 0 or not plugin_path.is_file():
-        raise AllwrightError(
-            "allwright attempted to install the `web` plugin automatically, "
-            "but the install did not complete successfully"
+    if completed.returncode != 0:
+        details = "\n".join(
+            value.strip()
+            for value in (completed.stdout, completed.stderr)
+            if value and value.strip()
         )
-    if installed_plugin_version("web") != expected_version:
         raise AllwrightError(
-            "allwright attempted to install the `web` plugin automatically, "
-            f"but version {expected_version} is still not active"
+            details or f"allwright {plugin_id} plugin invocation failed"
         )
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise AllwrightError(
+            f"failed to decode allwright {plugin_id} plugin response: {exc}"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise AllwrightError(
+            f"allwright {plugin_id} plugin response must be a JSON object"
+        )
+    return payload
+
+
+def ensure_plugins_installed_with_cli(
+    cli_path: Path,
+    expected_version: str,
+    plugin_ids: list[str],
+) -> None:
+    for plugin_id in dict.fromkeys(plugin_id.strip() for plugin_id in plugin_ids if plugin_id.strip()):
+        plugin_path = allwright_home() / "plugins" / plugin_id / "lib" / plugin_library_filename(plugin_id)
+        if plugin_path.is_file() and installed_plugin_version(plugin_id) == expected_version:
+            continue
+
+        completed = subprocess.run(
+            [str(cli_path), "plugin", "install", plugin_id, "--version", expected_version],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if completed.returncode != 0 or not plugin_path.is_file():
+            raise AllwrightError(
+                f"allwright attempted to install the `{plugin_id}` plugin automatically, "
+                "but the install did not complete successfully"
+            )
+        if installed_plugin_version(plugin_id) != expected_version:
+            raise AllwrightError(
+                f"allwright attempted to install the `{plugin_id}` plugin automatically, "
+                f"but version {expected_version} is still not active"
+            )
 
 
 def resolve_release_tag() -> str:
@@ -388,9 +432,18 @@ def cli_filename() -> str:
     return "allwright.exe" if os.name == "nt" else "allwright"
 
 
-def web_plugin_filename() -> str:
+def plugin_library_filename(plugin_id: str) -> str:
+    stem = plugin_library_stem(plugin_id)
     if os.name == "nt":
-        return "allwright_surface_web.dll"
+        return f"{stem}.dll"
     if os.uname().sysname == "Darwin":
-        return "liballwright_surface_web.dylib"
-    return "liballwright_surface_web.so"
+        return f"lib{stem}.dylib"
+    return f"lib{stem}.so"
+
+
+def plugin_library_stem(plugin_id: str) -> str:
+    if plugin_id == "web":
+        return "allwright_surface_web"
+    if plugin_id == "mobile-android":
+        return "allwright_surface_mobile_android"
+    raise AllwrightError(f"automatic install is not supported for allwright plugin `{plugin_id}`")

@@ -72,7 +72,8 @@ impl Tab {
     }
 
     pub async fn navigate(&self, url: impl Into<String>) -> Result<NavigateResult> {
-        self.navigate_with_options(url, CommandOptions::default()).await
+        self.navigate_with_options(url, CommandOptions::default())
+            .await
     }
 
     pub async fn navigate_with_options(
@@ -191,7 +192,10 @@ impl Tab {
         }
     }
 
-    pub(crate) async fn ensure_handle<'a>(&self, state: &'a mut TabState) -> Result<&'a mut TabHandle> {
+    pub(crate) async fn ensure_handle<'a>(
+        &self,
+        state: &'a mut TabState,
+    ) -> Result<&'a mut TabHandle> {
         if state.handle.is_none() {
             let mut engine = self.inner.runtime.engine.clone();
             let (command_tx, command_rx) = mpsc::channel(16);
@@ -205,9 +209,10 @@ impl Tab {
             });
         }
 
-        state.handle.as_mut().ok_or_else(|| {
-            Error::new("tab session handle was not initialized")
-        })
+        state
+            .handle
+            .as_mut()
+            .ok_or_else(|| Error::new("tab session handle was not initialized"))
     }
 }
 

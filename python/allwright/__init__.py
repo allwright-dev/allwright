@@ -4,6 +4,8 @@ from .client import (
     ClickResult,
     CommandOptions,
     CountResult,
+    AndroidDevice,
+    AndroidPage,
     ElementResult,
     FillResult,
     HighlightOptions,
@@ -20,6 +22,8 @@ from .client import (
     TextResult,
     WaitForSelectorOptions,
     WaitForSelectorResult,
+    MobileAndroidConnectOptions,
+    MobileAndroidLaunchOptions,
     chromium,
     find_config_file,
     firefox,
@@ -31,6 +35,7 @@ from .client import (
     resolve_config,
     set_server_addr,
     shutdown,
+    mobile,
 )
 
 __all__ = [
@@ -39,6 +44,8 @@ __all__ = [
     "ClickResult",
     "CommandOptions",
     "CountResult",
+    "AndroidDevice",
+    "AndroidPage",
     "ElementResult",
     "FillResult",
     "HighlightOptions",
@@ -55,6 +62,8 @@ __all__ = [
     "TextResult",
     "WaitForSelectorOptions",
     "WaitForSelectorResult",
+    "MobileAndroidConnectOptions",
+    "MobileAndroidLaunchOptions",
     "chromium",
     "find_config_file",
     "firefox",
@@ -66,4 +75,5 @@ __all__ = [
     "resolve_config",
     "set_server_addr",
     "shutdown",
+    "mobile",
 ]

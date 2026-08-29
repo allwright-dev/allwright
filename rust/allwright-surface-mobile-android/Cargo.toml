@@ -10,7 +10,12 @@ readme = "README.md"
 keywords = ["automation", "android", "mobile", "plugin"]
 categories = ["development-tools::testing", "api-bindings"]
 
+[lib]
+crate-type = ["rlib", "cdylib"]
+
 [dependencies]
 allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.44" }
 allwright-surface-mobile = { path = "../allwright-surface-mobile", version = "0.0.44" }
+serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }

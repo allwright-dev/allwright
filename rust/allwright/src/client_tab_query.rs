@@ -5,9 +5,7 @@ use crate::proto::{
     TabSessionCommand, WaitForSelectorCommand,
 };
 
-use super::command::{
-    command_retry_options, count_result_from_event, highlight_result_from_event,
-};
+use super::command::{command_retry_options, count_result_from_event, highlight_result_from_event};
 use super::selectors::normalize_selector_for_transport;
 use super::tab::ensure_tab_open;
 use super::types::{
@@ -16,8 +14,12 @@ use super::types::{
 };
 
 impl Tab {
-    pub async fn count(&self, css_selector: impl Into<String>) -> Result<super::types::CountResult> {
-        self.count_with_options(css_selector, CommandOptions::default()).await
+    pub async fn count(
+        &self,
+        css_selector: impl Into<String>,
+    ) -> Result<super::types::CountResult> {
+        self.count_with_options(css_selector, CommandOptions::default())
+            .await
     }
 
     pub async fn count_with_options(
@@ -44,11 +46,10 @@ impl Tab {
             .map_err(|_| Error::new("failed to send CountElementsCommand"))?;
 
         loop {
-            let event = handle
-                .events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("tab session closed while waiting for count result"))?;
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("tab session closed while waiting for count result")
+                })?;
 
             match event.event {
                 Some(TabEvent::Attached(_)) => {}
@@ -58,8 +59,7 @@ impl Tab {
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while counting locator {:?}: {}",
-                        css_selector,
-                        error.message,
+                        css_selector, error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {
@@ -104,11 +104,9 @@ impl Tab {
             .map_err(|_| Error::new("failed to send HighlightElementsCommand"))?;
 
         loop {
-            let event = handle
-                .events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("tab session closed while waiting for highlight result"))?;
+            let event = handle.events.message().await?.ok_or_else(|| {
+                Error::new("tab session closed while waiting for highlight result")
+            })?;
 
             match event.event {
                 Some(TabEvent::Attached(_)) => {}
@@ -118,8 +116,7 @@ impl Tab {
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while highlighting locator {:?}: {}",
-                        css_selector,
-                        error.message,
+                        css_selector, error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {
@@ -144,8 +141,12 @@ impl Tab {
         css_selector: impl Into<String>,
         options: CommandOptions,
     ) -> Result<TextResult> {
-        self.read_text(normalize_selector_for_transport(&css_selector.into()), options, true)
-            .await
+        self.read_text(
+            normalize_selector_for_transport(&css_selector.into()),
+            options,
+            true,
+        )
+        .await
     }
 
     pub async fn inner_text(&self, css_selector: impl Into<String>) -> Result<TextResult> {
@@ -158,8 +159,12 @@ impl Tab {
         css_selector: impl Into<String>,
         options: CommandOptions,
     ) -> Result<TextResult> {
-        self.read_text(normalize_selector_for_transport(&css_selector.into()), options, false)
-            .await
+        self.read_text(
+            normalize_selector_for_transport(&css_selector.into()),
+            options,
+            false,
+        )
+        .await
     }
 
     pub async fn wait_for_selector(
@@ -210,8 +215,7 @@ impl Tab {
                 Some(TabEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while waiting for locator {:?}: {}",
-                        css_selector,
-                        error.message,
+                        css_selector, error.message,
                     )));
                 }
                 Some(TabEvent::Closed(_)) => {
@@ -256,11 +260,10 @@ impl Tab {
             .await
             .map_err(|_| Error::new("failed to send text command"))?;
         loop {
-            let event = handle
-                .events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("tab session closed while waiting for text result"))?;
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("tab session closed while waiting for text result")
+                })?;
             match event.event {
                 Some(TabEvent::Attached(_)) => {}
                 Some(TabEvent::TextContentResolved(text)) => {

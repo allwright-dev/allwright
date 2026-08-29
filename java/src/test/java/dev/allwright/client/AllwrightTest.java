@@ -41,21 +41,23 @@ class AllwrightTest {
                 schemaVersion: 1
                 server:
                   addr: 127.0.0.1:6000
-                browser:
-                  name: chromium
-                  binary: /opt/chrome
-                  launchOptions:
-                    timeoutMs: 1200
+                web:
+                  browser:
+                    name: chromium
+                    binary: /opt/chrome
+                    launchOptions:
+                      timeoutMs: 1200
                 expect:
                   timeoutMs: 3000
                   intervalMs: 250
                 suites:
                   firefox-smoke:
-                    browser:
-                      name: firefox
-                      binary: /opt/firefox
-                      launchOptions:
-                        timeoutMs: 2400
+                    web:
+                      browser:
+                        name: firefox
+                        binary: /opt/firefox
+                        launchOptions:
+                          timeoutMs: 2400
                     expect:
                       intervalMs: 100
                 """

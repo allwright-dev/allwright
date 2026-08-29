@@ -1,6 +1,7 @@
 package dev.allwright.client;
 
 import java.nio.file.Path;
+import java.util.Map;
 
 public record ResolvedConfig(
         Path configFilePath,
@@ -9,5 +10,8 @@ public record ResolvedConfig(
         String browserName,
         String browserBinary,
         LaunchOptions launchOptions,
-        RetryConfig expect
+        RetryConfig expect,
+        Map<String, Object> web,
+        Map<String, Object> mobile,
+        Map<String, Object> desktop
 ) {}
