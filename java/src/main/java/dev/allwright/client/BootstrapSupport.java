@@ -27,7 +27,7 @@ final class BootstrapSupport {
     private static final String ALLWRIGHT_REPOSITORY_ENV_VAR = "ALLWRIGHT_REPOSITORY";
     private static final String ALLWRIGHT_VERSION_ENV_VAR = "ALLWRIGHT_VERSION";
     private static final String DEFAULT_RELEASE_REPOSITORY = "allwright-dev/allwright";
-    private static final String DEFAULT_RELEASE_VERSION = "0.0.47";
+    private static final String DEFAULT_RELEASE_VERSION = "0.0.48";
     private static final Duration PING_TIMEOUT = Duration.ofSeconds(1);
     private static final Duration STARTUP_TIMEOUT = Duration.ofSeconds(20);
     private static final HttpClient RELEASE_HTTP_CLIENT = HttpClient.newBuilder()
