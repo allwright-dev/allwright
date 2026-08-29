@@ -17,10 +17,6 @@ apk_path=$1
 selector=$2
 shift 2
 
-if [[ -x ".venv-mobile-android/bin/python" && -z "${ALLWRIGHT_ANDROID_PYTHON:-}" ]]; then
-  export ALLWRIGHT_ANDROID_PYTHON="$PWD/.venv-mobile-android/bin/python"
-fi
-
 cargo run -p allwright-surface-mobile-android --example smoke -- \
   --apk "$apk_path" \
   --selector "$selector" \

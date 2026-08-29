@@ -1,6 +1,6 @@
 # @allwright.dev/vitest
 
-Vitest fixtures for allwright with Playwright-style `browser` and `page` injection.
+Vitest fixtures for allwright with Playwright-style `browser` and `page` injection, plus Android mobile fixtures for hybrid tests.
 
 Install:
 
@@ -15,6 +15,10 @@ test("opens a page", async ({ page }) => {
   await page.goto("https://example.com");
   const title = await page.textContent("h1");
   expect(title.text).toContain("Example");
+});
+
+test("opens an Android app", async ({ androidPage }) => {
+  await androidPage.click('Id=com.example.airticket:id/bottom_nav_account');
 });
 ```
 
@@ -56,3 +60,38 @@ test.use({
   }
 });
 ```
+
+Android fixtures are available alongside the web fixtures:
+
+```ts
+import { test } from "@allwright.dev/vitest";
+
+test.use({
+  allwright: {
+    android: {
+      launchOptions: {
+        apkPath: "/absolute/path/to/app.apk",
+        appId: "com.example.airticket",
+      },
+    },
+  },
+});
+
+test("android only", async ({ androidPage }) => {
+  await androidPage.fill('xpath=//*[@text="Email"]', "user@example.com");
+});
+
+test("hybrid web and android", async ({ page, androidPage }) => {
+  await page.goto("https://example.com");
+  await androidPage.click('Id=com.example.airticket:id/bottom_nav_account');
+});
+```
+
+Available fixtures:
+
+- `browser`: launched web browser
+- `page`: initial web page
+- `android`: connected Android device session
+- `androidPage`: launched Android app page
+
+`androidPage` launches using `allwright.android.launchOptions` first, then falls back to `config.mobile.android`.

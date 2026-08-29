@@ -16,10 +16,6 @@ fi
 apk_path=$1
 shift
 
-if [[ -x ".venv-mobile-android/bin/python" && -z "${ALLWRIGHT_ANDROID_PYTHON:-}" ]]; then
-  export ALLWRIGHT_ANDROID_PYTHON="$PWD/.venv-mobile-android/bin/python"
-fi
-
 mkdir -p tmp
 
 cargo run -p allwright-surface-mobile-android --example source -- \

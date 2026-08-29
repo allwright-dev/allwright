@@ -1,8 +1,13 @@
 import {
   launchConfiguredBrowser,
+  mobile,
   resolveConfig,
   setServerAddr,
   shutdown,
+  type MobileAndroidConnectOptions,
+  type MobileAndroidDevice,
+  type MobileAndroidLaunchOptions,
+  type MobileAndroidPage,
   type Browser,
   type BrowserKind,
   type LaunchOptions,
@@ -18,6 +23,10 @@ export interface AllwrightVitestOptions {
   serverAddr?: string;
   browser?: BrowserKind;
   browserBinary?: string;
+  android?: {
+    connectOptions?: MobileAndroidConnectOptions;
+    launchOptions?: MobileAndroidLaunchOptions;
+  };
   configFile?: string;
   suite?: string;
 }
@@ -25,6 +34,8 @@ export interface AllwrightVitestOptions {
 export interface AllwrightVitestFixtures {
   browser: Browser;
   page: Page;
+  android: MobileAndroidDevice;
+  androidPage: MobileAndroidPage;
 }
 
 export interface RetryExpectationOptions {
@@ -87,6 +98,19 @@ export const test = base.extend<AllwrightVitestContext>({
   page: async ({ browser }, use) => {
     await use(browser.page());
   },
+
+  android: async ({ allwright }, use) => {
+    const config = resolveVitestConfig(allwright);
+    const android = await mobile.android.connect(resolveAndroidConnectOptions(config, allwright));
+    await use(android);
+  },
+
+  androidPage: async ({ android, allwright }, use) => {
+    const config = resolveVitestConfig(allwright);
+    const launchOptions = resolveAndroidLaunchOptions(config, allwright);
+    const page = await android.launch(launchOptions);
+    await use(page);
+  },
 });
 
 const DEFAULT_EXPECT_TIMEOUT_MS = 5_000;
@@ -127,6 +151,40 @@ function resolveVitestConfig(options: AllwrightVitestOptions): ResolvedAllwright
     },
     expect: config.expect,
   };
+}
+
+function resolveAndroidConnectOptions(
+  config: ResolvedAllwrightConfig,
+  options: AllwrightVitestOptions,
+): MobileAndroidConnectOptions {
+  return {
+    device: options.android?.connectOptions?.device ?? config.mobile.android?.device,
+    adbEndpoint: options.android?.connectOptions?.adbEndpoint,
+    preserveAppState: options.android?.connectOptions?.preserveAppState ?? false,
+    timeoutMs: options.android?.connectOptions?.timeoutMs,
+  };
+}
+
+function resolveAndroidLaunchOptions(
+  config: ResolvedAllwrightConfig,
+  options: AllwrightVitestOptions,
+): MobileAndroidLaunchOptions {
+  const launchOptions: MobileAndroidLaunchOptions = {
+    apkPath: options.android?.launchOptions?.apkPath ?? config.mobile.android?.appBinary,
+    appId: options.android?.launchOptions?.appId ?? config.mobile.android?.appId,
+    launchActivity:
+      options.android?.launchOptions?.launchActivity ?? config.mobile.android?.appActivity,
+    stopBeforeLaunch: options.android?.launchOptions?.stopBeforeLaunch ?? false,
+    timeoutMs: options.android?.launchOptions?.timeoutMs,
+  };
+
+  if (!launchOptions.apkPath && !launchOptions.appId) {
+    throw new Error(
+      "androidPage fixture requires android launch options with `apkPath` or `appId`, or config.mobile.android.app configured",
+    );
+  }
+
+  return launchOptions;
 }
 
 async function retryExpectation(

@@ -9,11 +9,10 @@ use allwright_surface_mobile::{
     MobileRuntimeReadiness, MobileSurfaceProfile, RuntimeMaturity, boot_surface,
     normalize_selector_for_transport,
 };
-use serde_json::Value;
 use std::env;
 use std::ffi::{CStr, CString, c_char};
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -27,11 +26,11 @@ const ANDROID_APP_KINDS: &[MobileAppKind] = &[
 ];
 const ANDROID_MISSING_RUNTIME_ARTIFACTS: &[&str] = &[
     "server-side mobile session routing in allwright-core",
-    "expanded command coverage beyond connect, launch, and click",
+    "expanded command coverage beyond connect, launch, click, and fill",
 ];
 const ANDROID_NEXT_MILESTONES: &[&str] = &[
     "route Android mobile commands through the core engine session server",
-    "add fill, text, and waitForSelector on top of the same UiAutomator2 bridge",
+    "add text and waitForSelector on top of the native ADB-driven runtime",
     "expand runtime packaging validation across macOS, Linux, and Windows release assets",
 ];
 
@@ -88,6 +87,57 @@ pub struct UiAutomator2FillInfo {
     pub resolved_selector: String,
     pub value: String,
     pub note: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ForegroundAppInfo {
+    current_package: Option<String>,
+    current_activity: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AndroidUiNode {
+    class_name: Option<String>,
+    resource_id: Option<String>,
+    text: Option<String>,
+    content_desc: Option<String>,
+    bounds: Option<AndroidBounds>,
+    parent_index: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AndroidBounds {
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+}
+
+impl AndroidBounds {
+    fn center(self) -> (i32, i32) {
+        ((self.left + self.right) / 2, (self.top + self.bottom) / 2)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum SelectorFlavorInternal {
+    Css,
+    XPath,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SelectorSegment {
+    flavor: SelectorFlavorInternal,
+    value: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct NodeCriteria {
+    class_name: Option<String>,
+    resource_id_exact: Option<String>,
+    resource_id_suffix: Option<String>,
+    text: Option<String>,
+    content_desc: Option<String>,
 }
 
 impl SurfacePlugin for MobileAndroidPlugin {
@@ -201,19 +251,19 @@ pub fn connect(options: &ConnectOptions) -> Result<MobileConnectInfo, String> {
     let devices = list_adb_devices()?;
     let selected =
         select_device_for_connect(options, &devices).map_err(|error| error.to_string())?;
-    let u2 = uiautomator2_connect(&selected.serial)?;
+    let foreground = current_foreground_app(&selected.serial)?;
 
     Ok(MobileConnectInfo {
         browser: "android".to_string(),
         note: format!(
-            "connected Android device `{}` over ADB and bootstrapped UiAutomator2",
+            "connected Android device `{}` over ADB and attached the native Android runtime",
             selected.name.as_deref().unwrap_or(selected.serial.as_str())
         ),
         browser_session: MobileBrowserSessionHandle {
             platform: MobilePlatform::Android,
             automation: MobileAutomationSessionInfo {
-                backend: "uiautomator2".to_string(),
-                session_id: format!("uiautomator2:{}", selected.serial),
+                backend: "android-adb".to_string(),
+                session_id: format!("android-adb:{}", selected.serial),
                 note: "session established through the Android surface plugin".to_string(),
             },
             device: DeviceTarget {
@@ -226,8 +276,8 @@ pub fn connect(options: &ConnectOptions) -> Result<MobileConnectInfo, String> {
             note: "attached to the device foreground context".to_string(),
             page_session: MobilePageSessionHandle {
                 page_id: format!("{}:foreground", selected.serial),
-                package_name: u2.current_package,
-                activity_name: u2.current_activity,
+                package_name: foreground.current_package,
+                activity_name: foreground.current_activity,
                 webview_context: None,
             },
         },
@@ -285,7 +335,7 @@ pub fn launch_app(
         )?;
     }
 
-    let current = uiautomator2_connect(device_id)?;
+    let current = current_foreground_app(device_id)?;
     let activity_name = current
         .current_activity
         .or_else(|| options.launch_activity.clone());
@@ -315,7 +365,7 @@ pub fn click_element(
         return Err("click_element requires a non-empty selector".to_string());
     }
 
-    let clicked = uiautomator2_click(&browser_session.device.device_id, &normalized, timeout_ms)?;
+    let clicked = adb_click(&browser_session.device.device_id, &normalized, timeout_ms)?;
     Ok(MobileClickInfo {
         selector: clicked.resolved_selector,
         note: format!("{}; page={}", clicked.note, page_session.page_id),
@@ -335,7 +385,7 @@ pub fn fill_element(
         return Err("fill_element requires a non-empty selector".to_string());
     }
 
-    let filled = uiautomator2_fill(
+    let filled = adb_fill(
         &browser_session.device.device_id,
         &normalized,
         value,
@@ -352,7 +402,7 @@ pub fn dump_source(
     browser_session: &MobileBrowserSessionHandle,
     _page_session: &MobilePageSessionHandle,
 ) -> Result<UiAutomator2SourceInfo, String> {
-    let source = uiautomator2_source(&browser_session.device.device_id)?;
+    let source = adb_dump_source(&browser_session.device.device_id)?;
     Ok(UiAutomator2SourceInfo {
         source: source.source,
         current_package: source.current_package,
@@ -610,100 +660,564 @@ fn parse_package_name_from_aapt_badging(output: &str) -> Option<String> {
     })
 }
 
-fn uiautomator2_connect(device_id: &str) -> Result<UiAutomator2ConnectInfo, String> {
-    let value = run_uiautomator2_bridge("connect", &[device_id])?;
-    Ok(UiAutomator2ConnectInfo {
-        device_name: string_field(&value, "deviceName"),
-        current_package: string_field(&value, "currentPackage"),
-        current_activity: string_field(&value, "currentActivity"),
-    })
+fn current_foreground_app(device_id: &str) -> Result<ForegroundAppInfo, String> {
+    let window_dump = run_adb_for_device(device_id, &["shell", "dumpsys", "window", "windows"])
+        .or_else(|_| run_adb_for_device(device_id, &["shell", "dumpsys", "window"]))?;
+    Ok(parse_foreground_app_from_dumpsys(&window_dump))
 }
 
-fn uiautomator2_click(
+fn adb_click(
     device_id: &str,
     selector: &str,
     timeout_ms: Option<u32>,
 ) -> Result<UiAutomator2ClickInfo, String> {
-    let timeout = timeout_ms
-        .map(|value| format!("{:.3}", f64::from(value) / 1_000.0))
-        .unwrap_or_else(|| "10.0".to_string());
-    let value = run_uiautomator2_bridge("click", &[device_id, selector, "--timeout", &timeout])?;
+    let snapshot = resolve_selector_snapshot(device_id, selector, timeout_ms)?;
+    let bounds = snapshot
+        .node
+        .bounds
+        .ok_or_else(|| format!("selector resolved without bounds: {}", snapshot.selector))?;
+    let (x, y) = bounds.center();
+    let _ = run_adb_for_device(
+        device_id,
+        &["shell", "input", "tap", &x.to_string(), &y.to_string()],
+    )?;
     Ok(UiAutomator2ClickInfo {
-        resolved_selector: string_field(&value, "resolvedSelector")
-            .unwrap_or_else(|| selector.to_string()),
-        note: string_field(&value, "note")
-            .unwrap_or_else(|| "clicked Android element through UiAutomator2".to_string()),
+        resolved_selector: snapshot.selector,
+        note: format!(
+            "clicked Android element via native ADB input on {}/{}",
+            snapshot
+                .foreground
+                .current_package
+                .as_deref()
+                .unwrap_or("<unknown>"),
+            snapshot
+                .foreground
+                .current_activity
+                .as_deref()
+                .unwrap_or("<unknown>")
+        ),
     })
 }
 
-fn uiautomator2_fill(
+fn adb_fill(
     device_id: &str,
     selector: &str,
     fill_value: &str,
     timeout_ms: Option<u32>,
 ) -> Result<UiAutomator2FillInfo, String> {
-    let timeout = timeout_ms
-        .map(|value| format!("{:.3}", f64::from(value) / 1_000.0))
-        .unwrap_or_else(|| "10.0".to_string());
-    let value = run_uiautomator2_bridge(
-        "fill",
-        &[device_id, selector, fill_value, "--timeout", &timeout],
+    let snapshot = resolve_selector_snapshot(device_id, selector, timeout_ms)?;
+    let bounds = snapshot
+        .node
+        .bounds
+        .ok_or_else(|| format!("selector resolved without bounds: {}", snapshot.selector))?;
+    let (x, y) = bounds.center();
+    let _ = run_adb_for_device(
+        device_id,
+        &["shell", "input", "tap", &x.to_string(), &y.to_string()],
     )?;
+    let _ = run_adb_for_device(device_id, &["shell", "input", "keyevent", "KEYCODE_MOVE_END"])?;
+    let existing_text = snapshot.node.text.as_deref().unwrap_or("");
+    for _ in existing_text.chars() {
+        let _ = run_adb_for_device(device_id, &["shell", "input", "keyevent", "KEYCODE_DEL"])?;
+    }
+    let encoded = encode_adb_text(fill_value);
+    if !encoded.is_empty() {
+        let _ = run_adb_for_device(device_id, &["shell", "input", "text", &encoded])?;
+    }
     Ok(UiAutomator2FillInfo {
-        resolved_selector: string_field(&value, "resolvedSelector")
-            .unwrap_or_else(|| selector.to_string()),
-        value: string_field(&value, "value").unwrap_or_else(|| fill_value.to_string()),
-        note: string_field(&value, "note")
-            .unwrap_or_else(|| "filled Android element through UiAutomator2".to_string()),
+        resolved_selector: snapshot.selector,
+        value: fill_value.to_string(),
+        note: format!(
+            "filled Android element via native ADB input on {}/{}",
+            snapshot
+                .foreground
+                .current_package
+                .as_deref()
+                .unwrap_or("<unknown>"),
+            snapshot
+                .foreground
+                .current_activity
+                .as_deref()
+                .unwrap_or("<unknown>")
+        ),
     })
 }
 
-fn uiautomator2_source(device_id: &str) -> Result<UiAutomator2SourceInfo, String> {
-    let value = run_uiautomator2_bridge("source", &[device_id])?;
+fn adb_dump_source(device_id: &str) -> Result<UiAutomator2SourceInfo, String> {
+    let remote_path = "/data/local/tmp/allwright-window.xml";
+    let _ = run_adb_for_device(device_id, &["shell", "uiautomator", "dump", remote_path])?;
+    let source = run_adb_for_device(device_id, &["shell", "cat", remote_path])?;
+    let foreground = current_foreground_app(device_id)?;
     Ok(UiAutomator2SourceInfo {
-        source: string_field(&value, "source").unwrap_or_default(),
-        current_package: string_field(&value, "currentPackage"),
-        current_activity: string_field(&value, "currentActivity"),
+        source,
+        current_package: foreground.current_package,
+        current_activity: foreground.current_activity,
     })
 }
 
-fn run_uiautomator2_bridge(command: &str, args: &[&str]) -> Result<Value, String> {
-    let script = uiautomator2_bridge_script_path();
-    if !script.is_file() {
-        return Err(format!(
-            "missing UiAutomator2 bridge script at {}",
-            script.display()
-        ));
-    }
-
-    let python = env::var("ALLWRIGHT_ANDROID_PYTHON").unwrap_or_else(|_| "python3".to_string());
-    let mut command_line = Command::new(&python);
-    command_line.arg(&script).arg(command).args(args);
-    let output = command_line
-        .output()
-        .map_err(|error| format!("failed to run `{python}`: {error}"))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let detail = if !stderr.is_empty() { stderr } else { stdout };
-        return Err(format!("UiAutomator2 bridge `{command}` failed: {detail}"));
-    }
-
-    serde_json::from_slice::<Value>(&output.stdout)
-        .map_err(|error| format!("failed to decode UiAutomator2 bridge response: {error}"))
+struct ResolvedSelectorSnapshot {
+    selector: String,
+    node: AndroidUiNode,
+    foreground: ForegroundAppInfo,
 }
 
-fn uiautomator2_bridge_script_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("scripts")
-        .join("mobile_android_uiautomator2_bridge.py")
+fn resolve_selector_snapshot(
+    device_id: &str,
+    selector: &str,
+    _timeout_ms: Option<u32>,
+) -> Result<ResolvedSelectorSnapshot, String> {
+    let source = adb_dump_source(device_id)?;
+    let nodes = parse_android_ui_nodes(&source.source)?;
+    let node = find_node_by_selector(&nodes, selector).ok_or_else(|| {
+        let package_name = source.current_package.as_deref().unwrap_or("<unknown>");
+        let activity_name = source.current_activity.as_deref().unwrap_or("<unknown>");
+        format!(
+            "selector not found: {selector} (current app: {package_name}/{activity_name})"
+        )
+    })?;
+    Ok(ResolvedSelectorSnapshot {
+        selector: selector.to_string(),
+        node: node.clone(),
+        foreground: ForegroundAppInfo {
+            current_package: source.current_package,
+            current_activity: source.current_activity,
+        },
+    })
 }
 
-fn string_field(value: &Value, key: &str) -> Option<String> {
-    value.get(key).and_then(Value::as_str).map(str::to_string)
+fn parse_foreground_app_from_dumpsys(output: &str) -> ForegroundAppInfo {
+    for line in output.lines() {
+        if !(line.contains("mCurrentFocus") || line.contains("mFocusedApp")) {
+            continue;
+        }
+        if let Some((package_name, activity_name)) = extract_component_from_line(line) {
+            return ForegroundAppInfo {
+                current_package: Some(package_name),
+                current_activity: Some(activity_name),
+            };
+        }
+    }
+    ForegroundAppInfo {
+        current_package: None,
+        current_activity: None,
+    }
+}
+
+fn extract_component_from_line(line: &str) -> Option<(String, String)> {
+    for token in line.split_whitespace() {
+        let cleaned = token.trim_matches(|ch: char| matches!(ch, '{' | '}' | ',' | ';'));
+        let slash_index = cleaned.find('/')?;
+        let package_name = cleaned[..slash_index].trim();
+        let activity_name = cleaned[slash_index + 1..].trim();
+        if package_name.is_empty()
+            || activity_name.is_empty()
+            || !package_name.contains('.')
+            || package_name.contains('=')
+        {
+            continue;
+        }
+        return Some((package_name.to_string(), activity_name.to_string()));
+    }
+    None
+}
+
+fn parse_android_ui_nodes(xml: &str) -> Result<Vec<AndroidUiNode>, String> {
+    let mut nodes = Vec::new();
+    let mut stack: Vec<usize> = Vec::new();
+    let mut cursor = 0usize;
+    while let Some(relative_start) = xml[cursor..].find('<') {
+        let start = cursor + relative_start;
+        let Some(relative_end) = xml[start..].find('>') else {
+            break;
+        };
+        let end = start + relative_end;
+        let tag = &xml[start + 1..end];
+        let trimmed = tag.trim();
+        if trimmed.starts_with("/node") {
+            let _ = stack.pop();
+        } else if trimmed.starts_with("node") {
+            let self_closing = trimmed.ends_with('/');
+            let attributes = parse_xml_attributes(trimmed);
+            let node = AndroidUiNode {
+                class_name: attributes.get("class").cloned(),
+                resource_id: attributes.get("resource-id").cloned(),
+                text: attributes.get("text").cloned(),
+                content_desc: attributes.get("content-desc").cloned(),
+                bounds: attributes
+                    .get("bounds")
+                    .and_then(|value| parse_bounds(value)),
+                parent_index: stack.last().copied(),
+            };
+            let index = nodes.len();
+            nodes.push(node);
+            if !self_closing {
+                stack.push(index);
+            }
+        }
+        cursor = end + 1;
+    }
+    Ok(nodes)
+}
+
+fn parse_xml_attributes(tag: &str) -> std::collections::BTreeMap<String, String> {
+    let mut attributes = std::collections::BTreeMap::new();
+    let bytes = tag.as_bytes();
+    let mut index = 0usize;
+    while index < bytes.len() {
+        while index < bytes.len() && !bytes[index].is_ascii_alphabetic() {
+            index += 1;
+        }
+        let key_start = index;
+        while index < bytes.len()
+            && (bytes[index].is_ascii_alphanumeric() || matches!(bytes[index], b'-' | b'_'))
+        {
+            index += 1;
+        }
+        if key_start == index {
+            continue;
+        }
+        let key = &tag[key_start..index];
+        while index < bytes.len() && bytes[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        if index >= bytes.len() || bytes[index] != b'=' {
+            continue;
+        }
+        index += 1;
+        while index < bytes.len() && bytes[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        if index >= bytes.len() || bytes[index] != b'"' {
+            continue;
+        }
+        index += 1;
+        let value_start = index;
+        while index < bytes.len() && bytes[index] != b'"' {
+            index += 1;
+        }
+        if index > value_start {
+            attributes.insert(
+                key.to_string(),
+                decode_xml_entities(&tag[value_start..index]),
+            );
+        }
+        if index < bytes.len() {
+            index += 1;
+        }
+    }
+    attributes
+}
+
+fn decode_xml_entities(value: &str) -> String {
+    value
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&amp;", "&")
+}
+
+fn parse_bounds(value: &str) -> Option<AndroidBounds> {
+    let trimmed = value.trim();
+    let trimmed = trimmed.strip_prefix('[')?;
+    let (left_top, right_bottom) = trimmed.split_once("][")?;
+    let right_bottom = right_bottom.strip_suffix(']')?;
+    let (left, top) = left_top.split_once(',')?;
+    let (right, bottom) = right_bottom.split_once(',')?;
+    Some(AndroidBounds {
+        left: left.parse().ok()?,
+        top: top.parse().ok()?,
+        right: right.parse().ok()?,
+        bottom: bottom.parse().ok()?,
+    })
+}
+
+fn find_node_by_selector<'a>(
+    nodes: &'a [AndroidUiNode],
+    selector: &str,
+) -> Option<&'a AndroidUiNode> {
+    let segments = parse_selector_segments(selector).ok()?;
+    let criteria = segments
+        .iter()
+        .map(selector_segment_to_criteria)
+        .collect::<Result<Vec<_>, _>>()
+        .ok()?;
+
+    nodes.iter().enumerate().find_map(|(index, node)| {
+        if !node_matches_criteria(node, criteria.last()?) {
+            return None;
+        }
+        if ancestor_chain_matches(nodes, index, &criteria[..criteria.len().saturating_sub(1)]) {
+            return Some(node);
+        }
+        None
+    })
+}
+
+fn ancestor_chain_matches(
+    nodes: &[AndroidUiNode],
+    node_index: usize,
+    criteria_chain: &[NodeCriteria],
+) -> bool {
+    if criteria_chain.is_empty() {
+        return true;
+    }
+    let mut current_parent = nodes[node_index].parent_index;
+    for criteria in criteria_chain.iter().rev() {
+        let mut matched_parent = None;
+        let mut probe = current_parent;
+        while let Some(index) = probe {
+            if node_matches_criteria(&nodes[index], criteria) {
+                matched_parent = Some(index);
+                break;
+            }
+            probe = nodes[index].parent_index;
+        }
+        let Some(index) = matched_parent else {
+            return false;
+        };
+        current_parent = nodes[index].parent_index;
+    }
+    true
+}
+
+fn node_matches_criteria(node: &AndroidUiNode, criteria: &NodeCriteria) -> bool {
+    if let Some(expected) = criteria.class_name.as_deref()
+        && node.class_name.as_deref() != Some(expected)
+    {
+        return false;
+    }
+    if let Some(expected) = criteria.resource_id_exact.as_deref()
+        && node.resource_id.as_deref() != Some(expected)
+    {
+        return false;
+    }
+    if let Some(expected_suffix) = criteria.resource_id_suffix.as_deref() {
+        let Some(resource_id) = node.resource_id.as_deref() else {
+            return false;
+        };
+        if !resource_id.ends_with(expected_suffix) {
+            return false;
+        }
+    }
+    if let Some(expected) = criteria.text.as_deref()
+        && node.text.as_deref() != Some(expected)
+    {
+        return false;
+    }
+    if let Some(expected) = criteria.content_desc.as_deref()
+        && node.content_desc.as_deref() != Some(expected)
+    {
+        return false;
+    }
+    true
+}
+
+fn parse_selector_segments(selector: &str) -> Result<Vec<SelectorSegment>, String> {
+    let mut segments = Vec::new();
+    let normalized = normalize_selector_for_transport(selector);
+    let trimmed = normalized.trim();
+    let mut index = 0usize;
+    while index < trimmed.len() {
+        let remainder = &trimmed[index..];
+        let (flavor, prefix_len) = if remainder.starts_with("css=") {
+            (SelectorFlavorInternal::Css, 4usize)
+        } else if remainder.starts_with("xpath=") {
+            (SelectorFlavorInternal::XPath, 6usize)
+        } else {
+            return Err(format!("unsupported selector segment in `{trimmed}`"));
+        };
+        index += prefix_len;
+        let bytes = trimmed.as_bytes();
+        if bytes.get(index).copied() != Some(b'"') {
+            return Err(format!("selector segment must use JSON string syntax: `{trimmed}`"));
+        }
+        let start = index;
+        index += 1;
+        let mut escaped = false;
+        while index < trimmed.len() {
+            let byte = bytes[index];
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                index += 1;
+                break;
+            }
+            index += 1;
+        }
+        let json_body = &trimmed[start..index];
+        let value = serde_json::from_str::<String>(json_body)
+            .map_err(|error| format!("failed to decode selector segment {json_body}: {error}"))?;
+        segments.push(SelectorSegment { flavor, value });
+        while index < trimmed.len() && trimmed.as_bytes()[index].is_ascii_whitespace() {
+            index += 1;
+        }
+    }
+    if segments.is_empty() {
+        return Err("selector must not be empty".to_string());
+    }
+    Ok(segments)
+}
+
+fn selector_segment_to_criteria(segment: &SelectorSegment) -> Result<NodeCriteria, String> {
+    match segment.flavor {
+        SelectorFlavorInternal::Css => parse_css_criteria(&segment.value),
+        SelectorFlavorInternal::XPath => parse_xpath_criteria(&segment.value),
+    }
+}
+
+fn parse_css_criteria(selector: &str) -> Result<NodeCriteria, String> {
+    let mut criteria = NodeCriteria::default();
+    let mut remainder = selector.trim();
+    while let Some(start) = remainder.find('[') {
+        let end = remainder[start + 1..]
+            .find(']')
+            .map(|index| start + 1 + index)
+            .ok_or_else(|| format!("unterminated CSS attribute selector in `{selector}`"))?;
+        let attribute = &remainder[start + 1..end];
+        let (name, value) = parse_attribute_filter(attribute)?;
+        match name {
+            "text" => criteria.text = Some(value),
+            "content-desc" => criteria.content_desc = Some(value),
+            "resource-id" => criteria.resource_id_exact = Some(value),
+            _ => {
+                return Err(format!(
+                    "unsupported CSS attribute selector `{name}` in `{selector}`"
+                ));
+            }
+        }
+        let mut next = String::with_capacity(remainder.len());
+        next.push_str(remainder[..start].trim_end());
+        next.push(' ');
+        next.push_str(remainder[end + 1..].trim_start());
+        let owned = next.trim().to_string();
+        remainder = Box::leak(owned.into_boxed_str());
+    }
+
+    let class_or_id = remainder.trim();
+    if let Some(resource_id) = class_or_id.strip_prefix('#') {
+        if resource_id.contains(':') {
+            criteria.resource_id_exact = Some(resource_id.to_string());
+        } else {
+            criteria.resource_id_suffix = Some(format!(":id/{resource_id}"));
+        }
+    } else if let Some(class_name) = class_or_id.strip_prefix('.') {
+        if !class_name.is_empty() {
+            criteria.class_name = Some(class_name.to_string());
+        }
+    } else if !class_or_id.is_empty() {
+        criteria.class_name = Some(class_or_id.to_string());
+    }
+    Ok(criteria)
+}
+
+fn parse_xpath_criteria(selector: &str) -> Result<NodeCriteria, String> {
+    let trimmed = selector.trim();
+    let mut criteria = NodeCriteria::default();
+    let mut path = trimmed;
+    if let Some(stripped) = path.strip_prefix(".//") {
+        path = stripped;
+    } else if let Some(stripped) = path.strip_prefix("//") {
+        path = stripped;
+    }
+
+    let path = path.trim();
+    let (node_pattern, predicates) = if let Some(start) = path.find('[') {
+        let end = path.rfind(']').ok_or_else(|| format!("unterminated XPath in `{selector}`"))?;
+        (&path[..start], Some(&path[start + 1..end]))
+    } else {
+        (path, None)
+    };
+
+    let node_pattern = node_pattern.trim();
+    if !node_pattern.is_empty() && node_pattern != "*" {
+        criteria.class_name = Some(node_pattern.to_string());
+    }
+
+    if let Some(predicates) = predicates {
+        for predicate in predicates.split(" and ") {
+            let predicate = predicate.trim().trim_matches(|ch| ch == '(' || ch == ')');
+            if let Some(value) = parse_xpath_attr_equals(predicate, "@text") {
+                criteria.text = Some(value);
+                continue;
+            }
+            if let Some(value) = parse_xpath_attr_equals(predicate, "@content-desc") {
+                criteria.content_desc = Some(value);
+                continue;
+            }
+            if let Some(value) = parse_xpath_attr_equals(predicate, "@class") {
+                criteria.class_name = Some(value);
+                continue;
+            }
+            if let Some(value) = parse_xpath_attr_equals(predicate, "@resource-id") {
+                if value.contains(':') {
+                    criteria.resource_id_exact = Some(value);
+                } else {
+                    criteria.resource_id_suffix = Some(format!(":id/{value}"));
+                }
+                continue;
+            }
+            if let Some(value) = parse_xpath_resource_suffix(predicate) {
+                criteria.resource_id_suffix = Some(value);
+                continue;
+            }
+        }
+    }
+
+    Ok(criteria)
+}
+
+fn parse_attribute_filter(attribute: &str) -> Result<(&str, String), String> {
+    let (name, value) = attribute
+        .split_once('=')
+        .ok_or_else(|| format!("unsupported CSS attribute selector `{attribute}`"))?;
+    Ok((name.trim(), parse_quoted_value(value.trim())?))
+}
+
+fn parse_xpath_attr_equals(predicate: &str, attr_name: &str) -> Option<String> {
+    let remainder = predicate.strip_prefix(attr_name)?;
+    let remainder = remainder.trim_start();
+    let remainder = remainder.strip_prefix('=')?.trim_start();
+    parse_quoted_value(remainder).ok()
+}
+
+fn parse_xpath_resource_suffix(predicate: &str) -> Option<String> {
+    let suffix_marker = ":id/";
+    let start = predicate.find(suffix_marker)?;
+    let candidate = &predicate[start - 1..];
+    parse_quoted_value(candidate).ok()
+}
+
+fn parse_quoted_value(input: &str) -> Result<String, String> {
+    let trimmed = input.trim();
+    let quote = trimmed
+        .chars()
+        .next()
+        .filter(|ch| *ch == '\'' || *ch == '"')
+        .ok_or_else(|| format!("expected quoted value in `{input}`"))?;
+    let end = trimmed[1..]
+        .find(quote)
+        .ok_or_else(|| format!("unterminated quoted value in `{input}`"))?;
+    Ok(trimmed[1..1 + end].to_string())
+}
+
+fn encode_adb_text(value: &str) -> String {
+    let mut encoded = String::new();
+    for ch in value.chars() {
+        match ch {
+            ' ' => encoded.push_str("%s"),
+            '"' => encoded.push_str("\\\""),
+            '\'' => encoded.push_str("\\'"),
+            '&' | '|' | ';' | '<' | '>' | '(' | ')' | '$' | '\\' => {
+                encoded.push('\\');
+                encoded.push(ch);
+            }
+            _ => encoded.push(ch),
+        }
+    }
+    encoded
 }
 
 #[cfg(test)]
