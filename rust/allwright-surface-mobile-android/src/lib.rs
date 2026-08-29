@@ -1136,7 +1136,7 @@ fn node_matches_criteria(node: &AndroidUiNode, criteria: &NodeCriteria) -> bool 
         let Some(resource_id) = node.resource_id.as_deref() else {
             return false;
         };
-        if !resource_id.ends_with(expected_suffix) {
+        if !resource_id_matches_suffix(resource_id, expected_suffix) {
             return false;
         }
     }
@@ -1526,6 +1526,18 @@ fn parse_xpath_resource_suffix(predicate: &str) -> Option<String> {
     parse_quoted_value(candidate).ok()
 }
 
+fn resource_id_matches_suffix(resource_id: &str, expected_suffix: &str) -> bool {
+    if resource_id.ends_with(expected_suffix) {
+        return true;
+    }
+
+    let bare_expected = expected_suffix
+        .rsplit('/')
+        .next()
+        .filter(|value| !value.is_empty());
+    matches!(bare_expected, Some(expected) if resource_id == expected)
+}
+
 fn contains_text(actual: Option<&str>, expected: &str) -> bool {
     actual.is_some_and(|value| value.contains(expected))
 }
@@ -1884,6 +1896,22 @@ mod tests {
             by_class.resource_id.as_deref(),
             Some("com.example.airticket:id/bottom_nav_account")
         );
+
+        let by_css_id = find_node_by_selector(&nodes, r##"css="#bottom_nav_account""##)
+            .expect("css id selector");
+        assert_eq!(
+            by_css_id.resource_id.as_deref(),
+            Some("com.example.airticket:id/bottom_nav_account")
+        );
+
+        let bare_nodes =
+            parse_android_ui_nodes(sample_ui_hierarchy_with_bare_resource_ids()).expect("xml");
+        let bare_by_css_id = find_node_by_selector(&bare_nodes, r##"css="#signup_first_name""##)
+            .expect("bare css id");
+        assert_eq!(
+            bare_by_css_id.resource_id.as_deref(),
+            Some("signup_first_name")
+        );
     }
 
     fn sample_ui_hierarchy() -> &'static str {
@@ -1893,6 +1921,15 @@ mod tests {
     <node index="0" text="Home" resource-id="com.example.airticket:id/bottom_nav_home" class="android.widget.TextView" package="com.example.airticket" content-desc="Home" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,2100][360,2400]" />
     <node index="1" text="Account" resource-id="com.example.airticket:id/bottom_nav_account" class="android.widget.TextView" package="com.example.airticket" content-desc="Open Account" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="true" bounds="[360,2100][720,2400]" />
     <node index="2" text="Email" resource-id="com.example.airticket:id/email" class="android.widget.EditText" package="com.example.airticket" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="true" scrollable="false" long-clickable="true" password="false" selected="false" bounds="[80,600][1000,720]" />
+  </node>
+</hierarchy>"#
+    }
+
+    fn sample_ui_hierarchy_with_bare_resource_ids() -> &'static str {
+        r#"<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example.airticket" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2400]">
+    <node index="0" text="First Name" resource-id="signup_first_name" class="android.widget.EditText" package="com.example.airticket" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="true" password="false" selected="false" bounds="[80,600][1000,720]" />
   </node>
 </hierarchy>"#
     }
