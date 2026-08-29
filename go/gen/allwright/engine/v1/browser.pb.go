@@ -21,34 +21,36 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type BrowserSessionCommand struct {
+type SurfaceSessionCommand struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Command:
 	//
-	//	*BrowserSessionCommand_LaunchChrome
-	//	*BrowserSessionCommand_OpenTab
-	//	*BrowserSessionCommand_Ping
-	//	*BrowserSessionCommand_Close
-	//	*BrowserSessionCommand_LaunchBrowser
-	Command       isBrowserSessionCommand_Command `protobuf_oneof:"command"`
+	//	*SurfaceSessionCommand_LaunchChrome
+	//	*SurfaceSessionCommand_OpenContext
+	//	*SurfaceSessionCommand_Ping
+	//	*SurfaceSessionCommand_Close
+	//	*SurfaceSessionCommand_LaunchBrowser
+	//	*SurfaceSessionCommand_ConnectMobile
+	//	*SurfaceSessionCommand_LaunchApp
+	Command       isSurfaceSessionCommand_Command `protobuf_oneof:"command"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *BrowserSessionCommand) Reset() {
-	*x = BrowserSessionCommand{}
+func (x *SurfaceSessionCommand) Reset() {
+	*x = SurfaceSessionCommand{}
 	mi := &file_core_v1_browser_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BrowserSessionCommand) String() string {
+func (x *SurfaceSessionCommand) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BrowserSessionCommand) ProtoMessage() {}
+func (*SurfaceSessionCommand) ProtoMessage() {}
 
-func (x *BrowserSessionCommand) ProtoReflect() protoreflect.Message {
+func (x *SurfaceSessionCommand) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_browser_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -60,118 +62,148 @@ func (x *BrowserSessionCommand) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BrowserSessionCommand.ProtoReflect.Descriptor instead.
-func (*BrowserSessionCommand) Descriptor() ([]byte, []int) {
+// Deprecated: Use SurfaceSessionCommand.ProtoReflect.Descriptor instead.
+func (*SurfaceSessionCommand) Descriptor() ([]byte, []int) {
 	return file_core_v1_browser_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *BrowserSessionCommand) GetCommand() isBrowserSessionCommand_Command {
+func (x *SurfaceSessionCommand) GetCommand() isSurfaceSessionCommand_Command {
 	if x != nil {
 		return x.Command
 	}
 	return nil
 }
 
-func (x *BrowserSessionCommand) GetLaunchChrome() *LaunchChromeCommand {
+func (x *SurfaceSessionCommand) GetLaunchChrome() *LaunchChromeCommand {
 	if x != nil {
-		if x, ok := x.Command.(*BrowserSessionCommand_LaunchChrome); ok {
+		if x, ok := x.Command.(*SurfaceSessionCommand_LaunchChrome); ok {
 			return x.LaunchChrome
 		}
 	}
 	return nil
 }
 
-func (x *BrowserSessionCommand) GetOpenTab() *OpenTabCommand {
+func (x *SurfaceSessionCommand) GetOpenContext() *OpenContextCommand {
 	if x != nil {
-		if x, ok := x.Command.(*BrowserSessionCommand_OpenTab); ok {
-			return x.OpenTab
+		if x, ok := x.Command.(*SurfaceSessionCommand_OpenContext); ok {
+			return x.OpenContext
 		}
 	}
 	return nil
 }
 
-func (x *BrowserSessionCommand) GetPing() *SessionPingCommand {
+func (x *SurfaceSessionCommand) GetPing() *SessionPingCommand {
 	if x != nil {
-		if x, ok := x.Command.(*BrowserSessionCommand_Ping); ok {
+		if x, ok := x.Command.(*SurfaceSessionCommand_Ping); ok {
 			return x.Ping
 		}
 	}
 	return nil
 }
 
-func (x *BrowserSessionCommand) GetClose() *CloseBrowserSessionCommand {
+func (x *SurfaceSessionCommand) GetClose() *CloseSurfaceSessionCommand {
 	if x != nil {
-		if x, ok := x.Command.(*BrowserSessionCommand_Close); ok {
+		if x, ok := x.Command.(*SurfaceSessionCommand_Close); ok {
 			return x.Close
 		}
 	}
 	return nil
 }
 
-func (x *BrowserSessionCommand) GetLaunchBrowser() *LaunchBrowserCommand {
+func (x *SurfaceSessionCommand) GetLaunchBrowser() *LaunchBrowserCommand {
 	if x != nil {
-		if x, ok := x.Command.(*BrowserSessionCommand_LaunchBrowser); ok {
+		if x, ok := x.Command.(*SurfaceSessionCommand_LaunchBrowser); ok {
 			return x.LaunchBrowser
 		}
 	}
 	return nil
 }
 
-type isBrowserSessionCommand_Command interface {
-	isBrowserSessionCommand_Command()
+func (x *SurfaceSessionCommand) GetConnectMobile() *ConnectMobileCommand {
+	if x != nil {
+		if x, ok := x.Command.(*SurfaceSessionCommand_ConnectMobile); ok {
+			return x.ConnectMobile
+		}
+	}
+	return nil
 }
 
-type BrowserSessionCommand_LaunchChrome struct {
+func (x *SurfaceSessionCommand) GetLaunchApp() *LaunchAppCommand {
+	if x != nil {
+		if x, ok := x.Command.(*SurfaceSessionCommand_LaunchApp); ok {
+			return x.LaunchApp
+		}
+	}
+	return nil
+}
+
+type isSurfaceSessionCommand_Command interface {
+	isSurfaceSessionCommand_Command()
+}
+
+type SurfaceSessionCommand_LaunchChrome struct {
 	LaunchChrome *LaunchChromeCommand `protobuf:"bytes,1,opt,name=launch_chrome,json=launchChrome,proto3,oneof"`
 }
 
-type BrowserSessionCommand_OpenTab struct {
-	OpenTab *OpenTabCommand `protobuf:"bytes,2,opt,name=open_tab,json=openTab,proto3,oneof"`
+type SurfaceSessionCommand_OpenContext struct {
+	OpenContext *OpenContextCommand `protobuf:"bytes,2,opt,name=open_context,json=openContext,proto3,oneof"`
 }
 
-type BrowserSessionCommand_Ping struct {
+type SurfaceSessionCommand_Ping struct {
 	Ping *SessionPingCommand `protobuf:"bytes,3,opt,name=ping,proto3,oneof"`
 }
 
-type BrowserSessionCommand_Close struct {
-	Close *CloseBrowserSessionCommand `protobuf:"bytes,4,opt,name=close,proto3,oneof"`
+type SurfaceSessionCommand_Close struct {
+	Close *CloseSurfaceSessionCommand `protobuf:"bytes,4,opt,name=close,proto3,oneof"`
 }
 
-type BrowserSessionCommand_LaunchBrowser struct {
+type SurfaceSessionCommand_LaunchBrowser struct {
 	LaunchBrowser *LaunchBrowserCommand `protobuf:"bytes,5,opt,name=launch_browser,json=launchBrowser,proto3,oneof"`
 }
 
-func (*BrowserSessionCommand_LaunchChrome) isBrowserSessionCommand_Command() {}
+type SurfaceSessionCommand_ConnectMobile struct {
+	ConnectMobile *ConnectMobileCommand `protobuf:"bytes,6,opt,name=connect_mobile,json=connectMobile,proto3,oneof"`
+}
 
-func (*BrowserSessionCommand_OpenTab) isBrowserSessionCommand_Command() {}
+type SurfaceSessionCommand_LaunchApp struct {
+	LaunchApp *LaunchAppCommand `protobuf:"bytes,7,opt,name=launch_app,json=launchApp,proto3,oneof"`
+}
 
-func (*BrowserSessionCommand_Ping) isBrowserSessionCommand_Command() {}
+func (*SurfaceSessionCommand_LaunchChrome) isSurfaceSessionCommand_Command() {}
 
-func (*BrowserSessionCommand_Close) isBrowserSessionCommand_Command() {}
+func (*SurfaceSessionCommand_OpenContext) isSurfaceSessionCommand_Command() {}
 
-func (*BrowserSessionCommand_LaunchBrowser) isBrowserSessionCommand_Command() {}
+func (*SurfaceSessionCommand_Ping) isSurfaceSessionCommand_Command() {}
 
-type OpenTabCommand struct {
+func (*SurfaceSessionCommand_Close) isSurfaceSessionCommand_Command() {}
+
+func (*SurfaceSessionCommand_LaunchBrowser) isSurfaceSessionCommand_Command() {}
+
+func (*SurfaceSessionCommand_ConnectMobile) isSurfaceSessionCommand_Command() {}
+
+func (*SurfaceSessionCommand_LaunchApp) isSurfaceSessionCommand_Command() {}
+
+type OpenContextCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,1,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *OpenTabCommand) Reset() {
-	*x = OpenTabCommand{}
+func (x *OpenContextCommand) Reset() {
+	*x = OpenContextCommand{}
 	mi := &file_core_v1_browser_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *OpenTabCommand) String() string {
+func (x *OpenContextCommand) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*OpenTabCommand) ProtoMessage() {}
+func (*OpenContextCommand) ProtoMessage() {}
 
-func (x *OpenTabCommand) ProtoReflect() protoreflect.Message {
+func (x *OpenContextCommand) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_browser_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -183,12 +215,12 @@ func (x *OpenTabCommand) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use OpenTabCommand.ProtoReflect.Descriptor instead.
-func (*OpenTabCommand) Descriptor() ([]byte, []int) {
+// Deprecated: Use OpenContextCommand.ProtoReflect.Descriptor instead.
+func (*OpenContextCommand) Descriptor() ([]byte, []int) {
 	return file_core_v1_browser_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *OpenTabCommand) GetRetryOptions() *CommandRetryOptions {
+func (x *OpenContextCommand) GetRetryOptions() *CommandRetryOptions {
 	if x != nil {
 		return x.RetryOptions
 	}
@@ -239,26 +271,26 @@ func (x *SessionPingCommand) GetMessage() string {
 	return ""
 }
 
-type CloseBrowserSessionCommand struct {
+type CloseSurfaceSessionCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CloseBrowserSessionCommand) Reset() {
-	*x = CloseBrowserSessionCommand{}
+func (x *CloseSurfaceSessionCommand) Reset() {
+	*x = CloseSurfaceSessionCommand{}
 	mi := &file_core_v1_browser_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CloseBrowserSessionCommand) String() string {
+func (x *CloseSurfaceSessionCommand) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CloseBrowserSessionCommand) ProtoMessage() {}
+func (*CloseSurfaceSessionCommand) ProtoMessage() {}
 
-func (x *CloseBrowserSessionCommand) ProtoReflect() protoreflect.Message {
+func (x *CloseSurfaceSessionCommand) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_browser_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -270,41 +302,43 @@ func (x *CloseBrowserSessionCommand) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CloseBrowserSessionCommand.ProtoReflect.Descriptor instead.
-func (*CloseBrowserSessionCommand) Descriptor() ([]byte, []int) {
+// Deprecated: Use CloseSurfaceSessionCommand.ProtoReflect.Descriptor instead.
+func (*CloseSurfaceSessionCommand) Descriptor() ([]byte, []int) {
 	return file_core_v1_browser_proto_rawDescGZIP(), []int{3}
 }
 
-type BrowserSessionEvent struct {
+type SurfaceSessionEvent struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	SessionId string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// Types that are valid to be assigned to Event:
 	//
-	//	*BrowserSessionEvent_ChromeLaunched
-	//	*BrowserSessionEvent_TabOpened
-	//	*BrowserSessionEvent_Pong
-	//	*BrowserSessionEvent_Closed
-	//	*BrowserSessionEvent_Error
-	//	*BrowserSessionEvent_BrowserLaunched
-	Event         isBrowserSessionEvent_Event `protobuf_oneof:"event"`
+	//	*SurfaceSessionEvent_ChromeLaunched
+	//	*SurfaceSessionEvent_ContextOpened
+	//	*SurfaceSessionEvent_Pong
+	//	*SurfaceSessionEvent_Closed
+	//	*SurfaceSessionEvent_Error
+	//	*SurfaceSessionEvent_BrowserLaunched
+	//	*SurfaceSessionEvent_MobileConnected
+	//	*SurfaceSessionEvent_AppLaunched
+	Event         isSurfaceSessionEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *BrowserSessionEvent) Reset() {
-	*x = BrowserSessionEvent{}
+func (x *SurfaceSessionEvent) Reset() {
+	*x = SurfaceSessionEvent{}
 	mi := &file_core_v1_browser_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BrowserSessionEvent) String() string {
+func (x *SurfaceSessionEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BrowserSessionEvent) ProtoMessage() {}
+func (*SurfaceSessionEvent) ProtoMessage() {}
 
-func (x *BrowserSessionEvent) ProtoReflect() protoreflect.Message {
+func (x *SurfaceSessionEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_browser_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -316,141 +350,171 @@ func (x *BrowserSessionEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BrowserSessionEvent.ProtoReflect.Descriptor instead.
-func (*BrowserSessionEvent) Descriptor() ([]byte, []int) {
+// Deprecated: Use SurfaceSessionEvent.ProtoReflect.Descriptor instead.
+func (*SurfaceSessionEvent) Descriptor() ([]byte, []int) {
 	return file_core_v1_browser_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *BrowserSessionEvent) GetSessionId() string {
+func (x *SurfaceSessionEvent) GetSessionId() string {
 	if x != nil {
 		return x.SessionId
 	}
 	return ""
 }
 
-func (x *BrowserSessionEvent) GetEvent() isBrowserSessionEvent_Event {
+func (x *SurfaceSessionEvent) GetEvent() isSurfaceSessionEvent_Event {
 	if x != nil {
 		return x.Event
 	}
 	return nil
 }
 
-func (x *BrowserSessionEvent) GetChromeLaunched() *ChromeLaunchedEvent {
+func (x *SurfaceSessionEvent) GetChromeLaunched() *ChromeLaunchedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*BrowserSessionEvent_ChromeLaunched); ok {
+		if x, ok := x.Event.(*SurfaceSessionEvent_ChromeLaunched); ok {
 			return x.ChromeLaunched
 		}
 	}
 	return nil
 }
 
-func (x *BrowserSessionEvent) GetTabOpened() *TabOpenedEvent {
+func (x *SurfaceSessionEvent) GetContextOpened() *ContextOpenedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*BrowserSessionEvent_TabOpened); ok {
-			return x.TabOpened
+		if x, ok := x.Event.(*SurfaceSessionEvent_ContextOpened); ok {
+			return x.ContextOpened
 		}
 	}
 	return nil
 }
 
-func (x *BrowserSessionEvent) GetPong() *SessionPongEvent {
+func (x *SurfaceSessionEvent) GetPong() *SessionPongEvent {
 	if x != nil {
-		if x, ok := x.Event.(*BrowserSessionEvent_Pong); ok {
+		if x, ok := x.Event.(*SurfaceSessionEvent_Pong); ok {
 			return x.Pong
 		}
 	}
 	return nil
 }
 
-func (x *BrowserSessionEvent) GetClosed() *BrowserSessionClosedEvent {
+func (x *SurfaceSessionEvent) GetClosed() *SurfaceSessionClosedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*BrowserSessionEvent_Closed); ok {
+		if x, ok := x.Event.(*SurfaceSessionEvent_Closed); ok {
 			return x.Closed
 		}
 	}
 	return nil
 }
 
-func (x *BrowserSessionEvent) GetError() *BrowserSessionErrorEvent {
+func (x *SurfaceSessionEvent) GetError() *SurfaceSessionErrorEvent {
 	if x != nil {
-		if x, ok := x.Event.(*BrowserSessionEvent_Error); ok {
+		if x, ok := x.Event.(*SurfaceSessionEvent_Error); ok {
 			return x.Error
 		}
 	}
 	return nil
 }
 
-func (x *BrowserSessionEvent) GetBrowserLaunched() *BrowserLaunchedEvent {
+func (x *SurfaceSessionEvent) GetBrowserLaunched() *BrowserLaunchedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*BrowserSessionEvent_BrowserLaunched); ok {
+		if x, ok := x.Event.(*SurfaceSessionEvent_BrowserLaunched); ok {
 			return x.BrowserLaunched
 		}
 	}
 	return nil
 }
 
-type isBrowserSessionEvent_Event interface {
-	isBrowserSessionEvent_Event()
+func (x *SurfaceSessionEvent) GetMobileConnected() *MobileConnectedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*SurfaceSessionEvent_MobileConnected); ok {
+			return x.MobileConnected
+		}
+	}
+	return nil
 }
 
-type BrowserSessionEvent_ChromeLaunched struct {
+func (x *SurfaceSessionEvent) GetAppLaunched() *AppLaunchedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*SurfaceSessionEvent_AppLaunched); ok {
+			return x.AppLaunched
+		}
+	}
+	return nil
+}
+
+type isSurfaceSessionEvent_Event interface {
+	isSurfaceSessionEvent_Event()
+}
+
+type SurfaceSessionEvent_ChromeLaunched struct {
 	ChromeLaunched *ChromeLaunchedEvent `protobuf:"bytes,2,opt,name=chrome_launched,json=chromeLaunched,proto3,oneof"`
 }
 
-type BrowserSessionEvent_TabOpened struct {
-	TabOpened *TabOpenedEvent `protobuf:"bytes,3,opt,name=tab_opened,json=tabOpened,proto3,oneof"`
+type SurfaceSessionEvent_ContextOpened struct {
+	ContextOpened *ContextOpenedEvent `protobuf:"bytes,3,opt,name=context_opened,json=contextOpened,proto3,oneof"`
 }
 
-type BrowserSessionEvent_Pong struct {
+type SurfaceSessionEvent_Pong struct {
 	Pong *SessionPongEvent `protobuf:"bytes,4,opt,name=pong,proto3,oneof"`
 }
 
-type BrowserSessionEvent_Closed struct {
-	Closed *BrowserSessionClosedEvent `protobuf:"bytes,5,opt,name=closed,proto3,oneof"`
+type SurfaceSessionEvent_Closed struct {
+	Closed *SurfaceSessionClosedEvent `protobuf:"bytes,5,opt,name=closed,proto3,oneof"`
 }
 
-type BrowserSessionEvent_Error struct {
-	Error *BrowserSessionErrorEvent `protobuf:"bytes,6,opt,name=error,proto3,oneof"`
+type SurfaceSessionEvent_Error struct {
+	Error *SurfaceSessionErrorEvent `protobuf:"bytes,6,opt,name=error,proto3,oneof"`
 }
 
-type BrowserSessionEvent_BrowserLaunched struct {
+type SurfaceSessionEvent_BrowserLaunched struct {
 	BrowserLaunched *BrowserLaunchedEvent `protobuf:"bytes,7,opt,name=browser_launched,json=browserLaunched,proto3,oneof"`
 }
 
-func (*BrowserSessionEvent_ChromeLaunched) isBrowserSessionEvent_Event() {}
-
-func (*BrowserSessionEvent_TabOpened) isBrowserSessionEvent_Event() {}
-
-func (*BrowserSessionEvent_Pong) isBrowserSessionEvent_Event() {}
-
-func (*BrowserSessionEvent_Closed) isBrowserSessionEvent_Event() {}
-
-func (*BrowserSessionEvent_Error) isBrowserSessionEvent_Event() {}
-
-func (*BrowserSessionEvent_BrowserLaunched) isBrowserSessionEvent_Event() {}
-
-type TabOpenedEvent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TabSessionId  string                 `protobuf:"bytes,1,opt,name=tab_session_id,json=tabSessionId,proto3" json:"tab_session_id,omitempty"`
-	Note          string                 `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+type SurfaceSessionEvent_MobileConnected struct {
+	MobileConnected *MobileConnectedEvent `protobuf:"bytes,8,opt,name=mobile_connected,json=mobileConnected,proto3,oneof"`
 }
 
-func (x *TabOpenedEvent) Reset() {
-	*x = TabOpenedEvent{}
+type SurfaceSessionEvent_AppLaunched struct {
+	AppLaunched *AppLaunchedEvent `protobuf:"bytes,9,opt,name=app_launched,json=appLaunched,proto3,oneof"`
+}
+
+func (*SurfaceSessionEvent_ChromeLaunched) isSurfaceSessionEvent_Event() {}
+
+func (*SurfaceSessionEvent_ContextOpened) isSurfaceSessionEvent_Event() {}
+
+func (*SurfaceSessionEvent_Pong) isSurfaceSessionEvent_Event() {}
+
+func (*SurfaceSessionEvent_Closed) isSurfaceSessionEvent_Event() {}
+
+func (*SurfaceSessionEvent_Error) isSurfaceSessionEvent_Event() {}
+
+func (*SurfaceSessionEvent_BrowserLaunched) isSurfaceSessionEvent_Event() {}
+
+func (*SurfaceSessionEvent_MobileConnected) isSurfaceSessionEvent_Event() {}
+
+func (*SurfaceSessionEvent_AppLaunched) isSurfaceSessionEvent_Event() {}
+
+type ContextOpenedEvent struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ContextSessionId string                 `protobuf:"bytes,1,opt,name=context_session_id,json=contextSessionId,proto3" json:"context_session_id,omitempty"`
+	Note             string                 `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ContextOpenedEvent) Reset() {
+	*x = ContextOpenedEvent{}
 	mi := &file_core_v1_browser_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TabOpenedEvent) String() string {
+func (x *ContextOpenedEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TabOpenedEvent) ProtoMessage() {}
+func (*ContextOpenedEvent) ProtoMessage() {}
 
-func (x *TabOpenedEvent) ProtoReflect() protoreflect.Message {
+func (x *ContextOpenedEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_browser_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -462,19 +526,19 @@ func (x *TabOpenedEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TabOpenedEvent.ProtoReflect.Descriptor instead.
-func (*TabOpenedEvent) Descriptor() ([]byte, []int) {
+// Deprecated: Use ContextOpenedEvent.ProtoReflect.Descriptor instead.
+func (*ContextOpenedEvent) Descriptor() ([]byte, []int) {
 	return file_core_v1_browser_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *TabOpenedEvent) GetTabSessionId() string {
+func (x *ContextOpenedEvent) GetContextSessionId() string {
 	if x != nil {
-		return x.TabSessionId
+		return x.ContextSessionId
 	}
 	return ""
 }
 
-func (x *TabOpenedEvent) GetNote() string {
+func (x *ContextOpenedEvent) GetNote() string {
 	if x != nil {
 		return x.Note
 	}
@@ -525,27 +589,27 @@ func (x *SessionPongEvent) GetMessage() string {
 	return ""
 }
 
-type BrowserSessionClosedEvent struct {
+type SurfaceSessionClosedEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Reason        string                 `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *BrowserSessionClosedEvent) Reset() {
-	*x = BrowserSessionClosedEvent{}
+func (x *SurfaceSessionClosedEvent) Reset() {
+	*x = SurfaceSessionClosedEvent{}
 	mi := &file_core_v1_browser_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BrowserSessionClosedEvent) String() string {
+func (x *SurfaceSessionClosedEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BrowserSessionClosedEvent) ProtoMessage() {}
+func (*SurfaceSessionClosedEvent) ProtoMessage() {}
 
-func (x *BrowserSessionClosedEvent) ProtoReflect() protoreflect.Message {
+func (x *SurfaceSessionClosedEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_browser_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -557,39 +621,39 @@ func (x *BrowserSessionClosedEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BrowserSessionClosedEvent.ProtoReflect.Descriptor instead.
-func (*BrowserSessionClosedEvent) Descriptor() ([]byte, []int) {
+// Deprecated: Use SurfaceSessionClosedEvent.ProtoReflect.Descriptor instead.
+func (*SurfaceSessionClosedEvent) Descriptor() ([]byte, []int) {
 	return file_core_v1_browser_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *BrowserSessionClosedEvent) GetReason() string {
+func (x *SurfaceSessionClosedEvent) GetReason() string {
 	if x != nil {
 		return x.Reason
 	}
 	return ""
 }
 
-type BrowserSessionErrorEvent struct {
+type SurfaceSessionErrorEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *BrowserSessionErrorEvent) Reset() {
-	*x = BrowserSessionErrorEvent{}
+func (x *SurfaceSessionErrorEvent) Reset() {
+	*x = SurfaceSessionErrorEvent{}
 	mi := &file_core_v1_browser_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BrowserSessionErrorEvent) String() string {
+func (x *SurfaceSessionErrorEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BrowserSessionErrorEvent) ProtoMessage() {}
+func (*SurfaceSessionErrorEvent) ProtoMessage() {}
 
-func (x *BrowserSessionErrorEvent) ProtoReflect() protoreflect.Message {
+func (x *SurfaceSessionErrorEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_browser_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -601,12 +665,12 @@ func (x *BrowserSessionErrorEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BrowserSessionErrorEvent.ProtoReflect.Descriptor instead.
-func (*BrowserSessionErrorEvent) Descriptor() ([]byte, []int) {
+// Deprecated: Use SurfaceSessionErrorEvent.ProtoReflect.Descriptor instead.
+func (*SurfaceSessionErrorEvent) Descriptor() ([]byte, []int) {
 	return file_core_v1_browser_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *BrowserSessionErrorEvent) GetMessage() string {
+func (x *SurfaceSessionErrorEvent) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
@@ -617,40 +681,45 @@ var File_core_v1_browser_proto protoreflect.FileDescriptor
 
 const file_core_v1_browser_proto_rawDesc = "" +
 	"\n" +
-	"\x15core/v1/browser.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x19surfaces/web/v1/web.proto\"\x91\x03\n" +
-	"\x15BrowserSessionCommand\x12O\n" +
-	"\rlaunch_chrome\x18\x01 \x01(\v2(.allwright.engine.v1.LaunchChromeCommandH\x00R\flaunchChrome\x12@\n" +
-	"\bopen_tab\x18\x02 \x01(\v2#.allwright.engine.v1.OpenTabCommandH\x00R\aopenTab\x12=\n" +
+	"\x15core/v1/browser.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x1fsurfaces/mobile/v1/mobile.proto\x1a\x19surfaces/web/v1/web.proto\"\xb9\x04\n" +
+	"\x15SurfaceSessionCommand\x12O\n" +
+	"\rlaunch_chrome\x18\x01 \x01(\v2(.allwright.engine.v1.LaunchChromeCommandH\x00R\flaunchChrome\x12L\n" +
+	"\fopen_context\x18\x02 \x01(\v2'.allwright.engine.v1.OpenContextCommandH\x00R\vopenContext\x12=\n" +
 	"\x04ping\x18\x03 \x01(\v2'.allwright.engine.v1.SessionPingCommandH\x00R\x04ping\x12G\n" +
-	"\x05close\x18\x04 \x01(\v2/.allwright.engine.v1.CloseBrowserSessionCommandH\x00R\x05close\x12R\n" +
-	"\x0elaunch_browser\x18\x05 \x01(\v2).allwright.engine.v1.LaunchBrowserCommandH\x00R\rlaunchBrowserB\t\n" +
-	"\acommand\"v\n" +
-	"\x0eOpenTabCommand\x12R\n" +
+	"\x05close\x18\x04 \x01(\v2/.allwright.engine.v1.CloseSurfaceSessionCommandH\x00R\x05close\x12R\n" +
+	"\x0elaunch_browser\x18\x05 \x01(\v2).allwright.engine.v1.LaunchBrowserCommandH\x00R\rlaunchBrowser\x12R\n" +
+	"\x0econnect_mobile\x18\x06 \x01(\v2).allwright.engine.v1.ConnectMobileCommandH\x00R\rconnectMobile\x12F\n" +
+	"\n" +
+	"launch_app\x18\a \x01(\v2%.allwright.engine.v1.LaunchAppCommandH\x00R\tlaunchAppB\t\n" +
+	"\acommand\"z\n" +
+	"\x12OpenContextCommand\x12R\n" +
 	"\rretry_options\x18\x01 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
 	"\x0e_retry_options\".\n" +
 	"\x12SessionPingCommand\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"\x1c\n" +
-	"\x1aCloseBrowserSessionCommand\"\xfe\x03\n" +
-	"\x13BrowserSessionEvent\x12\x1d\n" +
+	"\x1aCloseSurfaceSessionCommand\"\xae\x05\n" +
+	"\x13SurfaceSessionEvent\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12S\n" +
-	"\x0fchrome_launched\x18\x02 \x01(\v2(.allwright.engine.v1.ChromeLaunchedEventH\x00R\x0echromeLaunched\x12D\n" +
-	"\n" +
-	"tab_opened\x18\x03 \x01(\v2#.allwright.engine.v1.TabOpenedEventH\x00R\ttabOpened\x12;\n" +
+	"\x0fchrome_launched\x18\x02 \x01(\v2(.allwright.engine.v1.ChromeLaunchedEventH\x00R\x0echromeLaunched\x12P\n" +
+	"\x0econtext_opened\x18\x03 \x01(\v2'.allwright.engine.v1.ContextOpenedEventH\x00R\rcontextOpened\x12;\n" +
 	"\x04pong\x18\x04 \x01(\v2%.allwright.engine.v1.SessionPongEventH\x00R\x04pong\x12H\n" +
-	"\x06closed\x18\x05 \x01(\v2..allwright.engine.v1.BrowserSessionClosedEventH\x00R\x06closed\x12E\n" +
-	"\x05error\x18\x06 \x01(\v2-.allwright.engine.v1.BrowserSessionErrorEventH\x00R\x05error\x12V\n" +
-	"\x10browser_launched\x18\a \x01(\v2).allwright.engine.v1.BrowserLaunchedEventH\x00R\x0fbrowserLaunchedB\a\n" +
-	"\x05event\"J\n" +
-	"\x0eTabOpenedEvent\x12$\n" +
-	"\x0etab_session_id\x18\x01 \x01(\tR\ftabSessionId\x12\x12\n" +
+	"\x06closed\x18\x05 \x01(\v2..allwright.engine.v1.SurfaceSessionClosedEventH\x00R\x06closed\x12E\n" +
+	"\x05error\x18\x06 \x01(\v2-.allwright.engine.v1.SurfaceSessionErrorEventH\x00R\x05error\x12V\n" +
+	"\x10browser_launched\x18\a \x01(\v2).allwright.engine.v1.BrowserLaunchedEventH\x00R\x0fbrowserLaunched\x12V\n" +
+	"\x10mobile_connected\x18\b \x01(\v2).allwright.engine.v1.MobileConnectedEventH\x00R\x0fmobileConnected\x12J\n" +
+	"\fapp_launched\x18\t \x01(\v2%.allwright.engine.v1.AppLaunchedEventH\x00R\vappLaunchedB\a\n" +
+	"\x05event\"V\n" +
+	"\x12ContextOpenedEvent\x12,\n" +
+	"\x12context_session_id\x18\x01 \x01(\tR\x10contextSessionId\x12\x12\n" +
 	"\x04note\x18\x02 \x01(\tR\x04note\",\n" +
 	"\x10SessionPongEvent\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"3\n" +
-	"\x19BrowserSessionClosedEvent\x12\x16\n" +
+	"\x19SurfaceSessionClosedEvent\x12\x16\n" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\"4\n" +
-	"\x18BrowserSessionErrorEvent\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessageB0Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
+	"\x18SurfaceSessionErrorEvent\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessageBK\n" +
+	"\x17dev.allwright.engine.v1P\x01Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
 
 var (
 	file_core_v1_browser_proto_rawDescOnce sync.Once
@@ -666,39 +735,47 @@ func file_core_v1_browser_proto_rawDescGZIP() []byte {
 
 var file_core_v1_browser_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_core_v1_browser_proto_goTypes = []any{
-	(*BrowserSessionCommand)(nil),      // 0: allwright.engine.v1.BrowserSessionCommand
-	(*OpenTabCommand)(nil),             // 1: allwright.engine.v1.OpenTabCommand
+	(*SurfaceSessionCommand)(nil),      // 0: allwright.engine.v1.SurfaceSessionCommand
+	(*OpenContextCommand)(nil),         // 1: allwright.engine.v1.OpenContextCommand
 	(*SessionPingCommand)(nil),         // 2: allwright.engine.v1.SessionPingCommand
-	(*CloseBrowserSessionCommand)(nil), // 3: allwright.engine.v1.CloseBrowserSessionCommand
-	(*BrowserSessionEvent)(nil),        // 4: allwright.engine.v1.BrowserSessionEvent
-	(*TabOpenedEvent)(nil),             // 5: allwright.engine.v1.TabOpenedEvent
+	(*CloseSurfaceSessionCommand)(nil), // 3: allwright.engine.v1.CloseSurfaceSessionCommand
+	(*SurfaceSessionEvent)(nil),        // 4: allwright.engine.v1.SurfaceSessionEvent
+	(*ContextOpenedEvent)(nil),         // 5: allwright.engine.v1.ContextOpenedEvent
 	(*SessionPongEvent)(nil),           // 6: allwright.engine.v1.SessionPongEvent
-	(*BrowserSessionClosedEvent)(nil),  // 7: allwright.engine.v1.BrowserSessionClosedEvent
-	(*BrowserSessionErrorEvent)(nil),   // 8: allwright.engine.v1.BrowserSessionErrorEvent
+	(*SurfaceSessionClosedEvent)(nil),  // 7: allwright.engine.v1.SurfaceSessionClosedEvent
+	(*SurfaceSessionErrorEvent)(nil),   // 8: allwright.engine.v1.SurfaceSessionErrorEvent
 	(*LaunchChromeCommand)(nil),        // 9: allwright.engine.v1.LaunchChromeCommand
 	(*LaunchBrowserCommand)(nil),       // 10: allwright.engine.v1.LaunchBrowserCommand
-	(*CommandRetryOptions)(nil),        // 11: allwright.engine.v1.CommandRetryOptions
-	(*ChromeLaunchedEvent)(nil),        // 12: allwright.engine.v1.ChromeLaunchedEvent
-	(*BrowserLaunchedEvent)(nil),       // 13: allwright.engine.v1.BrowserLaunchedEvent
+	(*ConnectMobileCommand)(nil),       // 11: allwright.engine.v1.ConnectMobileCommand
+	(*LaunchAppCommand)(nil),           // 12: allwright.engine.v1.LaunchAppCommand
+	(*CommandRetryOptions)(nil),        // 13: allwright.engine.v1.CommandRetryOptions
+	(*ChromeLaunchedEvent)(nil),        // 14: allwright.engine.v1.ChromeLaunchedEvent
+	(*BrowserLaunchedEvent)(nil),       // 15: allwright.engine.v1.BrowserLaunchedEvent
+	(*MobileConnectedEvent)(nil),       // 16: allwright.engine.v1.MobileConnectedEvent
+	(*AppLaunchedEvent)(nil),           // 17: allwright.engine.v1.AppLaunchedEvent
 }
 var file_core_v1_browser_proto_depIdxs = []int32{
-	9,  // 0: allwright.engine.v1.BrowserSessionCommand.launch_chrome:type_name -> allwright.engine.v1.LaunchChromeCommand
-	1,  // 1: allwright.engine.v1.BrowserSessionCommand.open_tab:type_name -> allwright.engine.v1.OpenTabCommand
-	2,  // 2: allwright.engine.v1.BrowserSessionCommand.ping:type_name -> allwright.engine.v1.SessionPingCommand
-	3,  // 3: allwright.engine.v1.BrowserSessionCommand.close:type_name -> allwright.engine.v1.CloseBrowserSessionCommand
-	10, // 4: allwright.engine.v1.BrowserSessionCommand.launch_browser:type_name -> allwright.engine.v1.LaunchBrowserCommand
-	11, // 5: allwright.engine.v1.OpenTabCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	12, // 6: allwright.engine.v1.BrowserSessionEvent.chrome_launched:type_name -> allwright.engine.v1.ChromeLaunchedEvent
-	5,  // 7: allwright.engine.v1.BrowserSessionEvent.tab_opened:type_name -> allwright.engine.v1.TabOpenedEvent
-	6,  // 8: allwright.engine.v1.BrowserSessionEvent.pong:type_name -> allwright.engine.v1.SessionPongEvent
-	7,  // 9: allwright.engine.v1.BrowserSessionEvent.closed:type_name -> allwright.engine.v1.BrowserSessionClosedEvent
-	8,  // 10: allwright.engine.v1.BrowserSessionEvent.error:type_name -> allwright.engine.v1.BrowserSessionErrorEvent
-	13, // 11: allwright.engine.v1.BrowserSessionEvent.browser_launched:type_name -> allwright.engine.v1.BrowserLaunchedEvent
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	9,  // 0: allwright.engine.v1.SurfaceSessionCommand.launch_chrome:type_name -> allwright.engine.v1.LaunchChromeCommand
+	1,  // 1: allwright.engine.v1.SurfaceSessionCommand.open_context:type_name -> allwright.engine.v1.OpenContextCommand
+	2,  // 2: allwright.engine.v1.SurfaceSessionCommand.ping:type_name -> allwright.engine.v1.SessionPingCommand
+	3,  // 3: allwright.engine.v1.SurfaceSessionCommand.close:type_name -> allwright.engine.v1.CloseSurfaceSessionCommand
+	10, // 4: allwright.engine.v1.SurfaceSessionCommand.launch_browser:type_name -> allwright.engine.v1.LaunchBrowserCommand
+	11, // 5: allwright.engine.v1.SurfaceSessionCommand.connect_mobile:type_name -> allwright.engine.v1.ConnectMobileCommand
+	12, // 6: allwright.engine.v1.SurfaceSessionCommand.launch_app:type_name -> allwright.engine.v1.LaunchAppCommand
+	13, // 7: allwright.engine.v1.OpenContextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	14, // 8: allwright.engine.v1.SurfaceSessionEvent.chrome_launched:type_name -> allwright.engine.v1.ChromeLaunchedEvent
+	5,  // 9: allwright.engine.v1.SurfaceSessionEvent.context_opened:type_name -> allwright.engine.v1.ContextOpenedEvent
+	6,  // 10: allwright.engine.v1.SurfaceSessionEvent.pong:type_name -> allwright.engine.v1.SessionPongEvent
+	7,  // 11: allwright.engine.v1.SurfaceSessionEvent.closed:type_name -> allwright.engine.v1.SurfaceSessionClosedEvent
+	8,  // 12: allwright.engine.v1.SurfaceSessionEvent.error:type_name -> allwright.engine.v1.SurfaceSessionErrorEvent
+	15, // 13: allwright.engine.v1.SurfaceSessionEvent.browser_launched:type_name -> allwright.engine.v1.BrowserLaunchedEvent
+	16, // 14: allwright.engine.v1.SurfaceSessionEvent.mobile_connected:type_name -> allwright.engine.v1.MobileConnectedEvent
+	17, // 15: allwright.engine.v1.SurfaceSessionEvent.app_launched:type_name -> allwright.engine.v1.AppLaunchedEvent
+	16, // [16:16] is the sub-list for method output_type
+	16, // [16:16] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_core_v1_browser_proto_init() }
@@ -707,22 +784,27 @@ func file_core_v1_browser_proto_init() {
 		return
 	}
 	file_core_v1_common_proto_init()
+	file_surfaces_mobile_v1_mobile_proto_init()
 	file_surfaces_web_v1_web_proto_init()
 	file_core_v1_browser_proto_msgTypes[0].OneofWrappers = []any{
-		(*BrowserSessionCommand_LaunchChrome)(nil),
-		(*BrowserSessionCommand_OpenTab)(nil),
-		(*BrowserSessionCommand_Ping)(nil),
-		(*BrowserSessionCommand_Close)(nil),
-		(*BrowserSessionCommand_LaunchBrowser)(nil),
+		(*SurfaceSessionCommand_LaunchChrome)(nil),
+		(*SurfaceSessionCommand_OpenContext)(nil),
+		(*SurfaceSessionCommand_Ping)(nil),
+		(*SurfaceSessionCommand_Close)(nil),
+		(*SurfaceSessionCommand_LaunchBrowser)(nil),
+		(*SurfaceSessionCommand_ConnectMobile)(nil),
+		(*SurfaceSessionCommand_LaunchApp)(nil),
 	}
 	file_core_v1_browser_proto_msgTypes[1].OneofWrappers = []any{}
 	file_core_v1_browser_proto_msgTypes[4].OneofWrappers = []any{
-		(*BrowserSessionEvent_ChromeLaunched)(nil),
-		(*BrowserSessionEvent_TabOpened)(nil),
-		(*BrowserSessionEvent_Pong)(nil),
-		(*BrowserSessionEvent_Closed)(nil),
-		(*BrowserSessionEvent_Error)(nil),
-		(*BrowserSessionEvent_BrowserLaunched)(nil),
+		(*SurfaceSessionEvent_ChromeLaunched)(nil),
+		(*SurfaceSessionEvent_ContextOpened)(nil),
+		(*SurfaceSessionEvent_Pong)(nil),
+		(*SurfaceSessionEvent_Closed)(nil),
+		(*SurfaceSessionEvent_Error)(nil),
+		(*SurfaceSessionEvent_BrowserLaunched)(nil),
+		(*SurfaceSessionEvent_MobileConnected)(nil),
+		(*SurfaceSessionEvent_AppLaunched)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

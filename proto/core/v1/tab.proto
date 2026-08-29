@@ -7,14 +7,14 @@ option java_multiple_files = true;
 
 import "surfaces/web/v1/web.proto";
 
-message TabSessionCommand {
-  string browser_session_id = 1;
-  string tab_session_id = 2;
+message ContextSessionCommand {
+  string surface_session_id = 1;
+  string context_session_id = 2;
 
   oneof command {
-    TabSessionPingCommand ping = 3;
-    CloseTabSessionCommand close = 4;
-    NavigateTabCommand navigate = 5;
+    ContextSessionPingCommand ping = 3;
+    CloseContextSessionCommand close = 4;
+    NavigatePageCommand navigate = 5;
     ClickElementCommand click_element = 6;
     CountElementsCommand count_elements = 7;
     HighlightElementsCommand highlight_elements = 8;
@@ -28,21 +28,21 @@ message TabSessionCommand {
   }
 }
 
-message TabSessionPingCommand {
+message ContextSessionPingCommand {
   string message = 1;
 }
 
-message CloseTabSessionCommand {}
+message CloseContextSessionCommand {}
 
-message TabSessionEvent {
-  string tab_session_id = 1;
+message ContextSessionEvent {
+  string context_session_id = 1;
 
   oneof event {
-    TabSessionAttachedEvent attached = 2;
-    TabSessionPongEvent pong = 3;
-    TabSessionClosedEvent closed = 4;
-    TabSessionErrorEvent error = 5;
-    TabNavigatedEvent navigated = 6;
+    ContextSessionAttachedEvent attached = 2;
+    ContextSessionPongEvent pong = 3;
+    ContextSessionClosedEvent closed = 4;
+    ContextSessionErrorEvent error = 5;
+    PageNavigatedEvent navigated = 6;
     ChromiumBidiInjectionEvent chromium_bidi_injection = 7;
     ElementClickedEvent element_clicked = 8;
     ElementCountedEvent element_counted = 9;
@@ -57,18 +57,18 @@ message TabSessionEvent {
   }
 }
 
-message TabSessionAttachedEvent {
+message ContextSessionAttachedEvent {
   string note = 1;
 }
 
-message TabSessionPongEvent {
+message ContextSessionPongEvent {
   string message = 1;
 }
 
-message TabSessionClosedEvent {
+message ContextSessionClosedEvent {
   string reason = 1;
 }
 
-message TabSessionErrorEvent {
+message ContextSessionErrorEvent {
   string message = 1;
 }

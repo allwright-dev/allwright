@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use crate::proto::browser_session_command::Command as BrowserCommand;
-use crate::proto::browser_session_event::Event as BrowserEvent;
+use crate::proto::surface_session_command::Command as SurfaceCommand;
+use crate::proto::surface_session_event::Event as SurfaceEvent;
 use crate::proto::{
-    BrowserKind as ProtoBrowserKind, BrowserLaunchedEvent, BrowserSessionCommand,
+    BrowserKind as ProtoBrowserKind, BrowserLaunchedEvent, SurfaceSessionCommand,
     LaunchBrowserCommand,
 };
 use tokio::sync::{Mutex as AsyncMutex, mpsc};
@@ -29,13 +29,13 @@ pub async fn launch_browser(browser_kind: BrowserKind, options: LaunchOptions) -
     let mut engine = runtime.engine.clone();
     let (command_tx, command_rx) = mpsc::channel(16);
     let response = engine
-        .browser_session(tonic::Request::new(ReceiverStream::new(command_rx)))
+        .surface_session(tonic::Request::new(ReceiverStream::new(command_rx)))
         .await?;
     let mut events = response.into_inner();
 
     command_tx
-        .send(BrowserSessionCommand {
-            command: Some(BrowserCommand::LaunchBrowser(LaunchBrowserCommand {
+        .send(SurfaceSessionCommand {
+            command: Some(SurfaceCommand::LaunchBrowser(LaunchBrowserCommand {
                 browser_kind: match browser_kind {
                     BrowserKind::Chromium => ProtoBrowserKind::Chromium as i32,
                     BrowserKind::Firefox => ProtoBrowserKind::Firefox as i32,
@@ -54,11 +54,11 @@ pub async fn launch_browser(browser_kind: BrowserKind, options: LaunchOptions) -
             .ok_or_else(|| Error::new("browser session closed before launch response"))?;
 
         match event.event {
-            Some(BrowserEvent::BrowserLaunched(BrowserLaunchedEvent {
+            Some(SurfaceEvent::BrowserLaunched(BrowserLaunchedEvent {
                 browser,
                 note,
                 user_data_dir,
-                initial_tab_session_id,
+                initial_page_session_id,
                 ..
             })) => {
                 return Ok(build_browser(
@@ -70,10 +70,10 @@ pub async fn launch_browser(browser_kind: BrowserKind, options: LaunchOptions) -
                     note,
                     String::new(),
                     user_data_dir,
-                    initial_tab_session_id,
+                    initial_page_session_id,
                 ));
             }
-            Some(BrowserEvent::ChromeLaunched(launched)) => {
+            Some(SurfaceEvent::ChromeLaunched(launched)) => {
                 return Ok(build_browser(
                     runtime,
                     command_tx,
@@ -83,10 +83,10 @@ pub async fn launch_browser(browser_kind: BrowserKind, options: LaunchOptions) -
                     launched.note,
                     launched.cdp_websocket_url,
                     launched.user_data_dir,
-                    launched.initial_tab_session_id,
+                    launched.initial_page_session_id,
                 ));
             }
-            Some(BrowserEvent::Error(error)) => {
+            Some(SurfaceEvent::Error(error)) => {
                 return Err(Error::new(format!(
                     "browser session error during launch: {}",
                     error.message
@@ -117,20 +117,20 @@ impl BrowserType {
 
 fn build_browser(
     runtime: Arc<super::types::RuntimeClient>,
-    command_tx: mpsc::Sender<BrowserSessionCommand>,
-    events: tonic::Streaming<crate::proto::BrowserSessionEvent>,
-    browser_session_id: String,
+    command_tx: mpsc::Sender<SurfaceSessionCommand>,
+    events: tonic::Streaming<crate::proto::SurfaceSessionEvent>,
+    surface_session_id: String,
     browser: String,
     note: String,
     cdp_websocket_url: String,
     user_data_dir: String,
-    initial_tab_session_id: String,
+    initial_page_session_id: String,
 ) -> Browser {
     let initial_tab = Tab {
         inner: Arc::new(TabInner {
             runtime: Arc::clone(&runtime),
-            browser_session_id: browser_session_id.clone(),
-            session_id: initial_tab_session_id,
+            surface_session_id: surface_session_id.clone(),
+            session_id: initial_page_session_id,
             state: AsyncMutex::new(TabState::default()),
         }),
     };
@@ -142,7 +142,7 @@ fn build_browser(
                 events,
                 closed: false,
             }),
-            session_id: browser_session_id,
+            session_id: surface_session_id,
             browser_name: browser,
             launch_note: note,
             cdp_websocket_url,

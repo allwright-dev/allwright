@@ -320,14 +320,14 @@ pub(crate) struct BrowserInner {
 }
 
 pub(crate) struct BrowserState {
-    pub(crate) command_tx: mpsc::Sender<crate::proto::BrowserSessionCommand>,
-    pub(crate) events: tonic::Streaming<crate::proto::BrowserSessionEvent>,
+    pub(crate) command_tx: mpsc::Sender<crate::proto::SurfaceSessionCommand>,
+    pub(crate) events: tonic::Streaming<crate::proto::SurfaceSessionEvent>,
     pub(crate) closed: bool,
 }
 
 pub(crate) struct TabInner {
     pub(crate) runtime: Arc<RuntimeClient>,
-    pub(crate) browser_session_id: String,
+    pub(crate) surface_session_id: String,
     pub(crate) session_id: String,
     pub(crate) state: AsyncMutex<TabState>,
 }
@@ -338,7 +338,7 @@ pub(crate) struct TabState {
 }
 
 pub(crate) struct TabHandle {
-    pub(crate) command_tx: mpsc::Sender<crate::proto::TabSessionCommand>,
-    pub(crate) events: tonic::Streaming<crate::proto::TabSessionEvent>,
+    pub(crate) command_tx: mpsc::Sender<crate::proto::ContextSessionCommand>,
+    pub(crate) events: tonic::Streaming<crate::proto::ContextSessionEvent>,
     pub(crate) closed: bool,
 }

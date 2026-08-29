@@ -12,13 +12,15 @@ bun add -d vitest @allwright.dev/vitest
 import { expect, test } from "@allwright.dev/vitest";
 
 test("opens a page", async ({ page }) => {
-  await page.goto("https://example.com");
-  const title = await page.textContent("h1");
-  expect(title.text).toContain("Example");
+  await page.goto("https://themoderninternet.vercel.app");
+  await page.click(
+    "xpath=//div[contains(@class,'card')][.//h2[normalize-space()='Form Inputs']]//button[normalize-space()='Visit page']",
+  );
+  await expect(page.locator('xpath=//h1[text()="Form Inputs"]')).toHaveText("Form Inputs");
 });
 
-test("opens an Android app", async ({ androidPage }) => {
-  await androidPage.click('Id=com.example.airticket:id/bottom_nav_account');
+test("opens an Android app", async ({ androidApp }) => {
+  await androidApp.click('Id=com.example.airticket:id/bottom_nav_account');
 });
 ```
 
@@ -77,21 +79,23 @@ test.use({
   },
 });
 
-test("android only", async ({ androidPage }) => {
-  await androidPage.fill('xpath=//*[@text="Email"]', "user@example.com");
+test("android only", async ({ androidApp }) => {
+  await androidApp.fill('xpath=//*[@text="Email"]', "user@example.com");
 });
 
-test("hybrid web and android", async ({ page, androidPage }) => {
-  await page.goto("https://example.com");
-  await androidPage.click('Id=com.example.airticket:id/bottom_nav_account');
+test("hybrid web and android", async ({ page, androidApp }) => {
+  await page.goto("https://themoderninternet.vercel.app");
+  await androidApp.click('Id=com.example.airticket:id/bottom_nav_account');
 });
 ```
+
+Fixtures are lazy on first use. Injecting `browser`, `page`, `android`, or `androidApp` does not launch or connect immediately; the underlying session is created only when the test first performs an action through that fixture. Sync metadata properties like `browser.sessionId` or `android.sessionId` are only available after the lazy fixture has been realized by a prior awaited call.
 
 Available fixtures:
 
 - `browser`: launched web browser
 - `page`: initial web page
 - `android`: connected Android device session
-- `androidPage`: launched Android app page
+- `androidApp`: launched Android app page
 
-`androidPage` launches using `allwright.android.launchOptions` first, then falls back to `config.mobile.android`.
+`androidApp` launches using `allwright.android.launchOptions` first, then falls back to `config.mobile.android`.

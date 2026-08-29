@@ -18,12 +18,9 @@ default = ["client"]
 client = []
 server = []
 
-[[example]]
-name = "playground"
-required-features = ["client"]
-
 [dependencies]
 allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.52" }
+allwright-surface-mobile = { path = "../allwright-surface-mobile", version = "0.0.52" }
 flate2 = { workspace = true }
 libloading = { workspace = true }
 prost = { workspace = true }

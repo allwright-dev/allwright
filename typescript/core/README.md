@@ -13,11 +13,14 @@ import { firefox } from "@allwright.dev/core";
 
 const browser = await firefox.launch();
 const page = browser.page();
-await page.goto("https://example.com");
+await page.goto("https://themoderninternet.vercel.app");
+await page.click(
+  "xpath=//div[contains(@class,'card')][.//h2[normalize-space()='Form Inputs']]//button[normalize-space()='Visit page']",
+);
 await browser.close();
 ```
 
-A small runnable example also lives in [examples/basic.ts](./examples/basic.ts), and the fuller end-to-end playground lives in [examples/playground.ts](./examples/playground.ts).
+Runnable examples live in [examples/web-basic.ts](./examples/web-basic.ts) and [examples/android-basic.ts](./examples/android-basic.ts).
 
 Shared config files are stack-agnostic and can live in `allwright.config.yaml` or `allwright.config.json`.
 The shared schema lives at the repo root in `allwright.schema.json`.

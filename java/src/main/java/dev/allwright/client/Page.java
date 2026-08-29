@@ -1,7 +1,7 @@
 package dev.allwright.client;
 
 import dev.allwright.engine.v1.ClickElementCommand;
-import dev.allwright.engine.v1.CloseTabSessionCommand;
+import dev.allwright.engine.v1.CloseContextSessionCommand;
 import dev.allwright.engine.v1.CountElementsCommand;
 import dev.allwright.engine.v1.FillElementCommand;
 import dev.allwright.engine.v1.FocusElementCommand;
@@ -9,18 +9,18 @@ import dev.allwright.engine.v1.GetInnerTextCommand;
 import dev.allwright.engine.v1.GetTextContentCommand;
 import dev.allwright.engine.v1.HighlightElementsCommand;
 import dev.allwright.engine.v1.HoverElementCommand;
-import dev.allwright.engine.v1.NavigateTabCommand;
+import dev.allwright.engine.v1.NavigatePageCommand;
 import dev.allwright.engine.v1.PressKeyCommand;
-import dev.allwright.engine.v1.TabSessionCommand;
-import dev.allwright.engine.v1.TabSessionEvent;
-import dev.allwright.engine.v1.TabSessionPingCommand;
+import dev.allwright.engine.v1.ContextSessionCommand;
+import dev.allwright.engine.v1.ContextSessionEvent;
+import dev.allwright.engine.v1.ContextSessionPingCommand;
 import dev.allwright.engine.v1.WaitForSelectorCommand;
 
 public final class Page implements AutoCloseable {
     private final RuntimeSupport.RuntimeClient runtime;
     private final String browserSessionId;
     private final String sessionId;
-    private RuntimeSupport.StreamHandle<TabSessionCommand, TabSessionEvent> stream;
+    private RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> stream;
     private boolean closed;
 
     Page(RuntimeSupport.RuntimeClient runtime, String browserSessionId, String sessionId) {
@@ -46,17 +46,17 @@ public final class Page implements AutoCloseable {
     }
 
     public synchronized NavigateResult goTo(String url, CommandOptions options) {
-        RuntimeSupport.StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
-        NavigateTabCommand.Builder navigate = NavigateTabCommand.newBuilder().setUrl(url);
+        NavigatePageCommand.Builder navigate = NavigatePageCommand.newBuilder().setUrl(url);
         if (CommandSupport.hasTimeout(resolvedOptions.timeoutMs())) {
             navigate.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
         }
         handle.send(
-                TabSessionCommand.newBuilder()
-                        .setBrowserSessionId(browserSessionId)
-                        .setTabSessionId(sessionId)
+                ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
                         .setNavigate(navigate)
                         .build()
         );
@@ -65,7 +65,7 @@ public final class Page implements AutoCloseable {
         String navigatedNote = null;
 
         while (true) {
-            TabSessionEvent event = handle.recv("receive tab session event while navigating");
+            ContextSessionEvent event = handle.recv("receive tab session event while navigating");
             switch (event.getEventCase()) {
                 case NAVIGATED -> {
                     navigatedUrl = event.getNavigated().getUrl();
@@ -110,7 +110,7 @@ public final class Page implements AutoCloseable {
     }
 
     public synchronized ClickResult click(String selector, CommandOptions options) {
-        RuntimeSupport.StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
         String transportSelector = SelectorSupport.normalizeSelectorForTransport(selector);
@@ -119,15 +119,15 @@ public final class Page implements AutoCloseable {
             click.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
         }
         handle.send(
-                TabSessionCommand.newBuilder()
-                        .setBrowserSessionId(browserSessionId)
-                        .setTabSessionId(sessionId)
+                ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
                         .setClickElement(click)
                         .build()
         );
 
         while (true) {
-            TabSessionEvent event = handle.recv("receive tab session event while clicking");
+            ContextSessionEvent event = handle.recv("receive tab session event while clicking");
             switch (event.getEventCase()) {
                 case ELEMENT_CLICKED -> {
                     return new ClickResult(
@@ -154,7 +154,7 @@ public final class Page implements AutoCloseable {
     }
 
     public synchronized CountResult count(String selector, CommandOptions options) {
-        RuntimeSupport.StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
         String transportSelector = SelectorSupport.normalizeSelectorForTransport(selector);
@@ -163,15 +163,15 @@ public final class Page implements AutoCloseable {
             count.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
         }
         handle.send(
-                TabSessionCommand.newBuilder()
-                        .setBrowserSessionId(browserSessionId)
-                        .setTabSessionId(sessionId)
+                ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
                         .setCountElements(count)
                         .build()
         );
 
         while (true) {
-            TabSessionEvent event = handle.recv("receive tab session event while counting elements");
+            ContextSessionEvent event = handle.recv("receive tab session event while counting elements");
             switch (event.getEventCase()) {
                 case ELEMENT_COUNTED -> {
                     return new CountResult(
@@ -198,7 +198,7 @@ public final class Page implements AutoCloseable {
     }
 
     public synchronized HighlightResult highlight(String selector, HighlightOptions options) {
-        RuntimeSupport.StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         HighlightOptions resolvedOptions = options == null ? new HighlightOptions() : options;
         String transportSelector = SelectorSupport.normalizeSelectorForTransport(selector);
@@ -211,15 +211,15 @@ public final class Page implements AutoCloseable {
             highlight.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
         }
         handle.send(
-                TabSessionCommand.newBuilder()
-                        .setBrowserSessionId(browserSessionId)
-                        .setTabSessionId(sessionId)
+                ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
                         .setHighlightElements(highlight)
                         .build()
         );
 
         while (true) {
-            TabSessionEvent event = handle.recv("receive tab session event while highlighting elements");
+            ContextSessionEvent event = handle.recv("receive tab session event while highlighting elements");
             switch (event.getEventCase()) {
                 case ELEMENTS_HIGHLIGHTED -> {
                     return new HighlightResult(
@@ -254,12 +254,12 @@ public final class Page implements AutoCloseable {
         }
         return performElementCommand(
                 "focusing",
-                TabSessionCommand.newBuilder()
-                        .setBrowserSessionId(browserSessionId)
-                        .setTabSessionId(sessionId)
+                ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
                         .setFocusElement(focus)
                         .build(),
-                TabSessionEvent.EventCase.ELEMENT_FOCUSED
+                ContextSessionEvent.EventCase.ELEMENT_FOCUSED
         );
     }
 
@@ -268,7 +268,7 @@ public final class Page implements AutoCloseable {
     }
 
     public synchronized FillResult fill(String selector, String value, CommandOptions options) {
-        RuntimeSupport.StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
         FillElementCommand.Builder fill = FillElementCommand.newBuilder()
@@ -278,14 +278,14 @@ public final class Page implements AutoCloseable {
             fill.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
         }
         handle.send(
-                TabSessionCommand.newBuilder()
-                        .setBrowserSessionId(browserSessionId)
-                        .setTabSessionId(sessionId)
+                ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
                         .setFillElement(fill)
                         .build()
         );
         while (true) {
-            TabSessionEvent event = handle.recv("receive tab session event while filling");
+            ContextSessionEvent event = handle.recv("receive tab session event while filling");
             switch (event.getEventCase()) {
                 case ELEMENT_FILLED -> {
                     return new FillResult(
@@ -320,12 +320,12 @@ public final class Page implements AutoCloseable {
         }
         return performElementCommand(
                 "hovering",
-                TabSessionCommand.newBuilder()
-                        .setBrowserSessionId(browserSessionId)
-                        .setTabSessionId(sessionId)
+                ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
                         .setHoverElement(hover)
                         .build(),
-                TabSessionEvent.EventCase.ELEMENT_HOVERED
+                ContextSessionEvent.EventCase.ELEMENT_HOVERED
         );
     }
 
@@ -334,7 +334,7 @@ public final class Page implements AutoCloseable {
     }
 
     public synchronized PressResult press(String selector, String key, PressOptions options) {
-        RuntimeSupport.StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         PressOptions resolvedOptions = options == null ? new PressOptions() : options;
         PressKeyCommand.Builder press = PressKeyCommand.newBuilder()
@@ -347,14 +347,14 @@ public final class Page implements AutoCloseable {
             press.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
         }
         handle.send(
-                TabSessionCommand.newBuilder()
-                        .setBrowserSessionId(browserSessionId)
-                        .setTabSessionId(sessionId)
+                ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
                         .setPressKey(press)
                         .build()
         );
         while (true) {
-            TabSessionEvent event = handle.recv("receive tab session event while pressing key");
+            ContextSessionEvent event = handle.recv("receive tab session event while pressing key");
             switch (event.getEventCase()) {
                 case KEY_PRESSED -> {
                     return new PressResult(
@@ -397,7 +397,7 @@ public final class Page implements AutoCloseable {
     }
 
     public synchronized WaitForSelectorResult waitForSelector(String selector, WaitForSelectorOptions options) {
-        RuntimeSupport.StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         WaitForSelectorOptions resolvedOptions = options == null ? new WaitForSelectorOptions() : options;
         WaitForSelectorCommand.Builder waitFor = WaitForSelectorCommand.newBuilder()
@@ -409,14 +409,14 @@ public final class Page implements AutoCloseable {
             waitFor.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
         }
         handle.send(
-                TabSessionCommand.newBuilder()
-                        .setBrowserSessionId(browserSessionId)
-                        .setTabSessionId(sessionId)
+                ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
                         .setWaitForSelector(waitFor)
                         .build()
         );
         while (true) {
-            TabSessionEvent event = handle.recv("receive tab session event while waiting for selector");
+            ContextSessionEvent event = handle.recv("receive tab session event while waiting for selector");
             switch (event.getEventCase()) {
                 case SELECTOR_WAIT_SATISFIED -> {
                     return new WaitForSelectorResult(
@@ -443,18 +443,18 @@ public final class Page implements AutoCloseable {
     }
 
     public synchronized String ping(String message) {
-        RuntimeSupport.StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         handle.send(
-                TabSessionCommand.newBuilder()
-                        .setBrowserSessionId(browserSessionId)
-                        .setTabSessionId(sessionId)
-                        .setPing(TabSessionPingCommand.newBuilder().setMessage(message).build())
+                ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
+                        .setPing(ContextSessionPingCommand.newBuilder().setMessage(message).build())
                         .build()
         );
 
         while (true) {
-            TabSessionEvent event = handle.recv("receive tab session event while pinging page");
+            ContextSessionEvent event = handle.recv("receive tab session event while pinging page");
             switch (event.getEventCase()) {
                 case PONG -> {
                     return event.getPong().getMessage();
@@ -474,21 +474,21 @@ public final class Page implements AutoCloseable {
 
     @Override
     public synchronized void close() {
-        RuntimeSupport.StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         if (closed) {
             return;
         }
 
         handle.send(
-                TabSessionCommand.newBuilder()
-                        .setBrowserSessionId(browserSessionId)
-                        .setTabSessionId(sessionId)
-                        .setClose(CloseTabSessionCommand.newBuilder().build())
+                ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
+                        .setClose(CloseContextSessionCommand.newBuilder().build())
                         .build()
         );
 
         while (true) {
-            TabSessionEvent event = handle.recv("receive tab session event while closing page");
+            ContextSessionEvent event = handle.recv("receive tab session event while closing page");
             switch (event.getEventCase()) {
                 case CLOSED -> {
                     closed = true;
@@ -512,18 +512,18 @@ public final class Page implements AutoCloseable {
 
     private ElementResult performElementCommand(
             String action,
-            TabSessionCommand command,
-            TabSessionEvent.EventCase successCase
+            ContextSessionCommand command,
+            ContextSessionEvent.EventCase successCase
     ) {
-        RuntimeSupport.StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         handle.send(command);
 
         while (true) {
-            TabSessionEvent event = handle.recv("receive tab session event while " + action);
+            ContextSessionEvent event = handle.recv("receive tab session event while " + action);
             switch (event.getEventCase()) {
                 case ELEMENT_FOCUSED -> {
-                    if (successCase == TabSessionEvent.EventCase.ELEMENT_FOCUSED) {
+                    if (successCase == ContextSessionEvent.EventCase.ELEMENT_FOCUSED) {
                         return new ElementResult(
                                 event.getElementFocused().getCssSelector(),
                                 event.getElementFocused().getNote()
@@ -531,7 +531,7 @@ public final class Page implements AutoCloseable {
                     }
                 }
                 case ELEMENT_HOVERED -> {
-                    if (successCase == TabSessionEvent.EventCase.ELEMENT_HOVERED) {
+                    if (successCase == ContextSessionEvent.EventCase.ELEMENT_HOVERED) {
                         return new ElementResult(
                                 event.getElementHovered().getCssSelector(),
                                 event.getElementHovered().getNote()
@@ -552,13 +552,13 @@ public final class Page implements AutoCloseable {
     }
 
     private TextResult readText(String selector, CommandOptions options, boolean textContent) {
-        RuntimeSupport.StreamHandle<TabSessionCommand, TabSessionEvent> handle = ensureStream();
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
         String transportSelector = SelectorSupport.normalizeSelectorForTransport(selector);
-        TabSessionCommand.Builder command = TabSessionCommand.newBuilder()
-                .setBrowserSessionId(browserSessionId)
-                .setTabSessionId(sessionId);
+        ContextSessionCommand.Builder command = ContextSessionCommand.newBuilder()
+                .setSurfaceSessionId(browserSessionId)
+                .setContextSessionId(sessionId);
         if (textContent) {
             GetTextContentCommand.Builder getTextContent =
                     GetTextContentCommand.newBuilder().setCssSelector(transportSelector);
@@ -577,7 +577,7 @@ public final class Page implements AutoCloseable {
         handle.send(command.build());
 
         while (true) {
-            TabSessionEvent event = handle.recv(
+            ContextSessionEvent event = handle.recv(
                     "receive tab session event while " + (textContent ? "reading text content" : "reading inner text")
             );
             switch (event.getEventCase()) {
@@ -618,9 +618,9 @@ public final class Page implements AutoCloseable {
         }
     }
 
-    private RuntimeSupport.StreamHandle<TabSessionCommand, TabSessionEvent> ensureStream() {
+    private RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> ensureStream() {
         if (stream == null) {
-            stream = new RuntimeSupport.StreamHandle<>(runtime.asyncStub()::tabSession);
+            stream = new RuntimeSupport.StreamHandle<>(runtime.asyncStub()::contextSession);
         }
         return stream;
     }

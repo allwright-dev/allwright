@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package allwright.engine.v1;
+option go_package = "allwright.dev/gen/allwright/engine/v1;enginev1";
+
+import "core/v1/common.proto";
+
+enum MobilePlatform {
+  MOBILE_PLATFORM_UNSPECIFIED = 0;
+  MOBILE_PLATFORM_ANDROID = 1;
+  MOBILE_PLATFORM_IOS = 2;
+}
+
+enum DeviceConnectionKind {
+  DEVICE_CONNECTION_KIND_UNSPECIFIED = 0;
+  DEVICE_CONNECTION_KIND_USB = 1;
+  DEVICE_CONNECTION_KIND_EMULATOR = 2;
+  DEVICE_CONNECTION_KIND_REMOTE_ADB = 3;
+}
+
+message ConnectMobileCommand {
+  MobilePlatform platform = 1;
+  optional string device = 2;
+  optional string adb_endpoint = 3;
+  bool preserve_app_state = 4;
+  optional CommandRetryOptions retry_options = 5;
+}
+
+message MobileConnectedEvent {
+  MobilePlatform platform = 1;
+  string device_name = 2;
+  string note = 3;
+  string device_id = 4;
+  DeviceConnectionKind connection_kind = 5;
+  string backend = 6;
+  string device_session_id = 7;
+  string initial_app_session_id = 8;
+  optional string package_name = 9;
+  optional string activity_name = 10;
+}
+
+message LaunchAppCommand {
+  optional string apk_path = 1;
+  optional string app_id = 2;
+  optional string launch_activity = 3;
+  bool stop_before_launch = 4;
+  optional CommandRetryOptions retry_options = 5;
+}
+
+message AppLaunchedEvent {
+  string app_session_id = 1;
+  string note = 2;
+  optional string package_name = 3;
+  optional string activity_name = 4;
+  optional string webview_context = 5;
+}

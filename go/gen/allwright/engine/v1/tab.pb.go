@@ -21,44 +21,44 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type TabSessionCommand struct {
+type ContextSessionCommand struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
-	BrowserSessionId string                 `protobuf:"bytes,1,opt,name=browser_session_id,json=browserSessionId,proto3" json:"browser_session_id,omitempty"`
-	TabSessionId     string                 `protobuf:"bytes,2,opt,name=tab_session_id,json=tabSessionId,proto3" json:"tab_session_id,omitempty"`
+	SurfaceSessionId string                 `protobuf:"bytes,1,opt,name=surface_session_id,json=surfaceSessionId,proto3" json:"surface_session_id,omitempty"`
+	ContextSessionId string                 `protobuf:"bytes,2,opt,name=context_session_id,json=contextSessionId,proto3" json:"context_session_id,omitempty"`
 	// Types that are valid to be assigned to Command:
 	//
-	//	*TabSessionCommand_Ping
-	//	*TabSessionCommand_Close
-	//	*TabSessionCommand_Navigate
-	//	*TabSessionCommand_ClickElement
-	//	*TabSessionCommand_CountElements
-	//	*TabSessionCommand_HighlightElements
-	//	*TabSessionCommand_FocusElement
-	//	*TabSessionCommand_FillElement
-	//	*TabSessionCommand_HoverElement
-	//	*TabSessionCommand_PressKey
-	//	*TabSessionCommand_GetTextContent
-	//	*TabSessionCommand_GetInnerText
-	//	*TabSessionCommand_WaitForSelector
-	Command       isTabSessionCommand_Command `protobuf_oneof:"command"`
+	//	*ContextSessionCommand_Ping
+	//	*ContextSessionCommand_Close
+	//	*ContextSessionCommand_Navigate
+	//	*ContextSessionCommand_ClickElement
+	//	*ContextSessionCommand_CountElements
+	//	*ContextSessionCommand_HighlightElements
+	//	*ContextSessionCommand_FocusElement
+	//	*ContextSessionCommand_FillElement
+	//	*ContextSessionCommand_HoverElement
+	//	*ContextSessionCommand_PressKey
+	//	*ContextSessionCommand_GetTextContent
+	//	*ContextSessionCommand_GetInnerText
+	//	*ContextSessionCommand_WaitForSelector
+	Command       isContextSessionCommand_Command `protobuf_oneof:"command"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TabSessionCommand) Reset() {
-	*x = TabSessionCommand{}
+func (x *ContextSessionCommand) Reset() {
+	*x = ContextSessionCommand{}
 	mi := &file_core_v1_tab_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TabSessionCommand) String() string {
+func (x *ContextSessionCommand) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TabSessionCommand) ProtoMessage() {}
+func (*ContextSessionCommand) ProtoMessage() {}
 
-func (x *TabSessionCommand) ProtoReflect() protoreflect.Message {
+func (x *ContextSessionCommand) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_tab_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -70,252 +70,252 @@ func (x *TabSessionCommand) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TabSessionCommand.ProtoReflect.Descriptor instead.
-func (*TabSessionCommand) Descriptor() ([]byte, []int) {
+// Deprecated: Use ContextSessionCommand.ProtoReflect.Descriptor instead.
+func (*ContextSessionCommand) Descriptor() ([]byte, []int) {
 	return file_core_v1_tab_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *TabSessionCommand) GetBrowserSessionId() string {
+func (x *ContextSessionCommand) GetSurfaceSessionId() string {
 	if x != nil {
-		return x.BrowserSessionId
+		return x.SurfaceSessionId
 	}
 	return ""
 }
 
-func (x *TabSessionCommand) GetTabSessionId() string {
+func (x *ContextSessionCommand) GetContextSessionId() string {
 	if x != nil {
-		return x.TabSessionId
+		return x.ContextSessionId
 	}
 	return ""
 }
 
-func (x *TabSessionCommand) GetCommand() isTabSessionCommand_Command {
+func (x *ContextSessionCommand) GetCommand() isContextSessionCommand_Command {
 	if x != nil {
 		return x.Command
 	}
 	return nil
 }
 
-func (x *TabSessionCommand) GetPing() *TabSessionPingCommand {
+func (x *ContextSessionCommand) GetPing() *ContextSessionPingCommand {
 	if x != nil {
-		if x, ok := x.Command.(*TabSessionCommand_Ping); ok {
+		if x, ok := x.Command.(*ContextSessionCommand_Ping); ok {
 			return x.Ping
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionCommand) GetClose() *CloseTabSessionCommand {
+func (x *ContextSessionCommand) GetClose() *CloseContextSessionCommand {
 	if x != nil {
-		if x, ok := x.Command.(*TabSessionCommand_Close); ok {
+		if x, ok := x.Command.(*ContextSessionCommand_Close); ok {
 			return x.Close
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionCommand) GetNavigate() *NavigateTabCommand {
+func (x *ContextSessionCommand) GetNavigate() *NavigatePageCommand {
 	if x != nil {
-		if x, ok := x.Command.(*TabSessionCommand_Navigate); ok {
+		if x, ok := x.Command.(*ContextSessionCommand_Navigate); ok {
 			return x.Navigate
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionCommand) GetClickElement() *ClickElementCommand {
+func (x *ContextSessionCommand) GetClickElement() *ClickElementCommand {
 	if x != nil {
-		if x, ok := x.Command.(*TabSessionCommand_ClickElement); ok {
+		if x, ok := x.Command.(*ContextSessionCommand_ClickElement); ok {
 			return x.ClickElement
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionCommand) GetCountElements() *CountElementsCommand {
+func (x *ContextSessionCommand) GetCountElements() *CountElementsCommand {
 	if x != nil {
-		if x, ok := x.Command.(*TabSessionCommand_CountElements); ok {
+		if x, ok := x.Command.(*ContextSessionCommand_CountElements); ok {
 			return x.CountElements
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionCommand) GetHighlightElements() *HighlightElementsCommand {
+func (x *ContextSessionCommand) GetHighlightElements() *HighlightElementsCommand {
 	if x != nil {
-		if x, ok := x.Command.(*TabSessionCommand_HighlightElements); ok {
+		if x, ok := x.Command.(*ContextSessionCommand_HighlightElements); ok {
 			return x.HighlightElements
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionCommand) GetFocusElement() *FocusElementCommand {
+func (x *ContextSessionCommand) GetFocusElement() *FocusElementCommand {
 	if x != nil {
-		if x, ok := x.Command.(*TabSessionCommand_FocusElement); ok {
+		if x, ok := x.Command.(*ContextSessionCommand_FocusElement); ok {
 			return x.FocusElement
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionCommand) GetFillElement() *FillElementCommand {
+func (x *ContextSessionCommand) GetFillElement() *FillElementCommand {
 	if x != nil {
-		if x, ok := x.Command.(*TabSessionCommand_FillElement); ok {
+		if x, ok := x.Command.(*ContextSessionCommand_FillElement); ok {
 			return x.FillElement
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionCommand) GetHoverElement() *HoverElementCommand {
+func (x *ContextSessionCommand) GetHoverElement() *HoverElementCommand {
 	if x != nil {
-		if x, ok := x.Command.(*TabSessionCommand_HoverElement); ok {
+		if x, ok := x.Command.(*ContextSessionCommand_HoverElement); ok {
 			return x.HoverElement
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionCommand) GetPressKey() *PressKeyCommand {
+func (x *ContextSessionCommand) GetPressKey() *PressKeyCommand {
 	if x != nil {
-		if x, ok := x.Command.(*TabSessionCommand_PressKey); ok {
+		if x, ok := x.Command.(*ContextSessionCommand_PressKey); ok {
 			return x.PressKey
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionCommand) GetGetTextContent() *GetTextContentCommand {
+func (x *ContextSessionCommand) GetGetTextContent() *GetTextContentCommand {
 	if x != nil {
-		if x, ok := x.Command.(*TabSessionCommand_GetTextContent); ok {
+		if x, ok := x.Command.(*ContextSessionCommand_GetTextContent); ok {
 			return x.GetTextContent
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionCommand) GetGetInnerText() *GetInnerTextCommand {
+func (x *ContextSessionCommand) GetGetInnerText() *GetInnerTextCommand {
 	if x != nil {
-		if x, ok := x.Command.(*TabSessionCommand_GetInnerText); ok {
+		if x, ok := x.Command.(*ContextSessionCommand_GetInnerText); ok {
 			return x.GetInnerText
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionCommand) GetWaitForSelector() *WaitForSelectorCommand {
+func (x *ContextSessionCommand) GetWaitForSelector() *WaitForSelectorCommand {
 	if x != nil {
-		if x, ok := x.Command.(*TabSessionCommand_WaitForSelector); ok {
+		if x, ok := x.Command.(*ContextSessionCommand_WaitForSelector); ok {
 			return x.WaitForSelector
 		}
 	}
 	return nil
 }
 
-type isTabSessionCommand_Command interface {
-	isTabSessionCommand_Command()
+type isContextSessionCommand_Command interface {
+	isContextSessionCommand_Command()
 }
 
-type TabSessionCommand_Ping struct {
-	Ping *TabSessionPingCommand `protobuf:"bytes,3,opt,name=ping,proto3,oneof"`
+type ContextSessionCommand_Ping struct {
+	Ping *ContextSessionPingCommand `protobuf:"bytes,3,opt,name=ping,proto3,oneof"`
 }
 
-type TabSessionCommand_Close struct {
-	Close *CloseTabSessionCommand `protobuf:"bytes,4,opt,name=close,proto3,oneof"`
+type ContextSessionCommand_Close struct {
+	Close *CloseContextSessionCommand `protobuf:"bytes,4,opt,name=close,proto3,oneof"`
 }
 
-type TabSessionCommand_Navigate struct {
-	Navigate *NavigateTabCommand `protobuf:"bytes,5,opt,name=navigate,proto3,oneof"`
+type ContextSessionCommand_Navigate struct {
+	Navigate *NavigatePageCommand `protobuf:"bytes,5,opt,name=navigate,proto3,oneof"`
 }
 
-type TabSessionCommand_ClickElement struct {
+type ContextSessionCommand_ClickElement struct {
 	ClickElement *ClickElementCommand `protobuf:"bytes,6,opt,name=click_element,json=clickElement,proto3,oneof"`
 }
 
-type TabSessionCommand_CountElements struct {
+type ContextSessionCommand_CountElements struct {
 	CountElements *CountElementsCommand `protobuf:"bytes,7,opt,name=count_elements,json=countElements,proto3,oneof"`
 }
 
-type TabSessionCommand_HighlightElements struct {
+type ContextSessionCommand_HighlightElements struct {
 	HighlightElements *HighlightElementsCommand `protobuf:"bytes,8,opt,name=highlight_elements,json=highlightElements,proto3,oneof"`
 }
 
-type TabSessionCommand_FocusElement struct {
+type ContextSessionCommand_FocusElement struct {
 	FocusElement *FocusElementCommand `protobuf:"bytes,9,opt,name=focus_element,json=focusElement,proto3,oneof"`
 }
 
-type TabSessionCommand_FillElement struct {
+type ContextSessionCommand_FillElement struct {
 	FillElement *FillElementCommand `protobuf:"bytes,10,opt,name=fill_element,json=fillElement,proto3,oneof"`
 }
 
-type TabSessionCommand_HoverElement struct {
+type ContextSessionCommand_HoverElement struct {
 	HoverElement *HoverElementCommand `protobuf:"bytes,11,opt,name=hover_element,json=hoverElement,proto3,oneof"`
 }
 
-type TabSessionCommand_PressKey struct {
+type ContextSessionCommand_PressKey struct {
 	PressKey *PressKeyCommand `protobuf:"bytes,12,opt,name=press_key,json=pressKey,proto3,oneof"`
 }
 
-type TabSessionCommand_GetTextContent struct {
+type ContextSessionCommand_GetTextContent struct {
 	GetTextContent *GetTextContentCommand `protobuf:"bytes,13,opt,name=get_text_content,json=getTextContent,proto3,oneof"`
 }
 
-type TabSessionCommand_GetInnerText struct {
+type ContextSessionCommand_GetInnerText struct {
 	GetInnerText *GetInnerTextCommand `protobuf:"bytes,14,opt,name=get_inner_text,json=getInnerText,proto3,oneof"`
 }
 
-type TabSessionCommand_WaitForSelector struct {
+type ContextSessionCommand_WaitForSelector struct {
 	WaitForSelector *WaitForSelectorCommand `protobuf:"bytes,15,opt,name=wait_for_selector,json=waitForSelector,proto3,oneof"`
 }
 
-func (*TabSessionCommand_Ping) isTabSessionCommand_Command() {}
+func (*ContextSessionCommand_Ping) isContextSessionCommand_Command() {}
 
-func (*TabSessionCommand_Close) isTabSessionCommand_Command() {}
+func (*ContextSessionCommand_Close) isContextSessionCommand_Command() {}
 
-func (*TabSessionCommand_Navigate) isTabSessionCommand_Command() {}
+func (*ContextSessionCommand_Navigate) isContextSessionCommand_Command() {}
 
-func (*TabSessionCommand_ClickElement) isTabSessionCommand_Command() {}
+func (*ContextSessionCommand_ClickElement) isContextSessionCommand_Command() {}
 
-func (*TabSessionCommand_CountElements) isTabSessionCommand_Command() {}
+func (*ContextSessionCommand_CountElements) isContextSessionCommand_Command() {}
 
-func (*TabSessionCommand_HighlightElements) isTabSessionCommand_Command() {}
+func (*ContextSessionCommand_HighlightElements) isContextSessionCommand_Command() {}
 
-func (*TabSessionCommand_FocusElement) isTabSessionCommand_Command() {}
+func (*ContextSessionCommand_FocusElement) isContextSessionCommand_Command() {}
 
-func (*TabSessionCommand_FillElement) isTabSessionCommand_Command() {}
+func (*ContextSessionCommand_FillElement) isContextSessionCommand_Command() {}
 
-func (*TabSessionCommand_HoverElement) isTabSessionCommand_Command() {}
+func (*ContextSessionCommand_HoverElement) isContextSessionCommand_Command() {}
 
-func (*TabSessionCommand_PressKey) isTabSessionCommand_Command() {}
+func (*ContextSessionCommand_PressKey) isContextSessionCommand_Command() {}
 
-func (*TabSessionCommand_GetTextContent) isTabSessionCommand_Command() {}
+func (*ContextSessionCommand_GetTextContent) isContextSessionCommand_Command() {}
 
-func (*TabSessionCommand_GetInnerText) isTabSessionCommand_Command() {}
+func (*ContextSessionCommand_GetInnerText) isContextSessionCommand_Command() {}
 
-func (*TabSessionCommand_WaitForSelector) isTabSessionCommand_Command() {}
+func (*ContextSessionCommand_WaitForSelector) isContextSessionCommand_Command() {}
 
-type TabSessionPingCommand struct {
+type ContextSessionPingCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TabSessionPingCommand) Reset() {
-	*x = TabSessionPingCommand{}
+func (x *ContextSessionPingCommand) Reset() {
+	*x = ContextSessionPingCommand{}
 	mi := &file_core_v1_tab_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TabSessionPingCommand) String() string {
+func (x *ContextSessionPingCommand) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TabSessionPingCommand) ProtoMessage() {}
+func (*ContextSessionPingCommand) ProtoMessage() {}
 
-func (x *TabSessionPingCommand) ProtoReflect() protoreflect.Message {
+func (x *ContextSessionPingCommand) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_tab_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -327,38 +327,38 @@ func (x *TabSessionPingCommand) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TabSessionPingCommand.ProtoReflect.Descriptor instead.
-func (*TabSessionPingCommand) Descriptor() ([]byte, []int) {
+// Deprecated: Use ContextSessionPingCommand.ProtoReflect.Descriptor instead.
+func (*ContextSessionPingCommand) Descriptor() ([]byte, []int) {
 	return file_core_v1_tab_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *TabSessionPingCommand) GetMessage() string {
+func (x *ContextSessionPingCommand) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
 	return ""
 }
 
-type CloseTabSessionCommand struct {
+type CloseContextSessionCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CloseTabSessionCommand) Reset() {
-	*x = CloseTabSessionCommand{}
+func (x *CloseContextSessionCommand) Reset() {
+	*x = CloseContextSessionCommand{}
 	mi := &file_core_v1_tab_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CloseTabSessionCommand) String() string {
+func (x *CloseContextSessionCommand) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CloseTabSessionCommand) ProtoMessage() {}
+func (*CloseContextSessionCommand) ProtoMessage() {}
 
-func (x *CloseTabSessionCommand) ProtoReflect() protoreflect.Message {
+func (x *CloseContextSessionCommand) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_tab_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -370,51 +370,51 @@ func (x *CloseTabSessionCommand) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CloseTabSessionCommand.ProtoReflect.Descriptor instead.
-func (*CloseTabSessionCommand) Descriptor() ([]byte, []int) {
+// Deprecated: Use CloseContextSessionCommand.ProtoReflect.Descriptor instead.
+func (*CloseContextSessionCommand) Descriptor() ([]byte, []int) {
 	return file_core_v1_tab_proto_rawDescGZIP(), []int{2}
 }
 
-type TabSessionEvent struct {
-	state        protoimpl.MessageState `protogen:"open.v1"`
-	TabSessionId string                 `protobuf:"bytes,1,opt,name=tab_session_id,json=tabSessionId,proto3" json:"tab_session_id,omitempty"`
+type ContextSessionEvent struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ContextSessionId string                 `protobuf:"bytes,1,opt,name=context_session_id,json=contextSessionId,proto3" json:"context_session_id,omitempty"`
 	// Types that are valid to be assigned to Event:
 	//
-	//	*TabSessionEvent_Attached
-	//	*TabSessionEvent_Pong
-	//	*TabSessionEvent_Closed
-	//	*TabSessionEvent_Error
-	//	*TabSessionEvent_Navigated
-	//	*TabSessionEvent_ChromiumBidiInjection
-	//	*TabSessionEvent_ElementClicked
-	//	*TabSessionEvent_ElementCounted
-	//	*TabSessionEvent_ElementsHighlighted
-	//	*TabSessionEvent_ElementFocused
-	//	*TabSessionEvent_ElementFilled
-	//	*TabSessionEvent_ElementHovered
-	//	*TabSessionEvent_KeyPressed
-	//	*TabSessionEvent_TextContentResolved
-	//	*TabSessionEvent_InnerTextResolved
-	//	*TabSessionEvent_SelectorWaitSatisfied
-	Event         isTabSessionEvent_Event `protobuf_oneof:"event"`
+	//	*ContextSessionEvent_Attached
+	//	*ContextSessionEvent_Pong
+	//	*ContextSessionEvent_Closed
+	//	*ContextSessionEvent_Error
+	//	*ContextSessionEvent_Navigated
+	//	*ContextSessionEvent_ChromiumBidiInjection
+	//	*ContextSessionEvent_ElementClicked
+	//	*ContextSessionEvent_ElementCounted
+	//	*ContextSessionEvent_ElementsHighlighted
+	//	*ContextSessionEvent_ElementFocused
+	//	*ContextSessionEvent_ElementFilled
+	//	*ContextSessionEvent_ElementHovered
+	//	*ContextSessionEvent_KeyPressed
+	//	*ContextSessionEvent_TextContentResolved
+	//	*ContextSessionEvent_InnerTextResolved
+	//	*ContextSessionEvent_SelectorWaitSatisfied
+	Event         isContextSessionEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TabSessionEvent) Reset() {
-	*x = TabSessionEvent{}
+func (x *ContextSessionEvent) Reset() {
+	*x = ContextSessionEvent{}
 	mi := &file_core_v1_tab_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TabSessionEvent) String() string {
+func (x *ContextSessionEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TabSessionEvent) ProtoMessage() {}
+func (*ContextSessionEvent) ProtoMessage() {}
 
-func (x *TabSessionEvent) ProtoReflect() protoreflect.Message {
+func (x *ContextSessionEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_tab_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -426,290 +426,290 @@ func (x *TabSessionEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TabSessionEvent.ProtoReflect.Descriptor instead.
-func (*TabSessionEvent) Descriptor() ([]byte, []int) {
+// Deprecated: Use ContextSessionEvent.ProtoReflect.Descriptor instead.
+func (*ContextSessionEvent) Descriptor() ([]byte, []int) {
 	return file_core_v1_tab_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *TabSessionEvent) GetTabSessionId() string {
+func (x *ContextSessionEvent) GetContextSessionId() string {
 	if x != nil {
-		return x.TabSessionId
+		return x.ContextSessionId
 	}
 	return ""
 }
 
-func (x *TabSessionEvent) GetEvent() isTabSessionEvent_Event {
+func (x *ContextSessionEvent) GetEvent() isContextSessionEvent_Event {
 	if x != nil {
 		return x.Event
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetAttached() *TabSessionAttachedEvent {
+func (x *ContextSessionEvent) GetAttached() *ContextSessionAttachedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_Attached); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_Attached); ok {
 			return x.Attached
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetPong() *TabSessionPongEvent {
+func (x *ContextSessionEvent) GetPong() *ContextSessionPongEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_Pong); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_Pong); ok {
 			return x.Pong
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetClosed() *TabSessionClosedEvent {
+func (x *ContextSessionEvent) GetClosed() *ContextSessionClosedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_Closed); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_Closed); ok {
 			return x.Closed
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetError() *TabSessionErrorEvent {
+func (x *ContextSessionEvent) GetError() *ContextSessionErrorEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_Error); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_Error); ok {
 			return x.Error
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetNavigated() *TabNavigatedEvent {
+func (x *ContextSessionEvent) GetNavigated() *PageNavigatedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_Navigated); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_Navigated); ok {
 			return x.Navigated
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetChromiumBidiInjection() *ChromiumBidiInjectionEvent {
+func (x *ContextSessionEvent) GetChromiumBidiInjection() *ChromiumBidiInjectionEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_ChromiumBidiInjection); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_ChromiumBidiInjection); ok {
 			return x.ChromiumBidiInjection
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetElementClicked() *ElementClickedEvent {
+func (x *ContextSessionEvent) GetElementClicked() *ElementClickedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_ElementClicked); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_ElementClicked); ok {
 			return x.ElementClicked
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetElementCounted() *ElementCountedEvent {
+func (x *ContextSessionEvent) GetElementCounted() *ElementCountedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_ElementCounted); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_ElementCounted); ok {
 			return x.ElementCounted
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetElementsHighlighted() *ElementsHighlightedEvent {
+func (x *ContextSessionEvent) GetElementsHighlighted() *ElementsHighlightedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_ElementsHighlighted); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_ElementsHighlighted); ok {
 			return x.ElementsHighlighted
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetElementFocused() *ElementFocusedEvent {
+func (x *ContextSessionEvent) GetElementFocused() *ElementFocusedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_ElementFocused); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_ElementFocused); ok {
 			return x.ElementFocused
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetElementFilled() *ElementFilledEvent {
+func (x *ContextSessionEvent) GetElementFilled() *ElementFilledEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_ElementFilled); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_ElementFilled); ok {
 			return x.ElementFilled
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetElementHovered() *ElementHoveredEvent {
+func (x *ContextSessionEvent) GetElementHovered() *ElementHoveredEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_ElementHovered); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_ElementHovered); ok {
 			return x.ElementHovered
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetKeyPressed() *KeyPressedEvent {
+func (x *ContextSessionEvent) GetKeyPressed() *KeyPressedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_KeyPressed); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_KeyPressed); ok {
 			return x.KeyPressed
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetTextContentResolved() *TextContentResolvedEvent {
+func (x *ContextSessionEvent) GetTextContentResolved() *TextContentResolvedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_TextContentResolved); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_TextContentResolved); ok {
 			return x.TextContentResolved
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetInnerTextResolved() *InnerTextResolvedEvent {
+func (x *ContextSessionEvent) GetInnerTextResolved() *InnerTextResolvedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_InnerTextResolved); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_InnerTextResolved); ok {
 			return x.InnerTextResolved
 		}
 	}
 	return nil
 }
 
-func (x *TabSessionEvent) GetSelectorWaitSatisfied() *SelectorWaitSatisfiedEvent {
+func (x *ContextSessionEvent) GetSelectorWaitSatisfied() *SelectorWaitSatisfiedEvent {
 	if x != nil {
-		if x, ok := x.Event.(*TabSessionEvent_SelectorWaitSatisfied); ok {
+		if x, ok := x.Event.(*ContextSessionEvent_SelectorWaitSatisfied); ok {
 			return x.SelectorWaitSatisfied
 		}
 	}
 	return nil
 }
 
-type isTabSessionEvent_Event interface {
-	isTabSessionEvent_Event()
+type isContextSessionEvent_Event interface {
+	isContextSessionEvent_Event()
 }
 
-type TabSessionEvent_Attached struct {
-	Attached *TabSessionAttachedEvent `protobuf:"bytes,2,opt,name=attached,proto3,oneof"`
+type ContextSessionEvent_Attached struct {
+	Attached *ContextSessionAttachedEvent `protobuf:"bytes,2,opt,name=attached,proto3,oneof"`
 }
 
-type TabSessionEvent_Pong struct {
-	Pong *TabSessionPongEvent `protobuf:"bytes,3,opt,name=pong,proto3,oneof"`
+type ContextSessionEvent_Pong struct {
+	Pong *ContextSessionPongEvent `protobuf:"bytes,3,opt,name=pong,proto3,oneof"`
 }
 
-type TabSessionEvent_Closed struct {
-	Closed *TabSessionClosedEvent `protobuf:"bytes,4,opt,name=closed,proto3,oneof"`
+type ContextSessionEvent_Closed struct {
+	Closed *ContextSessionClosedEvent `protobuf:"bytes,4,opt,name=closed,proto3,oneof"`
 }
 
-type TabSessionEvent_Error struct {
-	Error *TabSessionErrorEvent `protobuf:"bytes,5,opt,name=error,proto3,oneof"`
+type ContextSessionEvent_Error struct {
+	Error *ContextSessionErrorEvent `protobuf:"bytes,5,opt,name=error,proto3,oneof"`
 }
 
-type TabSessionEvent_Navigated struct {
-	Navigated *TabNavigatedEvent `protobuf:"bytes,6,opt,name=navigated,proto3,oneof"`
+type ContextSessionEvent_Navigated struct {
+	Navigated *PageNavigatedEvent `protobuf:"bytes,6,opt,name=navigated,proto3,oneof"`
 }
 
-type TabSessionEvent_ChromiumBidiInjection struct {
+type ContextSessionEvent_ChromiumBidiInjection struct {
 	ChromiumBidiInjection *ChromiumBidiInjectionEvent `protobuf:"bytes,7,opt,name=chromium_bidi_injection,json=chromiumBidiInjection,proto3,oneof"`
 }
 
-type TabSessionEvent_ElementClicked struct {
+type ContextSessionEvent_ElementClicked struct {
 	ElementClicked *ElementClickedEvent `protobuf:"bytes,8,opt,name=element_clicked,json=elementClicked,proto3,oneof"`
 }
 
-type TabSessionEvent_ElementCounted struct {
+type ContextSessionEvent_ElementCounted struct {
 	ElementCounted *ElementCountedEvent `protobuf:"bytes,9,opt,name=element_counted,json=elementCounted,proto3,oneof"`
 }
 
-type TabSessionEvent_ElementsHighlighted struct {
+type ContextSessionEvent_ElementsHighlighted struct {
 	ElementsHighlighted *ElementsHighlightedEvent `protobuf:"bytes,10,opt,name=elements_highlighted,json=elementsHighlighted,proto3,oneof"`
 }
 
-type TabSessionEvent_ElementFocused struct {
+type ContextSessionEvent_ElementFocused struct {
 	ElementFocused *ElementFocusedEvent `protobuf:"bytes,11,opt,name=element_focused,json=elementFocused,proto3,oneof"`
 }
 
-type TabSessionEvent_ElementFilled struct {
+type ContextSessionEvent_ElementFilled struct {
 	ElementFilled *ElementFilledEvent `protobuf:"bytes,12,opt,name=element_filled,json=elementFilled,proto3,oneof"`
 }
 
-type TabSessionEvent_ElementHovered struct {
+type ContextSessionEvent_ElementHovered struct {
 	ElementHovered *ElementHoveredEvent `protobuf:"bytes,13,opt,name=element_hovered,json=elementHovered,proto3,oneof"`
 }
 
-type TabSessionEvent_KeyPressed struct {
+type ContextSessionEvent_KeyPressed struct {
 	KeyPressed *KeyPressedEvent `protobuf:"bytes,14,opt,name=key_pressed,json=keyPressed,proto3,oneof"`
 }
 
-type TabSessionEvent_TextContentResolved struct {
+type ContextSessionEvent_TextContentResolved struct {
 	TextContentResolved *TextContentResolvedEvent `protobuf:"bytes,15,opt,name=text_content_resolved,json=textContentResolved,proto3,oneof"`
 }
 
-type TabSessionEvent_InnerTextResolved struct {
+type ContextSessionEvent_InnerTextResolved struct {
 	InnerTextResolved *InnerTextResolvedEvent `protobuf:"bytes,16,opt,name=inner_text_resolved,json=innerTextResolved,proto3,oneof"`
 }
 
-type TabSessionEvent_SelectorWaitSatisfied struct {
+type ContextSessionEvent_SelectorWaitSatisfied struct {
 	SelectorWaitSatisfied *SelectorWaitSatisfiedEvent `protobuf:"bytes,17,opt,name=selector_wait_satisfied,json=selectorWaitSatisfied,proto3,oneof"`
 }
 
-func (*TabSessionEvent_Attached) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_Attached) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_Pong) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_Pong) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_Closed) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_Closed) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_Error) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_Error) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_Navigated) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_Navigated) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_ChromiumBidiInjection) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_ChromiumBidiInjection) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_ElementClicked) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_ElementClicked) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_ElementCounted) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_ElementCounted) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_ElementsHighlighted) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_ElementsHighlighted) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_ElementFocused) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_ElementFocused) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_ElementFilled) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_ElementFilled) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_ElementHovered) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_ElementHovered) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_KeyPressed) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_KeyPressed) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_TextContentResolved) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_TextContentResolved) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_InnerTextResolved) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_InnerTextResolved) isContextSessionEvent_Event() {}
 
-func (*TabSessionEvent_SelectorWaitSatisfied) isTabSessionEvent_Event() {}
+func (*ContextSessionEvent_SelectorWaitSatisfied) isContextSessionEvent_Event() {}
 
-type TabSessionAttachedEvent struct {
+type ContextSessionAttachedEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Note          string                 `protobuf:"bytes,1,opt,name=note,proto3" json:"note,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TabSessionAttachedEvent) Reset() {
-	*x = TabSessionAttachedEvent{}
+func (x *ContextSessionAttachedEvent) Reset() {
+	*x = ContextSessionAttachedEvent{}
 	mi := &file_core_v1_tab_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TabSessionAttachedEvent) String() string {
+func (x *ContextSessionAttachedEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TabSessionAttachedEvent) ProtoMessage() {}
+func (*ContextSessionAttachedEvent) ProtoMessage() {}
 
-func (x *TabSessionAttachedEvent) ProtoReflect() protoreflect.Message {
+func (x *ContextSessionAttachedEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_tab_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -721,39 +721,39 @@ func (x *TabSessionAttachedEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TabSessionAttachedEvent.ProtoReflect.Descriptor instead.
-func (*TabSessionAttachedEvent) Descriptor() ([]byte, []int) {
+// Deprecated: Use ContextSessionAttachedEvent.ProtoReflect.Descriptor instead.
+func (*ContextSessionAttachedEvent) Descriptor() ([]byte, []int) {
 	return file_core_v1_tab_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *TabSessionAttachedEvent) GetNote() string {
+func (x *ContextSessionAttachedEvent) GetNote() string {
 	if x != nil {
 		return x.Note
 	}
 	return ""
 }
 
-type TabSessionPongEvent struct {
+type ContextSessionPongEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TabSessionPongEvent) Reset() {
-	*x = TabSessionPongEvent{}
+func (x *ContextSessionPongEvent) Reset() {
+	*x = ContextSessionPongEvent{}
 	mi := &file_core_v1_tab_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TabSessionPongEvent) String() string {
+func (x *ContextSessionPongEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TabSessionPongEvent) ProtoMessage() {}
+func (*ContextSessionPongEvent) ProtoMessage() {}
 
-func (x *TabSessionPongEvent) ProtoReflect() protoreflect.Message {
+func (x *ContextSessionPongEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_tab_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -765,39 +765,39 @@ func (x *TabSessionPongEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TabSessionPongEvent.ProtoReflect.Descriptor instead.
-func (*TabSessionPongEvent) Descriptor() ([]byte, []int) {
+// Deprecated: Use ContextSessionPongEvent.ProtoReflect.Descriptor instead.
+func (*ContextSessionPongEvent) Descriptor() ([]byte, []int) {
 	return file_core_v1_tab_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *TabSessionPongEvent) GetMessage() string {
+func (x *ContextSessionPongEvent) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
 	return ""
 }
 
-type TabSessionClosedEvent struct {
+type ContextSessionClosedEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Reason        string                 `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TabSessionClosedEvent) Reset() {
-	*x = TabSessionClosedEvent{}
+func (x *ContextSessionClosedEvent) Reset() {
+	*x = ContextSessionClosedEvent{}
 	mi := &file_core_v1_tab_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TabSessionClosedEvent) String() string {
+func (x *ContextSessionClosedEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TabSessionClosedEvent) ProtoMessage() {}
+func (*ContextSessionClosedEvent) ProtoMessage() {}
 
-func (x *TabSessionClosedEvent) ProtoReflect() protoreflect.Message {
+func (x *ContextSessionClosedEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_tab_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -809,39 +809,39 @@ func (x *TabSessionClosedEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TabSessionClosedEvent.ProtoReflect.Descriptor instead.
-func (*TabSessionClosedEvent) Descriptor() ([]byte, []int) {
+// Deprecated: Use ContextSessionClosedEvent.ProtoReflect.Descriptor instead.
+func (*ContextSessionClosedEvent) Descriptor() ([]byte, []int) {
 	return file_core_v1_tab_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *TabSessionClosedEvent) GetReason() string {
+func (x *ContextSessionClosedEvent) GetReason() string {
 	if x != nil {
 		return x.Reason
 	}
 	return ""
 }
 
-type TabSessionErrorEvent struct {
+type ContextSessionErrorEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TabSessionErrorEvent) Reset() {
-	*x = TabSessionErrorEvent{}
+func (x *ContextSessionErrorEvent) Reset() {
+	*x = ContextSessionErrorEvent{}
 	mi := &file_core_v1_tab_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TabSessionErrorEvent) String() string {
+func (x *ContextSessionErrorEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TabSessionErrorEvent) ProtoMessage() {}
+func (*ContextSessionErrorEvent) ProtoMessage() {}
 
-func (x *TabSessionErrorEvent) ProtoReflect() protoreflect.Message {
+func (x *ContextSessionErrorEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_core_v1_tab_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -853,12 +853,12 @@ func (x *TabSessionErrorEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TabSessionErrorEvent.ProtoReflect.Descriptor instead.
-func (*TabSessionErrorEvent) Descriptor() ([]byte, []int) {
+// Deprecated: Use ContextSessionErrorEvent.ProtoReflect.Descriptor instead.
+func (*ContextSessionErrorEvent) Descriptor() ([]byte, []int) {
 	return file_core_v1_tab_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *TabSessionErrorEvent) GetMessage() string {
+func (x *ContextSessionErrorEvent) GetMessage() string {
 	if x != nil {
 		return x.Message
 	}
@@ -869,13 +869,13 @@ var File_core_v1_tab_proto protoreflect.FileDescriptor
 
 const file_core_v1_tab_proto_rawDesc = "" +
 	"\n" +
-	"\x11core/v1/tab.proto\x12\x13allwright.engine.v1\x1a\x19surfaces/web/v1/web.proto\"\xff\b\n" +
-	"\x11TabSessionCommand\x12,\n" +
-	"\x12browser_session_id\x18\x01 \x01(\tR\x10browserSessionId\x12$\n" +
-	"\x0etab_session_id\x18\x02 \x01(\tR\ftabSessionId\x12@\n" +
-	"\x04ping\x18\x03 \x01(\v2*.allwright.engine.v1.TabSessionPingCommandH\x00R\x04ping\x12C\n" +
-	"\x05close\x18\x04 \x01(\v2+.allwright.engine.v1.CloseTabSessionCommandH\x00R\x05close\x12E\n" +
-	"\bnavigate\x18\x05 \x01(\v2'.allwright.engine.v1.NavigateTabCommandH\x00R\bnavigate\x12O\n" +
+	"\x11core/v1/tab.proto\x12\x13allwright.engine.v1\x1a\x19surfaces/web/v1/web.proto\"\x94\t\n" +
+	"\x15ContextSessionCommand\x12,\n" +
+	"\x12surface_session_id\x18\x01 \x01(\tR\x10surfaceSessionId\x12,\n" +
+	"\x12context_session_id\x18\x02 \x01(\tR\x10contextSessionId\x12D\n" +
+	"\x04ping\x18\x03 \x01(\v2..allwright.engine.v1.ContextSessionPingCommandH\x00R\x04ping\x12G\n" +
+	"\x05close\x18\x04 \x01(\v2/.allwright.engine.v1.CloseContextSessionCommandH\x00R\x05close\x12F\n" +
+	"\bnavigate\x18\x05 \x01(\v2(.allwright.engine.v1.NavigatePageCommandH\x00R\bnavigate\x12O\n" +
 	"\rclick_element\x18\x06 \x01(\v2(.allwright.engine.v1.ClickElementCommandH\x00R\fclickElement\x12R\n" +
 	"\x0ecount_elements\x18\a \x01(\v2).allwright.engine.v1.CountElementsCommandH\x00R\rcountElements\x12^\n" +
 	"\x12highlight_elements\x18\b \x01(\v2-.allwright.engine.v1.HighlightElementsCommandH\x00R\x11highlightElements\x12O\n" +
@@ -887,17 +887,17 @@ const file_core_v1_tab_proto_rawDesc = "" +
 	"\x10get_text_content\x18\r \x01(\v2*.allwright.engine.v1.GetTextContentCommandH\x00R\x0egetTextContent\x12P\n" +
 	"\x0eget_inner_text\x18\x0e \x01(\v2(.allwright.engine.v1.GetInnerTextCommandH\x00R\fgetInnerText\x12Y\n" +
 	"\x11wait_for_selector\x18\x0f \x01(\v2+.allwright.engine.v1.WaitForSelectorCommandH\x00R\x0fwaitForSelectorB\t\n" +
-	"\acommand\"1\n" +
-	"\x15TabSessionPingCommand\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\"\x18\n" +
-	"\x16CloseTabSessionCommand\"\x8a\v\n" +
-	"\x0fTabSessionEvent\x12$\n" +
-	"\x0etab_session_id\x18\x01 \x01(\tR\ftabSessionId\x12J\n" +
-	"\battached\x18\x02 \x01(\v2,.allwright.engine.v1.TabSessionAttachedEventH\x00R\battached\x12>\n" +
-	"\x04pong\x18\x03 \x01(\v2(.allwright.engine.v1.TabSessionPongEventH\x00R\x04pong\x12D\n" +
-	"\x06closed\x18\x04 \x01(\v2*.allwright.engine.v1.TabSessionClosedEventH\x00R\x06closed\x12A\n" +
-	"\x05error\x18\x05 \x01(\v2).allwright.engine.v1.TabSessionErrorEventH\x00R\x05error\x12F\n" +
-	"\tnavigated\x18\x06 \x01(\v2&.allwright.engine.v1.TabNavigatedEventH\x00R\tnavigated\x12i\n" +
+	"\acommand\"5\n" +
+	"\x19ContextSessionPingCommand\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"\x1c\n" +
+	"\x1aCloseContextSessionCommand\"\xa7\v\n" +
+	"\x13ContextSessionEvent\x12,\n" +
+	"\x12context_session_id\x18\x01 \x01(\tR\x10contextSessionId\x12N\n" +
+	"\battached\x18\x02 \x01(\v20.allwright.engine.v1.ContextSessionAttachedEventH\x00R\battached\x12B\n" +
+	"\x04pong\x18\x03 \x01(\v2,.allwright.engine.v1.ContextSessionPongEventH\x00R\x04pong\x12H\n" +
+	"\x06closed\x18\x04 \x01(\v2..allwright.engine.v1.ContextSessionClosedEventH\x00R\x06closed\x12E\n" +
+	"\x05error\x18\x05 \x01(\v2-.allwright.engine.v1.ContextSessionErrorEventH\x00R\x05error\x12G\n" +
+	"\tnavigated\x18\x06 \x01(\v2'.allwright.engine.v1.PageNavigatedEventH\x00R\tnavigated\x12i\n" +
 	"\x17chromium_bidi_injection\x18\a \x01(\v2/.allwright.engine.v1.ChromiumBidiInjectionEventH\x00R\x15chromiumBidiInjection\x12S\n" +
 	"\x0felement_clicked\x18\b \x01(\v2(.allwright.engine.v1.ElementClickedEventH\x00R\x0eelementClicked\x12S\n" +
 	"\x0felement_counted\x18\t \x01(\v2(.allwright.engine.v1.ElementCountedEventH\x00R\x0eelementCounted\x12b\n" +
@@ -911,15 +911,16 @@ const file_core_v1_tab_proto_rawDesc = "" +
 	"\x15text_content_resolved\x18\x0f \x01(\v2-.allwright.engine.v1.TextContentResolvedEventH\x00R\x13textContentResolved\x12]\n" +
 	"\x13inner_text_resolved\x18\x10 \x01(\v2+.allwright.engine.v1.InnerTextResolvedEventH\x00R\x11innerTextResolved\x12i\n" +
 	"\x17selector_wait_satisfied\x18\x11 \x01(\v2/.allwright.engine.v1.SelectorWaitSatisfiedEventH\x00R\x15selectorWaitSatisfiedB\a\n" +
-	"\x05event\"-\n" +
-	"\x17TabSessionAttachedEvent\x12\x12\n" +
-	"\x04note\x18\x01 \x01(\tR\x04note\"/\n" +
-	"\x13TabSessionPongEvent\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\"/\n" +
-	"\x15TabSessionClosedEvent\x12\x16\n" +
-	"\x06reason\x18\x01 \x01(\tR\x06reason\"0\n" +
-	"\x14TabSessionErrorEvent\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessageB0Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
+	"\x05event\"1\n" +
+	"\x1bContextSessionAttachedEvent\x12\x12\n" +
+	"\x04note\x18\x01 \x01(\tR\x04note\"3\n" +
+	"\x17ContextSessionPongEvent\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"3\n" +
+	"\x19ContextSessionClosedEvent\x12\x16\n" +
+	"\x06reason\x18\x01 \x01(\tR\x06reason\"4\n" +
+	"\x18ContextSessionErrorEvent\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessageBK\n" +
+	"\x17dev.allwright.engine.v1P\x01Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
 
 var (
 	file_core_v1_tab_proto_rawDescOnce sync.Once
@@ -935,68 +936,68 @@ func file_core_v1_tab_proto_rawDescGZIP() []byte {
 
 var file_core_v1_tab_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_core_v1_tab_proto_goTypes = []any{
-	(*TabSessionCommand)(nil),          // 0: allwright.engine.v1.TabSessionCommand
-	(*TabSessionPingCommand)(nil),      // 1: allwright.engine.v1.TabSessionPingCommand
-	(*CloseTabSessionCommand)(nil),     // 2: allwright.engine.v1.CloseTabSessionCommand
-	(*TabSessionEvent)(nil),            // 3: allwright.engine.v1.TabSessionEvent
-	(*TabSessionAttachedEvent)(nil),    // 4: allwright.engine.v1.TabSessionAttachedEvent
-	(*TabSessionPongEvent)(nil),        // 5: allwright.engine.v1.TabSessionPongEvent
-	(*TabSessionClosedEvent)(nil),      // 6: allwright.engine.v1.TabSessionClosedEvent
-	(*TabSessionErrorEvent)(nil),       // 7: allwright.engine.v1.TabSessionErrorEvent
-	(*NavigateTabCommand)(nil),         // 8: allwright.engine.v1.NavigateTabCommand
-	(*ClickElementCommand)(nil),        // 9: allwright.engine.v1.ClickElementCommand
-	(*CountElementsCommand)(nil),       // 10: allwright.engine.v1.CountElementsCommand
-	(*HighlightElementsCommand)(nil),   // 11: allwright.engine.v1.HighlightElementsCommand
-	(*FocusElementCommand)(nil),        // 12: allwright.engine.v1.FocusElementCommand
-	(*FillElementCommand)(nil),         // 13: allwright.engine.v1.FillElementCommand
-	(*HoverElementCommand)(nil),        // 14: allwright.engine.v1.HoverElementCommand
-	(*PressKeyCommand)(nil),            // 15: allwright.engine.v1.PressKeyCommand
-	(*GetTextContentCommand)(nil),      // 16: allwright.engine.v1.GetTextContentCommand
-	(*GetInnerTextCommand)(nil),        // 17: allwright.engine.v1.GetInnerTextCommand
-	(*WaitForSelectorCommand)(nil),     // 18: allwright.engine.v1.WaitForSelectorCommand
-	(*TabNavigatedEvent)(nil),          // 19: allwright.engine.v1.TabNavigatedEvent
-	(*ChromiumBidiInjectionEvent)(nil), // 20: allwright.engine.v1.ChromiumBidiInjectionEvent
-	(*ElementClickedEvent)(nil),        // 21: allwright.engine.v1.ElementClickedEvent
-	(*ElementCountedEvent)(nil),        // 22: allwright.engine.v1.ElementCountedEvent
-	(*ElementsHighlightedEvent)(nil),   // 23: allwright.engine.v1.ElementsHighlightedEvent
-	(*ElementFocusedEvent)(nil),        // 24: allwright.engine.v1.ElementFocusedEvent
-	(*ElementFilledEvent)(nil),         // 25: allwright.engine.v1.ElementFilledEvent
-	(*ElementHoveredEvent)(nil),        // 26: allwright.engine.v1.ElementHoveredEvent
-	(*KeyPressedEvent)(nil),            // 27: allwright.engine.v1.KeyPressedEvent
-	(*TextContentResolvedEvent)(nil),   // 28: allwright.engine.v1.TextContentResolvedEvent
-	(*InnerTextResolvedEvent)(nil),     // 29: allwright.engine.v1.InnerTextResolvedEvent
-	(*SelectorWaitSatisfiedEvent)(nil), // 30: allwright.engine.v1.SelectorWaitSatisfiedEvent
+	(*ContextSessionCommand)(nil),       // 0: allwright.engine.v1.ContextSessionCommand
+	(*ContextSessionPingCommand)(nil),   // 1: allwright.engine.v1.ContextSessionPingCommand
+	(*CloseContextSessionCommand)(nil),  // 2: allwright.engine.v1.CloseContextSessionCommand
+	(*ContextSessionEvent)(nil),         // 3: allwright.engine.v1.ContextSessionEvent
+	(*ContextSessionAttachedEvent)(nil), // 4: allwright.engine.v1.ContextSessionAttachedEvent
+	(*ContextSessionPongEvent)(nil),     // 5: allwright.engine.v1.ContextSessionPongEvent
+	(*ContextSessionClosedEvent)(nil),   // 6: allwright.engine.v1.ContextSessionClosedEvent
+	(*ContextSessionErrorEvent)(nil),    // 7: allwright.engine.v1.ContextSessionErrorEvent
+	(*NavigatePageCommand)(nil),         // 8: allwright.engine.v1.NavigatePageCommand
+	(*ClickElementCommand)(nil),         // 9: allwright.engine.v1.ClickElementCommand
+	(*CountElementsCommand)(nil),        // 10: allwright.engine.v1.CountElementsCommand
+	(*HighlightElementsCommand)(nil),    // 11: allwright.engine.v1.HighlightElementsCommand
+	(*FocusElementCommand)(nil),         // 12: allwright.engine.v1.FocusElementCommand
+	(*FillElementCommand)(nil),          // 13: allwright.engine.v1.FillElementCommand
+	(*HoverElementCommand)(nil),         // 14: allwright.engine.v1.HoverElementCommand
+	(*PressKeyCommand)(nil),             // 15: allwright.engine.v1.PressKeyCommand
+	(*GetTextContentCommand)(nil),       // 16: allwright.engine.v1.GetTextContentCommand
+	(*GetInnerTextCommand)(nil),         // 17: allwright.engine.v1.GetInnerTextCommand
+	(*WaitForSelectorCommand)(nil),      // 18: allwright.engine.v1.WaitForSelectorCommand
+	(*PageNavigatedEvent)(nil),          // 19: allwright.engine.v1.PageNavigatedEvent
+	(*ChromiumBidiInjectionEvent)(nil),  // 20: allwright.engine.v1.ChromiumBidiInjectionEvent
+	(*ElementClickedEvent)(nil),         // 21: allwright.engine.v1.ElementClickedEvent
+	(*ElementCountedEvent)(nil),         // 22: allwright.engine.v1.ElementCountedEvent
+	(*ElementsHighlightedEvent)(nil),    // 23: allwright.engine.v1.ElementsHighlightedEvent
+	(*ElementFocusedEvent)(nil),         // 24: allwright.engine.v1.ElementFocusedEvent
+	(*ElementFilledEvent)(nil),          // 25: allwright.engine.v1.ElementFilledEvent
+	(*ElementHoveredEvent)(nil),         // 26: allwright.engine.v1.ElementHoveredEvent
+	(*KeyPressedEvent)(nil),             // 27: allwright.engine.v1.KeyPressedEvent
+	(*TextContentResolvedEvent)(nil),    // 28: allwright.engine.v1.TextContentResolvedEvent
+	(*InnerTextResolvedEvent)(nil),      // 29: allwright.engine.v1.InnerTextResolvedEvent
+	(*SelectorWaitSatisfiedEvent)(nil),  // 30: allwright.engine.v1.SelectorWaitSatisfiedEvent
 }
 var file_core_v1_tab_proto_depIdxs = []int32{
-	1,  // 0: allwright.engine.v1.TabSessionCommand.ping:type_name -> allwright.engine.v1.TabSessionPingCommand
-	2,  // 1: allwright.engine.v1.TabSessionCommand.close:type_name -> allwright.engine.v1.CloseTabSessionCommand
-	8,  // 2: allwright.engine.v1.TabSessionCommand.navigate:type_name -> allwright.engine.v1.NavigateTabCommand
-	9,  // 3: allwright.engine.v1.TabSessionCommand.click_element:type_name -> allwright.engine.v1.ClickElementCommand
-	10, // 4: allwright.engine.v1.TabSessionCommand.count_elements:type_name -> allwright.engine.v1.CountElementsCommand
-	11, // 5: allwright.engine.v1.TabSessionCommand.highlight_elements:type_name -> allwright.engine.v1.HighlightElementsCommand
-	12, // 6: allwright.engine.v1.TabSessionCommand.focus_element:type_name -> allwright.engine.v1.FocusElementCommand
-	13, // 7: allwright.engine.v1.TabSessionCommand.fill_element:type_name -> allwright.engine.v1.FillElementCommand
-	14, // 8: allwright.engine.v1.TabSessionCommand.hover_element:type_name -> allwright.engine.v1.HoverElementCommand
-	15, // 9: allwright.engine.v1.TabSessionCommand.press_key:type_name -> allwright.engine.v1.PressKeyCommand
-	16, // 10: allwright.engine.v1.TabSessionCommand.get_text_content:type_name -> allwright.engine.v1.GetTextContentCommand
-	17, // 11: allwright.engine.v1.TabSessionCommand.get_inner_text:type_name -> allwright.engine.v1.GetInnerTextCommand
-	18, // 12: allwright.engine.v1.TabSessionCommand.wait_for_selector:type_name -> allwright.engine.v1.WaitForSelectorCommand
-	4,  // 13: allwright.engine.v1.TabSessionEvent.attached:type_name -> allwright.engine.v1.TabSessionAttachedEvent
-	5,  // 14: allwright.engine.v1.TabSessionEvent.pong:type_name -> allwright.engine.v1.TabSessionPongEvent
-	6,  // 15: allwright.engine.v1.TabSessionEvent.closed:type_name -> allwright.engine.v1.TabSessionClosedEvent
-	7,  // 16: allwright.engine.v1.TabSessionEvent.error:type_name -> allwright.engine.v1.TabSessionErrorEvent
-	19, // 17: allwright.engine.v1.TabSessionEvent.navigated:type_name -> allwright.engine.v1.TabNavigatedEvent
-	20, // 18: allwright.engine.v1.TabSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
-	21, // 19: allwright.engine.v1.TabSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
-	22, // 20: allwright.engine.v1.TabSessionEvent.element_counted:type_name -> allwright.engine.v1.ElementCountedEvent
-	23, // 21: allwright.engine.v1.TabSessionEvent.elements_highlighted:type_name -> allwright.engine.v1.ElementsHighlightedEvent
-	24, // 22: allwright.engine.v1.TabSessionEvent.element_focused:type_name -> allwright.engine.v1.ElementFocusedEvent
-	25, // 23: allwright.engine.v1.TabSessionEvent.element_filled:type_name -> allwright.engine.v1.ElementFilledEvent
-	26, // 24: allwright.engine.v1.TabSessionEvent.element_hovered:type_name -> allwright.engine.v1.ElementHoveredEvent
-	27, // 25: allwright.engine.v1.TabSessionEvent.key_pressed:type_name -> allwright.engine.v1.KeyPressedEvent
-	28, // 26: allwright.engine.v1.TabSessionEvent.text_content_resolved:type_name -> allwright.engine.v1.TextContentResolvedEvent
-	29, // 27: allwright.engine.v1.TabSessionEvent.inner_text_resolved:type_name -> allwright.engine.v1.InnerTextResolvedEvent
-	30, // 28: allwright.engine.v1.TabSessionEvent.selector_wait_satisfied:type_name -> allwright.engine.v1.SelectorWaitSatisfiedEvent
+	1,  // 0: allwright.engine.v1.ContextSessionCommand.ping:type_name -> allwright.engine.v1.ContextSessionPingCommand
+	2,  // 1: allwright.engine.v1.ContextSessionCommand.close:type_name -> allwright.engine.v1.CloseContextSessionCommand
+	8,  // 2: allwright.engine.v1.ContextSessionCommand.navigate:type_name -> allwright.engine.v1.NavigatePageCommand
+	9,  // 3: allwright.engine.v1.ContextSessionCommand.click_element:type_name -> allwright.engine.v1.ClickElementCommand
+	10, // 4: allwright.engine.v1.ContextSessionCommand.count_elements:type_name -> allwright.engine.v1.CountElementsCommand
+	11, // 5: allwright.engine.v1.ContextSessionCommand.highlight_elements:type_name -> allwright.engine.v1.HighlightElementsCommand
+	12, // 6: allwright.engine.v1.ContextSessionCommand.focus_element:type_name -> allwright.engine.v1.FocusElementCommand
+	13, // 7: allwright.engine.v1.ContextSessionCommand.fill_element:type_name -> allwright.engine.v1.FillElementCommand
+	14, // 8: allwright.engine.v1.ContextSessionCommand.hover_element:type_name -> allwright.engine.v1.HoverElementCommand
+	15, // 9: allwright.engine.v1.ContextSessionCommand.press_key:type_name -> allwright.engine.v1.PressKeyCommand
+	16, // 10: allwright.engine.v1.ContextSessionCommand.get_text_content:type_name -> allwright.engine.v1.GetTextContentCommand
+	17, // 11: allwright.engine.v1.ContextSessionCommand.get_inner_text:type_name -> allwright.engine.v1.GetInnerTextCommand
+	18, // 12: allwright.engine.v1.ContextSessionCommand.wait_for_selector:type_name -> allwright.engine.v1.WaitForSelectorCommand
+	4,  // 13: allwright.engine.v1.ContextSessionEvent.attached:type_name -> allwright.engine.v1.ContextSessionAttachedEvent
+	5,  // 14: allwright.engine.v1.ContextSessionEvent.pong:type_name -> allwright.engine.v1.ContextSessionPongEvent
+	6,  // 15: allwright.engine.v1.ContextSessionEvent.closed:type_name -> allwright.engine.v1.ContextSessionClosedEvent
+	7,  // 16: allwright.engine.v1.ContextSessionEvent.error:type_name -> allwright.engine.v1.ContextSessionErrorEvent
+	19, // 17: allwright.engine.v1.ContextSessionEvent.navigated:type_name -> allwright.engine.v1.PageNavigatedEvent
+	20, // 18: allwright.engine.v1.ContextSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
+	21, // 19: allwright.engine.v1.ContextSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
+	22, // 20: allwright.engine.v1.ContextSessionEvent.element_counted:type_name -> allwright.engine.v1.ElementCountedEvent
+	23, // 21: allwright.engine.v1.ContextSessionEvent.elements_highlighted:type_name -> allwright.engine.v1.ElementsHighlightedEvent
+	24, // 22: allwright.engine.v1.ContextSessionEvent.element_focused:type_name -> allwright.engine.v1.ElementFocusedEvent
+	25, // 23: allwright.engine.v1.ContextSessionEvent.element_filled:type_name -> allwright.engine.v1.ElementFilledEvent
+	26, // 24: allwright.engine.v1.ContextSessionEvent.element_hovered:type_name -> allwright.engine.v1.ElementHoveredEvent
+	27, // 25: allwright.engine.v1.ContextSessionEvent.key_pressed:type_name -> allwright.engine.v1.KeyPressedEvent
+	28, // 26: allwright.engine.v1.ContextSessionEvent.text_content_resolved:type_name -> allwright.engine.v1.TextContentResolvedEvent
+	29, // 27: allwright.engine.v1.ContextSessionEvent.inner_text_resolved:type_name -> allwright.engine.v1.InnerTextResolvedEvent
+	30, // 28: allwright.engine.v1.ContextSessionEvent.selector_wait_satisfied:type_name -> allwright.engine.v1.SelectorWaitSatisfiedEvent
 	29, // [29:29] is the sub-list for method output_type
 	29, // [29:29] is the sub-list for method input_type
 	29, // [29:29] is the sub-list for extension type_name
@@ -1011,37 +1012,37 @@ func file_core_v1_tab_proto_init() {
 	}
 	file_surfaces_web_v1_web_proto_init()
 	file_core_v1_tab_proto_msgTypes[0].OneofWrappers = []any{
-		(*TabSessionCommand_Ping)(nil),
-		(*TabSessionCommand_Close)(nil),
-		(*TabSessionCommand_Navigate)(nil),
-		(*TabSessionCommand_ClickElement)(nil),
-		(*TabSessionCommand_CountElements)(nil),
-		(*TabSessionCommand_HighlightElements)(nil),
-		(*TabSessionCommand_FocusElement)(nil),
-		(*TabSessionCommand_FillElement)(nil),
-		(*TabSessionCommand_HoverElement)(nil),
-		(*TabSessionCommand_PressKey)(nil),
-		(*TabSessionCommand_GetTextContent)(nil),
-		(*TabSessionCommand_GetInnerText)(nil),
-		(*TabSessionCommand_WaitForSelector)(nil),
+		(*ContextSessionCommand_Ping)(nil),
+		(*ContextSessionCommand_Close)(nil),
+		(*ContextSessionCommand_Navigate)(nil),
+		(*ContextSessionCommand_ClickElement)(nil),
+		(*ContextSessionCommand_CountElements)(nil),
+		(*ContextSessionCommand_HighlightElements)(nil),
+		(*ContextSessionCommand_FocusElement)(nil),
+		(*ContextSessionCommand_FillElement)(nil),
+		(*ContextSessionCommand_HoverElement)(nil),
+		(*ContextSessionCommand_PressKey)(nil),
+		(*ContextSessionCommand_GetTextContent)(nil),
+		(*ContextSessionCommand_GetInnerText)(nil),
+		(*ContextSessionCommand_WaitForSelector)(nil),
 	}
 	file_core_v1_tab_proto_msgTypes[3].OneofWrappers = []any{
-		(*TabSessionEvent_Attached)(nil),
-		(*TabSessionEvent_Pong)(nil),
-		(*TabSessionEvent_Closed)(nil),
-		(*TabSessionEvent_Error)(nil),
-		(*TabSessionEvent_Navigated)(nil),
-		(*TabSessionEvent_ChromiumBidiInjection)(nil),
-		(*TabSessionEvent_ElementClicked)(nil),
-		(*TabSessionEvent_ElementCounted)(nil),
-		(*TabSessionEvent_ElementsHighlighted)(nil),
-		(*TabSessionEvent_ElementFocused)(nil),
-		(*TabSessionEvent_ElementFilled)(nil),
-		(*TabSessionEvent_ElementHovered)(nil),
-		(*TabSessionEvent_KeyPressed)(nil),
-		(*TabSessionEvent_TextContentResolved)(nil),
-		(*TabSessionEvent_InnerTextResolved)(nil),
-		(*TabSessionEvent_SelectorWaitSatisfied)(nil),
+		(*ContextSessionEvent_Attached)(nil),
+		(*ContextSessionEvent_Pong)(nil),
+		(*ContextSessionEvent_Closed)(nil),
+		(*ContextSessionEvent_Error)(nil),
+		(*ContextSessionEvent_Navigated)(nil),
+		(*ContextSessionEvent_ChromiumBidiInjection)(nil),
+		(*ContextSessionEvent_ElementClicked)(nil),
+		(*ContextSessionEvent_ElementCounted)(nil),
+		(*ContextSessionEvent_ElementsHighlighted)(nil),
+		(*ContextSessionEvent_ElementFocused)(nil),
+		(*ContextSessionEvent_ElementFilled)(nil),
+		(*ContextSessionEvent_ElementHovered)(nil),
+		(*ContextSessionEvent_KeyPressed)(nil),
+		(*ContextSessionEvent_TextContentResolved)(nil),
+		(*ContextSessionEvent_InnerTextResolved)(nil),
+		(*ContextSessionEvent_SelectorWaitSatisfied)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

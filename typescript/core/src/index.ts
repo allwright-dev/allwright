@@ -42,7 +42,7 @@ export type {
   MobileAndroidDevice,
   MobileAndroidLaunchOptions,
   MobileAndroidLocator,
-  MobileAndroidPage,
+  MobileAndroidApp,
   Locator,
   LocatorInfo,
   MobileSurfaceNamespace,

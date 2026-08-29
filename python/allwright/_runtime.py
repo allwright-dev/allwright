@@ -24,7 +24,7 @@ def ping() -> str:
 
 def launch_browser_with_kind(browser_kind: int, options: LaunchOptions | None = None) -> Browser:
     runtime = get_runtime()
-    stream = StreamHandle(runtime.stub.BrowserSession)
+    stream = StreamHandle(runtime.stub.SurfaceSession)
     launch_options = options or LaunchOptions()
 
     command_kwargs: dict[str, Any] = {}
@@ -34,7 +34,7 @@ def launch_browser_with_kind(browser_kind: int, options: LaunchOptions | None = 
         command_kwargs["retry_options"] = retry_options(launch_options.timeout_ms)
 
     stream.send(
-        engine_pb2.BrowserSessionCommand(
+        engine_pb2.SurfaceSessionCommand(
             launch_browser=engine_pb2.LaunchBrowserCommand(
                 browser_kind=browser_kind,
                 **command_kwargs,
@@ -49,8 +49,8 @@ def launch_browser_with_kind(browser_kind: int, options: LaunchOptions | None = 
                 launched = event.browser_launched
                 initial_page = Page(
                     runtime=runtime,
-                    browser_session_id=event.session_id,
-                    session_id=launched.initial_tab_session_id,
+                    surface_session_id=event.session_id,
+                    session_id=launched.initial_page_session_id,
                 )
                 return Browser(
                     runtime=runtime,

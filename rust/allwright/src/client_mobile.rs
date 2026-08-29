@@ -1,7 +1,20 @@
-use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 
-use super::bootstrap::invoke_plugin;
-use super::types::{ClickResult, CommandOptions, Error, FillResult, Result};
+use crate::proto::context_session_command::Command as ContextCommand;
+use crate::proto::context_session_event::Event as ContextEvent;
+use crate::proto::surface_session_command::Command as SurfaceCommand;
+use crate::proto::surface_session_event::Event as SurfaceEvent;
+use crate::proto::{
+    AppLaunchedEvent, ClickElementCommand, ConnectMobileCommand, ContextSessionCommand,
+    FillElementCommand, LaunchAppCommand, MobileConnectedEvent, MobilePlatform as ProtoMobilePlatform,
+    SurfaceSessionCommand,
+};
+use tokio::sync::{Mutex as AsyncMutex, mpsc};
+use tokio_stream::wrappers::ReceiverStream;
+
+use super::command::command_retry_options;
+use super::runtime::get_runtime;
+use super::types::{ClickResult, CommandOptions, Error, FillResult, Result, RuntimeClient};
 
 #[derive(Debug, Clone, Default)]
 pub struct MobileAndroidConnectOptions {
@@ -20,126 +33,209 @@ pub struct MobileAndroidLaunchOptions {
     pub timeout_ms: Option<u32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct MobilePluginEnvelope<T> {
-    ok: bool,
-    result: Option<T>,
-    error: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct MobileBrowserSessionHandle {
-    platform: String,
-    automation: MobileAutomationSessionInfo,
-    device: MobileDeviceTarget,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct MobileAutomationSessionInfo {
-    session_id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct MobileDeviceTarget {
-    device_id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct MobilePageSessionHandle {
-    page_id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct MobilePageInfo {
-    page_session: MobilePageSessionHandle,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct MobileConnectInfo {
-    browser_session: MobileBrowserSessionHandle,
-    initial_page: MobilePageInfo,
-}
-
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AndroidLocator {
-    page: AndroidPage,
+    page: AndroidApp,
     selector: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct AndroidPage {
-    browser_session: MobileBrowserSessionHandle,
-    page_session: MobilePageSessionHandle,
+#[derive(Clone)]
+pub struct AndroidApp {
+    inner: Arc<AndroidAppInner>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AndroidDevice {
-    connect_info: MobileConnectInfo,
-    page: AndroidPage,
+    inner: Arc<AndroidDeviceInner>,
+}
+
+struct AndroidDeviceInner {
+    runtime: Arc<RuntimeClient>,
+    state: AsyncMutex<AndroidDeviceState>,
+    session_id: String,
+    initial_app: AndroidApp,
+    current_app: Mutex<AndroidApp>,
+}
+
+struct AndroidDeviceState {
+    command_tx: mpsc::Sender<SurfaceSessionCommand>,
+    events: tonic::Streaming<crate::proto::SurfaceSessionEvent>,
+    closed: bool,
+}
+
+struct AndroidAppInner {
+    runtime: Arc<RuntimeClient>,
+    surface_session_id: String,
+    session_id: String,
+    state: AsyncMutex<AndroidAppState>,
+}
+
+#[derive(Default)]
+struct AndroidAppState {
+    handle: Option<AndroidTabHandle>,
+}
+
+struct AndroidTabHandle {
+    command_tx: mpsc::Sender<crate::proto::ContextSessionCommand>,
+    events: tonic::Streaming<crate::proto::ContextSessionEvent>,
+    closed: bool,
 }
 
 pub mod android {
     use super::*;
 
-    pub fn connect(options: MobileAndroidConnectOptions) -> Result<AndroidDevice> {
-        let request = serde_json::json!({
-            "command": "connect",
-            "platform": "android",
-            "device": options.device,
-            "adb_endpoint": options.adb_endpoint,
-            "preserve_app_state": options.preserve_app_state,
-            "timeout_ms": options.timeout_ms,
-        });
-        let connect_info: MobileConnectInfo = invoke_android("connect", request)?;
-        Ok(AndroidDevice::new(connect_info))
+    pub async fn connect(options: MobileAndroidConnectOptions) -> Result<AndroidDevice> {
+        let runtime = get_runtime().await?;
+        let mut engine = runtime.engine.clone();
+        let (command_tx, command_rx) = mpsc::channel(16);
+        let response = engine
+            .surface_session(tonic::Request::new(ReceiverStream::new(command_rx)))
+            .await?;
+        let mut events = response.into_inner();
+
+        command_tx
+            .send(SurfaceSessionCommand {
+                command: Some(SurfaceCommand::ConnectMobile(ConnectMobileCommand {
+                    platform: ProtoMobilePlatform::Android as i32,
+                    device: options.device,
+                    adb_endpoint: options.adb_endpoint,
+                    preserve_app_state: options.preserve_app_state,
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send ConnectMobileCommand"))?;
+
+        loop {
+            let event = events
+                .message()
+                .await?
+                .ok_or_else(|| Error::new("surface session closed before mobile connect response"))?;
+
+            match event.event {
+                Some(SurfaceEvent::MobileConnected(MobileConnectedEvent {
+                    initial_app_session_id,
+                    device_session_id,
+                    ..
+                })) => {
+                    let initial_app = AndroidApp {
+                        inner: Arc::new(AndroidAppInner {
+                            runtime: Arc::clone(&runtime),
+                            surface_session_id: event.session_id.clone(),
+                            session_id: initial_app_session_id,
+                            state: AsyncMutex::new(AndroidAppState::default()),
+                        }),
+                    };
+                    return Ok(AndroidDevice {
+                        inner: Arc::new(AndroidDeviceInner {
+                            runtime,
+                            state: AsyncMutex::new(AndroidDeviceState {
+                                command_tx,
+                                events,
+                                closed: false,
+                            }),
+                            session_id: if device_session_id.is_empty() {
+                                event.session_id
+                            } else {
+                                device_session_id
+                            },
+                            initial_app: initial_app.clone(),
+                            current_app: Mutex::new(initial_app),
+                        }),
+                    });
+                }
+                Some(SurfaceEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "surface session error during mobile connect: {}",
+                        error.message
+                    )));
+                }
+                _ => {}
+            }
+        }
     }
 }
 
 impl AndroidDevice {
-    fn new(connect_info: MobileConnectInfo) -> Self {
-        let page = AndroidPage {
-            browser_session: connect_info.browser_session.clone(),
-            page_session: connect_info.initial_page.page_session.clone(),
-        };
-        Self { connect_info, page }
-    }
-
     pub fn session_id(&self) -> &str {
-        &self.connect_info.browser_session.automation.session_id
+        &self.inner.session_id
     }
 
-    pub fn page(&self) -> AndroidPage {
-        self.page.clone()
+    pub fn app(&self) -> AndroidApp {
+        self.inner
+            .current_app
+            .lock()
+            .map(|app| app.clone())
+            .unwrap_or_else(|_| self.inner.initial_app.clone())
     }
 
-    pub fn initial_page(&self) -> AndroidPage {
-        self.page()
+    pub fn initial_app(&self) -> AndroidApp {
+        self.inner.initial_app.clone()
     }
 
-    pub fn launch(&mut self, options: MobileAndroidLaunchOptions) -> Result<AndroidPage> {
-        let request = serde_json::json!({
-            "command": "launch_app",
-            "browser_session": self.connect_info.browser_session,
-            "options": {
-                "apk_path": options.apk_path,
-                "app_id": options.app_id,
-                "launch_activity": options.launch_activity,
-                "stop_before_launch": options.stop_before_launch,
-                "timeout_ms": options.timeout_ms,
-            },
-        });
-        let page_info: MobilePageInfo = invoke_android("launch", request)?;
-        self.page = AndroidPage {
-            browser_session: self.connect_info.browser_session.clone(),
-            page_session: page_info.page_session,
-        };
-        Ok(self.page.clone())
+    pub async fn launch(&self, options: MobileAndroidLaunchOptions) -> Result<AndroidApp> {
+        let mut state = self.inner.state.lock().await;
+        ensure_android_device_open(&state, &self.inner.session_id)?;
+
+        state
+            .command_tx
+            .send(SurfaceSessionCommand {
+                command: Some(SurfaceCommand::LaunchApp(LaunchAppCommand {
+                    apk_path: options.apk_path,
+                    app_id: options.app_id,
+                    launch_activity: options.launch_activity,
+                    stop_before_launch: options.stop_before_launch,
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send LaunchAppCommand"))?;
+
+        loop {
+            let event = state
+                .events
+                .message()
+                .await?
+                .ok_or_else(|| Error::new("surface session closed before app launch response"))?;
+
+            match event.event {
+                Some(SurfaceEvent::AppLaunched(AppLaunchedEvent {
+                    app_session_id, ..
+                })) => {
+                    let app = AndroidApp {
+                        inner: Arc::new(AndroidAppInner {
+                            runtime: Arc::clone(&self.inner.runtime),
+                            surface_session_id: event.session_id,
+                            session_id: app_session_id,
+                            state: AsyncMutex::new(AndroidAppState::default()),
+                        }),
+                    };
+                    if let Ok(mut current_app) = self.inner.current_app.lock() {
+                        *current_app = app.clone();
+                    }
+                    return Ok(app);
+                }
+                Some(SurfaceEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "surface session error while launching Android app: {}",
+                        error.message
+                    )));
+                }
+                Some(SurfaceEvent::Closed(_)) => {
+                    state.closed = true;
+                    return Err(Error::new(
+                        "surface session closed while waiting for Android app launch",
+                    ));
+                }
+                _ => {}
+            }
+        }
     }
 }
 
-impl AndroidPage {
+impl AndroidApp {
     pub fn session_id(&self) -> &str {
-        &self.page_session.page_id
+        &self.inner.session_id
     }
 
     pub fn locator(&self, selector: impl Into<String>) -> AndroidLocator {
@@ -149,58 +245,144 @@ impl AndroidPage {
         }
     }
 
-    pub fn click(&self, selector: &str, options: CommandOptions) -> Result<ClickResult> {
-        #[derive(Deserialize)]
-        struct ClickInfo {
-            selector: String,
-            note: String,
-            session_id: String,
+    pub async fn click(&self, selector: &str, options: CommandOptions) -> Result<ClickResult> {
+        let selector = normalize_mobile_selector_for_transport(selector);
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.inner.session_id)?;
+
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::ClickElement(ClickElementCommand {
+                    css_selector: selector.clone(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send ClickElementCommand"))?;
+
+        loop {
+            let event = handle
+                .events
+                .message()
+                .await?
+                .ok_or_else(|| Error::new("app session closed while waiting for click result"))?;
+
+            match event.event {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::ElementClicked(clicked)) => {
+                    return Ok(ClickResult {
+                        selector: clicked.css_selector,
+                        note: clicked.note,
+                        bidi_session_id: clicked.bidi_session_id,
+                    });
+                }
+                Some(ContextEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "app session error while clicking Android locator {:?}: {}",
+                        selector, error.message,
+                    )));
+                }
+                Some(ContextEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "app session {} closed while waiting for click result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
         }
-        let result: ClickInfo = invoke_android(
-            "click",
-            serde_json::json!({
-                "command": "click_element",
-                "browser_session": self.browser_session,
-                "page_session": self.page_session,
-                "selector": normalize_mobile_selector_for_transport(selector),
-                "timeout_ms": options.timeout_ms,
-            }),
-        )?;
-        Ok(ClickResult {
-            selector: result.selector,
-            note: result.note,
-            bidi_session_id: result.session_id,
-        })
     }
 
-    pub fn fill(&self, selector: &str, value: &str, options: CommandOptions) -> Result<FillResult> {
-        #[derive(Deserialize)]
-        struct FillInfo {
-            selector: String,
-            value: String,
-            note: String,
+    pub async fn fill(
+        &self,
+        selector: &str,
+        value: &str,
+        options: CommandOptions,
+    ) -> Result<FillResult> {
+        let selector = normalize_mobile_selector_for_transport(selector);
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.inner.session_id)?;
+
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::FillElement(FillElementCommand {
+                    css_selector: selector.clone(),
+                    value: value.to_string(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send FillElementCommand"))?;
+
+        loop {
+            let event = handle
+                .events
+                .message()
+                .await?
+                .ok_or_else(|| Error::new("app session closed while waiting for fill result"))?;
+
+            match event.event {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::ElementFilled(filled)) => {
+                    return Ok(FillResult {
+                        selector: filled.css_selector,
+                        value: filled.value,
+                        note: filled.note,
+                    });
+                }
+                Some(ContextEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "app session error while filling Android locator {:?}: {}",
+                        selector, error.message,
+                    )));
+                }
+                Some(ContextEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "app session {} closed while waiting for fill result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
         }
-        let result: FillInfo = invoke_android(
-            "fill",
-            serde_json::json!({
-                "command": "fill_element",
-                "browser_session": self.browser_session,
-                "page_session": self.page_session,
-                "selector": normalize_mobile_selector_for_transport(selector),
-                "value": value,
-                "timeout_ms": options.timeout_ms,
-            }),
-        )?;
-        Ok(FillResult {
-            selector: result.selector,
-            value: result.value,
-            note: result.note,
-        })
+    }
+
+    async fn ensure_handle<'a>(
+        &self,
+        state: &'a mut AndroidAppState,
+    ) -> Result<&'a mut AndroidTabHandle> {
+        if state.handle.is_none() {
+            let mut engine = self.inner.runtime.engine.clone();
+            let (command_tx, command_rx) = mpsc::channel(16);
+            let response = engine
+                .context_session(tonic::Request::new(ReceiverStream::new(command_rx)))
+                .await?;
+            state.handle = Some(AndroidTabHandle {
+                command_tx,
+                events: response.into_inner(),
+                closed: false,
+            });
+        }
+
+        state
+            .handle
+            .as_mut()
+            .ok_or_else(|| Error::new("android app session handle was not initialized"))
     }
 }
 
 impl AndroidLocator {
-    pub fn page(&self) -> &AndroidPage {
+    pub fn app(&self) -> &AndroidApp {
         &self.page
     }
 
@@ -215,36 +397,50 @@ impl AndroidLocator {
         }
     }
 
-    pub fn click(&self, options: CommandOptions) -> Result<ClickResult> {
-        self.page.click(&self.selector, options)
+    pub async fn click(&self, options: CommandOptions) -> Result<ClickResult> {
+        self.page.click(&self.selector, options).await
     }
 
-    pub fn fill(&self, value: &str, options: CommandOptions) -> Result<FillResult> {
-        self.page.fill(&self.selector, value, options)
+    pub async fn fill(&self, value: &str, options: CommandOptions) -> Result<FillResult> {
+        self.page.fill(&self.selector, value, options).await
     }
 }
 
-fn invoke_android<T>(command_name: &str, request: serde_json::Value) -> Result<T>
-where
-    T: for<'de> Deserialize<'de>,
-{
-    let payload = invoke_plugin("mobile-android", &request.to_string())?;
-    let envelope: MobilePluginEnvelope<T> =
-        serde_json::from_str(payload.trim()).map_err(|error| {
-            Error::new(format!(
-                "failed to decode mobile-android plugin response for {command_name}: {error}"
-            ))
-        })?;
-    if !envelope.ok {
-        return Err(Error::new(envelope.error.unwrap_or_else(|| {
-            format!("mobile-android plugin {command_name} failed")
-        })));
+fn ensure_android_device_open(state: &AndroidDeviceState, session_id: &str) -> Result<()> {
+    if state.closed {
+        return Err(Error::new(format!(
+            "android device session {} is closed",
+            session_id
+        )));
     }
-    envelope.result.ok_or_else(|| {
-        Error::new(format!(
-            "mobile-android plugin {command_name} returned success without a result payload"
-        ))
-    })
+    Ok(())
+}
+
+fn ensure_android_app_open(handle: &AndroidTabHandle, session_id: &str) -> Result<()> {
+    if handle.closed {
+        return Err(Error::new(format!(
+            "android app session {} is closed",
+            session_id
+        )));
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MobileSelectorFlavor {
+    Css,
+    XPath,
+    UiAutomator,
+}
+
+impl MobileSelectorFlavor {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Css => "css",
+            Self::XPath => "xpath",
+            Self::UiAutomator => "uia",
+        }
+    }
 }
 
 const UIAUTOMATOR_SELECTOR_KEYS: &[&str] = &[
@@ -280,52 +476,39 @@ const UIAUTOMATOR_SELECTOR_KEYS: &[&str] = &[
     "instance",
 ];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MobileSelectorFlavor {
-    Css,
-    XPath,
-    UiAutomator,
-}
-
-impl MobileSelectorFlavor {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Css => "css",
-            Self::XPath => "xpath",
-            Self::UiAutomator => "uia",
-        }
-    }
-}
-
 fn parse_explicit_mobile_selector_prefix(selector: &str) -> Option<(MobileSelectorFlavor, usize)> {
     let lowered = selector.to_ascii_lowercase();
     if lowered.starts_with("xpath=") || lowered.starts_with("xpath:") {
         return Some((MobileSelectorFlavor::XPath, 6));
     }
-    if lowered.starts_with("css=") || lowered.starts_with("css:") {
-        return Some((MobileSelectorFlavor::Css, 4));
-    }
     if lowered.starts_with("uia=") || lowered.starts_with("uia:") {
         return Some((MobileSelectorFlavor::UiAutomator, 4));
+    }
+    if let Some(prefix_len) = parse_ui_automator_selector_prefix(&lowered) {
+        return Some((MobileSelectorFlavor::UiAutomator, prefix_len));
+    }
+    if lowered.starts_with("text=") || lowered.starts_with("text:") {
+        return Some((MobileSelectorFlavor::UiAutomator, 5));
+    }
+    if lowered.starts_with("id=") || lowered.starts_with("id:") {
+        return Some((MobileSelectorFlavor::Css, 3));
+    }
+    if lowered.starts_with("css=") || lowered.starts_with("css:") {
+        return Some((MobileSelectorFlavor::Css, 4));
     }
     None
 }
 
-fn parse_uiautomator_selector_prefix(selector: &str) -> Option<usize> {
-    for (index, ch) in selector.char_indices() {
-        if ch != '=' && ch != ':' {
-            continue;
+fn parse_ui_automator_selector_prefix(selector: &str) -> Option<usize> {
+    UIAUTOMATOR_SELECTOR_KEYS.iter().find_map(|key| {
+        if selector.starts_with(key) {
+            let separator = selector.as_bytes().get(key.len()).copied()?;
+            if separator == b'=' || separator == b':' {
+                return Some(key.len() + 1);
+            }
         }
-        let key = selector[..index].trim().to_ascii_lowercase();
-        if UIAUTOMATOR_SELECTOR_KEYS
-            .iter()
-            .any(|candidate| *candidate == key)
-        {
-            return Some(index + ch.len_utf8());
-        }
-        return None;
-    }
-    None
+        None
+    })
 }
 
 fn find_json_string_end(value: &str) -> Option<usize> {
@@ -333,6 +516,7 @@ fn find_json_string_end(value: &str) -> Option<usize> {
     if bytes.first().copied()? != b'"' {
         return None;
     }
+
     let mut index = 1usize;
     let mut escaped = false;
     while index < bytes.len() {
@@ -370,6 +554,7 @@ fn is_normalized_mobile_transport_selector(selector: &str) -> bool {
             return false;
         };
         index += json_end;
+
         if index == trimmed.len() {
             return true;
         }
@@ -382,6 +567,7 @@ fn is_normalized_mobile_transport_selector(selector: &str) -> bool {
             return false;
         }
         index += whitespace_len;
+
         if parse_explicit_mobile_selector_prefix(&trimmed[index..]).is_none() {
             return false;
         }
@@ -394,23 +580,58 @@ fn decode_selector_body(body: &str) -> String {
     let candidate = body.trim();
     if candidate.len() >= 2 && candidate.starts_with('"') && candidate.ends_with('"') {
         if let Ok(decoded) = serde_json::from_str::<String>(candidate) {
-            return decoded;
+            return unescape_shell_escaped_selector(&decoded);
         }
     }
-    candidate.to_string()
+    unescape_shell_escaped_selector(candidate)
+}
+
+fn unescape_shell_escaped_selector(value: &str) -> String {
+    let mut result = String::with_capacity(value.len());
+    let mut chars = value.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            match chars.peek().copied() {
+                Some('_' | ' ' | '#' | ':' | '[' | ']' | '(' | ')' | '"' | '\'') => {
+                    result.push(chars.next().expect("peeked char should exist"));
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        result.push(ch);
+    }
+    result
 }
 
 fn parse_mobile_selector_for_transport(selector: &str) -> (MobileSelectorFlavor, String) {
     let trimmed = selector.trim();
     if let Some((flavor, prefix_len)) = parse_explicit_mobile_selector_prefix(trimmed) {
-        return (flavor, decode_selector_body(&trimmed[prefix_len..]));
+        let body = decode_selector_body(&trimmed[prefix_len..]);
+        return match flavor {
+            MobileSelectorFlavor::Css if prefix_len == 3 => {
+                let normalized = if body.starts_with('#') {
+                    body
+                } else {
+                    format!("#{body}")
+                };
+                (MobileSelectorFlavor::Css, normalized)
+            }
+            MobileSelectorFlavor::UiAutomator
+                if prefix_len != 4 && !trimmed[..prefix_len].eq_ignore_ascii_case("text=") =>
+            {
+                (
+                    MobileSelectorFlavor::UiAutomator,
+                    format!("{}={body}", &trimmed[..prefix_len - 1]),
+                )
+            }
+            MobileSelectorFlavor::UiAutomator if prefix_len == 5 => {
+                (MobileSelectorFlavor::UiAutomator, format!("text={body}"))
+            }
+            _ => (flavor, body),
+        };
     }
-    if let Some(prefix_len) = parse_uiautomator_selector_prefix(trimmed) {
-        return (
-            MobileSelectorFlavor::UiAutomator,
-            format!("{}={}", &trimmed[..prefix_len - 1], &trimmed[prefix_len..]),
-        );
-    }
+
     if trimmed.starts_with("//")
         || trimmed.starts_with(".//")
         || trimmed.starts_with("../")
@@ -419,6 +640,7 @@ fn parse_mobile_selector_for_transport(selector: &str) -> (MobileSelectorFlavor,
     {
         return (MobileSelectorFlavor::XPath, trimmed.to_string());
     }
+
     (MobileSelectorFlavor::Css, trimmed.to_string())
 }
 
@@ -439,21 +661,21 @@ fn normalize_mobile_selector_for_transport(selector: &str) -> String {
 }
 
 fn chain_mobile_selector_for_transport(parent: &str, child: &str) -> String {
-    let parent_selector = if parent.trim().is_empty() {
+    let parent = if parent.trim().is_empty() {
         String::new()
     } else {
         normalize_mobile_selector_for_transport(parent)
     };
-    let child_selector = if child.trim().is_empty() {
+    let child = if child.trim().is_empty() {
         String::new()
     } else {
         normalize_mobile_selector_for_transport(child)
     };
-    if parent_selector.is_empty() {
-        return child_selector;
+    if parent.is_empty() {
+        return child;
     }
-    if child_selector.is_empty() {
-        return parent_selector;
+    if child.is_empty() {
+        return parent;
     }
-    format!("{parent_selector} {child_selector}")
+    format!("{parent} {child}")
 }

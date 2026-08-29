@@ -15,7 +15,7 @@ func newBrowserFromLaunch(
 	launchNote string,
 	cdpWebSocketURL string,
 	userDataDir string,
-	initialTabSessionID string,
+	initialPageSessionID string,
 ) *Browser {
 	browser := &Browser{
 		runtime:         runtime,
@@ -29,7 +29,7 @@ func newBrowserFromLaunch(
 	browser.initialTab = &Tab{
 		runtime:          runtime,
 		browserSessionID: browser.sessionID,
-		sessionID:        initialTabSessionID,
+		sessionID:        initialPageSessionID,
 	}
 	return browser
 }
@@ -97,14 +97,14 @@ func (b *Browser) NewTab(ctx context.Context, options ...CommandOptions) (*Tab, 
 
 	commandOptions := firstCommandOptions(options)
 
-	if err := b.stream.Send(&enginev1.BrowserSessionCommand{
-		Command: &enginev1.BrowserSessionCommand_OpenTab{
-			OpenTab: &enginev1.OpenTabCommand{
+	if err := b.stream.Send(&enginev1.SurfaceSessionCommand{
+		Command: &enginev1.SurfaceSessionCommand_OpenContext{
+			OpenContext: &enginev1.OpenContextCommand{
 				RetryOptions: retryOptionsProto(commandOptions.Timeout),
 			},
 		},
 	}); err != nil {
-		return nil, fmt.Errorf("send OpenTabCommand: %w", err)
+		return nil, fmt.Errorf("send OpenContextCommand: %w", err)
 	}
 
 	for {
@@ -114,13 +114,13 @@ func (b *Browser) NewTab(ctx context.Context, options ...CommandOptions) (*Tab, 
 		}
 
 		switch payload := event.GetEvent().(type) {
-		case *enginev1.BrowserSessionEvent_TabOpened:
+		case *enginev1.SurfaceSessionEvent_ContextOpened:
 			return &Tab{
 				runtime:          b.runtime,
 				browserSessionID: b.sessionID,
-				sessionID:        payload.TabOpened.GetTabSessionId(),
+				sessionID:        payload.ContextOpened.GetContextSessionId(),
 			}, nil
-		case *enginev1.BrowserSessionEvent_Error:
+		case *enginev1.SurfaceSessionEvent_Error:
 			return nil, fmt.Errorf("browser session error while opening tab: %s", payload.Error.GetMessage())
 		}
 	}
@@ -144,8 +144,8 @@ func (b *Browser) Ping(ctx context.Context, message string) (string, error) {
 		return "", fmt.Errorf("browser session %s is closed", b.sessionID)
 	}
 
-	if err := b.stream.Send(&enginev1.BrowserSessionCommand{
-		Command: &enginev1.BrowserSessionCommand_Ping{
+	if err := b.stream.Send(&enginev1.SurfaceSessionCommand{
+		Command: &enginev1.SurfaceSessionCommand_Ping{
 			Ping: &enginev1.SessionPingCommand{
 				Message: message,
 			},
@@ -161,9 +161,9 @@ func (b *Browser) Ping(ctx context.Context, message string) (string, error) {
 		}
 
 		switch payload := event.GetEvent().(type) {
-		case *enginev1.BrowserSessionEvent_Pong:
+		case *enginev1.SurfaceSessionEvent_Pong:
 			return payload.Pong.GetMessage(), nil
-		case *enginev1.BrowserSessionEvent_Error:
+		case *enginev1.SurfaceSessionEvent_Error:
 			return "", fmt.Errorf("browser session error while pinging: %s", payload.Error.GetMessage())
 		}
 	}
@@ -180,12 +180,12 @@ func (b *Browser) Close(ctx context.Context) error {
 		return nil
 	}
 
-	if err := b.stream.Send(&enginev1.BrowserSessionCommand{
-		Command: &enginev1.BrowserSessionCommand_Close{
-			Close: &enginev1.CloseBrowserSessionCommand{},
+	if err := b.stream.Send(&enginev1.SurfaceSessionCommand{
+		Command: &enginev1.SurfaceSessionCommand_Close{
+			Close: &enginev1.CloseSurfaceSessionCommand{},
 		},
 	}); err != nil {
-		return fmt.Errorf("send CloseBrowserSessionCommand: %w", err)
+		return fmt.Errorf("send CloseSurfaceSessionCommand: %w", err)
 	}
 
 	for {
@@ -195,14 +195,14 @@ func (b *Browser) Close(ctx context.Context) error {
 		}
 
 		switch payload := event.GetEvent().(type) {
-		case *enginev1.BrowserSessionEvent_Closed:
+		case *enginev1.SurfaceSessionEvent_Closed:
 			b.closed = true
 			if err := b.stream.CloseSend(); err != nil {
 				return fmt.Errorf("close browser session send side: %w", err)
 			}
 			_ = payload
 			return nil
-		case *enginev1.BrowserSessionEvent_Error:
+		case *enginev1.SurfaceSessionEvent_Error:
 			return fmt.Errorf("browser session error while closing: %s", payload.Error.GetMessage())
 		}
 	}

@@ -166,15 +166,17 @@ var File_core_v1_common_proto protoreflect.FileDescriptor
 const file_core_v1_common_proto_rawDesc = "" +
 	"\n" +
 	"\x14core/v1/common.proto\x12\x13allwright.engine.v1\"\r\n" +
-	"\vPingRequest\"(\n" +
+	"\vPingRequest\"B\n" +
 	"\fPingResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\"\x8f\x01\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\"\x8f\x01\n" +
 	"\x13CommandRetryOptions\x12\"\n" +
 	"\n" +
 	"timeout_ms\x18\x01 \x01(\rH\x00R\ttimeoutMs\x88\x01\x01\x12/\n" +
 	"\x11retry_interval_ms\x18\x02 \x01(\rH\x01R\x0fretryIntervalMs\x88\x01\x01B\r\n" +
 	"\v_timeout_msB\x14\n" +
-	"\x12_retry_interval_msB0Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
+	"\x12_retry_interval_msBK\n" +
+	"\x17dev.allwright.engine.v1P\x01Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
 
 var (
 	file_core_v1_common_proto_rawDescOnce sync.Once

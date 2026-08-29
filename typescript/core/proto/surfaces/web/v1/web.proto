@@ -22,7 +22,7 @@ message BrowserLaunchedEvent {
   string browser = 2;
   string note = 3;
   string user_data_dir = 4;
-  string initial_tab_session_id = 5;
+  string initial_page_session_id = 5;
 }
 
 message LaunchChromeCommand {
@@ -35,10 +35,10 @@ message ChromeLaunchedEvent {
   string note = 2;
   string cdp_websocket_url = 3;
   string user_data_dir = 4;
-  string initial_tab_session_id = 5;
+  string initial_page_session_id = 5;
 }
 
-message NavigateTabCommand {
+message NavigatePageCommand {
   string url = 1;
   optional CommandRetryOptions retry_options = 2;
 }
@@ -98,7 +98,7 @@ message WaitForSelectorCommand {
   optional CommandRetryOptions retry_options = 3;
 }
 
-message TabNavigatedEvent {
+message PageNavigatedEvent {
   string url = 1;
   string note = 2;
 }

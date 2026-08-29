@@ -24,29 +24,28 @@ var File_engine_v1_engine_proto protoreflect.FileDescriptor
 
 const file_engine_v1_engine_proto_rawDesc = "" +
 	"\n" +
-	"\x16engine/v1/engine.proto\x12\x13allwright.engine.v1\x1a\x15core/v1/browser.proto\x1a\x14core/v1/common.proto\x1a\x11core/v1/tab.proto2\xa8\x02\n" +
+	"\x16engine/v1/engine.proto\x12\x13allwright.engine.v1\x1a\x15core/v1/browser.proto\x1a\x14core/v1/common.proto\x1a\x11core/v1/tab.proto2\xb4\x02\n" +
 	"\rEngineService\x12K\n" +
 	"\x04Ping\x12 .allwright.engine.v1.PingRequest\x1a!.allwright.engine.v1.PingResponse\x12j\n" +
-	"\x0eBrowserSession\x12*.allwright.engine.v1.BrowserSessionCommand\x1a(.allwright.engine.v1.BrowserSessionEvent(\x010\x01\x12^\n" +
-	"\n" +
-	"TabSession\x12&.allwright.engine.v1.TabSessionCommand\x1a$.allwright.engine.v1.TabSessionEvent(\x010\x01BK\n" +
+	"\x0eSurfaceSession\x12*.allwright.engine.v1.SurfaceSessionCommand\x1a(.allwright.engine.v1.SurfaceSessionEvent(\x010\x01\x12j\n" +
+	"\x0eContextSession\x12*.allwright.engine.v1.ContextSessionCommand\x1a(.allwright.engine.v1.ContextSessionEvent(\x010\x01BK\n" +
 	"\x17dev.allwright.engine.v1P\x01Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
 
 var file_engine_v1_engine_proto_goTypes = []any{
 	(*PingRequest)(nil),           // 0: allwright.engine.v1.PingRequest
-	(*BrowserSessionCommand)(nil), // 1: allwright.engine.v1.BrowserSessionCommand
-	(*TabSessionCommand)(nil),     // 2: allwright.engine.v1.TabSessionCommand
+	(*SurfaceSessionCommand)(nil), // 1: allwright.engine.v1.SurfaceSessionCommand
+	(*ContextSessionCommand)(nil), // 2: allwright.engine.v1.ContextSessionCommand
 	(*PingResponse)(nil),          // 3: allwright.engine.v1.PingResponse
-	(*BrowserSessionEvent)(nil),   // 4: allwright.engine.v1.BrowserSessionEvent
-	(*TabSessionEvent)(nil),       // 5: allwright.engine.v1.TabSessionEvent
+	(*SurfaceSessionEvent)(nil),   // 4: allwright.engine.v1.SurfaceSessionEvent
+	(*ContextSessionEvent)(nil),   // 5: allwright.engine.v1.ContextSessionEvent
 }
 var file_engine_v1_engine_proto_depIdxs = []int32{
 	0, // 0: allwright.engine.v1.EngineService.Ping:input_type -> allwright.engine.v1.PingRequest
-	1, // 1: allwright.engine.v1.EngineService.BrowserSession:input_type -> allwright.engine.v1.BrowserSessionCommand
-	2, // 2: allwright.engine.v1.EngineService.TabSession:input_type -> allwright.engine.v1.TabSessionCommand
+	1, // 1: allwright.engine.v1.EngineService.SurfaceSession:input_type -> allwright.engine.v1.SurfaceSessionCommand
+	2, // 2: allwright.engine.v1.EngineService.ContextSession:input_type -> allwright.engine.v1.ContextSessionCommand
 	3, // 3: allwright.engine.v1.EngineService.Ping:output_type -> allwright.engine.v1.PingResponse
-	4, // 4: allwright.engine.v1.EngineService.BrowserSession:output_type -> allwright.engine.v1.BrowserSessionEvent
-	5, // 5: allwright.engine.v1.EngineService.TabSession:output_type -> allwright.engine.v1.TabSessionEvent
+	4, // 4: allwright.engine.v1.EngineService.SurfaceSession:output_type -> allwright.engine.v1.SurfaceSessionEvent
+	5, // 5: allwright.engine.v1.EngineService.ContextSession:output_type -> allwright.engine.v1.ContextSessionEvent
 	3, // [3:6] is the sub-list for method output_type
 	0, // [0:3] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name

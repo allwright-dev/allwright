@@ -1,12 +1,12 @@
 package dev.allwright.client;
 
-import dev.allwright.engine.v1.BrowserSessionClosedEvent;
-import dev.allwright.engine.v1.BrowserSessionCommand;
-import dev.allwright.engine.v1.BrowserSessionEvent;
-import dev.allwright.engine.v1.CloseBrowserSessionCommand;
-import dev.allwright.engine.v1.OpenTabCommand;
+import dev.allwright.engine.v1.SurfaceSessionClosedEvent;
+import dev.allwright.engine.v1.SurfaceSessionCommand;
+import dev.allwright.engine.v1.SurfaceSessionEvent;
+import dev.allwright.engine.v1.CloseSurfaceSessionCommand;
+import dev.allwright.engine.v1.OpenContextCommand;
 import dev.allwright.engine.v1.SessionPingCommand;
-import dev.allwright.engine.v1.TabOpenedEvent;
+import dev.allwright.engine.v1.ContextOpenedEvent;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,7 +14,7 @@ import java.util.Map;
 
 public final class Browser implements AutoCloseable {
     private final RuntimeSupport.RuntimeClient runtime;
-    private final RuntimeSupport.StreamHandle<BrowserSessionCommand, BrowserSessionEvent> stream;
+    private final RuntimeSupport.StreamHandle<SurfaceSessionCommand, SurfaceSessionEvent> stream;
     private final Map<String, Page> pages = new LinkedHashMap<>();
     private final Page initialPage;
     private boolean closed;
@@ -27,7 +27,7 @@ public final class Browser implements AutoCloseable {
 
     Browser(
             RuntimeSupport.RuntimeClient runtime,
-            RuntimeSupport.StreamHandle<BrowserSessionCommand, BrowserSessionEvent> stream,
+            RuntimeSupport.StreamHandle<SurfaceSessionCommand, SurfaceSessionEvent> stream,
             String sessionId,
             String browserName,
             String launchNote,
@@ -93,18 +93,18 @@ public final class Browser implements AutoCloseable {
     public synchronized Page newPage(CommandOptions options) {
         ensureOpen();
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
-        OpenTabCommand.Builder openTab = OpenTabCommand.newBuilder();
+        OpenContextCommand.Builder openContext = OpenContextCommand.newBuilder();
         if (CommandSupport.hasTimeout(resolvedOptions.timeoutMs())) {
-            openTab.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
+            openContext.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
         }
-        stream.send(BrowserSessionCommand.newBuilder().setOpenTab(openTab).build());
+        stream.send(SurfaceSessionCommand.newBuilder().setOpenContext(openContext).build());
 
         while (true) {
-            BrowserSessionEvent event = stream.recv("receive browser session event while opening page");
+            SurfaceSessionEvent event = stream.recv("receive browser session event while opening page");
             switch (event.getEventCase()) {
-                case TAB_OPENED -> {
-                    TabOpenedEvent opened = event.getTabOpened();
-                    Page page = new Page(runtime, sessionId, opened.getTabSessionId());
+                case CONTEXT_OPENED -> {
+                    ContextOpenedEvent opened = event.getContextOpened();
+                    Page page = new Page(runtime, sessionId, opened.getContextSessionId());
                     pages.put(page.sessionId(), page);
                     return page;
                 }
@@ -132,13 +132,13 @@ public final class Browser implements AutoCloseable {
     public synchronized String ping(String message) {
         ensureOpen();
         stream.send(
-                BrowserSessionCommand.newBuilder()
+                SurfaceSessionCommand.newBuilder()
                         .setPing(SessionPingCommand.newBuilder().setMessage(message).build())
                         .build()
         );
 
         while (true) {
-            BrowserSessionEvent event = stream.recv("receive browser session event while pinging browser");
+            SurfaceSessionEvent event = stream.recv("receive browser session event while pinging browser");
             switch (event.getEventCase()) {
                 case PONG -> {
                     return event.getPong().getMessage();
@@ -159,16 +159,16 @@ public final class Browser implements AutoCloseable {
         }
 
         stream.send(
-                BrowserSessionCommand.newBuilder()
-                        .setClose(CloseBrowserSessionCommand.newBuilder().build())
+                SurfaceSessionCommand.newBuilder()
+                        .setClose(CloseSurfaceSessionCommand.newBuilder().build())
                         .build()
         );
 
         while (true) {
-            BrowserSessionEvent event = stream.recv("receive browser session event while closing browser");
+            SurfaceSessionEvent event = stream.recv("receive browser session event while closing browser");
             switch (event.getEventCase()) {
                 case CLOSED -> {
-                    BrowserSessionClosedEvent ignored = event.getClosed();
+                    SurfaceSessionClosedEvent ignored = event.getClosed();
                     closed = true;
                     stream.closeSend();
                     return;

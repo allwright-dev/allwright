@@ -4,19 +4,22 @@ package allwright.engine.v1;
 option go_package = "allwright.dev/gen/allwright/engine/v1;enginev1";
 
 import "core/v1/common.proto";
+import "surfaces/mobile/v1/mobile.proto";
 import "surfaces/web/v1/web.proto";
 
-message BrowserSessionCommand {
+message SurfaceSessionCommand {
   oneof command {
     LaunchChromeCommand launch_chrome = 1;
-    OpenTabCommand open_tab = 2;
+    OpenContextCommand open_context = 2;
     SessionPingCommand ping = 3;
-    CloseBrowserSessionCommand close = 4;
+    CloseSurfaceSessionCommand close = 4;
     LaunchBrowserCommand launch_browser = 5;
+    ConnectMobileCommand connect_mobile = 6;
+    LaunchAppCommand launch_app = 7;
   }
 }
 
-message OpenTabCommand {
+message OpenContextCommand {
   optional CommandRetryOptions retry_options = 1;
 }
 
@@ -24,23 +27,25 @@ message SessionPingCommand {
   string message = 1;
 }
 
-message CloseBrowserSessionCommand {}
+message CloseSurfaceSessionCommand {}
 
-message BrowserSessionEvent {
+message SurfaceSessionEvent {
   string session_id = 1;
 
   oneof event {
     ChromeLaunchedEvent chrome_launched = 2;
-    TabOpenedEvent tab_opened = 3;
+    ContextOpenedEvent context_opened = 3;
     SessionPongEvent pong = 4;
-    BrowserSessionClosedEvent closed = 5;
-    BrowserSessionErrorEvent error = 6;
+    SurfaceSessionClosedEvent closed = 5;
+    SurfaceSessionErrorEvent error = 6;
     BrowserLaunchedEvent browser_launched = 7;
+    MobileConnectedEvent mobile_connected = 8;
+    AppLaunchedEvent app_launched = 9;
   }
 }
 
-message TabOpenedEvent {
-  string tab_session_id = 1;
+message ContextOpenedEvent {
+  string context_session_id = 1;
   string note = 2;
 }
 
@@ -48,10 +53,10 @@ message SessionPongEvent {
   string message = 1;
 }
 
-message BrowserSessionClosedEvent {
+message SurfaceSessionClosedEvent {
   string reason = 1;
 }
 
-message BrowserSessionErrorEvent {
+message SurfaceSessionErrorEvent {
   string message = 1;
 }

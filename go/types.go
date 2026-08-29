@@ -215,14 +215,14 @@ type Locator struct {
 }
 
 type browserSessionStream interface {
-	Send(*enginev1.BrowserSessionCommand) error
-	Recv() (*enginev1.BrowserSessionEvent, error)
+	Send(*enginev1.SurfaceSessionCommand) error
+	Recv() (*enginev1.SurfaceSessionEvent, error)
 	CloseSend() error
 }
 
 type tabSessionStream interface {
-	Send(*enginev1.TabSessionCommand) error
-	Recv() (*enginev1.TabSessionEvent, error)
+	Send(*enginev1.ContextSessionCommand) error
+	Recv() (*enginev1.ContextSessionEvent, error)
 	CloseSend() error
 }
 

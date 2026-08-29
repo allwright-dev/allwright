@@ -18,7 +18,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 final class BootstrapSupport {
     private static final String ALLWRIGHT_AUTO_INSTALL_ENV_VAR = "ALLWRIGHT_AUTO_INSTALL";
@@ -211,94 +210,6 @@ final class BootstrapSupport {
         }
     }
 
-    static void ensurePluginsInstalled(String... pluginIds) {
-        String expectedVersion = expectedRuntimeVersion();
-        Path cliPath = ensureCliAvailable(expectedVersion);
-        ensurePluginsInstalledWithCli(cliPath, expectedVersion, pluginIds);
-    }
-
-    static String invokePlugin(String pluginId, String requestJson) {
-        String expectedVersion = expectedRuntimeVersion();
-        Path cliPath = ensureCliAvailable(expectedVersion);
-        Process process;
-        try {
-            process = new ProcessBuilder(
-                    cliPath.toString(),
-                    "plugin",
-                    "invoke",
-                    pluginId,
-                    "--request-json",
-                    requestJson
-            ).start();
-        } catch (IOException exception) {
-            throw new AllwrightException("invoke allwright " + pluginId + " plugin: " + exception.getMessage(), exception);
-        }
-
-        try {
-            int exitCode = process.waitFor();
-            String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-            String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-            if (exitCode != 0) {
-                String details = java.util.stream.Stream.of(stdout, stderr)
-                        .filter(value -> value != null && !value.isBlank())
-                        .collect(Collectors.joining(System.lineSeparator()));
-                throw new AllwrightException(
-                        details.isBlank() ? "allwright " + pluginId + " plugin invocation failed" : details
-                );
-            }
-            return stdout;
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new AllwrightException("invoke allwright " + pluginId + " plugin: " + exception.getMessage(), exception);
-        } catch (IOException exception) {
-            throw new AllwrightException("read allwright " + pluginId + " plugin output: " + exception.getMessage(), exception);
-        }
-    }
-
-    private static void ensurePluginsInstalledWithCli(Path cliPath, String expectedVersion, String... pluginIds) {
-        for (String pluginId : java.util.Arrays.stream(pluginIds)
-                .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(value -> !value.isEmpty())
-                .distinct()
-                .toList()) {
-            Path pluginPath = allwrightHome().resolve("plugins").resolve(pluginId).resolve("lib").resolve(pluginLibraryFilename(pluginId));
-            if (Files.isRegularFile(pluginPath) && expectedVersion.equals(installedPluginVersion(pluginId))) {
-                continue;
-            }
-            try {
-                Process process = new ProcessBuilder(
-                        cliPath.toString(),
-                        "plugin",
-                        "install",
-                        pluginId,
-                        "--version",
-                        expectedVersion
-                )
-                        .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                        .redirectError(ProcessBuilder.Redirect.DISCARD)
-                        .start();
-                int exitCode = process.waitFor();
-                if (exitCode != 0 || !Files.isRegularFile(pluginPath)) {
-                    throw new AllwrightException(
-                            "allwright attempted to install the `" + pluginId + "` plugin automatically, but the install did not complete successfully"
-                    );
-                }
-                if (!expectedVersion.equals(installedPluginVersion(pluginId))) {
-                    throw new AllwrightException(
-                            "allwright attempted to install the `" + pluginId + "` plugin automatically, but version "
-                                    + expectedVersion + " is still not active"
-                    );
-                }
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                throw new AllwrightException("install allwright " + pluginId + " plugin: " + exception.getMessage(), exception);
-            } catch (IOException exception) {
-                throw new AllwrightException("install allwright " + pluginId + " plugin: " + exception.getMessage(), exception);
-            }
-        }
-    }
-
     private static String resolveReleaseTag() {
         String version = System.getenv(ALLWRIGHT_VERSION_ENV_VAR);
         if (version == null || version.isBlank()) {
@@ -466,29 +377,6 @@ final class BootstrapSupport {
         return host.equals("127.0.0.1") || host.equals("localhost") || host.equals("::1");
     }
 
-    private static String installedPluginVersion(String pluginId) {
-        Path manifestPath = allwrightHome().resolve("plugins.txt");
-        if (!Files.isRegularFile(manifestPath)) {
-            return null;
-        }
-        try {
-            for (String line : Files.readAllLines(manifestPath)) {
-                String trimmed = line.trim();
-                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                    continue;
-                }
-                String[] parts = trimmed.split("\t", 3);
-                if (parts.length < 3 || !parts[0].equals(pluginId)) {
-                    continue;
-                }
-                return normalizeReleaseVersion(parts[2]);
-            }
-        } catch (IOException exception) {
-            throw new AllwrightException("read allwright plugin manifest " + manifestPath + ": " + exception.getMessage(), exception);
-        }
-        return null;
-    }
-
     private static String allocateManagedServerAddr(String serverAddr) {
         String host = localBindingHost(serverAddr);
         try (ServerSocket socket = new ServerSocket(0, 0, InetAddress.getByName(host))) {
@@ -552,28 +440,6 @@ final class BootstrapSupport {
 
     private static String cliFilename() {
         return System.getProperty("os.name").toLowerCase().contains("windows") ? "allwright.exe" : "allwright";
-    }
-
-    private static String pluginLibraryFilename(String pluginId) {
-        String stem = pluginLibraryStem(pluginId);
-        String os = System.getProperty("os.name").toLowerCase();
-        if (os.contains("windows")) {
-            return stem + ".dll";
-        }
-        if (os.contains("mac")) {
-            return "lib" + stem + ".dylib";
-        }
-        return "lib" + stem + ".so";
-    }
-
-    private static String pluginLibraryStem(String pluginId) {
-        return switch (pluginId) {
-            case "web" -> "allwright_surface_web";
-            case "mobile-android" -> "allwright_surface_mobile_android";
-            default -> throw new AllwrightException(
-                    "automatic install is not supported for allwright plugin `" + pluginId + "`"
-            );
-        };
     }
 
     private static Path findExtractedCli(Path extractRoot) throws IOException {

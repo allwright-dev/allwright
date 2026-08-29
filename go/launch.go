@@ -27,13 +27,13 @@ func LaunchBrowser(ctx context.Context, browserKind enginev1.BrowserKind, option
 		return nil, err
 	}
 
-	stream, err := runtime.engine.BrowserSession(ctx)
+	stream, err := runtime.engine.SurfaceSession(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("open browser session stream: %w", err)
 	}
 
-	command := &enginev1.BrowserSessionCommand{
-		Command: &enginev1.BrowserSessionCommand_LaunchBrowser{
+	command := &enginev1.SurfaceSessionCommand{
+		Command: &enginev1.SurfaceSessionCommand_LaunchBrowser{
 			LaunchBrowser: &enginev1.LaunchBrowserCommand{
 				BrowserKind:   browserKind,
 				BrowserBinary: optionalString(options.BrowserBinary),
@@ -52,7 +52,7 @@ func LaunchBrowser(ctx context.Context, browserKind enginev1.BrowserKind, option
 		}
 
 		switch payload := event.GetEvent().(type) {
-		case *enginev1.BrowserSessionEvent_BrowserLaunched:
+		case *enginev1.SurfaceSessionEvent_BrowserLaunched:
 			return newBrowserFromLaunch(
 				runtime,
 				stream,
@@ -61,9 +61,9 @@ func LaunchBrowser(ctx context.Context, browserKind enginev1.BrowserKind, option
 				payload.BrowserLaunched.GetNote(),
 				"",
 				payload.BrowserLaunched.GetUserDataDir(),
-				payload.BrowserLaunched.GetInitialTabSessionId(),
+				payload.BrowserLaunched.GetInitialPageSessionId(),
 			), nil
-		case *enginev1.BrowserSessionEvent_ChromeLaunched:
+		case *enginev1.SurfaceSessionEvent_ChromeLaunched:
 			return newBrowserFromLaunch(
 				runtime,
 				stream,
@@ -72,9 +72,9 @@ func LaunchBrowser(ctx context.Context, browserKind enginev1.BrowserKind, option
 				payload.ChromeLaunched.GetNote(),
 				payload.ChromeLaunched.GetCdpWebsocketUrl(),
 				payload.ChromeLaunched.GetUserDataDir(),
-				payload.ChromeLaunched.GetInitialTabSessionId(),
+				payload.ChromeLaunched.GetInitialPageSessionId(),
 			), nil
-		case *enginev1.BrowserSessionEvent_Error:
+		case *enginev1.SurfaceSessionEvent_Error:
 			return nil, fmt.Errorf("browser session error during launch: %s", payload.Error.GetMessage())
 		}
 	}

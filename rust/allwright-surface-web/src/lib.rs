@@ -11,7 +11,7 @@ use std::fs;
 use std::future::Future;
 use std::net::TcpListener;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
 
@@ -1838,6 +1838,8 @@ fn launch_chrome_with_cdp(browser_binary: &str) -> Result<ChromeLaunchInfo, Stri
             "--disable-sync",
             &format!("--user-data-dir={user_data_dir_str}"),
         ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|error| format!("failed to launch Chrome binary {browser_binary}: {error}"))?;
     let process_id = child.id();
@@ -1964,6 +1966,8 @@ fn launch_firefox_with_remote_agent(browser_binary: &str) -> Result<BrowserLaunc
             &user_data_dir_str,
             "about:blank",
         ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|error| format!("failed to launch Firefox binary {browser_binary}: {error}"))?;
     let process_id = child.id();

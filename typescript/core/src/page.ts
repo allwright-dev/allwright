@@ -18,7 +18,7 @@ import type {
   PressOptions,
   PressResult,
   RuntimeClient,
-  TabSessionEvent,
+  ContextSessionEvent,
   TextResult,
   WaitForSelectorOptions,
   WaitForSelectorResult,
@@ -45,16 +45,16 @@ export class PageImpl implements Page {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
-      browserSessionId: this.browserSessionId,
-      tabSessionId: this.sessionId,
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
       navigate: {
         url,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });
 
-    let navigated: TabSessionEvent["navigated"] | null = null;
-    let injection: TabSessionEvent["chromiumBidiInjection"] | null = null;
+    let navigated: ContextSessionEvent["navigated"] | null = null;
+    let injection: ContextSessionEvent["chromiumBidiInjection"] | null = null;
 
     while (true) {
       const event = await handle.queue.next();
@@ -90,8 +90,8 @@ export class PageImpl implements Page {
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
-      browserSessionId: this.browserSessionId,
-      tabSessionId: this.sessionId,
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
       clickElement: {
         cssSelector: transportSelector,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
@@ -122,8 +122,8 @@ export class PageImpl implements Page {
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
-      browserSessionId: this.browserSessionId,
-      tabSessionId: this.sessionId,
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
       countElements: {
         cssSelector: transportSelector,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
@@ -154,8 +154,8 @@ export class PageImpl implements Page {
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
-      browserSessionId: this.browserSessionId,
-      tabSessionId: this.sessionId,
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
       highlightElements: {
         cssSelector: transportSelector,
         durationMs: options.durationMs,
@@ -187,8 +187,8 @@ export class PageImpl implements Page {
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
-      browserSessionId: this.browserSessionId,
-      tabSessionId: this.sessionId,
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
       focusElement: {
         cssSelector: transportSelector,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
@@ -218,8 +218,8 @@ export class PageImpl implements Page {
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
-      browserSessionId: this.browserSessionId,
-      tabSessionId: this.sessionId,
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
       fillElement: {
         cssSelector: transportSelector,
         value,
@@ -251,8 +251,8 @@ export class PageImpl implements Page {
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
-      browserSessionId: this.browserSessionId,
-      tabSessionId: this.sessionId,
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
       hoverElement: {
         cssSelector: transportSelector,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
@@ -282,8 +282,8 @@ export class PageImpl implements Page {
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
-      browserSessionId: this.browserSessionId,
-      tabSessionId: this.sessionId,
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
       pressKey: {
         cssSelector: transportSelector,
         key,
@@ -327,8 +327,8 @@ export class PageImpl implements Page {
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
     handle.stream.write({
-      browserSessionId: this.browserSessionId,
-      tabSessionId: this.sessionId,
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
       waitForSelector: {
         cssSelector: transportSelector,
         visible: options.visible,
@@ -362,8 +362,8 @@ export class PageImpl implements Page {
     }
 
     handle.stream.write({
-      browserSessionId: this.browserSessionId,
-      tabSessionId: this.sessionId,
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
       close: {},
     });
 
@@ -384,8 +384,8 @@ export class PageImpl implements Page {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
-      browserSessionId: this.browserSessionId,
-      tabSessionId: this.sessionId,
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
       ping: {
         message,
       },
@@ -428,16 +428,16 @@ export class PageImpl implements Page {
     handle.stream.write(
       textContent
         ? {
-            browserSessionId: this.browserSessionId,
-            tabSessionId: this.sessionId,
+            surfaceSessionId: this.browserSessionId,
+            contextSessionId: this.sessionId,
             getTextContent: {
               cssSelector: transportSelector,
               retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
             },
           }
         : {
-            browserSessionId: this.browserSessionId,
-            tabSessionId: this.sessionId,
+            surfaceSessionId: this.browserSessionId,
+            contextSessionId: this.sessionId,
             getInnerText: {
               cssSelector: transportSelector,
               retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,

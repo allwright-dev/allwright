@@ -11,6 +11,6 @@ import "core/v1/tab.proto";
 
 service EngineService {
   rpc Ping(PingRequest) returns (PingResponse);
-  rpc BrowserSession(stream BrowserSessionCommand) returns (stream BrowserSessionEvent);
-  rpc TabSession(stream TabSessionCommand) returns (stream TabSessionEvent);
+  rpc SurfaceSession(stream SurfaceSessionCommand) returns (stream SurfaceSessionEvent);
+  rpc ContextSession(stream ContextSessionCommand) returns (stream ContextSessionEvent);
 }

@@ -153,14 +153,14 @@ export interface MobileAndroidLaunchOptions {
 }
 
 export interface MobileAndroidLocator {
-  readonly page: MobileAndroidPage;
+  readonly page: MobileAndroidApp;
   readonly selector: string;
   click(options?: CommandOptions): Promise<ClickResult>;
   fill(value: string, options?: CommandOptions): Promise<FillResult>;
   locator(selector: string): MobileAndroidLocator;
 }
 
-export interface MobileAndroidPage {
+export interface MobileAndroidApp {
   readonly sessionId: string;
   locator(selector: string): MobileAndroidLocator;
   click(selector: string, options?: CommandOptions): Promise<ClickResult>;
@@ -169,9 +169,9 @@ export interface MobileAndroidPage {
 
 export interface MobileAndroidDevice {
   readonly sessionId: string;
-  page(): MobileAndroidPage;
-  initialPage(): MobileAndroidPage;
-  launch(options?: MobileAndroidLaunchOptions): Promise<MobileAndroidPage>;
+  app(): MobileAndroidApp;
+  initialApp(): MobileAndroidApp;
+  launch(options?: MobileAndroidLaunchOptions): Promise<MobileAndroidApp>;
 }
 
 export interface MobileSurfaceNamespace {
@@ -312,7 +312,7 @@ export interface ChromeLaunchedPayload {
   note?: string;
   cdpWebsocketUrl?: string;
   userDataDir?: string;
-  initialTabSessionId?: string;
+  initialPageSessionId?: string;
 }
 
 export interface BrowserLaunchedPayload {
@@ -320,16 +320,35 @@ export interface BrowserLaunchedPayload {
   browser?: string;
   note?: string;
   userDataDir?: string;
-  initialTabSessionId?: string;
+  initialPageSessionId?: string;
 }
 
-export interface BrowserSessionEvent {
+export interface SurfaceSessionEvent {
   sessionId?: string;
   event?: string;
   chromeLaunched?: ChromeLaunchedPayload;
   browserLaunched?: BrowserLaunchedPayload;
-  tabOpened?: {
-    tabSessionId?: string;
+  mobileConnected?: {
+    platform?: number | string;
+    deviceName?: string;
+    note?: string;
+    deviceId?: string;
+    connectionKind?: number | string;
+    backend?: string;
+    deviceSessionId?: string;
+    initialAppSessionId?: string;
+    packageName?: string;
+    activityName?: string;
+  };
+  appLaunched?: {
+    appSessionId?: string;
+    note?: string;
+    packageName?: string;
+    activityName?: string;
+    webviewContext?: string;
+  };
+  contextOpened?: {
+    contextSessionId?: string;
     note?: string;
   };
   pong?: {
@@ -343,8 +362,8 @@ export interface BrowserSessionEvent {
   };
 }
 
-export interface TabSessionEvent {
-  tabSessionId?: string;
+export interface ContextSessionEvent {
+  contextSessionId?: string;
   event?: string;
   attached?: {
     note?: string;
@@ -438,35 +457,59 @@ export interface LaunchBrowserRequest {
   };
 }
 
-export interface OpenTabRequest {
-  openTab: {
+export interface OpenContextRequest {
+  openContext: {
     retryOptions?: {
       timeoutMs?: number;
     };
   };
 }
 
-export interface BrowserPingRequest {
+export interface ConnectMobileRequest {
+  connectMobile: {
+    platform: number;
+    device?: string;
+    adbEndpoint?: string;
+    preserveAppState?: boolean;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
+export interface LaunchAppRequest {
+  launchApp: {
+    apkPath?: string;
+    appId?: string;
+    launchActivity?: string;
+    stopBeforeLaunch?: boolean;
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
+export interface SurfacePingRequest {
   ping: {
     message: string;
   };
 }
 
-export interface CloseBrowserRequest {
+export interface CloseSurfaceRequest {
   close: Record<string, never>;
 }
 
-export interface TabPingRequest {
-  browserSessionId: string;
-  tabSessionId: string;
+export interface ContextPingRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
   ping: {
     message: string;
   };
 }
 
 export interface NavigateRequest {
-  browserSessionId: string;
-  tabSessionId: string;
+  surfaceSessionId: string;
+  contextSessionId: string;
   navigate: {
     url: string;
     retryOptions?: {
@@ -476,8 +519,8 @@ export interface NavigateRequest {
 }
 
 export interface ClickRequest {
-  browserSessionId: string;
-  tabSessionId: string;
+  surfaceSessionId: string;
+  contextSessionId: string;
   clickElement: {
     cssSelector: string;
     retryOptions?: {
@@ -487,8 +530,8 @@ export interface ClickRequest {
 }
 
 export interface CountRequest {
-  browserSessionId: string;
-  tabSessionId: string;
+  surfaceSessionId: string;
+  contextSessionId: string;
   countElements: {
     cssSelector: string;
     retryOptions?: {
@@ -498,8 +541,8 @@ export interface CountRequest {
 }
 
 export interface HighlightRequest {
-  browserSessionId: string;
-  tabSessionId: string;
+  surfaceSessionId: string;
+  contextSessionId: string;
   highlightElements: {
     cssSelector: string;
     durationMs?: number;
@@ -510,8 +553,8 @@ export interface HighlightRequest {
 }
 
 export interface FocusRequest {
-  browserSessionId: string;
-  tabSessionId: string;
+  surfaceSessionId: string;
+  contextSessionId: string;
   focusElement: {
     cssSelector: string;
     retryOptions?: {
@@ -521,8 +564,8 @@ export interface FocusRequest {
 }
 
 export interface FillRequest {
-  browserSessionId: string;
-  tabSessionId: string;
+  surfaceSessionId: string;
+  contextSessionId: string;
   fillElement: {
     cssSelector: string;
     value: string;
@@ -533,8 +576,8 @@ export interface FillRequest {
 }
 
 export interface HoverRequest {
-  browserSessionId: string;
-  tabSessionId: string;
+  surfaceSessionId: string;
+  contextSessionId: string;
   hoverElement: {
     cssSelector: string;
     retryOptions?: {
@@ -544,8 +587,8 @@ export interface HoverRequest {
 }
 
 export interface PressRequest {
-  browserSessionId: string;
-  tabSessionId: string;
+  surfaceSessionId: string;
+  contextSessionId: string;
   pressKey: {
     cssSelector: string;
     key: string;
@@ -557,8 +600,8 @@ export interface PressRequest {
 }
 
 export interface TextContentRequest {
-  browserSessionId: string;
-  tabSessionId: string;
+  surfaceSessionId: string;
+  contextSessionId: string;
   getTextContent: {
     cssSelector: string;
     retryOptions?: {
@@ -568,8 +611,8 @@ export interface TextContentRequest {
 }
 
 export interface InnerTextRequest {
-  browserSessionId: string;
-  tabSessionId: string;
+  surfaceSessionId: string;
+  contextSessionId: string;
   getInnerText: {
     cssSelector: string;
     retryOptions?: {
@@ -579,8 +622,8 @@ export interface InnerTextRequest {
 }
 
 export interface WaitForSelectorRequest {
-  browserSessionId: string;
-  tabSessionId: string;
+  surfaceSessionId: string;
+  contextSessionId: string;
   waitForSelector: {
     cssSelector: string;
     visible?: boolean;
@@ -590,21 +633,23 @@ export interface WaitForSelectorRequest {
   };
 }
 
-export interface CloseTabRequest {
-  browserSessionId: string;
-  tabSessionId: string;
+export interface CloseContextRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
   close: Record<string, never>;
 }
 
-export type BrowserSessionRequest =
+export type SurfaceSessionRequest =
   | LaunchBrowserRequest
   | LaunchChromeRequest
-  | OpenTabRequest
-  | BrowserPingRequest
-  | CloseBrowserRequest;
+  | OpenContextRequest
+  | ConnectMobileRequest
+  | LaunchAppRequest
+  | SurfacePingRequest
+  | CloseSurfaceRequest;
 
-export type TabSessionRequest =
-  | TabPingRequest
+export type ContextSessionRequest =
+  | ContextPingRequest
   | NavigateRequest
   | ClickRequest
   | CountRequest
@@ -616,18 +661,18 @@ export type TabSessionRequest =
   | TextContentRequest
   | InnerTextRequest
   | WaitForSelectorRequest
-  | CloseTabRequest;
+  | CloseContextRequest;
 
-export type BrowserSessionStream = grpc.ClientDuplexStream<BrowserSessionRequest, BrowserSessionEvent>;
-export type PageSessionStream = grpc.ClientDuplexStream<TabSessionRequest, TabSessionEvent>;
+export type SurfaceSessionStream = grpc.ClientDuplexStream<SurfaceSessionRequest, SurfaceSessionEvent>;
+export type ContextSessionStream = grpc.ClientDuplexStream<ContextSessionRequest, ContextSessionEvent>;
 
 export interface EngineServiceClientShape {
   Ping(
     request: Record<string, never>,
     callback: (error: grpc.ServiceError | null, response: PingResponse) => void,
   ): void;
-  BrowserSession(): BrowserSessionStream;
-  TabSession(): PageSessionStream;
+  SurfaceSession(): SurfaceSessionStream;
+  ContextSession(): ContextSessionStream;
   close(): void;
 }
 
@@ -647,15 +692,15 @@ export interface RuntimeClient {
 
 export interface BrowserLaunchState {
   runtime: RuntimeClient;
-  stream: BrowserSessionStream;
-  queue: EventQueue<BrowserSessionEvent>;
+  stream: SurfaceSessionStream;
+  queue: EventQueue<SurfaceSessionEvent>;
   sessionId: string;
   launched: BrowserLaunchedPayload;
 }
 
 export interface PageHandle {
-  stream: PageSessionStream;
-  queue: EventQueue<TabSessionEvent>;
+  stream: ContextSessionStream;
+  queue: EventQueue<ContextSessionEvent>;
   closed: boolean;
 }
 

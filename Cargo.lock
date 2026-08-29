@@ -38,6 +38,7 @@ name = "allwright-core"
 version = "0.0.52"
 dependencies = [
  "allwright-plugin-sdk",
+ "allwright-surface-mobile",
  "clap",
  "flate2",
  "libloading",

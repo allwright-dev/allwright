@@ -1,8 +1,10 @@
 package dev.allwright.client;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import org.yaml.snakeyaml.Yaml;
+import dev.allwright.engine.v1.SurfaceSessionCommand;
+import dev.allwright.engine.v1.SurfaceSessionEvent;
+import dev.allwright.engine.v1.ConnectMobileCommand;
+import dev.allwright.engine.v1.MobileConnectedEvent;
+import dev.allwright.engine.v1.MobilePlatform;
 
 public final class AndroidSurface {
     AndroidSurface() {}
@@ -13,33 +15,47 @@ public final class AndroidSurface {
 
     public AndroidDevice connect(MobileAndroidConnectOptions options) {
         MobileAndroidConnectOptions resolved = options == null ? new MobileAndroidConnectOptions() : options;
-        Map<String, Object> request = new LinkedHashMap<>();
-        request.put("command", "connect");
-        request.put("platform", "android");
-        request.put("device", resolved.device());
-        request.put("adb_endpoint", resolved.adbEndpoint());
-        request.put("preserve_app_state", resolved.preserveAppState());
-        request.put("timeout_ms", resolved.timeoutMs());
-        String response = BootstrapSupport.invokePlugin("mobile-android", MobileJsonSupport.toJson(request));
-        return new AndroidDevice(mobileResult("connect", response));
-    }
+        RuntimeSupport.RuntimeClient runtime = Allwright.getRuntime();
+        RuntimeSupport.StreamHandle<SurfaceSessionCommand, SurfaceSessionEvent> stream =
+                new RuntimeSupport.StreamHandle<>(runtime.asyncStub()::surfaceSession);
 
-    static Map<String, Object> mobileResult(String commandName, String response) {
-        Object parsed = new Yaml().load(response);
-        Map<String, Object> envelope = ConfigSupport.mapValue(parsed);
-        if (envelope == null) {
-            throw new AllwrightException("mobile-android plugin " + commandName + " returned no envelope");
+        ConnectMobileCommand.Builder connect = ConnectMobileCommand.newBuilder()
+                .setPlatform(MobilePlatform.MOBILE_PLATFORM_ANDROID)
+                .setPreserveAppState(resolved.preserveAppState());
+        if (resolved.device() != null && !resolved.device().isBlank()) {
+            connect.setDevice(resolved.device());
         }
-        Object ok = envelope.get("ok");
-        if (!(ok instanceof Boolean success) || !success) {
-            throw new AllwrightException(
-                    String.valueOf(envelope.getOrDefault("error", "mobile-android plugin " + commandName + " failed"))
-            );
+        if (resolved.adbEndpoint() != null && !resolved.adbEndpoint().isBlank()) {
+            connect.setAdbEndpoint(resolved.adbEndpoint());
         }
-        Map<String, Object> result = ConfigSupport.mapValue(envelope.get("result"));
-        if (result == null) {
-            throw new AllwrightException("mobile-android plugin " + commandName + " returned no result");
+        if (CommandSupport.hasTimeout(resolved.timeoutMs())) {
+            connect.setRetryOptions(CommandSupport.commandRetryOptions(resolved.timeoutMs()));
         }
-        return result;
+
+        stream.send(SurfaceSessionCommand.newBuilder().setConnectMobile(connect).build());
+
+        while (true) {
+            SurfaceSessionEvent event = stream.recv("receive browser session event while connecting Android device");
+            switch (event.getEventCase()) {
+                case MOBILE_CONNECTED -> {
+                    MobileConnectedEvent connected = event.getMobileConnected();
+                    String sessionId = connected.getDeviceSessionId().isBlank()
+                            ? event.getSessionId()
+                            : connected.getDeviceSessionId();
+                    return new AndroidDevice(
+                            runtime,
+                            stream,
+                            sessionId,
+                            event.getSessionId(),
+                            connected.getInitialAppSessionId()
+                    );
+                }
+                case ERROR -> throw new AllwrightException(
+                        "device session error during Android connect: " + event.getError().getMessage()
+                );
+                default -> {
+                }
+            }
+        }
     }
 }

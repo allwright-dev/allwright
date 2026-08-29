@@ -1,8 +1,8 @@
-use crate::proto::tab_session_command::Command as TabCommand;
-use crate::proto::tab_session_event::Event as TabEvent;
+use crate::proto::context_session_command::Command as ContextCommand;
+use crate::proto::context_session_event::Event as ContextEvent;
 use crate::proto::{
     CountElementsCommand, GetInnerTextCommand, GetTextContentCommand, HighlightElementsCommand,
-    TabSessionCommand, WaitForSelectorCommand,
+    ContextSessionCommand, WaitForSelectorCommand,
 };
 
 use super::command::{command_retry_options, count_result_from_event, highlight_result_from_event};
@@ -34,10 +34,10 @@ impl Tab {
 
         handle
             .command_tx
-            .send(TabSessionCommand {
-                browser_session_id: self.inner.browser_session_id.clone(),
-                tab_session_id: self.inner.session_id.clone(),
-                command: Some(TabCommand::CountElements(CountElementsCommand {
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::CountElements(CountElementsCommand {
                     css_selector: css_selector.clone(),
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
@@ -52,17 +52,17 @@ impl Tab {
                 })?;
 
             match event.event {
-                Some(TabEvent::Attached(_)) => {}
-                Some(TabEvent::ElementCounted(counted)) => {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::ElementCounted(counted)) => {
                     return Ok(count_result_from_event(counted));
                 }
-                Some(TabEvent::Error(error)) => {
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while counting locator {:?}: {}",
                         css_selector, error.message,
                     )));
                 }
-                Some(TabEvent::Closed(_)) => {
+                Some(ContextEvent::Closed(_)) => {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "tab session {} closed while waiting for count result",
@@ -91,10 +91,10 @@ impl Tab {
 
         handle
             .command_tx
-            .send(TabSessionCommand {
-                browser_session_id: self.inner.browser_session_id.clone(),
-                tab_session_id: self.inner.session_id.clone(),
-                command: Some(TabCommand::HighlightElements(HighlightElementsCommand {
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::HighlightElements(HighlightElementsCommand {
                     css_selector: css_selector.clone(),
                     duration_ms: options.duration_ms,
                     retry_options: command_retry_options(options.timeout_ms),
@@ -109,17 +109,17 @@ impl Tab {
             })?;
 
             match event.event {
-                Some(TabEvent::Attached(_)) => {}
-                Some(TabEvent::ElementsHighlighted(highlighted)) => {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::ElementsHighlighted(highlighted)) => {
                     return Ok(highlight_result_from_event(highlighted));
                 }
-                Some(TabEvent::Error(error)) => {
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while highlighting locator {:?}: {}",
                         css_selector, error.message,
                     )));
                 }
-                Some(TabEvent::Closed(_)) => {
+                Some(ContextEvent::Closed(_)) => {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "tab session {} closed while waiting for highlight result",
@@ -186,10 +186,10 @@ impl Tab {
         ensure_tab_open(handle, &self.inner.session_id)?;
         handle
             .command_tx
-            .send(TabSessionCommand {
-                browser_session_id: self.inner.browser_session_id.clone(),
-                tab_session_id: self.inner.session_id.clone(),
-                command: Some(TabCommand::WaitForSelector(WaitForSelectorCommand {
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::WaitForSelector(WaitForSelectorCommand {
                     css_selector: css_selector.clone(),
                     visible: options.visible,
                     retry_options: command_retry_options(options.timeout_ms),
@@ -204,21 +204,21 @@ impl Tab {
                 .await?
                 .ok_or_else(|| Error::new("tab session closed while waiting for selector"))?;
             match event.event {
-                Some(TabEvent::Attached(_)) => {}
-                Some(TabEvent::SelectorWaitSatisfied(waited)) => {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::SelectorWaitSatisfied(waited)) => {
                     return Ok(WaitForSelectorResult {
                         selector: waited.css_selector,
                         visible: waited.visible,
                         note: waited.note,
                     });
                 }
-                Some(TabEvent::Error(error)) => {
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while waiting for locator {:?}: {}",
                         css_selector, error.message,
                     )));
                 }
-                Some(TabEvent::Closed(_)) => {
+                Some(ContextEvent::Closed(_)) => {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "tab session {} closed while waiting for selector result",
@@ -240,21 +240,21 @@ impl Tab {
         let handle = self.ensure_handle(&mut state).await?;
         ensure_tab_open(handle, &self.inner.session_id)?;
         let command = if text_content {
-            TabCommand::GetTextContent(GetTextContentCommand {
+            ContextCommand::GetTextContent(GetTextContentCommand {
                 css_selector,
                 retry_options: command_retry_options(options.timeout_ms),
             })
         } else {
-            TabCommand::GetInnerText(GetInnerTextCommand {
+            ContextCommand::GetInnerText(GetInnerTextCommand {
                 css_selector,
                 retry_options: command_retry_options(options.timeout_ms),
             })
         };
         handle
             .command_tx
-            .send(TabSessionCommand {
-                browser_session_id: self.inner.browser_session_id.clone(),
-                tab_session_id: self.inner.session_id.clone(),
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
                 command: Some(command),
             })
             .await
@@ -265,28 +265,28 @@ impl Tab {
                     Error::new("tab session closed while waiting for text result")
                 })?;
             match event.event {
-                Some(TabEvent::Attached(_)) => {}
-                Some(TabEvent::TextContentResolved(text)) => {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::TextContentResolved(text)) => {
                     return Ok(TextResult {
                         selector: text.css_selector,
                         text: text.text,
                         note: text.note,
                     });
                 }
-                Some(TabEvent::InnerTextResolved(text)) => {
+                Some(ContextEvent::InnerTextResolved(text)) => {
                     return Ok(TextResult {
                         selector: text.css_selector,
                         text: text.text,
                         note: text.note,
                     });
                 }
-                Some(TabEvent::Error(error)) => {
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while reading text: {}",
                         error.message
                     )));
                 }
-                Some(TabEvent::Closed(_)) => {
+                Some(ContextEvent::Closed(_)) => {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "tab session {} closed while waiting for text result",

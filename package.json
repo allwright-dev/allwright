@@ -9,7 +9,6 @@
   "scripts": {
     "build": "bun run build:core && bun run build:vitest",
     "build:core": "bun run --filter @allwright.dev/core build",
-    "build:vitest": "bun run --filter @allwright.dev/vitest build",
-    "example:playground": "bun run --filter @allwright.dev/core example:playground"
+    "build:vitest": "bun run --filter @allwright.dev/vitest build"
   }
 }

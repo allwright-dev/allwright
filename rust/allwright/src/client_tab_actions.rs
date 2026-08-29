@@ -1,8 +1,8 @@
-use crate::proto::tab_session_command::Command as TabCommand;
-use crate::proto::tab_session_event::Event as TabEvent;
+use crate::proto::context_session_command::Command as ContextCommand;
+use crate::proto::context_session_event::Event as ContextEvent;
 use crate::proto::{
     ClickElementCommand, FillElementCommand, FocusElementCommand, HoverElementCommand,
-    PressKeyCommand, TabSessionCommand,
+    PressKeyCommand, ContextSessionCommand,
 };
 
 use super::command::command_retry_options;
@@ -31,10 +31,10 @@ impl Tab {
 
         handle
             .command_tx
-            .send(TabSessionCommand {
-                browser_session_id: self.inner.browser_session_id.clone(),
-                tab_session_id: self.inner.session_id.clone(),
-                command: Some(TabCommand::ClickElement(ClickElementCommand {
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::ClickElement(ClickElementCommand {
                     css_selector: css_selector.clone(),
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
@@ -49,21 +49,21 @@ impl Tab {
                 })?;
 
             match event.event {
-                Some(TabEvent::Attached(_)) => {}
-                Some(TabEvent::ElementClicked(clicked)) => {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::ElementClicked(clicked)) => {
                     return Ok(ClickResult {
                         selector: clicked.css_selector,
                         note: clicked.note,
                         bidi_session_id: clicked.bidi_session_id,
                     });
                 }
-                Some(TabEvent::Error(error)) => {
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while clicking locator {:?}: {}",
                         css_selector, error.message,
                     )));
                 }
-                Some(TabEvent::Closed(_)) => {
+                Some(ContextEvent::Closed(_)) => {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "tab session {} closed while waiting for click result",
@@ -92,10 +92,10 @@ impl Tab {
 
         handle
             .command_tx
-            .send(TabSessionCommand {
-                browser_session_id: self.inner.browser_session_id.clone(),
-                tab_session_id: self.inner.session_id.clone(),
-                command: Some(TabCommand::FocusElement(FocusElementCommand {
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::FocusElement(FocusElementCommand {
                     css_selector: css_selector.clone(),
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
@@ -109,20 +109,20 @@ impl Tab {
                     Error::new("tab session closed while waiting for focus result")
                 })?;
             match event.event {
-                Some(TabEvent::Attached(_)) => {}
-                Some(TabEvent::ElementFocused(focused)) => {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::ElementFocused(focused)) => {
                     return Ok(ElementResult {
                         selector: focused.css_selector,
                         note: focused.note,
                     });
                 }
-                Some(TabEvent::Error(error)) => {
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while focusing locator {:?}: {}",
                         css_selector, error.message,
                     )));
                 }
-                Some(TabEvent::Closed(_)) => {
+                Some(ContextEvent::Closed(_)) => {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "tab session {} closed while waiting for focus result",
@@ -156,10 +156,10 @@ impl Tab {
 
         handle
             .command_tx
-            .send(TabSessionCommand {
-                browser_session_id: self.inner.browser_session_id.clone(),
-                tab_session_id: self.inner.session_id.clone(),
-                command: Some(TabCommand::FillElement(FillElementCommand {
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::FillElement(FillElementCommand {
                     css_selector: css_selector.clone(),
                     value: value.into(),
                     retry_options: command_retry_options(options.timeout_ms),
@@ -173,21 +173,21 @@ impl Tab {
                     Error::new("tab session closed while waiting for fill result")
                 })?;
             match event.event {
-                Some(TabEvent::Attached(_)) => {}
-                Some(TabEvent::ElementFilled(filled)) => {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::ElementFilled(filled)) => {
                     return Ok(FillResult {
                         selector: filled.css_selector,
                         value: filled.value,
                         note: filled.note,
                     });
                 }
-                Some(TabEvent::Error(error)) => {
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while filling locator {:?}: {}",
                         css_selector, error.message,
                     )));
                 }
-                Some(TabEvent::Closed(_)) => {
+                Some(ContextEvent::Closed(_)) => {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "tab session {} closed while waiting for fill result",
@@ -215,10 +215,10 @@ impl Tab {
         ensure_tab_open(handle, &self.inner.session_id)?;
         handle
             .command_tx
-            .send(TabSessionCommand {
-                browser_session_id: self.inner.browser_session_id.clone(),
-                tab_session_id: self.inner.session_id.clone(),
-                command: Some(TabCommand::HoverElement(HoverElementCommand {
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::HoverElement(HoverElementCommand {
                     css_selector: css_selector.clone(),
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
@@ -231,20 +231,20 @@ impl Tab {
                     Error::new("tab session closed while waiting for hover result")
                 })?;
             match event.event {
-                Some(TabEvent::Attached(_)) => {}
-                Some(TabEvent::ElementHovered(hovered)) => {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::ElementHovered(hovered)) => {
                     return Ok(ElementResult {
                         selector: hovered.css_selector,
                         note: hovered.note,
                     });
                 }
-                Some(TabEvent::Error(error)) => {
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while hovering locator {:?}: {}",
                         css_selector, error.message,
                     )));
                 }
-                Some(TabEvent::Closed(_)) => {
+                Some(ContextEvent::Closed(_)) => {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "tab session {} closed while waiting for hover result",
@@ -277,10 +277,10 @@ impl Tab {
         ensure_tab_open(handle, &self.inner.session_id)?;
         handle
             .command_tx
-            .send(TabSessionCommand {
-                browser_session_id: self.inner.browser_session_id.clone(),
-                tab_session_id: self.inner.session_id.clone(),
-                command: Some(TabCommand::PressKey(PressKeyCommand {
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::PressKey(PressKeyCommand {
                     css_selector,
                     key: key.into(),
                     text: options.text,
@@ -295,21 +295,21 @@ impl Tab {
                     Error::new("tab session closed while waiting for press result")
                 })?;
             match event.event {
-                Some(TabEvent::Attached(_)) => {}
-                Some(TabEvent::KeyPressed(pressed)) => {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::KeyPressed(pressed)) => {
                     return Ok(PressResult {
                         selector: pressed.css_selector,
                         key: pressed.key,
                         note: pressed.note,
                     });
                 }
-                Some(TabEvent::Error(error)) => {
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while pressing key: {}",
                         error.message
                     )));
                 }
-                Some(TabEvent::Closed(_)) => {
+                Some(ContextEvent::Closed(_)) => {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "tab session {} closed while waiting for press result",

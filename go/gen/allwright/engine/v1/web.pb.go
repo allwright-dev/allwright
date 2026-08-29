@@ -131,14 +131,14 @@ func (x *LaunchBrowserCommand) GetRetryOptions() *CommandRetryOptions {
 }
 
 type BrowserLaunchedEvent struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	BrowserKind         BrowserKind            `protobuf:"varint,1,opt,name=browser_kind,json=browserKind,proto3,enum=allwright.engine.v1.BrowserKind" json:"browser_kind,omitempty"`
-	Browser             string                 `protobuf:"bytes,2,opt,name=browser,proto3" json:"browser,omitempty"`
-	Note                string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
-	UserDataDir         string                 `protobuf:"bytes,4,opt,name=user_data_dir,json=userDataDir,proto3" json:"user_data_dir,omitempty"`
-	InitialTabSessionId string                 `protobuf:"bytes,5,opt,name=initial_tab_session_id,json=initialTabSessionId,proto3" json:"initial_tab_session_id,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	BrowserKind          BrowserKind            `protobuf:"varint,1,opt,name=browser_kind,json=browserKind,proto3,enum=allwright.engine.v1.BrowserKind" json:"browser_kind,omitempty"`
+	Browser              string                 `protobuf:"bytes,2,opt,name=browser,proto3" json:"browser,omitempty"`
+	Note                 string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	UserDataDir          string                 `protobuf:"bytes,4,opt,name=user_data_dir,json=userDataDir,proto3" json:"user_data_dir,omitempty"`
+	InitialPageSessionId string                 `protobuf:"bytes,5,opt,name=initial_page_session_id,json=initialPageSessionId,proto3" json:"initial_page_session_id,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *BrowserLaunchedEvent) Reset() {
@@ -199,9 +199,9 @@ func (x *BrowserLaunchedEvent) GetUserDataDir() string {
 	return ""
 }
 
-func (x *BrowserLaunchedEvent) GetInitialTabSessionId() string {
+func (x *BrowserLaunchedEvent) GetInitialPageSessionId() string {
 	if x != nil {
-		return x.InitialTabSessionId
+		return x.InitialPageSessionId
 	}
 	return ""
 }
@@ -259,14 +259,14 @@ func (x *LaunchChromeCommand) GetRetryOptions() *CommandRetryOptions {
 }
 
 type ChromeLaunchedEvent struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	Browser             string                 `protobuf:"bytes,1,opt,name=browser,proto3" json:"browser,omitempty"`
-	Note                string                 `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`
-	CdpWebsocketUrl     string                 `protobuf:"bytes,3,opt,name=cdp_websocket_url,json=cdpWebsocketUrl,proto3" json:"cdp_websocket_url,omitempty"`
-	UserDataDir         string                 `protobuf:"bytes,4,opt,name=user_data_dir,json=userDataDir,proto3" json:"user_data_dir,omitempty"`
-	InitialTabSessionId string                 `protobuf:"bytes,5,opt,name=initial_tab_session_id,json=initialTabSessionId,proto3" json:"initial_tab_session_id,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Browser              string                 `protobuf:"bytes,1,opt,name=browser,proto3" json:"browser,omitempty"`
+	Note                 string                 `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`
+	CdpWebsocketUrl      string                 `protobuf:"bytes,3,opt,name=cdp_websocket_url,json=cdpWebsocketUrl,proto3" json:"cdp_websocket_url,omitempty"`
+	UserDataDir          string                 `protobuf:"bytes,4,opt,name=user_data_dir,json=userDataDir,proto3" json:"user_data_dir,omitempty"`
+	InitialPageSessionId string                 `protobuf:"bytes,5,opt,name=initial_page_session_id,json=initialPageSessionId,proto3" json:"initial_page_session_id,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *ChromeLaunchedEvent) Reset() {
@@ -327,14 +327,14 @@ func (x *ChromeLaunchedEvent) GetUserDataDir() string {
 	return ""
 }
 
-func (x *ChromeLaunchedEvent) GetInitialTabSessionId() string {
+func (x *ChromeLaunchedEvent) GetInitialPageSessionId() string {
 	if x != nil {
-		return x.InitialTabSessionId
+		return x.InitialPageSessionId
 	}
 	return ""
 }
 
-type NavigateTabCommand struct {
+type NavigatePageCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
 	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
@@ -342,20 +342,20 @@ type NavigateTabCommand struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *NavigateTabCommand) Reset() {
-	*x = NavigateTabCommand{}
+func (x *NavigatePageCommand) Reset() {
+	*x = NavigatePageCommand{}
 	mi := &file_surfaces_web_v1_web_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *NavigateTabCommand) String() string {
+func (x *NavigatePageCommand) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*NavigateTabCommand) ProtoMessage() {}
+func (*NavigatePageCommand) ProtoMessage() {}
 
-func (x *NavigateTabCommand) ProtoReflect() protoreflect.Message {
+func (x *NavigatePageCommand) ProtoReflect() protoreflect.Message {
 	mi := &file_surfaces_web_v1_web_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -367,19 +367,19 @@ func (x *NavigateTabCommand) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use NavigateTabCommand.ProtoReflect.Descriptor instead.
-func (*NavigateTabCommand) Descriptor() ([]byte, []int) {
+// Deprecated: Use NavigatePageCommand.ProtoReflect.Descriptor instead.
+func (*NavigatePageCommand) Descriptor() ([]byte, []int) {
 	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *NavigateTabCommand) GetUrl() string {
+func (x *NavigatePageCommand) GetUrl() string {
 	if x != nil {
 		return x.Url
 	}
 	return ""
 }
 
-func (x *NavigateTabCommand) GetRetryOptions() *CommandRetryOptions {
+func (x *NavigatePageCommand) GetRetryOptions() *CommandRetryOptions {
 	if x != nil {
 		return x.RetryOptions
 	}
@@ -946,7 +946,7 @@ func (x *WaitForSelectorCommand) GetRetryOptions() *CommandRetryOptions {
 	return nil
 }
 
-type TabNavigatedEvent struct {
+type PageNavigatedEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
 	Note          string                 `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`
@@ -954,20 +954,20 @@ type TabNavigatedEvent struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TabNavigatedEvent) Reset() {
-	*x = TabNavigatedEvent{}
+func (x *PageNavigatedEvent) Reset() {
+	*x = PageNavigatedEvent{}
 	mi := &file_surfaces_web_v1_web_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TabNavigatedEvent) String() string {
+func (x *PageNavigatedEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TabNavigatedEvent) ProtoMessage() {}
+func (*PageNavigatedEvent) ProtoMessage() {}
 
-func (x *TabNavigatedEvent) ProtoReflect() protoreflect.Message {
+func (x *PageNavigatedEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_surfaces_web_v1_web_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -979,19 +979,19 @@ func (x *TabNavigatedEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TabNavigatedEvent.ProtoReflect.Descriptor instead.
-func (*TabNavigatedEvent) Descriptor() ([]byte, []int) {
+// Deprecated: Use PageNavigatedEvent.ProtoReflect.Descriptor instead.
+func (*PageNavigatedEvent) Descriptor() ([]byte, []int) {
 	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{15}
 }
 
-func (x *TabNavigatedEvent) GetUrl() string {
+func (x *PageNavigatedEvent) GetUrl() string {
 	if x != nil {
 		return x.Url
 	}
 	return ""
 }
 
-func (x *TabNavigatedEvent) GetNote() string {
+func (x *PageNavigatedEvent) GetNote() string {
 	if x != nil {
 		return x.Note
 	}
@@ -1668,25 +1668,25 @@ const file_surfaces_web_v1_web_proto_rawDesc = "" +
 	"\x0ebrowser_binary\x18\x02 \x01(\tH\x00R\rbrowserBinary\x88\x01\x01\x12R\n" +
 	"\rretry_options\x18\x03 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x01R\fretryOptions\x88\x01\x01B\x11\n" +
 	"\x0f_browser_binaryB\x10\n" +
-	"\x0e_retry_options\"\xe2\x01\n" +
+	"\x0e_retry_options\"\xe4\x01\n" +
 	"\x14BrowserLaunchedEvent\x12C\n" +
 	"\fbrowser_kind\x18\x01 \x01(\x0e2 .allwright.engine.v1.BrowserKindR\vbrowserKind\x12\x18\n" +
 	"\abrowser\x18\x02 \x01(\tR\abrowser\x12\x12\n" +
 	"\x04note\x18\x03 \x01(\tR\x04note\x12\"\n" +
-	"\ruser_data_dir\x18\x04 \x01(\tR\vuserDataDir\x123\n" +
-	"\x16initial_tab_session_id\x18\x05 \x01(\tR\x13initialTabSessionId\"\xb7\x01\n" +
+	"\ruser_data_dir\x18\x04 \x01(\tR\vuserDataDir\x125\n" +
+	"\x17initial_page_session_id\x18\x05 \x01(\tR\x14initialPageSessionId\"\xb7\x01\n" +
 	"\x13LaunchChromeCommand\x12(\n" +
 	"\rchrome_binary\x18\x01 \x01(\tH\x00R\fchromeBinary\x88\x01\x01\x12R\n" +
 	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x01R\fretryOptions\x88\x01\x01B\x10\n" +
 	"\x0e_chrome_binaryB\x10\n" +
-	"\x0e_retry_options\"\xc8\x01\n" +
+	"\x0e_retry_options\"\xca\x01\n" +
 	"\x13ChromeLaunchedEvent\x12\x18\n" +
 	"\abrowser\x18\x01 \x01(\tR\abrowser\x12\x12\n" +
 	"\x04note\x18\x02 \x01(\tR\x04note\x12*\n" +
 	"\x11cdp_websocket_url\x18\x03 \x01(\tR\x0fcdpWebsocketUrl\x12\"\n" +
-	"\ruser_data_dir\x18\x04 \x01(\tR\vuserDataDir\x123\n" +
-	"\x16initial_tab_session_id\x18\x05 \x01(\tR\x13initialTabSessionId\"\x8c\x01\n" +
-	"\x12NavigateTabCommand\x12\x10\n" +
+	"\ruser_data_dir\x18\x04 \x01(\tR\vuserDataDir\x125\n" +
+	"\x17initial_page_session_id\x18\x05 \x01(\tR\x14initialPageSessionId\"\x8d\x01\n" +
+	"\x13NavigatePageCommand\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12R\n" +
 	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
 	"\x0e_retry_options\"\x9e\x01\n" +
@@ -1739,8 +1739,8 @@ const file_surfaces_web_v1_web_proto_rawDesc = "" +
 	"\rretry_options\x18\x03 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x01R\fretryOptions\x88\x01\x01B\n" +
 	"\n" +
 	"\b_visibleB\x10\n" +
-	"\x0e_retry_options\"9\n" +
-	"\x11TabNavigatedEvent\x12\x10\n" +
+	"\x0e_retry_options\":\n" +
+	"\x12PageNavigatedEvent\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x12\n" +
 	"\x04note\x18\x02 \x01(\tR\x04note\"\xd7\x01\n" +
 	"\x1aChromiumBidiInjectionEvent\x12\x12\n" +
@@ -1790,7 +1790,8 @@ const file_surfaces_web_v1_web_proto_rawDesc = "" +
 	"\vBrowserKind\x12\x1c\n" +
 	"\x18BROWSER_KIND_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15BROWSER_KIND_CHROMIUM\x10\x01\x12\x18\n" +
-	"\x14BROWSER_KIND_FIREFOX\x10\x02B0Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
+	"\x14BROWSER_KIND_FIREFOX\x10\x02BK\n" +
+	"\x17dev.allwright.engine.v1P\x01Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
 
 var (
 	file_surfaces_web_v1_web_proto_rawDescOnce sync.Once
@@ -1812,7 +1813,7 @@ var file_surfaces_web_v1_web_proto_goTypes = []any{
 	(*BrowserLaunchedEvent)(nil),       // 2: allwright.engine.v1.BrowserLaunchedEvent
 	(*LaunchChromeCommand)(nil),        // 3: allwright.engine.v1.LaunchChromeCommand
 	(*ChromeLaunchedEvent)(nil),        // 4: allwright.engine.v1.ChromeLaunchedEvent
-	(*NavigateTabCommand)(nil),         // 5: allwright.engine.v1.NavigateTabCommand
+	(*NavigatePageCommand)(nil),        // 5: allwright.engine.v1.NavigatePageCommand
 	(*ClickElementCommand)(nil),        // 6: allwright.engine.v1.ClickElementCommand
 	(*CountElementsCommand)(nil),       // 7: allwright.engine.v1.CountElementsCommand
 	(*HighlightElementsCommand)(nil),   // 8: allwright.engine.v1.HighlightElementsCommand
@@ -1823,7 +1824,7 @@ var file_surfaces_web_v1_web_proto_goTypes = []any{
 	(*GetTextContentCommand)(nil),      // 13: allwright.engine.v1.GetTextContentCommand
 	(*GetInnerTextCommand)(nil),        // 14: allwright.engine.v1.GetInnerTextCommand
 	(*WaitForSelectorCommand)(nil),     // 15: allwright.engine.v1.WaitForSelectorCommand
-	(*TabNavigatedEvent)(nil),          // 16: allwright.engine.v1.TabNavigatedEvent
+	(*PageNavigatedEvent)(nil),         // 16: allwright.engine.v1.PageNavigatedEvent
 	(*ChromiumBidiInjectionEvent)(nil), // 17: allwright.engine.v1.ChromiumBidiInjectionEvent
 	(*ElementClickedEvent)(nil),        // 18: allwright.engine.v1.ElementClickedEvent
 	(*ElementCountedEvent)(nil),        // 19: allwright.engine.v1.ElementCountedEvent
@@ -1842,7 +1843,7 @@ var file_surfaces_web_v1_web_proto_depIdxs = []int32{
 	28, // 1: allwright.engine.v1.LaunchBrowserCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
 	0,  // 2: allwright.engine.v1.BrowserLaunchedEvent.browser_kind:type_name -> allwright.engine.v1.BrowserKind
 	28, // 3: allwright.engine.v1.LaunchChromeCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	28, // 4: allwright.engine.v1.NavigateTabCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	28, // 4: allwright.engine.v1.NavigatePageCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
 	28, // 5: allwright.engine.v1.ClickElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
 	28, // 6: allwright.engine.v1.CountElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
 	28, // 7: allwright.engine.v1.HighlightElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions

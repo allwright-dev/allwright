@@ -1,0 +1,12 @@
+./bootstrap.go
+./browser.go
+./command_options.go
+./config.go
+./launch.go
+./locator.go
+./mobile.go
+./page.go
+./page_session.go
+./runtime.go
+./selectors.go
+./types.go

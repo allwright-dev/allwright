@@ -8,7 +8,6 @@ import shutil
 import socket
 import subprocess
 import tarfile
-import tempfile
 import threading
 import time
 import urllib.request
@@ -154,74 +153,6 @@ def install_cli() -> Path:
     return cli_path
 
 
-def ensure_plugins_installed(plugin_ids: list[str]) -> None:
-    expected_version = expected_runtime_version()
-    cli_path = ensure_cli_available(expected_version)
-    ensure_plugins_installed_with_cli(cli_path, expected_version, plugin_ids)
-
-
-def invoke_plugin(plugin_id: str, request: object) -> dict[str, object]:
-    expected_version = expected_runtime_version()
-    cli_path = ensure_cli_available(expected_version)
-    completed = subprocess.run(
-        [str(cli_path), "plugin", "invoke", plugin_id, "--request-json", json.dumps(request)],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        check=False,
-    )
-    if completed.returncode != 0:
-        details = "\n".join(
-            value.strip()
-            for value in (completed.stdout, completed.stderr)
-            if value and value.strip()
-        )
-        raise AllwrightError(
-            details or f"allwright {plugin_id} plugin invocation failed"
-        )
-    try:
-        payload = json.loads(completed.stdout)
-    except json.JSONDecodeError as exc:
-        raise AllwrightError(
-            f"failed to decode allwright {plugin_id} plugin response: {exc}"
-        ) from exc
-    if not isinstance(payload, dict):
-        raise AllwrightError(
-            f"allwright {plugin_id} plugin response must be a JSON object"
-        )
-    return payload
-
-
-def ensure_plugins_installed_with_cli(
-    cli_path: Path,
-    expected_version: str,
-    plugin_ids: list[str],
-) -> None:
-    for plugin_id in dict.fromkeys(plugin_id.strip() for plugin_id in plugin_ids if plugin_id.strip()):
-        plugin_path = allwright_home() / "plugins" / plugin_id / "lib" / plugin_library_filename(plugin_id)
-        if plugin_path.is_file() and installed_plugin_version(plugin_id) == expected_version:
-            continue
-
-        completed = subprocess.run(
-            [str(cli_path), "plugin", "install", plugin_id, "--version", expected_version],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
-        if completed.returncode != 0 or not plugin_path.is_file():
-            raise AllwrightError(
-                f"allwright attempted to install the `{plugin_id}` plugin automatically, "
-                "but the install did not complete successfully"
-            )
-        if installed_plugin_version(plugin_id) != expected_version:
-            raise AllwrightError(
-                f"allwright attempted to install the `{plugin_id}` plugin automatically, "
-                f"but version {expected_version} is still not active"
-            )
-
-
 def resolve_release_tag() -> str:
     version = os.getenv(ALLWRIGHT_VERSION_ENV_VAR, "").strip() or DEFAULT_RELEASE_VERSION
     if version == "latest":
@@ -360,21 +291,6 @@ def is_local_server_addr(server_addr: str) -> bool:
     return host in {"127.0.0.1", "localhost", "::1"}
 
 
-def installed_plugin_version(plugin_id: str) -> str | None:
-    manifest = allwright_home() / "plugins.txt"
-    if not manifest.is_file():
-        return None
-    for line in manifest.read_text().splitlines():
-        trimmed = line.strip()
-        if not trimmed or trimmed.startswith("#"):
-            continue
-        parts = trimmed.split("\t", 2)
-        if len(parts) < 3 or parts[0] != plugin_id:
-            continue
-        return normalize_release_version(parts[2])
-    return None
-
-
 def allocate_managed_server_addr(server_addr: str) -> str:
     host = local_binding_host(server_addr)
     with socket.create_server((host, 0), family=socket.AF_INET6 if ":" in host else socket.AF_INET) as listener:
@@ -428,20 +344,3 @@ def cli_version_matches(cli_path: Path, expected_version: str) -> bool:
 
 def cli_filename() -> str:
     return "allwright.exe" if os.name == "nt" else "allwright"
-
-
-def plugin_library_filename(plugin_id: str) -> str:
-    stem = plugin_library_stem(plugin_id)
-    if os.name == "nt":
-        return f"{stem}.dll"
-    if os.uname().sysname == "Darwin":
-        return f"lib{stem}.dylib"
-    return f"lib{stem}.so"
-
-
-def plugin_library_stem(plugin_id: str) -> str:
-    if plugin_id == "web":
-        return "allwright_surface_web"
-    if plugin_id == "mobile-android":
-        return "allwright_surface_mobile_android"
-    raise AllwrightError(f"automatic install is not supported for allwright plugin `{plugin_id}`")

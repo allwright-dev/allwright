@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
+
+	enginev1 "allwright.dev/gen/allwright/engine/v1"
 )
 
 type MobileAndroidConnectOptions struct {
@@ -42,19 +45,27 @@ var uiAutomatorSelectorKeys = map[string]struct{}{
 	"index": {}, "instance": {},
 }
 
-type AndroidPage struct {
-	browserSession map[string]any
-	pageSession    map[string]any
+type AndroidApp struct {
+	runtime          *runtimeClient
+	stream           tabSessionStream
+	surfaceSessionID string
+	sessionID        string
+	attached         bool
+	closed           bool
 }
 
 type AndroidLocator struct {
-	page     *AndroidPage
+	page     *AndroidApp
 	selector string
 }
 
 type AndroidDevice struct {
-	connectInfo map[string]any
-	page        *AndroidPage
+	runtime          *runtimeClient
+	stream           browserSessionStream
+	sessionID        string
+	surfaceSessionID string
+	app              *AndroidApp
+	closed           bool
 }
 
 type AndroidSurface struct{}
@@ -67,14 +78,14 @@ var Mobile = mobileNamespace{
 	Android: AndroidSurface{},
 }
 
-func (p *AndroidPage) SessionID() string {
+func (p *AndroidApp) SessionID() string {
 	if p == nil {
 		return ""
 	}
-	return stringValueFromMap(p.pageSession, "page_id")
+	return p.sessionID
 }
 
-func (p *AndroidPage) Locator(selector string) *AndroidLocator {
+func (p *AndroidApp) Locator(selector string) *AndroidLocator {
 	if p == nil {
 		return nil
 	}
@@ -84,155 +95,238 @@ func (p *AndroidPage) Locator(selector string) *AndroidLocator {
 	}
 }
 
-func (p *AndroidPage) Click(ctx context.Context, selector string, options ...CommandOptions) (*ClickResult, error) {
-	if p == nil {
-		return nil, fmt.Errorf("android page is nil")
+func (p *AndroidApp) ensureStream(ctx context.Context) error {
+	if p.stream != nil {
+		return nil
 	}
-	request, err := json.Marshal(map[string]any{
-		"command":         "click_element",
-		"browser_session": p.browserSession,
-		"page_session":    p.pageSession,
-		"selector":        normalizeMobileSelectorForTransport(selector),
-		"timeout_ms":      commandOptionsTimeoutMs(firstCommandOptions(options)),
-	})
+	if p.runtime == nil {
+		return fmt.Errorf("android app runtime is nil")
+	}
+	stream, err := p.runtime.engine.ContextSession(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("encode mobile click request: %w", err)
+		return fmt.Errorf("open Android app session stream: %w", err)
 	}
-	output, err := invokePlugin(ctx, "mobile-android", string(request))
-	if err != nil {
-		return nil, err
-	}
-	result, err := decodeMobileResult(output, "click")
-	if err != nil {
-		return nil, err
-	}
-	return &ClickResult{
-		Selector:      stringValueFromMap(result, "selector"),
-		Note:          stringValueFromMap(result, "note"),
-		BidiSessionID: stringValueFromMap(result, "session_id"),
-	}, nil
+	p.stream = stream
+	return nil
 }
 
-func (p *AndroidPage) Fill(ctx context.Context, selector string, value string, options ...CommandOptions) (*FillResult, error) {
+func (p *AndroidApp) Click(ctx context.Context, selector string, options ...CommandOptions) (*ClickResult, error) {
 	if p == nil {
-		return nil, fmt.Errorf("android page is nil")
+		return nil, fmt.Errorf("android app is nil")
 	}
-	request, err := json.Marshal(map[string]any{
-		"command":         "fill_element",
-		"browser_session": p.browserSession,
-		"page_session":    p.pageSession,
-		"selector":        normalizeMobileSelectorForTransport(selector),
-		"value":           value,
-		"timeout_ms":      commandOptionsTimeoutMs(firstCommandOptions(options)),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("encode mobile fill request: %w", err)
-	}
-	output, err := invokePlugin(ctx, "mobile-android", string(request))
-	if err != nil {
+	if err := p.ensureStream(ctx); err != nil {
 		return nil, err
 	}
-	result, err := decodeMobileResult(output, "fill")
-	if err != nil {
+	if p.closed {
+		return nil, fmt.Errorf("android tab session %s is closed", p.sessionID)
+	}
+
+	commandOptions := firstCommandOptions(options)
+	selector = normalizeMobileSelectorForTransport(selector)
+	if err := p.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: p.surfaceSessionID,
+		ContextSessionId: p.sessionID,
+		Command: &enginev1.ContextSessionCommand_ClickElement{
+			ClickElement: &enginev1.ClickElementCommand{
+				CssSelector:  selector,
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send Android ClickElementCommand: %w", err)
+	}
+
+	for {
+		event, err := p.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive Android tab session event during click: %w", err)
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.ContextSessionEvent_Attached:
+			p.attached = true
+			_ = payload
+		case *enginev1.ContextSessionEvent_ElementClicked:
+			return &ClickResult{
+				Selector:      payload.ElementClicked.GetCssSelector(),
+				Note:          payload.ElementClicked.GetNote(),
+				BidiSessionID: payload.ElementClicked.GetBidiSessionId(),
+			}, nil
+		case *enginev1.ContextSessionEvent_Closed:
+			p.closed = true
+			return nil, fmt.Errorf("android app session %s closed while clicking", p.sessionID)
+		case *enginev1.ContextSessionEvent_Error:
+			return nil, fmt.Errorf("android app session error while clicking: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func (p *AndroidApp) Fill(ctx context.Context, selector string, value string, options ...CommandOptions) (*FillResult, error) {
+	if p == nil {
+		return nil, fmt.Errorf("android app is nil")
+	}
+	if err := p.ensureStream(ctx); err != nil {
 		return nil, err
 	}
-	return &FillResult{
-		Selector: stringValueFromMap(result, "selector"),
-		Value:    stringValueFromMap(result, "value"),
-		Note:     stringValueFromMap(result, "note"),
-	}, nil
+	if p.closed {
+		return nil, fmt.Errorf("android tab session %s is closed", p.sessionID)
+	}
+
+	commandOptions := firstCommandOptions(options)
+	selector = normalizeMobileSelectorForTransport(selector)
+	if err := p.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: p.surfaceSessionID,
+		ContextSessionId: p.sessionID,
+		Command: &enginev1.ContextSessionCommand_FillElement{
+			FillElement: &enginev1.FillElementCommand{
+				CssSelector:  selector,
+				Value:        value,
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send Android FillElementCommand: %w", err)
+	}
+
+	for {
+		event, err := p.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive Android tab session event during fill: %w", err)
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.ContextSessionEvent_Attached:
+			p.attached = true
+			_ = payload
+		case *enginev1.ContextSessionEvent_ElementFilled:
+			return &FillResult{
+				Selector: payload.ElementFilled.GetCssSelector(),
+				Value:    payload.ElementFilled.GetValue(),
+				Note:     payload.ElementFilled.GetNote(),
+			}, nil
+		case *enginev1.ContextSessionEvent_Closed:
+			p.closed = true
+			return nil, fmt.Errorf("android app session %s closed while filling", p.sessionID)
+		case *enginev1.ContextSessionEvent_Error:
+			return nil, fmt.Errorf("android app session error while filling: %s", payload.Error.GetMessage())
+		}
+	}
 }
 
 func (d *AndroidDevice) SessionID() string {
 	if d == nil {
 		return ""
 	}
-	browserSession, _ := d.connectInfo["browser_session"].(map[string]any)
-	automation, _ := browserSession["automation"].(map[string]any)
-	return stringValueFromMap(automation, "session_id")
+	return d.sessionID
 }
 
-func (d *AndroidDevice) Page() *AndroidPage {
+func (d *AndroidDevice) App() *AndroidApp {
 	if d == nil {
 		return nil
 	}
-	return d.page
+	return d.app
 }
 
-func (d *AndroidDevice) InitialPage() *AndroidPage {
-	return d.Page()
+func (d *AndroidDevice) InitialApp() *AndroidApp {
+	return d.App()
 }
 
-func (d *AndroidDevice) Launch(ctx context.Context, options MobileAndroidLaunchOptions) (*AndroidPage, error) {
+func (d *AndroidDevice) Launch(ctx context.Context, options MobileAndroidLaunchOptions) (*AndroidApp, error) {
 	if d == nil {
 		return nil, fmt.Errorf("android device is nil")
 	}
-	request, err := json.Marshal(map[string]any{
-		"command":         "launch_app",
-		"browser_session": d.connectInfo["browser_session"],
-		"options": map[string]any{
-			"apk_path":           optionalJSONValue(options.APKPath),
-			"app_id":             optionalJSONValue(options.AppID),
-			"launch_activity":    optionalJSONValue(options.LaunchActivity),
-			"stop_before_launch": options.StopBeforeLaunch,
-			"timeout_ms":         optionalUint32JSONValue(options.Timeout),
+	if d.closed {
+		return nil, fmt.Errorf("android device session %s is closed", d.sessionID)
+	}
+
+	if err := d.stream.Send(&enginev1.SurfaceSessionCommand{
+		Command: &enginev1.SurfaceSessionCommand_LaunchApp{
+			LaunchApp: &enginev1.LaunchAppCommand{
+				ApkPath:          optionalString(options.APKPath),
+				AppId:            optionalString(options.AppID),
+				LaunchActivity:   optionalString(options.LaunchActivity),
+				StopBeforeLaunch: options.StopBeforeLaunch,
+				RetryOptions:     retryOptionsProto(durationFromOptionalUint32(options.Timeout)),
+			},
 		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("encode mobile launch request: %w", err)
+	}); err != nil {
+		return nil, fmt.Errorf("send LaunchAppCommand: %w", err)
 	}
-	output, err := invokePlugin(ctx, "mobile-android", string(request))
-	if err != nil {
-		return nil, err
+
+	for {
+		event, err := d.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive surface session event while launching Android app: %w", err)
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.SurfaceSessionEvent_AppLaunched:
+			d.app = &AndroidApp{
+				runtime:          d.runtime,
+				surfaceSessionID: d.surfaceSessionID,
+				sessionID:        payload.AppLaunched.GetAppSessionId(),
+			}
+			return d.app, nil
+		case *enginev1.SurfaceSessionEvent_Closed:
+			d.closed = true
+			return nil, fmt.Errorf("android device session %s closed while launching app", d.sessionID)
+		case *enginev1.SurfaceSessionEvent_Error:
+			return nil, fmt.Errorf("android device session error while launching app: %s", payload.Error.GetMessage())
+		}
 	}
-	result, err := decodeMobileResult(output, "launch")
-	if err != nil {
-		return nil, err
-	}
-	d.page = newAndroidPage(
-		mapValueFromMap(d.connectInfo, "browser_session"),
-		mapValueFromMap(result, "page_session"),
-	)
-	return d.page, nil
 }
 
 func (AndroidSurface) Connect(ctx context.Context, options MobileAndroidConnectOptions) (*AndroidDevice, error) {
-	request, err := json.Marshal(map[string]any{
-		"command":            "connect",
-		"platform":           "android",
-		"device":             optionalJSONValue(options.Device),
-		"adb_endpoint":       optionalJSONValue(options.AdbEndpoint),
-		"preserve_app_state": options.PreserveAppState,
-		"timeout_ms":         optionalUint32JSONValue(options.Timeout),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("encode mobile connect request: %w", err)
-	}
-	output, err := invokePlugin(ctx, "mobile-android", string(request))
+	runtime, err := getRuntime(ctx)
 	if err != nil {
 		return nil, err
 	}
-	result, err := decodeMobileResult(output, "connect")
+
+	stream, err := runtime.engine.SurfaceSession(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open Android surface session stream: %w", err)
 	}
-	return &AndroidDevice{
-		connectInfo: result,
-		page: newAndroidPage(
-			mapValueFromMap(result, "browser_session"),
-			mapValueFromMap(mapValueFromMap(result, "initial_page"), "page_session"),
-		),
-	}, nil
+
+	if err := stream.Send(&enginev1.SurfaceSessionCommand{
+		Command: &enginev1.SurfaceSessionCommand_ConnectMobile{
+			ConnectMobile: &enginev1.ConnectMobileCommand{
+				Platform:         enginev1.MobilePlatform_MOBILE_PLATFORM_ANDROID,
+				Device:           optionalString(options.Device),
+				AdbEndpoint:      optionalString(options.AdbEndpoint),
+				PreserveAppState: options.PreserveAppState,
+				RetryOptions:     retryOptionsProto(durationFromOptionalUint32(options.Timeout)),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send ConnectMobileCommand: %w", err)
+	}
+
+	for {
+		event, err := stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive browser session event during Android connect: %w", err)
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.SurfaceSessionEvent_MobileConnected:
+			sessionID := payload.MobileConnected.GetDeviceSessionId()
+			if sessionID == "" {
+				sessionID = event.GetSessionId()
+			}
+			return &AndroidDevice{
+				runtime:          runtime,
+				stream:           stream,
+				sessionID:        sessionID,
+				surfaceSessionID: event.GetSessionId(),
+				app: &AndroidApp{
+					runtime:          runtime,
+					surfaceSessionID: event.GetSessionId(),
+					sessionID:        payload.MobileConnected.GetInitialAppSessionId(),
+				},
+			}, nil
+		case *enginev1.SurfaceSessionEvent_Error:
+			return nil, fmt.Errorf("device session error during Android connect: %s", payload.Error.GetMessage())
+		}
+	}
 }
 
-func newAndroidPage(browserSession map[string]any, pageSession map[string]any) *AndroidPage {
-	return &AndroidPage{
-		browserSession: browserSession,
-		pageSession:    pageSession,
-	}
-}
-
-func (l *AndroidLocator) Page() *AndroidPage {
+func (l *AndroidLocator) App() *AndroidApp {
 	if l == nil {
 		return nil
 	}
@@ -388,57 +482,9 @@ func chainMobileSelectorForTransport(parent string, child string) string {
 	return parentSelector + " " + childSelector
 }
 
-func decodeMobileResult(payload []byte, commandName string) (map[string]any, error) {
-	var envelope struct {
-		OK     bool           `json:"ok"`
-		Result map[string]any `json:"result"`
-		Error  string         `json:"error"`
-	}
-	if err := json.Unmarshal(payload, &envelope); err != nil {
-		return nil, fmt.Errorf("decode mobile plugin %s response: %w", commandName, err)
-	}
-	if !envelope.OK {
-		if envelope.Error == "" {
-			return nil, fmt.Errorf("mobile-android plugin %s failed", commandName)
-		}
-		return nil, fmt.Errorf("%s", envelope.Error)
-	}
-	if envelope.Result == nil {
-		return nil, fmt.Errorf("mobile-android plugin %s returned no result", commandName)
-	}
-	return envelope.Result, nil
-}
-
-func commandOptionsTimeoutMs(options CommandOptions) any {
-	if options.Timeout <= 0 {
-		return nil
-	}
-	return uint32(options.Timeout.Milliseconds())
-}
-
-func optionalJSONValue(value string) any {
-	if value == "" {
-		return nil
-	}
-	return value
-}
-
-func optionalUint32JSONValue(value uint32) any {
+func durationFromOptionalUint32(value uint32) time.Duration {
 	if value == 0 {
-		return nil
+		return 0
 	}
-	return value
-}
-
-func mapValueFromMap(value map[string]any, key string) map[string]any {
-	child, _ := value[key].(map[string]any)
-	if child == nil {
-		return map[string]any{}
-	}
-	return child
-}
-
-func stringValueFromMap(value map[string]any, key string) string {
-	text, _ := value[key].(string)
-	return text
+	return time.Duration(value) * time.Millisecond
 }

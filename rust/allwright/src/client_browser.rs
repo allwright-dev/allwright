@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use crate::proto::browser_session_command::Command as BrowserCommand;
-use crate::proto::browser_session_event::Event as BrowserEvent;
+use crate::proto::surface_session_command::Command as SurfaceCommand;
+use crate::proto::surface_session_event::Event as SurfaceEvent;
 use crate::proto::{
-    BrowserSessionCommand, CloseBrowserSessionCommand, OpenTabCommand, SessionPingCommand,
+    CloseSurfaceSessionCommand, OpenContextCommand, SessionPingCommand, SurfaceSessionCommand,
 };
 use tokio::sync::Mutex as AsyncMutex;
 
@@ -59,13 +59,13 @@ impl Browser {
 
         state
             .command_tx
-            .send(BrowserSessionCommand {
-                command: Some(BrowserCommand::OpenTab(OpenTabCommand {
+            .send(SurfaceSessionCommand {
+                command: Some(SurfaceCommand::OpenContext(OpenContextCommand {
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
             })
             .await
-            .map_err(|_| Error::new("failed to send OpenTabCommand to browser session"))?;
+            .map_err(|_| Error::new("failed to send OpenContextCommand to browser session"))?;
 
         loop {
             let event =
@@ -74,17 +74,17 @@ impl Browser {
                 })?;
 
             match event.event {
-                Some(BrowserEvent::TabOpened(opened)) => {
+                Some(SurfaceEvent::ContextOpened(opened)) => {
                     return Ok(Tab {
                         inner: Arc::new(TabInner {
                             runtime: Arc::clone(&self.inner.runtime),
-                            browser_session_id: self.inner.session_id.clone(),
-                            session_id: opened.tab_session_id,
+                            surface_session_id: self.inner.session_id.clone(),
+                            session_id: opened.context_session_id,
                             state: AsyncMutex::new(TabState::default()),
                         }),
                     });
                 }
-                Some(BrowserEvent::Error(error)) => {
+                Some(SurfaceEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "browser session error while opening tab: {}",
                         error.message
@@ -101,8 +101,8 @@ impl Browser {
 
         state
             .command_tx
-            .send(BrowserSessionCommand {
-                command: Some(BrowserCommand::Ping(SessionPingCommand {
+            .send(SurfaceSessionCommand {
+                command: Some(SurfaceCommand::Ping(SessionPingCommand {
                     message: message.into(),
                 })),
             })
@@ -117,8 +117,8 @@ impl Browser {
                 .ok_or_else(|| Error::new("browser session closed while waiting for pong"))?;
 
             match event.event {
-                Some(BrowserEvent::Pong(pong)) => return Ok(pong.message),
-                Some(BrowserEvent::Error(error)) => {
+                Some(SurfaceEvent::Pong(pong)) => return Ok(pong.message),
+                Some(SurfaceEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "browser session error while pinging: {}",
                         error.message
@@ -137,11 +137,11 @@ impl Browser {
 
         state
             .command_tx
-            .send(BrowserSessionCommand {
-                command: Some(BrowserCommand::Close(CloseBrowserSessionCommand {})),
+            .send(SurfaceSessionCommand {
+                command: Some(SurfaceCommand::Close(CloseSurfaceSessionCommand {})),
             })
             .await
-            .map_err(|_| Error::new("failed to send CloseBrowserSessionCommand"))?;
+            .map_err(|_| Error::new("failed to send CloseSurfaceSessionCommand"))?;
 
         loop {
             let event =
@@ -150,11 +150,11 @@ impl Browser {
                 })?;
 
             match event.event {
-                Some(BrowserEvent::Closed(_)) => {
+                Some(SurfaceEvent::Closed(_)) => {
                     state.closed = true;
                     return Ok(());
                 }
-                Some(BrowserEvent::Error(error)) => {
+                Some(SurfaceEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "browser session error while closing: {}",
                         error.message

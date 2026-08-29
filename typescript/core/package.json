@@ -37,7 +37,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "example:playground": "bun run examples/playground.ts",
+    "example:web": "bun run examples/web-basic.ts",
+    "example:android": "bun run examples/android-basic.ts",
     "prepublishOnly": "bun run build"
   },
   "dependencies": {

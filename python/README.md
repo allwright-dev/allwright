@@ -23,7 +23,11 @@ from allwright import firefox
 
 browser = firefox.launch()
 page = browser.page()
-page.goto("https://example.com")
-page.click("h1")
+page.goto("https://themoderninternet.vercel.app")
+page.click(
+    "xpath=//div[contains(@class,'card')][.//h2[normalize-space()='Form Inputs']]"
+    "//button[normalize-space()='Visit page']"
+)
+page.wait_for_selector('xpath=//h1[text()="Form Inputs"]')
 browser.close()
 ```

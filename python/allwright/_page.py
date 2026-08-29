@@ -26,9 +26,9 @@ from ._types import (
 
 
 class Page:
-    def __init__(self, runtime: RuntimeClient, browser_session_id: str, session_id: str) -> None:
+    def __init__(self, runtime: RuntimeClient, surface_session_id: str, session_id: str) -> None:
         self._runtime = runtime
-        self._browser_session_id = browser_session_id
+        self._surface_session_id = surface_session_id
         self._session_id = session_id
         self._lock = threading.Lock()
         self._handle: StreamHandle | None = None
@@ -39,8 +39,8 @@ class Page:
         return self._session_id
 
     @property
-    def browser_session_id(self) -> str:
-        return self._browser_session_id
+    def surface_session_id(self) -> str:
+        return self._surface_session_id
 
     def locator(self, selector: str) -> Locator:
         return Locator(page=self, selector=normalize_selector_for_transport(selector))
@@ -53,10 +53,10 @@ class Page:
             self._ensure_open()
             command_options = options or CommandOptions()
             handle.send(
-                engine_pb2.TabSessionCommand(
-                    browser_session_id=self.browser_session_id,
-                    tab_session_id=self.session_id,
-                    navigate=engine_pb2.NavigateTabCommand(
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
+                    navigate=engine_pb2.NavigatePageCommand(
                         url=url,
                         retry_options=retry_options(command_options.timeout_ms),
                     ),
@@ -105,9 +105,9 @@ class Page:
             command_options = options or CommandOptions()
             transport_selector = normalize_selector_for_transport(selector)
             handle.send(
-                engine_pb2.TabSessionCommand(
-                    browser_session_id=self.browser_session_id,
-                    tab_session_id=self.session_id,
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
                     click_element=engine_pb2.ClickElementCommand(
                         css_selector=transport_selector,
                         retry_options=retry_options(command_options.timeout_ms),
@@ -144,9 +144,9 @@ class Page:
             command_options = options or CommandOptions()
             transport_selector = normalize_selector_for_transport(selector)
             handle.send(
-                engine_pb2.TabSessionCommand(
-                    browser_session_id=self.browser_session_id,
-                    tab_session_id=self.session_id,
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
                     count_elements=engine_pb2.CountElementsCommand(
                         css_selector=transport_selector,
                         retry_options=retry_options(command_options.timeout_ms),
@@ -183,9 +183,9 @@ class Page:
             highlight_options = options or HighlightOptions()
             transport_selector = normalize_selector_for_transport(selector)
             handle.send(
-                engine_pb2.TabSessionCommand(
-                    browser_session_id=self.browser_session_id,
-                    tab_session_id=self.session_id,
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
                     highlight_elements=engine_pb2.HighlightElementsCommand(
                         css_selector=transport_selector,
                         duration_ms=highlight_options.duration_ms,
@@ -221,9 +221,9 @@ class Page:
         return self._element_command(
             action="focusing",
             event_name="element_focused",
-            command=engine_pb2.TabSessionCommand(
-                browser_session_id=self.browser_session_id,
-                tab_session_id=self.session_id,
+            command=engine_pb2.ContextSessionCommand(
+                surface_session_id=self.surface_session_id,
+                context_session_id=self.session_id,
                 focus_element=engine_pb2.FocusElementCommand(
                     css_selector=transport_selector,
                     retry_options=retry_options((options or CommandOptions()).timeout_ms),
@@ -238,9 +238,9 @@ class Page:
         return self._element_command(
             action="hovering",
             event_name="element_hovered",
-            command=engine_pb2.TabSessionCommand(
-                browser_session_id=self.browser_session_id,
-                tab_session_id=self.session_id,
+            command=engine_pb2.ContextSessionCommand(
+                surface_session_id=self.surface_session_id,
+                context_session_id=self.session_id,
                 hover_element=engine_pb2.HoverElementCommand(
                     css_selector=transport_selector,
                     retry_options=retry_options((options or CommandOptions()).timeout_ms),
@@ -262,9 +262,9 @@ class Page:
             command_options = options or CommandOptions()
             transport_selector = normalize_selector_for_transport(selector)
             handle.send(
-                engine_pb2.TabSessionCommand(
-                    browser_session_id=self.browser_session_id,
-                    tab_session_id=self.session_id,
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
                     fill_element=engine_pb2.FillElementCommand(
                         css_selector=transport_selector,
                         value=value,
@@ -307,9 +307,9 @@ class Page:
             press_options = options or PressOptions()
             transport_selector = normalize_selector_for_transport(selector)
             handle.send(
-                engine_pb2.TabSessionCommand(
-                    browser_session_id=self.browser_session_id,
-                    tab_session_id=self.session_id,
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
                     press_key=engine_pb2.PressKeyCommand(
                         css_selector=transport_selector,
                         key=key,
@@ -358,9 +358,9 @@ class Page:
             wait_options = options or WaitForSelectorOptions()
             transport_selector = normalize_selector_for_transport(selector)
             handle.send(
-                engine_pb2.TabSessionCommand(
-                    browser_session_id=self.browser_session_id,
-                    tab_session_id=self.session_id,
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
                     wait_for_selector=engine_pb2.WaitForSelectorCommand(
                         css_selector=transport_selector,
                         visible=wait_options.visible,
@@ -394,10 +394,10 @@ class Page:
             handle = self._ensure_handle()
             self._ensure_open()
             handle.send(
-                engine_pb2.TabSessionCommand(
-                    browser_session_id=self.browser_session_id,
-                    tab_session_id=self.session_id,
-                    ping=engine_pb2.TabSessionPingCommand(message=message),
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
+                    ping=engine_pb2.ContextSessionPingCommand(message=message),
                 )
             )
 
@@ -423,10 +423,10 @@ class Page:
                 return
 
             handle.send(
-                engine_pb2.TabSessionCommand(
-                    browser_session_id=self.browser_session_id,
-                    tab_session_id=self.session_id,
-                    close=engine_pb2.CloseTabSessionCommand(),
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
+                    close=engine_pb2.CloseContextSessionCommand(),
                 )
             )
 
@@ -444,7 +444,7 @@ class Page:
 
     def _ensure_handle(self) -> StreamHandle:
         if self._handle is None:
-            self._handle = StreamHandle(self._runtime.stub.TabSession)
+            self._handle = StreamHandle(self._runtime.stub.ContextSession)
         return self._handle
 
     def _ensure_open(self) -> None:
@@ -487,18 +487,18 @@ class Page:
             self._ensure_open()
             transport_selector = normalize_selector_for_transport(selector)
             if text_content:
-                command = engine_pb2.TabSessionCommand(
-                    browser_session_id=self.browser_session_id,
-                    tab_session_id=self.session_id,
+                command = engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
                     get_text_content=engine_pb2.GetTextContentCommand(
                         css_selector=transport_selector,
                         retry_options=retry_options(options.timeout_ms),
                     ),
                 )
             else:
-                command = engine_pb2.TabSessionCommand(
-                    browser_session_id=self.browser_session_id,
-                    tab_session_id=self.session_id,
+                command = engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
                     get_inner_text=engine_pb2.GetInnerTextCommand(
                         css_selector=transport_selector,
                         retry_options=retry_options(options.timeout_ms),

@@ -211,88 +211,6 @@ async function installCli(): Promise<string> {
   return cliPath;
 }
 
-export async function ensurePluginsInstalled(pluginIds: string[]): Promise<void> {
-  const expectedVersion = expectedRuntimeVersion();
-  const cliPath = await ensureCliAvailable(expectedVersion);
-  ensurePluginsInstalledWithCli(cliPath, expectedVersion, pluginIds);
-}
-
-export async function invokePlugin<TResponse>(pluginId: string, request: unknown): Promise<TResponse> {
-  const expectedVersion = expectedRuntimeVersion();
-  const cliPath = await ensureCliAvailable(expectedVersion);
-  const requestJson = JSON.stringify(request);
-  const result = spawnSync(
-    cliPath,
-    ["plugin", "invoke", pluginId, "--request-json", requestJson],
-    {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  );
-  if (result.error) {
-    throw new Error(`failed to invoke allwright ${pluginId} plugin with ${cliPath}: ${result.error.message}`);
-  }
-  if (result.status !== 0) {
-    const details = [result.stdout, result.stderr]
-      .map((value) => value?.trim())
-      .filter((value): value is string => !!value)
-      .join("\n");
-    throw new Error(
-      details
-        ? `allwright ${pluginId} plugin invocation failed:\n${details}`
-        : `allwright ${pluginId} plugin invocation failed`,
-    );
-  }
-  try {
-    return JSON.parse(result.stdout) as TResponse;
-  } catch (error) {
-    throw new Error(
-      `failed to decode allwright ${pluginId} plugin response: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
-
-function ensurePluginsInstalledWithCli(
-  cliPath: string,
-  expectedVersion: string,
-  pluginIds: string[],
-): void {
-  for (const pluginId of new Set(pluginIds.map((value) => value.trim()).filter(Boolean))) {
-    const pluginPath = path.join(
-      allwrightHome(),
-      "plugins",
-      pluginId,
-      "lib",
-      pluginLibraryFilename(pluginId),
-    );
-    if (isFile(pluginPath) && installedPluginVersion(pluginId) === expectedVersion) {
-      continue;
-    }
-
-    const result = spawnSync(cliPath, ["plugin", "install", pluginId, "--version", expectedVersion], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    if (result.error) {
-      throw new Error(`failed to install allwright ${pluginId} plugin with ${cliPath}: ${result.error.message}`);
-    }
-    if (result.status !== 0 || !isFile(pluginPath)) {
-      const details = [result.stdout, result.stderr]
-        .map((value) => value?.trim())
-        .filter((value): value is string => !!value)
-        .join("\n");
-      throw new Error(
-        details
-          ? `allwright attempted to install the \`${pluginId}\` plugin automatically, but the install did not complete successfully:\n${details}`
-          : `allwright attempted to install the \`${pluginId}\` plugin automatically, but the install did not complete successfully`,
-      );
-    }
-    if (installedPluginVersion(pluginId) !== expectedVersion) {
-      throw new Error(`allwright attempted to install the \`${pluginId}\` plugin automatically, but version ${expectedVersion} is still not active`);
-    }
-  }
-}
-
 async function resolveReleaseTag(): Promise<string> {
   const version = process.env[ALLWRIGHT_VERSION_ENV_VAR]?.trim() || DEFAULT_RELEASE_VERSION;
   if (version !== "latest") {
@@ -398,24 +316,6 @@ function cliListenAddr(serverAddr: string): string {
 function isLocalServerAddr(serverAddr: string): boolean {
   const host = parseServerHost(serverAddr);
   return host === "127.0.0.1" || host === "localhost" || host === "::1";
-}
-
-function installedPluginVersion(pluginId: string): string | null {
-  const manifestPath = path.join(allwrightHome(), "plugins.txt");
-  if (!isFile(manifestPath)) {
-    return null;
-  }
-  for (const line of fs.readFileSync(manifestPath, "utf8").split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) {
-      continue;
-    }
-    const [id, , version] = trimmed.split("\t", 3);
-    if (id === pluginId && version) {
-      return normalizeReleaseVersion(version);
-    }
-  }
-  return null;
 }
 
 async function allocateManagedServerAddr(serverAddr: string): Promise<string> {
@@ -539,28 +439,6 @@ function findExtractedCli(extractRoot: string): string | null {
     }
   }
   return null;
-}
-
-function pluginLibraryFilename(pluginId: string): string {
-  const stem = pluginLibraryStem(pluginId);
-  if (process.platform === "darwin") {
-    return `lib${stem}.dylib`;
-  }
-  if (process.platform === "win32") {
-    return `${stem}.dll`;
-  }
-  return `lib${stem}.so`;
-}
-
-function pluginLibraryStem(pluginId: string): string {
-  switch (pluginId) {
-    case "web":
-      return "allwright_surface_web";
-    case "mobile-android":
-      return "allwright_surface_mobile_android";
-    default:
-      throw new Error(`automatic install is not supported for allwright plugin \`${pluginId}\``);
-  }
 }
 
 function autoInstallEnabled(): boolean {

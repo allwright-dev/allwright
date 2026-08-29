@@ -16,6 +16,129 @@ pub struct CommandRetryOptions {
     pub retry_interval_ms: ::core::option::Option<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ConnectMobileCommand {
+    #[prost(enumeration = "MobilePlatform", tag = "1")]
+    pub platform: i32,
+    #[prost(string, optional, tag = "2")]
+    pub device: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "3")]
+    pub adb_endpoint: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(bool, tag = "4")]
+    pub preserve_app_state: bool,
+    #[prost(message, optional, tag = "5")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MobileConnectedEvent {
+    #[prost(enumeration = "MobilePlatform", tag = "1")]
+    pub platform: i32,
+    #[prost(string, tag = "2")]
+    pub device_name: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub device_id: ::prost::alloc::string::String,
+    #[prost(enumeration = "DeviceConnectionKind", tag = "5")]
+    pub connection_kind: i32,
+    #[prost(string, tag = "6")]
+    pub backend: ::prost::alloc::string::String,
+    #[prost(string, tag = "7")]
+    pub device_session_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "8")]
+    pub initial_app_session_id: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "9")]
+    pub package_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "10")]
+    pub activity_name: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LaunchAppCommand {
+    #[prost(string, optional, tag = "1")]
+    pub apk_path: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "2")]
+    pub app_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "3")]
+    pub launch_activity: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(bool, tag = "4")]
+    pub stop_before_launch: bool,
+    #[prost(message, optional, tag = "5")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AppLaunchedEvent {
+    #[prost(string, tag = "1")]
+    pub app_session_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub note: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "3")]
+    pub package_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "4")]
+    pub activity_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "5")]
+    pub webview_context: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum MobilePlatform {
+    Unspecified = 0,
+    Android = 1,
+    Ios = 2,
+}
+impl MobilePlatform {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "MOBILE_PLATFORM_UNSPECIFIED",
+            Self::Android => "MOBILE_PLATFORM_ANDROID",
+            Self::Ios => "MOBILE_PLATFORM_IOS",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "MOBILE_PLATFORM_UNSPECIFIED" => Some(Self::Unspecified),
+            "MOBILE_PLATFORM_ANDROID" => Some(Self::Android),
+            "MOBILE_PLATFORM_IOS" => Some(Self::Ios),
+            _ => None,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum DeviceConnectionKind {
+    Unspecified = 0,
+    Usb = 1,
+    Emulator = 2,
+    RemoteAdb = 3,
+}
+impl DeviceConnectionKind {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "DEVICE_CONNECTION_KIND_UNSPECIFIED",
+            Self::Usb => "DEVICE_CONNECTION_KIND_USB",
+            Self::Emulator => "DEVICE_CONNECTION_KIND_EMULATOR",
+            Self::RemoteAdb => "DEVICE_CONNECTION_KIND_REMOTE_ADB",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "DEVICE_CONNECTION_KIND_UNSPECIFIED" => Some(Self::Unspecified),
+            "DEVICE_CONNECTION_KIND_USB" => Some(Self::Usb),
+            "DEVICE_CONNECTION_KIND_EMULATOR" => Some(Self::Emulator),
+            "DEVICE_CONNECTION_KIND_REMOTE_ADB" => Some(Self::RemoteAdb),
+            _ => None,
+        }
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct LaunchBrowserCommand {
     #[prost(enumeration = "BrowserKind", tag = "1")]
     pub browser_kind: i32,
@@ -35,7 +158,7 @@ pub struct BrowserLaunchedEvent {
     #[prost(string, tag = "4")]
     pub user_data_dir: ::prost::alloc::string::String,
     #[prost(string, tag = "5")]
-    pub initial_tab_session_id: ::prost::alloc::string::String,
+    pub initial_page_session_id: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct LaunchChromeCommand {
@@ -55,10 +178,10 @@ pub struct ChromeLaunchedEvent {
     #[prost(string, tag = "4")]
     pub user_data_dir: ::prost::alloc::string::String,
     #[prost(string, tag = "5")]
-    pub initial_tab_session_id: ::prost::alloc::string::String,
+    pub initial_page_session_id: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct NavigateTabCommand {
+pub struct NavigatePageCommand {
     #[prost(string, tag = "1")]
     pub url: ::prost::alloc::string::String,
     #[prost(message, optional, tag = "2")]
@@ -145,7 +268,7 @@ pub struct WaitForSelectorCommand {
     pub retry_options: ::core::option::Option<CommandRetryOptions>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TabNavigatedEvent {
+pub struct PageNavigatedEvent {
     #[prost(string, tag = "1")]
     pub url: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
@@ -280,28 +403,32 @@ impl BrowserKind {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct BrowserSessionCommand {
-    #[prost(oneof = "browser_session_command::Command", tags = "1, 2, 3, 4, 5")]
-    pub command: ::core::option::Option<browser_session_command::Command>,
+pub struct SurfaceSessionCommand {
+    #[prost(oneof = "surface_session_command::Command", tags = "1, 2, 3, 4, 5, 6, 7")]
+    pub command: ::core::option::Option<surface_session_command::Command>,
 }
-/// Nested message and enum types in `BrowserSessionCommand`.
-pub mod browser_session_command {
+/// Nested message and enum types in `SurfaceSessionCommand`.
+pub mod surface_session_command {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Command {
         #[prost(message, tag = "1")]
         LaunchChrome(super::LaunchChromeCommand),
         #[prost(message, tag = "2")]
-        OpenTab(super::OpenTabCommand),
+        OpenContext(super::OpenContextCommand),
         #[prost(message, tag = "3")]
         Ping(super::SessionPingCommand),
         #[prost(message, tag = "4")]
-        Close(super::CloseBrowserSessionCommand),
+        Close(super::CloseSurfaceSessionCommand),
         #[prost(message, tag = "5")]
         LaunchBrowser(super::LaunchBrowserCommand),
+        #[prost(message, tag = "6")]
+        ConnectMobile(super::ConnectMobileCommand),
+        #[prost(message, tag = "7")]
+        LaunchApp(super::LaunchAppCommand),
     }
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
-pub struct OpenTabCommand {
+pub struct OpenContextCommand {
     #[prost(message, optional, tag = "1")]
     pub retry_options: ::core::option::Option<CommandRetryOptions>,
 }
@@ -311,36 +438,40 @@ pub struct SessionPingCommand {
     pub message: ::prost::alloc::string::String,
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
-pub struct CloseBrowserSessionCommand {}
+pub struct CloseSurfaceSessionCommand {}
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct BrowserSessionEvent {
+pub struct SurfaceSessionEvent {
     #[prost(string, tag = "1")]
     pub session_id: ::prost::alloc::string::String,
-    #[prost(oneof = "browser_session_event::Event", tags = "2, 3, 4, 5, 6, 7")]
-    pub event: ::core::option::Option<browser_session_event::Event>,
+    #[prost(oneof = "surface_session_event::Event", tags = "2, 3, 4, 5, 6, 7, 8, 9")]
+    pub event: ::core::option::Option<surface_session_event::Event>,
 }
-/// Nested message and enum types in `BrowserSessionEvent`.
-pub mod browser_session_event {
+/// Nested message and enum types in `SurfaceSessionEvent`.
+pub mod surface_session_event {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
         #[prost(message, tag = "2")]
         ChromeLaunched(super::ChromeLaunchedEvent),
         #[prost(message, tag = "3")]
-        TabOpened(super::TabOpenedEvent),
+        ContextOpened(super::ContextOpenedEvent),
         #[prost(message, tag = "4")]
         Pong(super::SessionPongEvent),
         #[prost(message, tag = "5")]
-        Closed(super::BrowserSessionClosedEvent),
+        Closed(super::SurfaceSessionClosedEvent),
         #[prost(message, tag = "6")]
-        Error(super::BrowserSessionErrorEvent),
+        Error(super::SurfaceSessionErrorEvent),
         #[prost(message, tag = "7")]
         BrowserLaunched(super::BrowserLaunchedEvent),
+        #[prost(message, tag = "8")]
+        MobileConnected(super::MobileConnectedEvent),
+        #[prost(message, tag = "9")]
+        AppLaunched(super::AppLaunchedEvent),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TabOpenedEvent {
+pub struct ContextOpenedEvent {
     #[prost(string, tag = "1")]
-    pub tab_session_id: ::prost::alloc::string::String,
+    pub context_session_id: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub note: ::prost::alloc::string::String,
 }
@@ -350,37 +481,37 @@ pub struct SessionPongEvent {
     pub message: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct BrowserSessionClosedEvent {
+pub struct SurfaceSessionClosedEvent {
     #[prost(string, tag = "1")]
     pub reason: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct BrowserSessionErrorEvent {
+pub struct SurfaceSessionErrorEvent {
     #[prost(string, tag = "1")]
     pub message: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TabSessionCommand {
+pub struct ContextSessionCommand {
     #[prost(string, tag = "1")]
-    pub browser_session_id: ::prost::alloc::string::String,
+    pub surface_session_id: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
-    pub tab_session_id: ::prost::alloc::string::String,
+    pub context_session_id: ::prost::alloc::string::String,
     #[prost(
-        oneof = "tab_session_command::Command",
+        oneof = "context_session_command::Command",
         tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15"
     )]
-    pub command: ::core::option::Option<tab_session_command::Command>,
+    pub command: ::core::option::Option<context_session_command::Command>,
 }
-/// Nested message and enum types in `TabSessionCommand`.
-pub mod tab_session_command {
+/// Nested message and enum types in `ContextSessionCommand`.
+pub mod context_session_command {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Command {
         #[prost(message, tag = "3")]
-        Ping(super::TabSessionPingCommand),
+        Ping(super::ContextSessionPingCommand),
         #[prost(message, tag = "4")]
-        Close(super::CloseTabSessionCommand),
+        Close(super::CloseContextSessionCommand),
         #[prost(message, tag = "5")]
-        Navigate(super::NavigateTabCommand),
+        Navigate(super::NavigatePageCommand),
         #[prost(message, tag = "6")]
         ClickElement(super::ClickElementCommand),
         #[prost(message, tag = "7")]
@@ -404,36 +535,36 @@ pub mod tab_session_command {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TabSessionPingCommand {
+pub struct ContextSessionPingCommand {
     #[prost(string, tag = "1")]
     pub message: ::prost::alloc::string::String,
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
-pub struct CloseTabSessionCommand {}
+pub struct CloseContextSessionCommand {}
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TabSessionEvent {
+pub struct ContextSessionEvent {
     #[prost(string, tag = "1")]
-    pub tab_session_id: ::prost::alloc::string::String,
+    pub context_session_id: ::prost::alloc::string::String,
     #[prost(
-        oneof = "tab_session_event::Event",
+        oneof = "context_session_event::Event",
         tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17"
     )]
-    pub event: ::core::option::Option<tab_session_event::Event>,
+    pub event: ::core::option::Option<context_session_event::Event>,
 }
-/// Nested message and enum types in `TabSessionEvent`.
-pub mod tab_session_event {
+/// Nested message and enum types in `ContextSessionEvent`.
+pub mod context_session_event {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
         #[prost(message, tag = "2")]
-        Attached(super::TabSessionAttachedEvent),
+        Attached(super::ContextSessionAttachedEvent),
         #[prost(message, tag = "3")]
-        Pong(super::TabSessionPongEvent),
+        Pong(super::ContextSessionPongEvent),
         #[prost(message, tag = "4")]
-        Closed(super::TabSessionClosedEvent),
+        Closed(super::ContextSessionClosedEvent),
         #[prost(message, tag = "5")]
-        Error(super::TabSessionErrorEvent),
+        Error(super::ContextSessionErrorEvent),
         #[prost(message, tag = "6")]
-        Navigated(super::TabNavigatedEvent),
+        Navigated(super::PageNavigatedEvent),
         #[prost(message, tag = "7")]
         ChromiumBidiInjection(super::ChromiumBidiInjectionEvent),
         #[prost(message, tag = "8")]
@@ -459,22 +590,22 @@ pub mod tab_session_event {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TabSessionAttachedEvent {
+pub struct ContextSessionAttachedEvent {
     #[prost(string, tag = "1")]
     pub note: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TabSessionPongEvent {
+pub struct ContextSessionPongEvent {
     #[prost(string, tag = "1")]
     pub message: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TabSessionClosedEvent {
+pub struct ContextSessionClosedEvent {
     #[prost(string, tag = "1")]
     pub reason: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TabSessionErrorEvent {
+pub struct ContextSessionErrorEvent {
     #[prost(string, tag = "1")]
     pub message: ::prost::alloc::string::String,
 }
@@ -590,13 +721,13 @@ pub mod engine_service_client {
                 .insert(GrpcMethod::new("allwright.engine.v1.EngineService", "Ping"));
             self.inner.unary(req, path, codec).await
         }
-        pub async fn browser_session(
+        pub async fn surface_session(
             &mut self,
             request: impl tonic::IntoStreamingRequest<
-                Message = super::BrowserSessionCommand,
+                Message = super::SurfaceSessionCommand,
             >,
         ) -> std::result::Result<
-            tonic::Response<tonic::codec::Streaming<super::BrowserSessionEvent>>,
+            tonic::Response<tonic::codec::Streaming<super::SurfaceSessionEvent>>,
             tonic::Status,
         > {
             self.inner
@@ -609,23 +740,25 @@ pub mod engine_service_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/allwright.engine.v1.EngineService/BrowserSession",
+                "/allwright.engine.v1.EngineService/SurfaceSession",
             );
             let mut req = request.into_streaming_request();
             req.extensions_mut()
                 .insert(
                     GrpcMethod::new(
                         "allwright.engine.v1.EngineService",
-                        "BrowserSession",
+                        "SurfaceSession",
                     ),
                 );
             self.inner.streaming(req, path, codec).await
         }
-        pub async fn tab_session(
+        pub async fn context_session(
             &mut self,
-            request: impl tonic::IntoStreamingRequest<Message = super::TabSessionCommand>,
+            request: impl tonic::IntoStreamingRequest<
+                Message = super::ContextSessionCommand,
+            >,
         ) -> std::result::Result<
-            tonic::Response<tonic::codec::Streaming<super::TabSessionEvent>>,
+            tonic::Response<tonic::codec::Streaming<super::ContextSessionEvent>>,
             tonic::Status,
         > {
             self.inner
@@ -638,12 +771,15 @@ pub mod engine_service_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/allwright.engine.v1.EngineService/TabSession",
+                "/allwright.engine.v1.EngineService/ContextSession",
             );
             let mut req = request.into_streaming_request();
             req.extensions_mut()
                 .insert(
-                    GrpcMethod::new("allwright.engine.v1.EngineService", "TabSession"),
+                    GrpcMethod::new(
+                        "allwright.engine.v1.EngineService",
+                        "ContextSession",
+                    ),
                 );
             self.inner.streaming(req, path, codec).await
         }
@@ -666,29 +802,32 @@ pub mod engine_service_server {
             &self,
             request: tonic::Request<super::PingRequest>,
         ) -> std::result::Result<tonic::Response<super::PingResponse>, tonic::Status>;
-        /// Server streaming response type for the BrowserSession method.
-        type BrowserSessionStream: tonic::codegen::tokio_stream::Stream<
-                Item = std::result::Result<super::BrowserSessionEvent, tonic::Status>,
+        /// Server streaming response type for the SurfaceSession method.
+        type SurfaceSessionStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::SurfaceSessionEvent, tonic::Status>,
             >
             + std::marker::Send
             + 'static;
-        async fn browser_session(
+        async fn surface_session(
             &self,
-            request: tonic::Request<tonic::Streaming<super::BrowserSessionCommand>>,
+            request: tonic::Request<tonic::Streaming<super::SurfaceSessionCommand>>,
         ) -> std::result::Result<
-            tonic::Response<Self::BrowserSessionStream>,
+            tonic::Response<Self::SurfaceSessionStream>,
             tonic::Status,
         >;
-        /// Server streaming response type for the TabSession method.
-        type TabSessionStream: tonic::codegen::tokio_stream::Stream<
-                Item = std::result::Result<super::TabSessionEvent, tonic::Status>,
+        /// Server streaming response type for the ContextSession method.
+        type ContextSessionStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::ContextSessionEvent, tonic::Status>,
             >
             + std::marker::Send
             + 'static;
-        async fn tab_session(
+        async fn context_session(
             &self,
-            request: tonic::Request<tonic::Streaming<super::TabSessionCommand>>,
-        ) -> std::result::Result<tonic::Response<Self::TabSessionStream>, tonic::Status>;
+            request: tonic::Request<tonic::Streaming<super::ContextSessionCommand>>,
+        ) -> std::result::Result<
+            tonic::Response<Self::ContextSessionStream>,
+            tonic::Status,
+        >;
     }
     #[derive(Debug)]
     pub struct EngineServiceServer<T> {
@@ -810,15 +949,15 @@ pub mod engine_service_server {
                     };
                     Box::pin(fut)
                 }
-                "/allwright.engine.v1.EngineService/BrowserSession" => {
+                "/allwright.engine.v1.EngineService/SurfaceSession" => {
                     #[allow(non_camel_case_types)]
-                    struct BrowserSessionSvc<T: EngineService>(pub Arc<T>);
+                    struct SurfaceSessionSvc<T: EngineService>(pub Arc<T>);
                     impl<
                         T: EngineService,
-                    > tonic::server::StreamingService<super::BrowserSessionCommand>
-                    for BrowserSessionSvc<T> {
-                        type Response = super::BrowserSessionEvent;
-                        type ResponseStream = T::BrowserSessionStream;
+                    > tonic::server::StreamingService<super::SurfaceSessionCommand>
+                    for SurfaceSessionSvc<T> {
+                        type Response = super::SurfaceSessionEvent;
+                        type ResponseStream = T::SurfaceSessionStream;
                         type Future = BoxFuture<
                             tonic::Response<Self::ResponseStream>,
                             tonic::Status,
@@ -826,12 +965,12 @@ pub mod engine_service_server {
                         fn call(
                             &mut self,
                             request: tonic::Request<
-                                tonic::Streaming<super::BrowserSessionCommand>,
+                                tonic::Streaming<super::SurfaceSessionCommand>,
                             >,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as EngineService>::browser_session(&inner, request).await
+                                <T as EngineService>::surface_session(&inner, request).await
                             };
                             Box::pin(fut)
                         }
@@ -842,7 +981,7 @@ pub mod engine_service_server {
                     let max_encoding_message_size = self.max_encoding_message_size;
                     let inner = self.inner.clone();
                     let fut = async move {
-                        let method = BrowserSessionSvc(inner);
+                        let method = SurfaceSessionSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -858,15 +997,15 @@ pub mod engine_service_server {
                     };
                     Box::pin(fut)
                 }
-                "/allwright.engine.v1.EngineService/TabSession" => {
+                "/allwright.engine.v1.EngineService/ContextSession" => {
                     #[allow(non_camel_case_types)]
-                    struct TabSessionSvc<T: EngineService>(pub Arc<T>);
+                    struct ContextSessionSvc<T: EngineService>(pub Arc<T>);
                     impl<
                         T: EngineService,
-                    > tonic::server::StreamingService<super::TabSessionCommand>
-                    for TabSessionSvc<T> {
-                        type Response = super::TabSessionEvent;
-                        type ResponseStream = T::TabSessionStream;
+                    > tonic::server::StreamingService<super::ContextSessionCommand>
+                    for ContextSessionSvc<T> {
+                        type Response = super::ContextSessionEvent;
+                        type ResponseStream = T::ContextSessionStream;
                         type Future = BoxFuture<
                             tonic::Response<Self::ResponseStream>,
                             tonic::Status,
@@ -874,12 +1013,12 @@ pub mod engine_service_server {
                         fn call(
                             &mut self,
                             request: tonic::Request<
-                                tonic::Streaming<super::TabSessionCommand>,
+                                tonic::Streaming<super::ContextSessionCommand>,
                             >,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as EngineService>::tab_session(&inner, request).await
+                                <T as EngineService>::context_session(&inner, request).await
                             };
                             Box::pin(fut)
                         }
@@ -890,7 +1029,7 @@ pub mod engine_service_server {
                     let max_encoding_message_size = self.max_encoding_message_size;
                     let inner = self.inner.clone();
                     let fut = async move {
-                        let method = TabSessionSvc(inner);
+                        let method = ContextSessionSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

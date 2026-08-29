@@ -64,7 +64,11 @@ import dev.allwright.client.Page;
 
 try (Browser browser = Allwright.firefox().launch()) {
     Page page = browser.page();
-    page.goTo("https://example.com");
-    page.click("h1");
+    page.goTo("https://themoderninternet.vercel.app");
+    page.click(
+            "xpath=//div[contains(@class,'card')][.//h2[normalize-space()='Form Inputs']]"
+                    + "//button[normalize-space()='Visit page']"
+    );
+    page.waitForSelector("xpath=//h1[text()=\"Form Inputs\"]");
 }
 ```

@@ -7,10 +7,11 @@ import { ensureRuntimeReady, shutdownManagedServer } from "./bootstrap.js";
 import { formatStreamError } from "./errors.js";
 import { EventQueue } from "./types.js";
 import type {
-  BrowserSessionEvent,
-  BrowserSessionStream,
+  SurfaceSessionEvent,
+  SurfaceSessionStream,
   Browser,
   BrowserKind,
+  ContextSessionEvent,
   EngineProtoRoot,
   EngineServiceClientShape,
   LaunchOptions,
@@ -65,7 +66,7 @@ export async function getRuntime(): Promise<RuntimeClient> {
 }
 
 export async function createPageHandle(runtime: RuntimeClient): Promise<PageHandle> {
-  const stream = runtime.client.TabSession();
+  const stream = runtime.client.ContextSession();
   const queue = bindStreamQueue(stream);
   return {
     stream,
@@ -76,8 +77,8 @@ export async function createPageHandle(runtime: RuntimeClient): Promise<PageHand
 
 export async function createBrowserSessionHandle(
   runtime: RuntimeClient,
-): Promise<{ stream: BrowserSessionStream; queue: EventQueue<BrowserSessionEvent> }> {
-  const stream = runtime.client.BrowserSession();
+): Promise<{ stream: SurfaceSessionStream; queue: EventQueue<SurfaceSessionEvent> }> {
+  const stream = runtime.client.SurfaceSession();
   const queue = bindStreamQueue(stream);
   return { stream, queue };
 }

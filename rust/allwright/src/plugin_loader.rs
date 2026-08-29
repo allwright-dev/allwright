@@ -5,6 +5,18 @@ use allwright_plugin_sdk::{
     HighlightElementsInfo, HoverInfo, PageInfo, PageSessionHandle, PluginCommand, PluginEnvelope,
     PluginResult, PressKeyInfo, TabNavigationInfo, TextInfo, WaitForSelectorInfo,
 };
+use allwright_surface_mobile::{
+    ConnectOptions as MobileConnectOptions, MobileBrowserSessionHandle, MobileClickInfo,
+    MobileCommand, MobileCommandResult, MobileConnectInfo, MobileFillInfo, MobilePageInfo,
+    MobilePageSessionHandle, MobilePlatform,
+};
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct MobilePluginEnvelope {
+    ok: bool,
+    result: Option<MobileCommandResult>,
+    error: Option<String>,
+}
 
 fn invoke_web(command: PluginCommand) -> Result<PluginResult, String> {
     let request_json = serde_json::to_string(&command)
@@ -24,11 +36,161 @@ fn invoke_web(command: PluginCommand) -> Result<PluginResult, String> {
     }
 }
 
+fn invoke_mobile(command: MobileCommand) -> Result<MobileCommandResult, String> {
+    let request_json = serde_json::to_string(&command)
+        .map_err(|error| format!("failed to encode mobile plugin request: {error}"))?;
+    let response_json = invoke_plugin(mobile_plugin_id_for_command(&command)?, &request_json)?;
+    let envelope: MobilePluginEnvelope = serde_json::from_str(&response_json)
+        .map_err(|error| format!("failed to decode mobile plugin response: {error}"))?;
+
+    if envelope.ok {
+        envelope
+            .result
+            .ok_or_else(|| "mobile plugin returned success without a result payload".to_string())
+    } else {
+        Err(envelope
+            .error
+            .unwrap_or_else(|| "mobile plugin returned an unknown error".to_string()))
+    }
+}
+
 async fn invoke_web_expected(
     _command_name: &str,
     command: PluginCommand,
 ) -> Result<PluginResult, String> {
     tokio::task::block_in_place(move || invoke_web(command))
+}
+
+async fn invoke_mobile_expected(
+    command: MobileCommand,
+) -> Result<MobileCommandResult, String> {
+    tokio::task::block_in_place(move || invoke_mobile(command))
+}
+
+fn mobile_plugin_id_for_command(command: &MobileCommand) -> Result<&'static str, String> {
+    let platform = match command {
+        MobileCommand::Connect(options) => options.platform,
+        MobileCommand::LaunchApp {
+            browser_session, ..
+        }
+        | MobileCommand::OpenPage { browser_session }
+        | MobileCommand::ClosePage {
+            browser_session, ..
+        }
+        | MobileCommand::ClickElement {
+            browser_session, ..
+        }
+        | MobileCommand::CountElements {
+            browser_session, ..
+        }
+        | MobileCommand::FillElement {
+            browser_session, ..
+        }
+        | MobileCommand::GetText {
+            browser_session, ..
+        }
+        | MobileCommand::WaitForSelector {
+            browser_session, ..
+        } => browser_session.platform,
+    };
+    mobile_plugin_id(platform)
+}
+
+fn mobile_plugin_id(platform: MobilePlatform) -> Result<&'static str, String> {
+    match platform {
+        MobilePlatform::Android => Ok("mobile-android"),
+        MobilePlatform::Ios => Err("mobile-ios runtime plugin is not available yet".to_string()),
+    }
+}
+
+pub async fn connect_mobile(options: MobileConnectOptions) -> Result<MobileConnectInfo, String> {
+    match invoke_mobile_expected(MobileCommand::Connect(options)).await? {
+        MobileCommandResult::Connect(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected response for ConnectMobile".to_string()),
+    }
+}
+
+pub async fn launch_mobile_app(
+    surface_session: &MobileBrowserSessionHandle,
+    options: allwright_surface_mobile::LaunchOptions,
+) -> Result<MobilePageInfo, String> {
+    match invoke_mobile_expected(MobileCommand::LaunchApp {
+        browser_session: surface_session.clone(),
+        options,
+    })
+    .await?
+    {
+        MobileCommandResult::LaunchApp(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected response for LaunchApp".to_string()),
+    }
+}
+
+pub async fn open_mobile_page(
+    surface_session: &MobileBrowserSessionHandle,
+) -> Result<MobilePageInfo, String> {
+    match invoke_mobile_expected(MobileCommand::OpenPage {
+        browser_session: surface_session.clone(),
+    })
+    .await?
+    {
+        MobileCommandResult::OpenPage(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected response for OpenPage".to_string()),
+    }
+}
+
+pub async fn close_mobile_page(
+    surface_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+) -> Result<(), String> {
+    match invoke_mobile_expected(MobileCommand::ClosePage {
+        browser_session: surface_session.clone(),
+        page_session: page_session.clone(),
+    })
+    .await?
+    {
+        MobileCommandResult::ClosePage => Ok(()),
+        _ => Err("mobile plugin returned an unexpected response for ClosePage".to_string()),
+    }
+}
+
+pub async fn click_mobile_element(
+    surface_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobileClickInfo, String> {
+    match invoke_mobile_expected(MobileCommand::ClickElement {
+        browser_session: surface_session.clone(),
+        page_session: page_session.clone(),
+        selector: selector.to_string(),
+        timeout_ms,
+    })
+    .await?
+    {
+        MobileCommandResult::ClickElement(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected response for ClickElement".to_string()),
+    }
+}
+
+pub async fn fill_mobile_element(
+    surface_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    value: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobileFillInfo, String> {
+    match invoke_mobile_expected(MobileCommand::FillElement {
+        browser_session: surface_session.clone(),
+        page_session: page_session.clone(),
+        selector: selector.to_string(),
+        value: value.to_string(),
+        timeout_ms,
+    })
+    .await?
+    {
+        MobileCommandResult::FillElement(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected response for FillElement".to_string()),
+    }
 }
 
 pub async fn open_chrome_window(chrome_binary: Option<&str>) -> Result<ChromeLaunchInfo, String> {
@@ -63,11 +225,11 @@ pub async fn launch_browser(
     }
 }
 
-pub async fn open_page(browser_session: &BrowserSessionHandle) -> Result<PageInfo, String> {
+pub async fn open_page(surface_session: &BrowserSessionHandle) -> Result<PageInfo, String> {
     match invoke_web_expected(
         "OpenTabCommand",
         PluginCommand::OpenPage {
-            browser_session: browser_session.clone(),
+            browser_session: surface_session.clone(),
         },
     )
     .await?
@@ -78,13 +240,13 @@ pub async fn open_page(browser_session: &BrowserSessionHandle) -> Result<PageInf
 }
 
 pub async fn close_page(
-    browser_session: &BrowserSessionHandle,
+    surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
 ) -> Result<(), String> {
     match invoke_web_expected(
-        "CloseTabSessionCommand",
+        "CloseContextSessionCommand",
         PluginCommand::ClosePage {
-            browser_session: browser_session.clone(),
+            browser_session: surface_session.clone(),
             page_session: page_session.clone(),
         },
     )
@@ -96,14 +258,14 @@ pub async fn close_page(
 }
 
 pub async fn navigate_page(
-    browser_session: &BrowserSessionHandle,
+    surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
     url: &str,
 ) -> Result<TabNavigationInfo, String> {
     match invoke_web_expected(
-        "NavigateTabCommand",
+        "NavigatePageCommand",
         PluginCommand::NavigatePage {
-            browser_session: browser_session.clone(),
+            browser_session: surface_session.clone(),
             page_session: page_session.clone(),
             url: url.to_string(),
         },
@@ -116,14 +278,14 @@ pub async fn navigate_page(
 }
 
 pub async fn click_element(
-    browser_session: &BrowserSessionHandle,
+    surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
     css_selector: &str,
 ) -> Result<ClickInfo, String> {
     match invoke_web_expected(
         "ClickElementCommand",
         PluginCommand::ClickElement {
-            browser_session: browser_session.clone(),
+            browser_session: surface_session.clone(),
             page_session: page_session.clone(),
             css_selector: css_selector.to_string(),
         },
@@ -136,14 +298,14 @@ pub async fn click_element(
 }
 
 pub async fn count_elements(
-    browser_session: &BrowserSessionHandle,
+    surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
     css_selector: &str,
 ) -> Result<ElementCountInfo, String> {
     match invoke_web_expected(
         "CountElementsCommand",
         PluginCommand::CountElements {
-            browser_session: browser_session.clone(),
+            browser_session: surface_session.clone(),
             page_session: page_session.clone(),
             css_selector: css_selector.to_string(),
         },
@@ -156,7 +318,7 @@ pub async fn count_elements(
 }
 
 pub async fn highlight_elements(
-    browser_session: &BrowserSessionHandle,
+    surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
     css_selector: &str,
     duration_ms: u64,
@@ -164,7 +326,7 @@ pub async fn highlight_elements(
     match invoke_web_expected(
         "HighlightElementsCommand",
         PluginCommand::HighlightElements {
-            browser_session: browser_session.clone(),
+            browser_session: surface_session.clone(),
             page_session: page_session.clone(),
             css_selector: css_selector.to_string(),
             duration_ms,
@@ -178,14 +340,14 @@ pub async fn highlight_elements(
 }
 
 pub async fn focus_element(
-    browser_session: &BrowserSessionHandle,
+    surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
     css_selector: &str,
 ) -> Result<FocusInfo, String> {
     match invoke_web_expected(
         "FocusElementCommand",
         PluginCommand::FocusElement {
-            browser_session: browser_session.clone(),
+            browser_session: surface_session.clone(),
             page_session: page_session.clone(),
             css_selector: css_selector.to_string(),
         },
@@ -198,7 +360,7 @@ pub async fn focus_element(
 }
 
 pub async fn fill_element(
-    browser_session: &BrowserSessionHandle,
+    surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
     css_selector: &str,
     value: &str,
@@ -206,7 +368,7 @@ pub async fn fill_element(
     match invoke_web_expected(
         "FillElementCommand",
         PluginCommand::FillElement {
-            browser_session: browser_session.clone(),
+            browser_session: surface_session.clone(),
             page_session: page_session.clone(),
             css_selector: css_selector.to_string(),
             value: value.to_string(),
@@ -220,14 +382,14 @@ pub async fn fill_element(
 }
 
 pub async fn hover_element(
-    browser_session: &BrowserSessionHandle,
+    surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
     css_selector: &str,
 ) -> Result<HoverInfo, String> {
     match invoke_web_expected(
         "HoverElementCommand",
         PluginCommand::HoverElement {
-            browser_session: browser_session.clone(),
+            browser_session: surface_session.clone(),
             page_session: page_session.clone(),
             css_selector: css_selector.to_string(),
         },
@@ -240,7 +402,7 @@ pub async fn hover_element(
 }
 
 pub async fn press_key(
-    browser_session: &BrowserSessionHandle,
+    surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
     css_selector: &str,
     key: &str,
@@ -249,7 +411,7 @@ pub async fn press_key(
     match invoke_web_expected(
         "PressKeyCommand",
         PluginCommand::PressKey {
-            browser_session: browser_session.clone(),
+            browser_session: surface_session.clone(),
             page_session: page_session.clone(),
             css_selector: css_selector.to_string(),
             key: key.to_string(),
@@ -264,14 +426,14 @@ pub async fn press_key(
 }
 
 pub async fn get_text_content(
-    browser_session: &BrowserSessionHandle,
+    surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
     css_selector: &str,
 ) -> Result<TextInfo, String> {
     match invoke_web_expected(
         "GetTextContentCommand",
         PluginCommand::GetTextContent {
-            browser_session: browser_session.clone(),
+            browser_session: surface_session.clone(),
             page_session: page_session.clone(),
             css_selector: css_selector.to_string(),
         },
@@ -284,14 +446,14 @@ pub async fn get_text_content(
 }
 
 pub async fn get_inner_text(
-    browser_session: &BrowserSessionHandle,
+    surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
     css_selector: &str,
 ) -> Result<TextInfo, String> {
     match invoke_web_expected(
         "GetInnerTextCommand",
         PluginCommand::GetInnerText {
-            browser_session: browser_session.clone(),
+            browser_session: surface_session.clone(),
             page_session: page_session.clone(),
             css_selector: css_selector.to_string(),
         },
@@ -304,7 +466,7 @@ pub async fn get_inner_text(
 }
 
 pub async fn wait_for_selector(
-    browser_session: &BrowserSessionHandle,
+    surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
     css_selector: &str,
     visible: bool,
@@ -312,7 +474,7 @@ pub async fn wait_for_selector(
     match invoke_web_expected(
         "WaitForSelectorCommand",
         PluginCommand::WaitForSelector {
-            browser_session: browser_session.clone(),
+            browser_session: surface_session.clone(),
             page_session: page_session.clone(),
             css_selector: css_selector.to_string(),
             visible,
@@ -364,7 +526,7 @@ pub fn close_browser_process(process_id: u32) -> Result<(), String> {
 
 pub async fn close_chrome_tab(cdp_websocket_url: &str, target_id: &str) -> Result<(), String> {
     match invoke_web_expected(
-        "CloseTabSessionCommand",
+        "CloseContextSessionCommand",
         PluginCommand::CloseChromeTab {
             cdp_websocket_url: cdp_websocket_url.to_string(),
             target_id: target_id.to_string(),
@@ -383,7 +545,7 @@ pub async fn navigate_chrome_tab(
     url: &str,
 ) -> Result<TabNavigationInfo, String> {
     match invoke_web_expected(
-        "NavigateTabCommand",
+        "NavigatePageCommand",
         PluginCommand::NavigateChromeTab {
             cdp_websocket_url: cdp_websocket_url.to_string(),
             target_id: target_id.to_string(),
@@ -401,7 +563,7 @@ pub async fn inject_chromium_bidi_mapper(
     cdp_websocket_url: &str,
 ) -> Result<ChromiumBidiMapperInfo, String> {
     match invoke_web_expected(
-        "NavigateTabCommand",
+        "NavigatePageCommand",
         PluginCommand::InjectChromiumBidiMapper {
             cdp_websocket_url: cdp_websocket_url.to_string(),
         },
@@ -422,7 +584,7 @@ pub async fn resolve_bidi_context_for_tab(
     url: Option<&str>,
 ) -> Result<(String, ChromiumBidiMapperInfo), String> {
     match invoke_web_expected(
-        "NavigateTabCommand",
+        "NavigatePageCommand",
         PluginCommand::ResolveBidiContextForTab {
             cdp_websocket_url: cdp_websocket_url.to_string(),
             mapper_target_id: mapper_target_id.map(str::to_string),

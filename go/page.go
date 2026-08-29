@@ -37,17 +37,17 @@ func (t *Tab) Navigate(ctx context.Context, url string, options ...CommandOption
 
 	commandOptions := firstCommandOptions(options)
 
-	if err := t.stream.Send(&enginev1.TabSessionCommand{
-		BrowserSessionId: t.browserSessionID,
-		TabSessionId:     t.sessionID,
-		Command: &enginev1.TabSessionCommand_Navigate{
-			Navigate: &enginev1.NavigateTabCommand{
+	if err := t.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: t.browserSessionID,
+		ContextSessionId: t.sessionID,
+		Command: &enginev1.ContextSessionCommand_Navigate{
+			Navigate: &enginev1.NavigatePageCommand{
 				Url:          url,
 				RetryOptions: retryOptionsProto(commandOptions.Timeout),
 			},
 		},
 	}); err != nil {
-		return nil, fmt.Errorf("send NavigateTabCommand: %w", err)
+		return nil, fmt.Errorf("send NavigatePageCommand: %w", err)
 	}
 
 	result := &NavigateResult{}
@@ -58,20 +58,20 @@ func (t *Tab) Navigate(ctx context.Context, url string, options ...CommandOption
 		}
 
 		switch payload := event.GetEvent().(type) {
-		case *enginev1.TabSessionEvent_Attached:
+		case *enginev1.ContextSessionEvent_Attached:
 			t.attached = true
 			_ = payload
-		case *enginev1.TabSessionEvent_Navigated:
+		case *enginev1.ContextSessionEvent_Navigated:
 			result.URL = payload.Navigated.GetUrl()
 			result.Note = payload.Navigated.GetNote()
-		case *enginev1.TabSessionEvent_ChromiumBidiInjection:
+		case *enginev1.ContextSessionEvent_ChromiumBidiInjection:
 			result.BidiSessionID = payload.ChromiumBidiInjection.GetBidiSessionId()
 			result.MapperTargetID = payload.ChromiumBidiInjection.GetMapperTargetId()
 			result.MapperSessionID = payload.ChromiumBidiInjection.GetMapperSessionId()
 			result.PackageVersion = payload.ChromiumBidiInjection.GetPackageVersion()
 			t.lastBidiSessionID = result.BidiSessionID
 			return result, nil
-		case *enginev1.TabSessionEvent_Error:
+		case *enginev1.ContextSessionEvent_Error:
 			return nil, fmt.Errorf("tab session error while navigating: %s", payload.Error.GetMessage())
 		}
 	}
@@ -94,10 +94,10 @@ func (t *Tab) Click(ctx context.Context, cssSelector string, options ...CommandO
 	commandOptions := firstCommandOptions(options)
 	cssSelector = normalizeSelectorForTransport(cssSelector)
 
-	if err := t.stream.Send(&enginev1.TabSessionCommand{
-		BrowserSessionId: t.browserSessionID,
-		TabSessionId:     t.sessionID,
-		Command: &enginev1.TabSessionCommand_ClickElement{
+	if err := t.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: t.browserSessionID,
+		ContextSessionId: t.sessionID,
+		Command: &enginev1.ContextSessionCommand_ClickElement{
 			ClickElement: &enginev1.ClickElementCommand{
 				CssSelector:  cssSelector,
 				RetryOptions: retryOptionsProto(commandOptions.Timeout),
@@ -114,17 +114,17 @@ func (t *Tab) Click(ctx context.Context, cssSelector string, options ...CommandO
 		}
 
 		switch payload := event.GetEvent().(type) {
-		case *enginev1.TabSessionEvent_Attached:
+		case *enginev1.ContextSessionEvent_Attached:
 			t.attached = true
 			_ = payload
-		case *enginev1.TabSessionEvent_ElementClicked:
+		case *enginev1.ContextSessionEvent_ElementClicked:
 			t.lastBidiSessionID = payload.ElementClicked.GetBidiSessionId()
 			return &ClickResult{
 				Selector:      payload.ElementClicked.GetCssSelector(),
 				Note:          payload.ElementClicked.GetNote(),
 				BidiSessionID: payload.ElementClicked.GetBidiSessionId(),
 			}, nil
-		case *enginev1.TabSessionEvent_Error:
+		case *enginev1.ContextSessionEvent_Error:
 			return nil, fmt.Errorf("tab session error while clicking: %s", payload.Error.GetMessage())
 		}
 	}
@@ -147,10 +147,10 @@ func (t *Tab) Count(ctx context.Context, cssSelector string, options ...CommandO
 	commandOptions := firstCommandOptions(options)
 	cssSelector = normalizeSelectorForTransport(cssSelector)
 
-	if err := t.stream.Send(&enginev1.TabSessionCommand{
-		BrowserSessionId: t.browserSessionID,
-		TabSessionId:     t.sessionID,
-		Command: &enginev1.TabSessionCommand_CountElements{
+	if err := t.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: t.browserSessionID,
+		ContextSessionId: t.sessionID,
+		Command: &enginev1.ContextSessionCommand_CountElements{
 			CountElements: &enginev1.CountElementsCommand{
 				CssSelector:  cssSelector,
 				RetryOptions: retryOptionsProto(commandOptions.Timeout),
@@ -167,16 +167,16 @@ func (t *Tab) Count(ctx context.Context, cssSelector string, options ...CommandO
 		}
 
 		switch payload := event.GetEvent().(type) {
-		case *enginev1.TabSessionEvent_Attached:
+		case *enginev1.ContextSessionEvent_Attached:
 			t.attached = true
 			_ = payload
-		case *enginev1.TabSessionEvent_ElementCounted:
+		case *enginev1.ContextSessionEvent_ElementCounted:
 			return &CountResult{
 				Selector: payload.ElementCounted.GetCssSelector(),
 				Count:    payload.ElementCounted.GetCount(),
 				Note:     payload.ElementCounted.GetNote(),
 			}, nil
-		case *enginev1.TabSessionEvent_Error:
+		case *enginev1.ContextSessionEvent_Error:
 			return nil, fmt.Errorf("tab session error while counting elements: %s", payload.Error.GetMessage())
 		}
 	}
@@ -199,10 +199,10 @@ func (t *Tab) Highlight(ctx context.Context, cssSelector string, options ...High
 	highlightOptions := firstHighlightOptions(options)
 	cssSelector = normalizeSelectorForTransport(cssSelector)
 
-	if err := t.stream.Send(&enginev1.TabSessionCommand{
-		BrowserSessionId: t.browserSessionID,
-		TabSessionId:     t.sessionID,
-		Command: &enginev1.TabSessionCommand_HighlightElements{
+	if err := t.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: t.browserSessionID,
+		ContextSessionId: t.sessionID,
+		Command: &enginev1.ContextSessionCommand_HighlightElements{
 			HighlightElements: &enginev1.HighlightElementsCommand{
 				CssSelector:  cssSelector,
 				DurationMs:   durationProto(highlightOptions.Duration),
@@ -220,16 +220,16 @@ func (t *Tab) Highlight(ctx context.Context, cssSelector string, options ...High
 		}
 
 		switch payload := event.GetEvent().(type) {
-		case *enginev1.TabSessionEvent_Attached:
+		case *enginev1.ContextSessionEvent_Attached:
 			t.attached = true
 			_ = payload
-		case *enginev1.TabSessionEvent_ElementsHighlighted:
+		case *enginev1.ContextSessionEvent_ElementsHighlighted:
 			return &HighlightResult{
 				Selector: payload.ElementsHighlighted.GetCssSelector(),
 				Count:    payload.ElementsHighlighted.GetCount(),
 				Note:     payload.ElementsHighlighted.GetNote(),
 			}, nil
-		case *enginev1.TabSessionEvent_Error:
+		case *enginev1.ContextSessionEvent_Error:
 			return nil, fmt.Errorf("tab session error while highlighting elements: %s", payload.Error.GetMessage())
 		}
 	}
@@ -252,10 +252,10 @@ func (t *Tab) Focus(ctx context.Context, cssSelector string, options ...CommandO
 	commandOptions := firstCommandOptions(options)
 	cssSelector = normalizeSelectorForTransport(cssSelector)
 
-	if err := t.stream.Send(&enginev1.TabSessionCommand{
-		BrowserSessionId: t.browserSessionID,
-		TabSessionId:     t.sessionID,
-		Command: &enginev1.TabSessionCommand_FocusElement{
+	if err := t.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: t.browserSessionID,
+		ContextSessionId: t.sessionID,
+		Command: &enginev1.ContextSessionCommand_FocusElement{
 			FocusElement: &enginev1.FocusElementCommand{
 				CssSelector:  cssSelector,
 				RetryOptions: retryOptionsProto(commandOptions.Timeout),
@@ -272,15 +272,15 @@ func (t *Tab) Focus(ctx context.Context, cssSelector string, options ...CommandO
 		}
 
 		switch payload := event.GetEvent().(type) {
-		case *enginev1.TabSessionEvent_Attached:
+		case *enginev1.ContextSessionEvent_Attached:
 			t.attached = true
 			_ = payload
-		case *enginev1.TabSessionEvent_ElementFocused:
+		case *enginev1.ContextSessionEvent_ElementFocused:
 			return &ElementResult{
 				Selector: payload.ElementFocused.GetCssSelector(),
 				Note:     payload.ElementFocused.GetNote(),
 			}, nil
-		case *enginev1.TabSessionEvent_Error:
+		case *enginev1.ContextSessionEvent_Error:
 			return nil, fmt.Errorf("tab session error while focusing: %s", payload.Error.GetMessage())
 		}
 	}
@@ -303,10 +303,10 @@ func (t *Tab) Fill(ctx context.Context, cssSelector string, value string, option
 	commandOptions := firstCommandOptions(options)
 	cssSelector = normalizeSelectorForTransport(cssSelector)
 
-	if err := t.stream.Send(&enginev1.TabSessionCommand{
-		BrowserSessionId: t.browserSessionID,
-		TabSessionId:     t.sessionID,
-		Command: &enginev1.TabSessionCommand_FillElement{
+	if err := t.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: t.browserSessionID,
+		ContextSessionId: t.sessionID,
+		Command: &enginev1.ContextSessionCommand_FillElement{
 			FillElement: &enginev1.FillElementCommand{
 				CssSelector:  cssSelector,
 				Value:        value,
@@ -324,16 +324,16 @@ func (t *Tab) Fill(ctx context.Context, cssSelector string, value string, option
 		}
 
 		switch payload := event.GetEvent().(type) {
-		case *enginev1.TabSessionEvent_Attached:
+		case *enginev1.ContextSessionEvent_Attached:
 			t.attached = true
 			_ = payload
-		case *enginev1.TabSessionEvent_ElementFilled:
+		case *enginev1.ContextSessionEvent_ElementFilled:
 			return &FillResult{
 				Selector: payload.ElementFilled.GetCssSelector(),
 				Value:    payload.ElementFilled.GetValue(),
 				Note:     payload.ElementFilled.GetNote(),
 			}, nil
-		case *enginev1.TabSessionEvent_Error:
+		case *enginev1.ContextSessionEvent_Error:
 			return nil, fmt.Errorf("tab session error while filling: %s", payload.Error.GetMessage())
 		}
 	}

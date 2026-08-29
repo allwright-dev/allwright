@@ -85,9 +85,6 @@ func ensureRuntimeReady(ctx context.Context, serverAddr string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	if err := ensurePluginsInstalledWithCLI(cliPath, expectedVersion, []string{"web"}); err != nil {
-		return "", err
-	}
 	if status, err := pingServer(ctx, serverAddr); err == nil {
 		if status.version == expectedVersion {
 			return serverAddr, nil
@@ -306,73 +303,6 @@ func installCLI() (string, error) {
 	return cliPath, nil
 }
 
-func ensurePluginsInstalled(pluginIDs []string) error {
-	expectedVersion := expectedRuntimeVersion()
-	cliPath, err := ensureCLIAvailable(expectedVersion)
-	if err != nil {
-		return err
-	}
-	return ensurePluginsInstalledWithCLI(cliPath, expectedVersion, pluginIDs)
-}
-
-func ensurePluginsInstalledWithCLI(cliPath string, expectedVersion string, pluginIDs []string) error {
-	home, err := allwrightHome()
-	if err != nil {
-		return err
-	}
-	if expectedVersion == "" {
-		expectedVersion = normalizeReleaseVersion(defaultReleaseVersion)
-	}
-	seen := map[string]bool{}
-	for _, pluginID := range pluginIDs {
-		pluginID = strings.TrimSpace(pluginID)
-		if pluginID == "" || seen[pluginID] {
-			continue
-		}
-		seen[pluginID] = true
-		pluginPath := filepath.Join(home, "plugins", pluginID, "lib", pluginLibraryFilename(pluginID))
-		if isFile(pluginPath) {
-			if version, err := installedPluginVersion(home, pluginID); err == nil && version == expectedVersion {
-				continue
-			}
-		}
-
-		cmd := exec.Command(cliPath, "plugin", "install", pluginID, "--version", expectedVersion)
-		cmd.Stdout = io.Discard
-		cmd.Stderr = io.Discard
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("install allwright %s plugin: %w", pluginID, err)
-		}
-		if !isFile(pluginPath) {
-			return fmt.Errorf("allwright attempted to install the %s plugin automatically, but the runtime library is still missing", pluginID)
-		}
-		if version, err := installedPluginVersion(home, pluginID); err == nil && version == expectedVersion {
-			continue
-		}
-		return fmt.Errorf("allwright attempted to install the %s plugin automatically, but version %s is still not active", pluginID, expectedVersion)
-	}
-	return nil
-}
-
-func invokePlugin(ctx context.Context, pluginID string, requestJSON string) ([]byte, error) {
-	expectedVersion := expectedRuntimeVersion()
-	cliPath, err := ensureCLIAvailable(expectedVersion)
-	if err != nil {
-		return nil, err
-	}
-	command := exec.CommandContext(ctx, cliPath, "plugin", "invoke", pluginID, "--request-json", requestJSON)
-	command.Stdin = nil
-	output, err := command.CombinedOutput()
-	if err != nil {
-		details := strings.TrimSpace(string(output))
-		if details == "" {
-			return nil, fmt.Errorf("allwright %s plugin invocation failed: %w", pluginID, err)
-		}
-		return nil, fmt.Errorf("%s", details)
-	}
-	return output, nil
-}
-
 func resolveReleaseTag() (string, error) {
 	version := strings.TrimSpace(os.Getenv(allwrightVersionEnvVar))
 	if version == "" {
@@ -569,29 +499,6 @@ func isLocalServerAddr(serverAddr string) bool {
 	return host == "127.0.0.1" || host == "localhost" || host == "::1"
 }
 
-func installedPluginVersion(home string, pluginID string) (string, error) {
-	manifestPath := filepath.Join(home, "plugins.txt")
-	contents, err := os.ReadFile(manifestPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", nil
-		}
-		return "", err
-	}
-	for _, line := range strings.Split(string(contents), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		parts := strings.SplitN(trimmed, "\t", 3)
-		if len(parts) < 3 || parts[0] != pluginID {
-			continue
-		}
-		return normalizeReleaseVersion(parts[2]), nil
-	}
-	return "", nil
-}
-
 func allocateManagedServerAddr(serverAddr string) (string, error) {
 	host := localBindingHost(serverAddr)
 	listener, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
@@ -683,31 +590,6 @@ func cliFilename() string {
 		return "allwright.exe"
 	}
 	return "allwright"
-}
-
-func pluginLibraryFilename(pluginID string) string {
-	stem := pluginLibraryStem(pluginID)
-	switch runtime.GOOS {
-	case "darwin":
-		return "lib" + stem + ".dylib"
-	case "linux":
-		return "lib" + stem + ".so"
-	case "windows":
-		return stem + ".dll"
-	default:
-		return stem + ".unknown"
-	}
-}
-
-func pluginLibraryStem(pluginID string) string {
-	switch pluginID {
-	case "web":
-		return "allwright_surface_web"
-	case "mobile-android":
-		return "allwright_surface_mobile_android"
-	default:
-		return "allwright_plugin"
-	}
 }
 
 func isFile(path string) bool {

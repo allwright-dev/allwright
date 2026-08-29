@@ -2,8 +2,8 @@ package dev.allwright.client;
 
 import dev.allwright.engine.v1.BrowserLaunchedEvent;
 import dev.allwright.engine.v1.BrowserKind;
-import dev.allwright.engine.v1.BrowserSessionCommand;
-import dev.allwright.engine.v1.BrowserSessionEvent;
+import dev.allwright.engine.v1.SurfaceSessionCommand;
+import dev.allwright.engine.v1.SurfaceSessionEvent;
 import dev.allwright.engine.v1.EngineServiceGrpc;
 import dev.allwright.engine.v1.LaunchBrowserCommand;
 import dev.allwright.engine.v1.PingRequest;
@@ -77,8 +77,8 @@ public final class Allwright {
 
     public static Browser launchBrowser(BrowserKind browserKind, LaunchOptions options) {
         RuntimeSupport.RuntimeClient runtime = getRuntime();
-        RuntimeSupport.StreamHandle<BrowserSessionCommand, BrowserSessionEvent> stream =
-                new RuntimeSupport.StreamHandle<>(runtime.asyncStub()::browserSession);
+        RuntimeSupport.StreamHandle<SurfaceSessionCommand, SurfaceSessionEvent> stream =
+                new RuntimeSupport.StreamHandle<>(runtime.asyncStub()::surfaceSession);
 
         LaunchBrowserCommand.Builder launch = LaunchBrowserCommand.newBuilder().setBrowserKind(browserKind);
         if (options.browserBinary() != null && !options.browserBinary().isBlank()) {
@@ -88,14 +88,14 @@ public final class Allwright {
             launch.setRetryOptions(CommandSupport.commandRetryOptions(options.timeoutMs()));
         }
 
-        stream.send(BrowserSessionCommand.newBuilder().setLaunchBrowser(launch).build());
+        stream.send(SurfaceSessionCommand.newBuilder().setLaunchBrowser(launch).build());
 
         while (true) {
-            BrowserSessionEvent event = stream.recv("receive browser session event during launch");
+            SurfaceSessionEvent event = stream.recv("receive browser session event during launch");
             switch (event.getEventCase()) {
                 case BROWSER_LAUNCHED -> {
                     BrowserLaunchedEvent launched = event.getBrowserLaunched();
-                    Page initialPage = new Page(runtime, event.getSessionId(), launched.getInitialTabSessionId());
+                    Page initialPage = new Page(runtime, event.getSessionId(), launched.getInitialPageSessionId());
                     return new Browser(
                             runtime,
                             stream,
@@ -277,7 +277,7 @@ public final class Allwright {
         };
     }
 
-    private static RuntimeSupport.RuntimeClient getRuntime() {
+    static RuntimeSupport.RuntimeClient getRuntime() {
         synchronized (RUNTIME_LOCK) {
             if (runtimeClient == null) {
                 String serverAddr = resolveServerAddr();

@@ -7,6 +7,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::plugin_loader as web_lib;
 use crate::proto;
 use allwright_plugin_sdk::{BrowserSessionHandle, PageSessionHandle};
+use allwright_surface_mobile::{
+    ConnectOptions as MobileConnectOptions, DeviceConnectionKind as MobileDeviceConnectionKind,
+    LaunchOptions as MobileLaunchOptions, MobileBrowserSessionHandle, MobilePageSessionHandle,
+    MobilePlatform,
+};
 use tokio::sync::{Mutex, mpsc};
 use tokio::time::{Duration, Instant, sleep};
 use tokio_stream::{Stream, wrappers::ReceiverStream};
@@ -14,21 +19,24 @@ use tonic::{Request, Response, Status, transport::Server};
 
 use proto::engine_service_server::{EngineService, EngineServiceServer};
 use proto::{
-    BrowserKind, BrowserLaunchedEvent, BrowserSessionClosedEvent, BrowserSessionCommand,
-    BrowserSessionErrorEvent, BrowserSessionEvent, ChromeLaunchedEvent, ChromiumBidiInjectionEvent,
-    ClickElementCommand, CloseBrowserSessionCommand, CloseTabSessionCommand, CommandRetryOptions,
-    CountElementsCommand, ElementClickedEvent, ElementCountedEvent, ElementFilledEvent,
-    ElementFocusedEvent, ElementHoveredEvent, ElementsHighlightedEvent, FillElementCommand,
-    FocusElementCommand, GetInnerTextCommand, GetTextContentCommand, HighlightElementsCommand,
-    HoverElementCommand, InnerTextResolvedEvent, KeyPressedEvent, LaunchBrowserCommand,
-    LaunchChromeCommand, NavigateTabCommand, OpenTabCommand, PingRequest, PingResponse,
-    PressKeyCommand, SelectorWaitSatisfiedEvent, SessionPingCommand, SessionPongEvent,
-    TabNavigatedEvent, TabOpenedEvent, TabSessionAttachedEvent, TabSessionClosedEvent,
-    TabSessionCommand, TabSessionErrorEvent, TabSessionEvent, TabSessionPingCommand,
-    TabSessionPongEvent, TextContentResolvedEvent, WaitForSelectorCommand,
-    browser_session_command::Command as BrowserCommand,
-    browser_session_event::Event as BrowserEvent, tab_session_command::Command as TabCommand,
-    tab_session_event::Event as TabEvent,
+    BrowserKind, BrowserLaunchedEvent, SurfaceSessionClosedEvent, SurfaceSessionCommand,
+    SurfaceSessionErrorEvent, SurfaceSessionEvent, ChromeLaunchedEvent, ChromiumBidiInjectionEvent,
+    ClickElementCommand, CloseSurfaceSessionCommand, CloseContextSessionCommand, CommandRetryOptions,
+    ConnectMobileCommand, CountElementsCommand, DeviceConnectionKind, ElementClickedEvent,
+    ElementCountedEvent, ElementFilledEvent, ElementFocusedEvent, ElementHoveredEvent,
+    ElementsHighlightedEvent, FillElementCommand, FocusElementCommand, GetInnerTextCommand,
+    GetTextContentCommand, HighlightElementsCommand, HoverElementCommand, InnerTextResolvedEvent,
+    KeyPressedEvent, LaunchAppCommand, LaunchBrowserCommand, LaunchChromeCommand,
+    MobileConnectedEvent, MobilePlatform as ProtoMobilePlatform, NavigatePageCommand,
+    OpenContextCommand, PingRequest, PingResponse, PressKeyCommand, SelectorWaitSatisfiedEvent,
+    SessionPingCommand, SessionPongEvent, PageNavigatedEvent, ContextOpenedEvent,
+    ContextSessionAttachedEvent, ContextSessionClosedEvent, ContextSessionCommand, ContextSessionErrorEvent,
+    ContextSessionEvent, ContextSessionPingCommand, ContextSessionPongEvent, TextContentResolvedEvent,
+    WaitForSelectorCommand, AppLaunchedEvent,
+    context_session_command::Command as ContextCommand,
+    context_session_event::Event as ContextEvent,
+    surface_session_command::Command as SurfaceCommand,
+    surface_session_event::Event as SurfaceEvent,
 };
 
 static BROWSER_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -45,16 +53,74 @@ struct BrowserAutomationState {
 #[derive(Debug, Default)]
 struct BrowserSessionState {
     launched: bool,
-    browser_session: Option<BrowserSessionHandle>,
+    surface_session: Option<EngineBrowserSessionHandle>,
     process_id: Option<u32>,
     automation: Option<BrowserAutomationState>,
 }
 
 #[derive(Debug, Clone)]
 struct TabSessionState {
-    browser_session_id: String,
-    page_session: PageSessionHandle,
+    surface_session_id: String,
+    page_session: EnginePageSessionHandle,
     current_url: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+enum EngineBrowserSessionHandle {
+    Web(BrowserSessionHandle),
+    Mobile(MobileBrowserSessionHandle),
+}
+
+#[derive(Debug, Clone)]
+enum EnginePageSessionHandle {
+    Web(PageSessionHandle),
+    Mobile(MobilePageSessionHandle),
+}
+
+struct EnginePageOpenResult {
+    note: String,
+    page_session: EnginePageSessionHandle,
+}
+
+impl EnginePageSessionHandle {
+    fn from_web_page(page: allwright_plugin_sdk::PageInfo) -> EnginePageOpenResult {
+        EnginePageOpenResult {
+            note: page.note,
+            page_session: EnginePageSessionHandle::Web(page.page_session),
+        }
+    }
+
+    fn from_mobile_page(page: allwright_surface_mobile::MobilePageInfo) -> EnginePageOpenResult {
+        EnginePageOpenResult {
+            note: page.note,
+            page_session: EnginePageSessionHandle::Mobile(page.page_session),
+        }
+    }
+}
+
+fn mobile_platform_from_proto(value: i32) -> Result<MobilePlatform, String> {
+    match ProtoMobilePlatform::try_from(value).unwrap_or(ProtoMobilePlatform::Unspecified) {
+        ProtoMobilePlatform::Android => Ok(MobilePlatform::Android),
+        ProtoMobilePlatform::Ios => Ok(MobilePlatform::Ios),
+        ProtoMobilePlatform::Unspecified => {
+            Err("connect_mobile requires a supported platform".to_string())
+        }
+    }
+}
+
+fn proto_mobile_platform(value: MobilePlatform) -> ProtoMobilePlatform {
+    match value {
+        MobilePlatform::Android => ProtoMobilePlatform::Android,
+        MobilePlatform::Ios => ProtoMobilePlatform::Ios,
+    }
+}
+
+fn proto_device_connection_kind(value: MobileDeviceConnectionKind) -> DeviceConnectionKind {
+    match value {
+        MobileDeviceConnectionKind::Usb => DeviceConnectionKind::Usb,
+        MobileDeviceConnectionKind::Emulator => DeviceConnectionKind::Emulator,
+        MobileDeviceConnectionKind::RemoteAdb => DeviceConnectionKind::RemoteAdb,
+    }
 }
 
 #[derive(Debug, Default)]
@@ -68,18 +134,18 @@ pub struct EngineGrpcService {
     state: Arc<Mutex<EngineState>>,
 }
 
-type BrowserSessionStream =
-    Pin<Box<dyn Stream<Item = Result<BrowserSessionEvent, Status>> + Send + 'static>>;
-type TabSessionStream =
-    Pin<Box<dyn Stream<Item = Result<TabSessionEvent, Status>> + Send + 'static>>;
+type SurfaceSessionStream =
+    Pin<Box<dyn Stream<Item = Result<SurfaceSessionEvent, Status>> + Send + 'static>>;
+type ContextSessionStream =
+    Pin<Box<dyn Stream<Item = Result<ContextSessionEvent, Status>> + Send + 'static>>;
 
 struct CommandOutcome {
-    event: BrowserSessionEvent,
+    event: SurfaceSessionEvent,
     should_close: bool,
 }
 
 struct TabCommandOutcome {
-    events: Vec<TabSessionEvent>,
+    events: Vec<ContextSessionEvent>,
     should_close: bool,
 }
 
@@ -136,30 +202,30 @@ where
     }
 }
 
-fn next_browser_session_id() -> String {
+fn next_surface_session_id() -> String {
     format!(
         "browser-session-{}",
         BROWSER_SESSION_COUNTER.fetch_add(1, Ordering::Relaxed)
     )
 }
 
-fn next_tab_session_id() -> String {
+fn next_context_session_id() -> String {
     format!(
         "tab-session-{}",
         TAB_SESSION_COUNTER.fetch_add(1, Ordering::Relaxed)
     )
 }
 
-fn browser_event(session_id: &str, event: BrowserEvent) -> BrowserSessionEvent {
-    BrowserSessionEvent {
+fn browser_event(session_id: &str, event: SurfaceEvent) -> SurfaceSessionEvent {
+    SurfaceSessionEvent {
         session_id: session_id.to_string(),
         event: Some(event),
     }
 }
 
-fn tab_event(tab_session_id: &str, event: TabEvent) -> TabSessionEvent {
-    TabSessionEvent {
-        tab_session_id: tab_session_id.to_string(),
+fn tab_event(context_session_id: &str, event: ContextEvent) -> ContextSessionEvent {
+    ContextSessionEvent {
+        context_session_id: context_session_id.to_string(),
         event: Some(event),
     }
 }
@@ -167,10 +233,10 @@ fn tab_event(tab_session_id: &str, event: TabEvent) -> TabSessionEvent {
 async fn handle_browser_command(
     state: Arc<Mutex<EngineState>>,
     session_id: &str,
-    command: BrowserSessionCommand,
+    command: SurfaceSessionCommand,
 ) -> Result<CommandOutcome, Status> {
     match command.command {
-        Some(BrowserCommand::LaunchBrowser(LaunchBrowserCommand {
+        Some(SurfaceCommand::LaunchBrowser(LaunchBrowserCommand {
             browser_kind,
             browser_binary,
             retry_options,
@@ -195,21 +261,25 @@ async fn handle_browser_command(
                     })
                     .await
                     .map_err(Status::internal)?;
-                    let initial_tab_session_id = next_tab_session_id();
+                    let initial_page_session_id = next_context_session_id();
                     state.lock().await.browser_sessions.insert(
                         session_id.to_string(),
                         BrowserSessionState {
                             launched: true,
-                            browser_session: Some(launch.browser_session.clone()),
+                            surface_session: Some(EngineBrowserSessionHandle::Web(
+                                launch.browser_session.clone(),
+                            )),
                             process_id: Some(launch.process_id),
                             automation: None,
                         },
                     );
                     state.lock().await.tab_sessions.insert(
-                        initial_tab_session_id.clone(),
+                        initial_page_session_id.clone(),
                         TabSessionState {
-                            browser_session_id: session_id.to_string(),
-                            page_session: launch.initial_page.page_session.clone(),
+                            surface_session_id: session_id.to_string(),
+                            page_session: EnginePageSessionHandle::Web(
+                                launch.initial_page.page_session.clone(),
+                            ),
                             current_url: None,
                         },
                     );
@@ -217,12 +287,12 @@ async fn handle_browser_command(
                     Ok(CommandOutcome {
                         event: browser_event(
                             session_id,
-                            BrowserEvent::BrowserLaunched(BrowserLaunchedEvent {
+                            SurfaceEvent::BrowserLaunched(BrowserLaunchedEvent {
                                 browser_kind: browser_kind as i32,
                                 browser: launch.browser,
                                 note: format!("{}; {}", launch.note, launch.initial_page.note),
                                 user_data_dir: launch.user_data_dir,
-                                initial_tab_session_id,
+                                initial_page_session_id,
                             }),
                         ),
                         should_close: false,
@@ -231,7 +301,7 @@ async fn handle_browser_command(
                 BrowserKind::Unspecified => Ok(CommandOutcome {
                     event: browser_event(
                         session_id,
-                        BrowserEvent::Error(BrowserSessionErrorEvent {
+                        SurfaceEvent::Error(SurfaceSessionErrorEvent {
                             message: "launch_browser requires a supported browser_kind".to_string(),
                         }),
                     ),
@@ -239,7 +309,7 @@ async fn handle_browser_command(
                 }),
             }
         }
-        Some(BrowserCommand::LaunchChrome(LaunchChromeCommand {
+        Some(SurfaceCommand::LaunchChrome(LaunchChromeCommand {
             chrome_binary,
             retry_options,
         })) => {
@@ -251,26 +321,28 @@ async fn handle_browser_command(
             })
             .await
             .map_err(Status::internal)?;
-            let initial_tab_session_id = next_tab_session_id();
+            let initial_page_session_id = next_context_session_id();
             state.lock().await.browser_sessions.insert(
                 session_id.to_string(),
                 BrowserSessionState {
                     launched: true,
-                    browser_session: Some(BrowserSessionHandle::Chromium {
-                        cdp_websocket_url: launch.cdp_websocket_url.clone(),
-                    }),
+                    surface_session: Some(EngineBrowserSessionHandle::Web(
+                        BrowserSessionHandle::Chromium {
+                            cdp_websocket_url: launch.cdp_websocket_url.clone(),
+                        },
+                    )),
                     process_id: Some(launch.process_id),
                     automation: None,
                 },
             );
             state.lock().await.tab_sessions.insert(
-                initial_tab_session_id.clone(),
+                initial_page_session_id.clone(),
                 TabSessionState {
-                    browser_session_id: session_id.to_string(),
-                    page_session: PageSessionHandle::Chromium {
+                    surface_session_id: session_id.to_string(),
+                    page_session: EnginePageSessionHandle::Web(PageSessionHandle::Chromium {
                         target_id: initial_tab.target_id,
                         browsing_context_id: None,
-                    },
+                    }),
                     current_url: None,
                 },
             );
@@ -278,23 +350,23 @@ async fn handle_browser_command(
             Ok(CommandOutcome {
                 event: browser_event(
                     session_id,
-                    BrowserEvent::ChromeLaunched(ChromeLaunchedEvent {
+                    SurfaceEvent::ChromeLaunched(ChromeLaunchedEvent {
                         browser: launch.browser,
                         note: format!("{}; {}", launch.note, initial_tab.note),
                         cdp_websocket_url: launch.cdp_websocket_url,
                         user_data_dir: launch.user_data_dir,
-                        initial_tab_session_id,
+                        initial_page_session_id,
                     }),
                 ),
                 should_close: false,
             })
         }
-        Some(BrowserCommand::OpenTab(OpenTabCommand { retry_options })) => {
-            let browser_session = {
+        Some(SurfaceCommand::OpenContext(OpenContextCommand { retry_options })) => {
+            let surface_session = {
                 let state = state.lock().await;
                 match state.browser_sessions.get(session_id) {
-                    Some(browser_session) if browser_session.launched => {
-                        browser_session.browser_session.clone().ok_or_else(|| {
+                    Some(surface_session) if surface_session.launched => {
+                        surface_session.surface_session.clone().ok_or_else(|| {
                             Status::internal("browser session is missing backend session metadata")
                         })?
                     }
@@ -302,7 +374,7 @@ async fn handle_browser_command(
                         return Ok(CommandOutcome {
                             event: browser_event(
                                 session_id,
-                                BrowserEvent::Error(BrowserSessionErrorEvent {
+                                SurfaceEvent::Error(SurfaceSessionErrorEvent {
                                     message: "browser must be launched before opening a tab"
                                         .to_string(),
                                 }),
@@ -314,7 +386,7 @@ async fn handle_browser_command(
                         return Ok(CommandOutcome {
                             event: browser_event(
                                 session_id,
-                                BrowserEvent::Error(BrowserSessionErrorEvent {
+                                SurfaceEvent::Error(SurfaceSessionErrorEvent {
                                     message: "browser session is not registered".to_string(),
                                 }),
                             ),
@@ -325,15 +397,24 @@ async fn handle_browser_command(
             };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let page = retry_with_timeout(retry_policy, || async {
-                web_lib::open_page(&browser_session).await
+                match &surface_session {
+                    EngineBrowserSessionHandle::Web(surface_session) => web_lib::open_page(surface_session)
+                        .await
+                        .map(EnginePageSessionHandle::from_web_page),
+                    EngineBrowserSessionHandle::Mobile(surface_session) => {
+                        web_lib::open_mobile_page(surface_session)
+                            .await
+                            .map(EnginePageSessionHandle::from_mobile_page)
+                    }
+                }
             })
             .await
             .map_err(Status::internal)?;
-            let tab_session_id = next_tab_session_id();
+            let context_session_id = next_context_session_id();
             state.lock().await.tab_sessions.insert(
-                tab_session_id.clone(),
+                context_session_id.clone(),
                 TabSessionState {
-                    browser_session_id: session_id.to_string(),
+                    surface_session_id: session_id.to_string(),
                     page_session: page.page_session,
                     current_url: None,
                 },
@@ -342,18 +423,176 @@ async fn handle_browser_command(
             Ok(CommandOutcome {
                 event: browser_event(
                     session_id,
-                    BrowserEvent::TabOpened(TabOpenedEvent {
-                        tab_session_id,
+                    SurfaceEvent::ContextOpened(ContextOpenedEvent {
+                        context_session_id,
                         note: page.note,
                     }),
                 ),
                 should_close: false,
             })
         }
-        Some(BrowserCommand::Ping(SessionPingCommand { message })) => Ok(CommandOutcome {
+        Some(SurfaceCommand::ConnectMobile(ConnectMobileCommand {
+            platform,
+            device,
+            adb_endpoint,
+            preserve_app_state,
+            retry_options,
+        })) => {
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let connect = retry_with_timeout(retry_policy, || async {
+                web_lib::connect_mobile(MobileConnectOptions {
+                    platform: mobile_platform_from_proto(platform)?,
+                    device: device.clone(),
+                    adb_endpoint: adb_endpoint.clone(),
+                    preserve_app_state,
+                    timeout_ms: retry_options.as_ref().and_then(|options| options.timeout_ms),
+                })
+                .await
+            })
+            .await
+            .map_err(Status::internal)?;
+            let initial_page_session_id = next_context_session_id();
+            state.lock().await.browser_sessions.insert(
+                session_id.to_string(),
+                BrowserSessionState {
+                    launched: true,
+                    surface_session: Some(EngineBrowserSessionHandle::Mobile(
+                        connect.browser_session.clone(),
+                    )),
+                    process_id: None,
+                    automation: None,
+                },
+            );
+            state.lock().await.tab_sessions.insert(
+                initial_page_session_id.clone(),
+                TabSessionState {
+                    surface_session_id: session_id.to_string(),
+                    page_session: EnginePageSessionHandle::Mobile(
+                        connect.initial_page.page_session.clone(),
+                    ),
+                    current_url: None,
+                },
+            );
+
+            Ok(CommandOutcome {
+                event: browser_event(
+                    session_id,
+                    SurfaceEvent::MobileConnected(MobileConnectedEvent {
+                        platform: proto_mobile_platform(connect.browser_session.platform) as i32,
+                        device_name: connect.browser,
+                        note: format!("{}; {}", connect.note, connect.initial_page.note),
+                        device_id: connect.browser_session.device.device_id,
+                        connection_kind: proto_device_connection_kind(
+                            connect.browser_session.device.connection_kind,
+                        ) as i32,
+                        backend: connect.browser_session.automation.backend,
+                        device_session_id: connect.browser_session.automation.session_id,
+                        initial_app_session_id: initial_page_session_id,
+                        package_name: connect.initial_page.page_session.package_name,
+                        activity_name: connect.initial_page.page_session.activity_name,
+                    }),
+                ),
+                should_close: false,
+            })
+        }
+        Some(SurfaceCommand::LaunchApp(LaunchAppCommand {
+            apk_path,
+            app_id,
+            launch_activity,
+            stop_before_launch,
+            retry_options,
+        })) => {
+            let surface_session = {
+                let state = state.lock().await;
+                match state.browser_sessions.get(session_id) {
+                    Some(surface_session) if surface_session.launched => {
+                        surface_session.surface_session.clone().ok_or_else(|| {
+                            Status::internal("browser session is missing backend session metadata")
+                        })?
+                    }
+                    Some(_) => {
+                        return Ok(CommandOutcome {
+                            event: browser_event(
+                                session_id,
+                                SurfaceEvent::Error(SurfaceSessionErrorEvent {
+                                    message: "browser must be connected before launching an app"
+                                        .to_string(),
+                                }),
+                            ),
+                            should_close: false,
+                        });
+                    }
+                    None => {
+                        return Ok(CommandOutcome {
+                            event: browser_event(
+                                session_id,
+                                SurfaceEvent::Error(SurfaceSessionErrorEvent {
+                                    message: "browser session is not registered".to_string(),
+                                }),
+                            ),
+                            should_close: false,
+                        });
+                    }
+                }
+            };
+
+            let EngineBrowserSessionHandle::Mobile(surface_session) = surface_session else {
+                return Ok(CommandOutcome {
+                    event: browser_event(
+                        session_id,
+                        SurfaceEvent::Error(SurfaceSessionErrorEvent {
+                            message: "launch_app is only supported for mobile browser sessions"
+                                .to_string(),
+                        }),
+                    ),
+                    should_close: false,
+                });
+            };
+
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let page = retry_with_timeout(retry_policy, || async {
+                web_lib::launch_mobile_app(
+                    &surface_session,
+                    MobileLaunchOptions {
+                        apk_path: apk_path.clone(),
+                        app_id: app_id.clone(),
+                        launch_activity: launch_activity.clone(),
+                        stop_before_launch,
+                        timeout_ms: retry_options.as_ref().and_then(|options| options.timeout_ms),
+                    },
+                )
+                .await
+            })
+            .await
+            .map_err(Status::internal)?;
+            let context_session_id = next_context_session_id();
+            state.lock().await.tab_sessions.insert(
+                context_session_id.clone(),
+                TabSessionState {
+                    surface_session_id: session_id.to_string(),
+                    page_session: EnginePageSessionHandle::Mobile(page.page_session.clone()),
+                    current_url: None,
+                },
+            );
+
+            Ok(CommandOutcome {
+                event: browser_event(
+                    session_id,
+                    SurfaceEvent::AppLaunched(AppLaunchedEvent {
+                        app_session_id: context_session_id,
+                        note: page.note,
+                        package_name: page.page_session.package_name,
+                        activity_name: page.page_session.activity_name,
+                        webview_context: page.page_session.webview_context,
+                    }),
+                ),
+                should_close: false,
+            })
+        }
+        Some(SurfaceCommand::Ping(SessionPingCommand { message })) => Ok(CommandOutcome {
             event: browser_event(
                 session_id,
-                BrowserEvent::Pong(SessionPongEvent {
+                SurfaceEvent::Pong(SessionPongEvent {
                     message: if message.is_empty() {
                         "pong".to_string()
                     } else {
@@ -363,20 +602,24 @@ async fn handle_browser_command(
             ),
             should_close: false,
         }),
-        Some(BrowserCommand::Close(CloseBrowserSessionCommand {})) => {
-            let process_id = state
-                .lock()
-                .await
-                .browser_sessions
-                .get(session_id)
-                .and_then(|session| session.process_id);
+        Some(SurfaceCommand::Close(CloseSurfaceSessionCommand {})) => {
+            let (process_id, surface_session) = {
+                let state = state.lock().await;
+                let session = state.browser_sessions.get(session_id);
+                (
+                    session.and_then(|session| session.process_id),
+                    session.and_then(|session| session.surface_session.clone()),
+                )
+            };
             if let Some(process_id) = process_id {
                 web_lib::close_browser_process(process_id).map_err(Status::internal)?;
+            } else if let Some(EngineBrowserSessionHandle::Mobile(_)) = surface_session {
+                // Mobile sessions currently have no process to tear down at the engine layer.
             }
             Ok(CommandOutcome {
                 event: browser_event(
                     session_id,
-                    BrowserEvent::Closed(BrowserSessionClosedEvent {
+                    SurfaceEvent::Closed(SurfaceSessionClosedEvent {
                         reason: "browser session closed by client".to_string(),
                     }),
                 ),
@@ -386,7 +629,7 @@ async fn handle_browser_command(
         None => Ok(CommandOutcome {
             event: browser_event(
                 session_id,
-                BrowserEvent::Error(BrowserSessionErrorEvent {
+                SurfaceEvent::Error(SurfaceSessionErrorEvent {
                     message: "browser session command payload is missing".to_string(),
                 }),
             ),
@@ -397,49 +640,49 @@ async fn handle_browser_command(
 
 async fn handle_tab_command(
     state: Arc<Mutex<EngineState>>,
-    command: TabSessionCommand,
+    command: ContextSessionCommand,
 ) -> Result<TabCommandOutcome, Status> {
-    let browser_session_id = command.browser_session_id;
-    let tab_session_id = command.tab_session_id;
-    if browser_session_id.trim().is_empty() {
+    let surface_session_id = command.surface_session_id;
+    let context_session_id = command.context_session_id;
+    if surface_session_id.trim().is_empty() {
         return Ok(TabCommandOutcome {
             events: vec![tab_event(
-                if tab_session_id.trim().is_empty() {
+                if context_session_id.trim().is_empty() {
                     "unknown-tab-session"
                 } else {
-                    &tab_session_id
+                    &context_session_id
                 },
-                TabEvent::Error(TabSessionErrorEvent {
-                    message: "browser_session_id is required".to_string(),
+                ContextEvent::Error(ContextSessionErrorEvent {
+                    message: "surface_session_id is required".to_string(),
                 }),
             )],
             should_close: false,
         });
     }
 
-    if tab_session_id.trim().is_empty() {
+    if context_session_id.trim().is_empty() {
         return Ok(TabCommandOutcome {
             events: vec![tab_event(
                 "unknown-tab-session",
-                TabEvent::Error(TabSessionErrorEvent {
-                    message: "tab_session_id is required".to_string(),
+                ContextEvent::Error(ContextSessionErrorEvent {
+                    message: "context_session_id is required".to_string(),
                 }),
             )],
             should_close: false,
         });
     }
 
-    let (browser_session, page_session, existing_automation) = {
+    let (surface_session, page_session, existing_automation) = {
         let state = state.lock().await;
-        let browser_session = match state.browser_sessions.get(&browser_session_id) {
-            Some(browser_session) => browser_session,
+        let surface_session = match state.browser_sessions.get(&surface_session_id) {
+            Some(surface_session) => surface_session,
             None => {
                 return Ok(TabCommandOutcome {
                     events: vec![tab_event(
-                        &tab_session_id,
-                        TabEvent::Error(TabSessionErrorEvent {
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
                             message: format!(
-                                "browser_session_id {browser_session_id} is not active"
+                                "surface_session_id {surface_session_id} is not active"
                             ),
                         }),
                     )],
@@ -448,14 +691,14 @@ async fn handle_tab_command(
             }
         };
 
-        let tab_session = match state.tab_sessions.get(&tab_session_id) {
-            Some(tab_session) => tab_session,
+        let context_session = match state.tab_sessions.get(&context_session_id) {
+            Some(context_session) => context_session,
             None => {
                 return Ok(TabCommandOutcome {
                     events: vec![tab_event(
-                        &tab_session_id,
-                        TabEvent::Error(TabSessionErrorEvent {
-                            message: format!("unknown tab_session_id {tab_session_id}"),
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: format!("unknown context_session_id {context_session_id}"),
                         }),
                     )],
                     should_close: false,
@@ -463,14 +706,14 @@ async fn handle_tab_command(
             }
         };
 
-        if tab_session.browser_session_id != browser_session_id {
+        if context_session.surface_session_id != surface_session_id {
             return Ok(TabCommandOutcome {
                 events: vec![tab_event(
-                    &tab_session_id,
-                    TabEvent::Error(TabSessionErrorEvent {
+                    &context_session_id,
+                    ContextEvent::Error(ContextSessionErrorEvent {
                         message: format!(
-                            "tab_session_id {tab_session_id} belongs to browser_session_id {}, not {browser_session_id}",
-                            tab_session.browser_session_id
+                            "context_session_id {context_session_id} belongs to surface_session_id {}, not {surface_session_id}",
+                            context_session.surface_session_id
                         ),
                     }),
                 )],
@@ -479,19 +722,19 @@ async fn handle_tab_command(
         }
 
         (
-            browser_session.browser_session.clone().ok_or_else(|| {
+            surface_session.surface_session.clone().ok_or_else(|| {
                 Status::internal("browser session is missing backend session metadata")
             })?,
-            tab_session.page_session.clone(),
-            browser_session.automation.clone(),
+            context_session.page_session.clone(),
+            surface_session.automation.clone(),
         )
     };
 
     match command.command {
-        Some(TabCommand::Ping(TabSessionPingCommand { message })) => Ok(TabCommandOutcome {
+        Some(ContextCommand::Ping(ContextSessionPingCommand { message })) => Ok(TabCommandOutcome {
             events: vec![tab_event(
-                &tab_session_id,
-                TabEvent::Pong(TabSessionPongEvent {
+                &context_session_id,
+                ContextEvent::Pong(ContextSessionPongEvent {
                     message: if message.is_empty() {
                         "tab-pong".to_string()
                     } else {
@@ -501,38 +744,89 @@ async fn handle_tab_command(
             )],
             should_close: false,
         }),
-        Some(TabCommand::Close(CloseTabSessionCommand {})) => {
-            web_lib::close_page(&browser_session, &page_session)
-                .await
-                .map_err(Status::internal)?;
-            state.lock().await.tab_sessions.remove(&tab_session_id);
+        Some(ContextCommand::Close(CloseContextSessionCommand {})) => {
+            match (&surface_session, &page_session) {
+                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                    web_lib::close_page(surface_session, page_session)
+                        .await
+                        .map_err(Status::internal)?;
+                }
+                (
+                    EngineBrowserSessionHandle::Mobile(surface_session),
+                    EnginePageSessionHandle::Mobile(page_session),
+                ) => {
+                    web_lib::close_mobile_page(surface_session, page_session)
+                        .await
+                        .map_err(Status::internal)?;
+                }
+                _ => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "tab session backend metadata is inconsistent".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            }
+            state.lock().await.tab_sessions.remove(&context_session_id);
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
-                    &tab_session_id,
-                    TabEvent::Closed(TabSessionClosedEvent {
+                    &context_session_id,
+                    ContextEvent::Closed(ContextSessionClosedEvent {
                         reason: "tab session closed by client".to_string(),
                     }),
                 )],
                 should_close: true,
             })
         }
-        Some(TabCommand::Navigate(NavigateTabCommand { url, retry_options })) => {
+        Some(ContextCommand::Navigate(NavigatePageCommand { url, retry_options })) => {
+            let (surface_session, page_session) = match (&surface_session, &page_session) {
+                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                    (surface_session, page_session)
+                }
+                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "navigate is not supported for mobile tab sessions".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+                _ => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "tab session backend metadata is inconsistent".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let navigation = retry_with_timeout(retry_policy, || async {
-                web_lib::navigate_page(&browser_session, &page_session, &url).await
+                web_lib::navigate_page(&surface_session, &page_session, &url).await
             })
             .await
             .map_err(Status::internal)?;
             {
                 let mut state = state.lock().await;
-                let tab_session = state
+                let context_session = state
                     .tab_sessions
-                    .get_mut(&tab_session_id)
+                    .get_mut(&context_session_id)
                     .ok_or_else(|| Status::internal("tab session disappeared during navigation"))?;
-                tab_session.page_session = navigation.page_session.clone();
-                tab_session.current_url = Some(navigation.url.clone());
-                if let Some(browser_session) = state.browser_sessions.get_mut(&browser_session_id) {
-                    browser_session.automation = Some(BrowserAutomationState {
+                context_session.page_session =
+                    EnginePageSessionHandle::Web(navigation.page_session.clone());
+                context_session.current_url = Some(navigation.url.clone());
+                if let Some(surface_session) = state.browser_sessions.get_mut(&surface_session_id) {
+                    surface_session.automation = Some(BrowserAutomationState {
                         bidi_session_id: navigation.automation.bidi_session_id.clone(),
                         mapper_target_id: navigation.automation.mapper_target_id.clone(),
                         mapper_session_id: navigation.automation.mapper_session_id.clone(),
@@ -543,15 +837,15 @@ async fn handle_tab_command(
             Ok(TabCommandOutcome {
                 events: vec![
                     tab_event(
-                        &tab_session_id,
-                        TabEvent::Navigated(TabNavigatedEvent {
+                        &context_session_id,
+                        ContextEvent::Navigated(PageNavigatedEvent {
                             url: navigation.url,
                             note: navigation.note,
                         }),
                     ),
                     tab_event(
-                        &tab_session_id,
-                        TabEvent::ChromiumBidiInjection(ChromiumBidiInjectionEvent {
+                        &context_session_id,
+                        ContextEvent::ChromiumBidiInjection(ChromiumBidiInjectionEvent {
                             note: navigation.automation.note,
                             bidi_session_id: navigation.automation.bidi_session_id,
                             mapper_target_id: navigation
@@ -572,49 +866,94 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
-        Some(TabCommand::ClickElement(ClickElementCommand {
+        Some(ContextCommand::ClickElement(ClickElementCommand {
             css_selector,
             retry_options,
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let click = retry_with_timeout(retry_policy, || async {
-                web_lib::click_element(&browser_session, &page_session, &css_selector).await
+                match (&surface_session, &page_session) {
+                    (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                        web_lib::click_element(surface_session, page_session, &css_selector)
+                            .await
+                            .map(|click| (click.css_selector, click.note, click.bidi_session_id))
+                    }
+                    (
+                        EngineBrowserSessionHandle::Mobile(surface_session),
+                        EnginePageSessionHandle::Mobile(page_session),
+                    ) => web_lib::click_mobile_element(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        retry_options.as_ref().and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|click| (click.selector, click.note, click.session_id)),
+                    _ => Err("tab session backend metadata is inconsistent".to_string()),
+                }
             })
             .await
             .map_err(Status::internal)?;
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
-                    &tab_session_id,
-                    TabEvent::ElementClicked(ElementClickedEvent {
-                        css_selector: click.css_selector,
-                        note: click.note,
-                        bidi_session_id: if click.bidi_session_id.is_empty() {
+                    &context_session_id,
+                    ContextEvent::ElementClicked(ElementClickedEvent {
+                        css_selector: click.0,
+                        note: click.1,
+                        bidi_session_id: if click.2.is_empty() {
                             existing_automation
                                 .as_ref()
                                 .map(|automation| automation.bidi_session_id.clone())
                                 .unwrap_or_default()
                         } else {
-                            click.bidi_session_id
+                            click.2
                         },
                     }),
                 )],
                 should_close: false,
             })
         }
-        Some(TabCommand::CountElements(CountElementsCommand {
+        Some(ContextCommand::CountElements(CountElementsCommand {
             css_selector,
             retry_options,
         })) => {
+            let (surface_session, page_session) = match (&surface_session, &page_session) {
+                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                    (surface_session, page_session)
+                }
+                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "count_elements is not supported for mobile tab sessions yet".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+                _ => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "tab session backend metadata is inconsistent".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let count = retry_with_timeout(retry_policy, || async {
-                web_lib::count_elements(&browser_session, &page_session, &css_selector).await
+                web_lib::count_elements(&surface_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
-                    &tab_session_id,
-                    TabEvent::ElementCounted(ElementCountedEvent {
+                    &context_session_id,
+                    ContextEvent::ElementCounted(ElementCountedEvent {
                         css_selector: count.css_selector,
                         count: count.count,
                         note: count.note,
@@ -623,15 +962,42 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
-        Some(TabCommand::HighlightElements(HighlightElementsCommand {
+        Some(ContextCommand::HighlightElements(HighlightElementsCommand {
             css_selector,
             duration_ms,
             retry_options,
         })) => {
+            let (surface_session, page_session) = match (&surface_session, &page_session) {
+                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                    (surface_session, page_session)
+                }
+                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "highlight_elements is not supported for mobile tab sessions".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+                _ => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "tab session backend metadata is inconsistent".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let highlight = retry_with_timeout(retry_policy, || async {
                 web_lib::highlight_elements(
-                    &browser_session,
+                    &surface_session,
                     &page_session,
                     &css_selector,
                     duration_ms.unwrap_or(2_000).into(),
@@ -642,8 +1008,8 @@ async fn handle_tab_command(
             .map_err(Status::internal)?;
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
-                    &tab_session_id,
-                    TabEvent::ElementsHighlighted(ElementsHighlightedEvent {
+                    &context_session_id,
+                    ContextEvent::ElementsHighlighted(ElementsHighlightedEvent {
                         css_selector: highlight.css_selector,
                         count: highlight.count,
                         note: highlight.note,
@@ -652,20 +1018,47 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
-        Some(TabCommand::FocusElement(FocusElementCommand {
+        Some(ContextCommand::FocusElement(FocusElementCommand {
             css_selector,
             retry_options,
         })) => {
+            let (surface_session, page_session) = match (&surface_session, &page_session) {
+                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                    (surface_session, page_session)
+                }
+                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "focus_element is not supported for mobile tab sessions".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+                _ => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "tab session backend metadata is inconsistent".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let focus = retry_with_timeout(retry_policy, || async {
-                web_lib::focus_element(&browser_session, &page_session, &css_selector).await
+                web_lib::focus_element(&surface_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
-                    &tab_session_id,
-                    TabEvent::ElementFocused(ElementFocusedEvent {
+                    &context_session_id,
+                    ContextEvent::ElementFocused(ElementFocusedEvent {
                         css_selector: focus.css_selector,
                         note: focus.note,
                     }),
@@ -673,43 +1066,89 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
-        Some(TabCommand::FillElement(FillElementCommand {
+        Some(ContextCommand::FillElement(FillElementCommand {
             css_selector,
             value,
             retry_options,
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let fill = retry_with_timeout(retry_policy, || async {
-                web_lib::fill_element(&browser_session, &page_session, &css_selector, &value).await
+                match (&surface_session, &page_session) {
+                    (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                        web_lib::fill_element(surface_session, page_session, &css_selector, &value)
+                            .await
+                            .map(|fill| (fill.css_selector, fill.value, fill.note))
+                    }
+                    (
+                        EngineBrowserSessionHandle::Mobile(surface_session),
+                        EnginePageSessionHandle::Mobile(page_session),
+                    ) => web_lib::fill_mobile_element(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        &value,
+                        retry_options.as_ref().and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|fill| (fill.selector, fill.value, fill.note)),
+                    _ => Err("tab session backend metadata is inconsistent".to_string()),
+                }
             })
             .await
             .map_err(Status::internal)?;
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
-                    &tab_session_id,
-                    TabEvent::ElementFilled(ElementFilledEvent {
-                        css_selector: fill.css_selector,
-                        value: fill.value,
-                        note: fill.note,
+                    &context_session_id,
+                    ContextEvent::ElementFilled(ElementFilledEvent {
+                        css_selector: fill.0,
+                        value: fill.1,
+                        note: fill.2,
                     }),
                 )],
                 should_close: false,
             })
         }
-        Some(TabCommand::HoverElement(HoverElementCommand {
+        Some(ContextCommand::HoverElement(HoverElementCommand {
             css_selector,
             retry_options,
         })) => {
+            let (surface_session, page_session) = match (&surface_session, &page_session) {
+                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                    (surface_session, page_session)
+                }
+                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "hover_element is not supported for mobile tab sessions".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+                _ => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "tab session backend metadata is inconsistent".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let hover = retry_with_timeout(retry_policy, || async {
-                web_lib::hover_element(&browser_session, &page_session, &css_selector).await
+                web_lib::hover_element(&surface_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
-                    &tab_session_id,
-                    TabEvent::ElementHovered(ElementHoveredEvent {
+                    &context_session_id,
+                    ContextEvent::ElementHovered(ElementHoveredEvent {
                         css_selector: hover.css_selector,
                         note: hover.note,
                     }),
@@ -717,16 +1156,43 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
-        Some(TabCommand::PressKey(PressKeyCommand {
+        Some(ContextCommand::PressKey(PressKeyCommand {
             css_selector,
             key,
             text,
             retry_options,
         })) => {
+            let (surface_session, page_session) = match (&surface_session, &page_session) {
+                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                    (surface_session, page_session)
+                }
+                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "press_key is not supported for mobile tab sessions".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+                _ => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "tab session backend metadata is inconsistent".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let press = retry_with_timeout(retry_policy, || async {
                 web_lib::press_key(
-                    &browser_session,
+                    &surface_session,
                     &page_session,
                     &css_selector,
                     &key,
@@ -738,8 +1204,8 @@ async fn handle_tab_command(
             .map_err(Status::internal)?;
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
-                    &tab_session_id,
-                    TabEvent::KeyPressed(KeyPressedEvent {
+                    &context_session_id,
+                    ContextEvent::KeyPressed(KeyPressedEvent {
                         css_selector: press.css_selector,
                         key: press.key,
                         note: press.note,
@@ -748,20 +1214,47 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
-        Some(TabCommand::GetTextContent(GetTextContentCommand {
+        Some(ContextCommand::GetTextContent(GetTextContentCommand {
             css_selector,
             retry_options,
         })) => {
+            let (surface_session, page_session) = match (&surface_session, &page_session) {
+                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                    (surface_session, page_session)
+                }
+                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "get_text_content is not supported for mobile tab sessions yet".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+                _ => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "tab session backend metadata is inconsistent".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let text = retry_with_timeout(retry_policy, || async {
-                web_lib::get_text_content(&browser_session, &page_session, &css_selector).await
+                web_lib::get_text_content(&surface_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
-                    &tab_session_id,
-                    TabEvent::TextContentResolved(TextContentResolvedEvent {
+                    &context_session_id,
+                    ContextEvent::TextContentResolved(TextContentResolvedEvent {
                         css_selector: text.css_selector,
                         text: text.text,
                         note: text.note,
@@ -770,20 +1263,47 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
-        Some(TabCommand::GetInnerText(GetInnerTextCommand {
+        Some(ContextCommand::GetInnerText(GetInnerTextCommand {
             css_selector,
             retry_options,
         })) => {
+            let (surface_session, page_session) = match (&surface_session, &page_session) {
+                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                    (surface_session, page_session)
+                }
+                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "get_inner_text is not supported for mobile tab sessions yet".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+                _ => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "tab session backend metadata is inconsistent".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let text = retry_with_timeout(retry_policy, || async {
-                web_lib::get_inner_text(&browser_session, &page_session, &css_selector).await
+                web_lib::get_inner_text(&surface_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
-                    &tab_session_id,
-                    TabEvent::InnerTextResolved(InnerTextResolvedEvent {
+                    &context_session_id,
+                    ContextEvent::InnerTextResolved(InnerTextResolvedEvent {
                         css_selector: text.css_selector,
                         text: text.text,
                         note: text.note,
@@ -792,15 +1312,42 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
-        Some(TabCommand::WaitForSelector(WaitForSelectorCommand {
+        Some(ContextCommand::WaitForSelector(WaitForSelectorCommand {
             css_selector,
             visible,
             retry_options,
         })) => {
+            let (surface_session, page_session) = match (&surface_session, &page_session) {
+                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                    (surface_session, page_session)
+                }
+                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "wait_for_selector is not supported for mobile tab sessions yet".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+                _ => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "tab session backend metadata is inconsistent".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let wait = retry_with_timeout(retry_policy, || async {
                 web_lib::wait_for_selector(
-                    &browser_session,
+                    &surface_session,
                     &page_session,
                     &css_selector,
                     visible.unwrap_or(false),
@@ -811,8 +1358,8 @@ async fn handle_tab_command(
             .map_err(Status::internal)?;
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
-                    &tab_session_id,
-                    TabEvent::SelectorWaitSatisfied(SelectorWaitSatisfiedEvent {
+                    &context_session_id,
+                    ContextEvent::SelectorWaitSatisfied(SelectorWaitSatisfiedEvent {
                         css_selector: wait.css_selector,
                         visible: wait.visible,
                         note: wait.note,
@@ -823,8 +1370,8 @@ async fn handle_tab_command(
         }
         None => Ok(TabCommandOutcome {
             events: vec![tab_event(
-                &tab_session_id,
-                TabEvent::Error(TabSessionErrorEvent {
+                &context_session_id,
+                ContextEvent::Error(ContextSessionErrorEvent {
                     message: "tab session command payload is missing".to_string(),
                 }),
             )],
@@ -835,8 +1382,8 @@ async fn handle_tab_command(
 
 #[tonic::async_trait]
 impl EngineService for EngineGrpcService {
-    type BrowserSessionStream = BrowserSessionStream;
-    type TabSessionStream = TabSessionStream;
+    type SurfaceSessionStream = SurfaceSessionStream;
+    type ContextSessionStream = ContextSessionStream;
 
     async fn ping(&self, _request: Request<PingRequest>) -> Result<Response<PingResponse>, Status> {
         Ok(Response::new(PingResponse {
@@ -845,11 +1392,11 @@ impl EngineService for EngineGrpcService {
         }))
     }
 
-    async fn browser_session(
+    async fn surface_session(
         &self,
-        request: Request<tonic::Streaming<BrowserSessionCommand>>,
-    ) -> Result<Response<Self::BrowserSessionStream>, Status> {
-        let session_id = next_browser_session_id();
+        request: Request<tonic::Streaming<SurfaceSessionCommand>>,
+    ) -> Result<Response<Self::SurfaceSessionStream>, Status> {
+        let session_id = next_surface_session_id();
         self.state
             .lock()
             .await
@@ -893,16 +1440,16 @@ impl EngineService for EngineGrpcService {
             state.browser_sessions.remove(&session_id);
             state
                 .tab_sessions
-                .retain(|_, tab_session| tab_session.browser_session_id != session_id);
+                .retain(|_, context_session| context_session.surface_session_id != session_id);
         });
 
         Ok(Response::new(Box::pin(ReceiverStream::new(rx))))
     }
 
-    async fn tab_session(
+    async fn context_session(
         &self,
-        request: Request<tonic::Streaming<TabSessionCommand>>,
-    ) -> Result<Response<Self::TabSessionStream>, Status> {
+        request: Request<tonic::Streaming<ContextSessionCommand>>,
+    ) -> Result<Response<Self::ContextSessionStream>, Status> {
         let mut inbound = request.into_inner();
         let state = Arc::clone(&self.state);
         let (tx, rx) = mpsc::channel(16);
@@ -913,13 +1460,13 @@ impl EngineService for EngineGrpcService {
             loop {
                 match inbound.message().await {
                     Ok(Some(command)) => {
-                        let attach_tab_session_id = command.tab_session_id.clone();
+                        let attach_context_session_id = command.context_session_id.clone();
                         if !attached {
                             attached = true;
                             if tx
                                 .send(Ok(tab_event(
-                                    &attach_tab_session_id,
-                                    TabEvent::Attached(TabSessionAttachedEvent {
+                                    &attach_context_session_id,
+                                    ContextEvent::Attached(ContextSessionAttachedEvent {
                                         note: "tab session attached".to_string(),
                                     }),
                                 )))

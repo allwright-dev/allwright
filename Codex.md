@@ -52,7 +52,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `allwright-dev/`: standalone Next.js site for the purchased `allwright.dev` domain, intended for Vercel deployment and public-facing marketing/docs entrypoints
 - `typescript/core/`: published npm package `@allwright.dev/core`, containing the TypeScript/JavaScript client, bundled shared proto files, and examples
 - `typescript/vitest/`: published npm package `@allwright.dev/vitest`, containing Vitest fixtures and retrying browser assertions on top of `@allwright.dev/core`
-- `typescript/vitest/` now also owns mobile-friendly fixtures such as `android` and `androidPage`, and should support hybrid tests that use both web and Android in the same test run
+- `typescript/vitest/` now also owns mobile-friendly fixtures such as `android` and `androidApp`, and should support hybrid tests that use both web and Android in the same test run
 - `proto/`: shared protobuf and gRPC contract root for all stacks
 - `proto/engine/v1/engine.proto`: umbrella engine service contract that imports the split proto ownership layers
 - `proto/core/v1/`: core-owned shared engine/session/browser/tab message contracts
@@ -75,6 +75,10 @@ This instruction should be treated as ongoing project policy for all future AI c
 - Plugin discovery, install, version matching, and dynamic loading should be lazy and usage-triggered. Core server startup must stay surface-agnostic and must not eagerly discover, install, register, or load `web`, `mobile-android`, or any other surface plugin.
 - Surface usage should trigger plugin resolution: web commands such as `launchBrowser(...)` should resolve `web`; Android commands such as `mobile.android.connect(...)` or plugin invocation should resolve `mobile-android`.
 - The engine should own plugin resolution. Clients should only ensure the engine/CLI is available and then send commands; they should not duplicate plugin install/version logic per language.
+- Hard rule: no client may invoke a plugin directly. Clients must talk only to the allwright server over the shared engine transport.
+- Hard rule: plugin ids, plugin request payloads, plugin ABI loading, and plugin process/library invocation are core concerns only. Those details must not appear in Go, Java, Python, TypeScript, or future client libraries.
+- The engine owning a session does not mean the engine owns surface behavior. Core should be glue only: accept client commands, resolve the target plugin, delegate execution, and relay results/events back through shared sessions.
+- Surface semantics and execution must stay in plugins. Selector interpretation, locator behavior, browser automation, ADB/device work, CDP/BiDi interactions, screenshots, input synthesis, and other surface-specific logic must not migrate into core.
 - Core-owned plugin resolution must preserve version matching: use `ALLWRIGHT_VERSION` when set, resolve `latest` through GitHub Releases, otherwise fall back to the shipped package version for the current core build, and only reuse an installed plugin when the manifest version matches the resolved target version.
 - If a required plugin is absent and auto-install is enabled, core should download the matching release asset into the local allwright plugin directory, update the local plugin manifest, and then load the plugin. If auto-install is disabled, the usage path should fail with a clear plugin-required error.
 - The CLI install path should be release-asset based, not `cargo install` based.
@@ -138,22 +142,25 @@ This instruction should be treated as ongoing project policy for all future AI c
 - The current Vercel workaround exists because Bun 1.3.14 has a known crash path with Next.js 16.3.0 builds on Linux, producing `SIGILL`/segfault failures during or after `next build`.
 - The current RPCs are:
   - `Ping`
-  - `BrowserSession` as a bidirectional stream
-  - `TabSession` as a bidirectional stream
+  - `SurfaceSession` as a bidirectional stream
+  - `ContextSession` as a bidirectional stream
+- `SurfaceSession` carries engine-owned cross-surface lifecycle commands such as web launch, mobile connect, and mobile app launch. This is orchestration and delegation only; the actual browser/device/app work must still happen inside the matching surface plugin.
+- The Android client paths across Rust, Go, Java, Python, and TypeScript now route through engine-owned `SurfaceSession` and `ContextSession` RPCs. Clients must remain server-only, and any future surface capability should follow the same pattern instead of adding direct plugin side channels.
+- Direct plugin invocation that still exists in non-Rust clients is architectural debt and should be removed. The correct fix is always to extend the server protocol/session model and keep clients server-only.
 - The first browser command is `LaunchChromeCommand`.
 - `LaunchChromeCommand` is only for opening a plain browser window.
-- `LaunchChromeCommand` also returns `initial_tab_session_id` for the startup tab that Chrome already opened.
+- `LaunchChromeCommand` also returns `initial_page_session_id` for the startup page that Chrome already opened.
 - Browser launch commands must not carry URL/navigation input.
-- `OpenTabCommand` opens a new tab from `BrowserSession` and returns `tab_session_id`.
-- `OpenTabCommand` is only valid after the parent browser session has launched.
-- `TabSession` is the follow-up tab-scoped stream keyed by `browser_session_id` plus `tab_session_id`.
-- `TabSession` must validate that the tab belongs to the specified browser session.
-- The startup Chrome tab must be tracked like any later tab and accept the same tab-stream commands.
-- Future tab launch commands must also not carry URL/navigation input.
-- Navigation is a separate `NavigateTabCommand` on `TabSession`.
-- Click is a separate `ClickElementCommand` on `TabSession`.
-- Future tab creation and tab-level communication should be modeled as separate commands inside the browser session stream.
-- Browser launch will likely need CDP enabled so the engine can attach to the browser session.
+- `OpenContextCommand` opens a new context from `SurfaceSession` and returns `context_session_id`.
+- `OpenContextCommand` is only valid after the parent surface session has launched.
+- `ContextSession` is the follow-up context-scoped stream keyed by `surface_session_id` plus `context_session_id`.
+- `ContextSession` must validate that the context belongs to the specified surface session.
+- The startup Chrome page must be tracked like any later page and accept the same context-stream commands.
+- Future context launch commands must also not carry URL/navigation input.
+- Navigation is a separate `NavigatePageCommand` on `ContextSession`.
+- Click is a separate `ClickElementCommand` on `ContextSession`.
+- Future context creation and context-level communication should be modeled as separate commands inside the surface session stream.
+- Browser launch will likely need CDP enabled so the engine can attach to the surface session.
 - The implemented web plugin runtime path enables CDP and surfaces browser-level connection metadata.
 - The implemented web plugin runtime path tracks browser sessions with engine session ids and associated CDP session information.
 - The implemented web plugin runtime path opens tabs through CDP `Target.createTarget`, not GUI scripting.
@@ -162,6 +169,8 @@ This instruction should be treated as ongoing project policy for all future AI c
 - The implemented web plugin runtime path waits for `Page.loadEventFired`, then injects a pinned `chromium-bidi` mapper artifact into a hidden mapper target in the same browser session.
 - Clear separation of concerns is required: core should own only the generic engine host, plugin discovery/loading, shared session transport, and plugin-missing errors; all web-specific behavior, state, CDP, and BiDi logic belongs in the `web` plugin.
 - The same separation applies to mobile: core owns only generic engine host, lazy plugin resolution, shared transport, version matching, and plugin loading; all Android-specific device discovery, ADB interaction, selector matching, source dumping, and native input belong in `mobile-android`.
+- Session ownership in core should remain orchestration-only. Core may track generic surface/context session ids and route commands, but it must not grow surface-aware locator engines, selector parsers, automation backends, or device/browser control code.
+- `mobile-android` now follows that intended separation in practice: core-owned surface/context routing invokes the plugin, while Android-specific ADB/runtime behavior remains inside the plugin.
 - The injected mapper is sourced from the published `chromium-bidi@17.0.2` package but is checked into `rust/allwright-surface-web/third_party/chromium-bidi/17.0.2/` so the publishable web surface crate does not depend on `npm`.
 - The intended web plugin path persists a real `bidi_session_id` plus mapper target/session ids after mapper injection.
 - The implemented web surface crate includes selector-based click through `script.evaluate` on the tab browsing context.
@@ -185,7 +194,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `typescript/core/src/index.ts` now provides the TypeScript/JavaScript client, hides the engine transport behind a lazy singleton connection, and exposes Playwright-style `chromium.launch(...)`, `Browser`, `Page`, and `Locator` methods instead of public grpc-js setup.
 - The TypeScript client now uses that same structure: `typescript/core/src/index.ts` stays a thin public barrel, while browser/page/locator/runtime/config/selector logic lives in dedicated files under `typescript/core/src/`.
 - Mobile selector transport must mirror the web client shape as closely as possible while remaining mobile-native: client-facing selectors should support explicit prefixes such as `xpath=...`, `css=...`, `id=...`, and UiAutomator-style keys such as `text=...`, `textContains=...`, `resourceId=...`, `descriptionContains=...`, `classNameMatches=...`, boolean flags, `index=...`, and `instance=...`.
-- Android locator chaining should follow the same mental model as web locators. Clients should expose `androidPage.locator(...).locator(...)` style chaining, and the mobile transport/plugin should preserve chained selector segments rather than collapsing everything into ad hoc string parsing.
+- Android locator chaining should follow the same mental model as web locators. Clients should expose `androidApp.locator(...).locator(...)` style chaining, and the mobile transport/plugin should preserve chained selector segments rather than collapsing everything into ad hoc string parsing.
 - The Go client now uses a multi-file layout with focused responsibilities: runtime connection state lives in `go/runtime.go`, launch/configured-browser entrypoints in `go/launch.go`, browser-session behavior in `go/browser.go`, tab/page behavior in `go/page.go` plus `go/page_session.go`, locator delegation in `go/locator.go`, command option/proto helpers in `go/command_options.go`, shared public types in `go/types.go`, config loading in `go/config.go`, and selector transport helpers in `go/selectors.go`.
 - The Rust client now uses a multi-file layout with focused responsibilities: `rust/allwright/src/client.rs` is a thin assembly/re-export module, shared public client types live in `rust/allwright/src/client_types.rs`, selector transport helpers live in `rust/allwright/src/client_selectors.rs`, runtime singleton/address management lives in `rust/allwright/src/client_runtime.rs`, config discovery/loading/merge logic lives in `rust/allwright/src/client_config.rs`, browser launch logic lives in `rust/allwright/src/client_launch.rs`, browser-session behavior lives in `rust/allwright/src/client_browser.rs`, tab core/session lifecycle lives in `rust/allwright/src/client_tab.rs`, tab element actions live in `rust/allwright/src/client_tab_actions.rs`, tab query/read operations live in `rust/allwright/src/client_tab_query.rs`, locator delegation lives in `rust/allwright/src/client_locator.rs`, and shared command/result helpers live in `rust/allwright/src/client_command.rs`.
 - The shared stack-agnostic config contract now lives at the repo root in `allwright.schema.json`, with `allwright.config.yaml` as the preferred human-authored format and `allwright.config.json` also supported against the same schema.
@@ -196,9 +205,11 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `typescript/core/examples/playground.ts` is the TypeScript-side example for a minimal browser-session test flow; use Bun or npm workspaces for local development runs in this repo and keep it focused on real browser work rather than extra ping-style smoke commands.
 - Generated TypeScript build output under `typescript/**/dist/` and per-package `.tsbuildinfo` files must not be checked in; they belong in `.gitignore` and should only exist as local/publish artifacts unless the repo explicitly adopts a checked-in-dist policy later.
 - Bun is the preferred TypeScript/JavaScript development toolchain in this repo: use `bun install` and `bun run ...` for local workspace development, keep `bun.lock` as the checked-in lockfile, and do not reintroduce `package-lock.json` except for a deliberate tooling-policy change. npm remains acceptable only where the registry transport itself requires it, such as `npm publish`.
-- `@allwright.dev/vitest` provides ready-made Vitest fixtures (`browser`, `page`, `allwright`, `android`, `androidPage`) plus a custom retrying `expect` surface aimed at Playwright-style ergonomics.
+- `@allwright.dev/vitest` provides ready-made Vitest fixtures (`browser`, `page`, `allwright`, `android`, `androidApp`) plus a custom retrying `expect` surface aimed at Playwright-style ergonomics. Fixture-level defaults belong here, not in the core SDK clients.
 - `@allwright.dev/vitest` is now the first consumer of that shared config model: it auto-resolves `allwright.config.yaml`, `allwright.config.yml`, or `allwright.config.json`, supports shared retry defaults plus per-suite selection through `allwright.suite`, and merges test-level overrides on top instead of inventing a Vitest-only config file shape.
 - The current retrying Vitest assertions support both `expect(page)` and `expect(page.locator(...))` forms for text, count, and visibility checks; they are intentionally implemented in the npm test helper layer rather than in the engine protocol for now.
+- The Android Vitest fixtures currently default to a longer setup window than web-only flows: `android` connect defaults to `30_000ms`, and `androidApp` launch defaults to `60_000ms`, while explicit `timeoutMs` values still win.
+- The other first-party clients currently do not have a fixture layer, so they should not invent Vitest-style fixture defaults. For non-Vitest stacks, timeout defaults should come either from explicit command options, shared core API conventions, or future test-framework-specific helper layers.
 - Mobile command ergonomics should preserve Playwright-style retry/timeout expectations where the protocol allows it. Android commands such as `click` and `fill` should honor `timeoutMs`, and future Android locator assertions should preserve the same retry-first mental model as web rather than exposing one-shot raw device calls.
 - Regenerating Go stubs should go through `./scripts/generate-go-proto.sh`, which installs pinned `protoc-gen-go@v1.36.10` and `protoc-gen-go-grpc@v1.5.1` into `go/.bin/` and rewrites the checked-in Go generated files under `go/gen/allwright/engine/v1/`.
 - Regenerating Rust stubs should go through `./scripts/generate-rust-proto.sh`, which runs `cargo run -p xtask -- generate-rust-proto` against the top-level `proto/` tree and rewrites the checked-in Rust generated files under `rust/allwright/src/`.

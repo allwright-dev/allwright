@@ -20,8 +20,8 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	EngineService_Ping_FullMethodName           = "/allwright.engine.v1.EngineService/Ping"
-	EngineService_BrowserSession_FullMethodName = "/allwright.engine.v1.EngineService/BrowserSession"
-	EngineService_TabSession_FullMethodName     = "/allwright.engine.v1.EngineService/TabSession"
+	EngineService_SurfaceSession_FullMethodName = "/allwright.engine.v1.EngineService/SurfaceSession"
+	EngineService_ContextSession_FullMethodName = "/allwright.engine.v1.EngineService/ContextSession"
 )
 
 // EngineServiceClient is the client API for EngineService service.
@@ -29,8 +29,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EngineServiceClient interface {
 	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
-	BrowserSession(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[BrowserSessionCommand, BrowserSessionEvent], error)
-	TabSession(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[TabSessionCommand, TabSessionEvent], error)
+	SurfaceSession(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[SurfaceSessionCommand, SurfaceSessionEvent], error)
+	ContextSession(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ContextSessionCommand, ContextSessionEvent], error)
 }
 
 type engineServiceClient struct {
@@ -51,39 +51,39 @@ func (c *engineServiceClient) Ping(ctx context.Context, in *PingRequest, opts ..
 	return out, nil
 }
 
-func (c *engineServiceClient) BrowserSession(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[BrowserSessionCommand, BrowserSessionEvent], error) {
+func (c *engineServiceClient) SurfaceSession(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[SurfaceSessionCommand, SurfaceSessionEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &EngineService_ServiceDesc.Streams[0], EngineService_BrowserSession_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &EngineService_ServiceDesc.Streams[0], EngineService_SurfaceSession_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[BrowserSessionCommand, BrowserSessionEvent]{ClientStream: stream}
+	x := &grpc.GenericClientStream[SurfaceSessionCommand, SurfaceSessionEvent]{ClientStream: stream}
 	return x, nil
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type EngineService_BrowserSessionClient = grpc.BidiStreamingClient[BrowserSessionCommand, BrowserSessionEvent]
+type EngineService_SurfaceSessionClient = grpc.BidiStreamingClient[SurfaceSessionCommand, SurfaceSessionEvent]
 
-func (c *engineServiceClient) TabSession(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[TabSessionCommand, TabSessionEvent], error) {
+func (c *engineServiceClient) ContextSession(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ContextSessionCommand, ContextSessionEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &EngineService_ServiceDesc.Streams[1], EngineService_TabSession_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &EngineService_ServiceDesc.Streams[1], EngineService_ContextSession_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[TabSessionCommand, TabSessionEvent]{ClientStream: stream}
+	x := &grpc.GenericClientStream[ContextSessionCommand, ContextSessionEvent]{ClientStream: stream}
 	return x, nil
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type EngineService_TabSessionClient = grpc.BidiStreamingClient[TabSessionCommand, TabSessionEvent]
+type EngineService_ContextSessionClient = grpc.BidiStreamingClient[ContextSessionCommand, ContextSessionEvent]
 
 // EngineServiceServer is the server API for EngineService service.
 // All implementations must embed UnimplementedEngineServiceServer
 // for forward compatibility.
 type EngineServiceServer interface {
 	Ping(context.Context, *PingRequest) (*PingResponse, error)
-	BrowserSession(grpc.BidiStreamingServer[BrowserSessionCommand, BrowserSessionEvent]) error
-	TabSession(grpc.BidiStreamingServer[TabSessionCommand, TabSessionEvent]) error
+	SurfaceSession(grpc.BidiStreamingServer[SurfaceSessionCommand, SurfaceSessionEvent]) error
+	ContextSession(grpc.BidiStreamingServer[ContextSessionCommand, ContextSessionEvent]) error
 	mustEmbedUnimplementedEngineServiceServer()
 }
 
@@ -97,11 +97,11 @@ type UnimplementedEngineServiceServer struct{}
 func (UnimplementedEngineServiceServer) Ping(context.Context, *PingRequest) (*PingResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
-func (UnimplementedEngineServiceServer) BrowserSession(grpc.BidiStreamingServer[BrowserSessionCommand, BrowserSessionEvent]) error {
-	return status.Errorf(codes.Unimplemented, "method BrowserSession not implemented")
+func (UnimplementedEngineServiceServer) SurfaceSession(grpc.BidiStreamingServer[SurfaceSessionCommand, SurfaceSessionEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method SurfaceSession not implemented")
 }
-func (UnimplementedEngineServiceServer) TabSession(grpc.BidiStreamingServer[TabSessionCommand, TabSessionEvent]) error {
-	return status.Errorf(codes.Unimplemented, "method TabSession not implemented")
+func (UnimplementedEngineServiceServer) ContextSession(grpc.BidiStreamingServer[ContextSessionCommand, ContextSessionEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method ContextSession not implemented")
 }
 func (UnimplementedEngineServiceServer) mustEmbedUnimplementedEngineServiceServer() {}
 func (UnimplementedEngineServiceServer) testEmbeddedByValue()                       {}
@@ -142,19 +142,19 @@ func _EngineService_Ping_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _EngineService_BrowserSession_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(EngineServiceServer).BrowserSession(&grpc.GenericServerStream[BrowserSessionCommand, BrowserSessionEvent]{ServerStream: stream})
+func _EngineService_SurfaceSession_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(EngineServiceServer).SurfaceSession(&grpc.GenericServerStream[SurfaceSessionCommand, SurfaceSessionEvent]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type EngineService_BrowserSessionServer = grpc.BidiStreamingServer[BrowserSessionCommand, BrowserSessionEvent]
+type EngineService_SurfaceSessionServer = grpc.BidiStreamingServer[SurfaceSessionCommand, SurfaceSessionEvent]
 
-func _EngineService_TabSession_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(EngineServiceServer).TabSession(&grpc.GenericServerStream[TabSessionCommand, TabSessionEvent]{ServerStream: stream})
+func _EngineService_ContextSession_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(EngineServiceServer).ContextSession(&grpc.GenericServerStream[ContextSessionCommand, ContextSessionEvent]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type EngineService_TabSessionServer = grpc.BidiStreamingServer[TabSessionCommand, TabSessionEvent]
+type EngineService_ContextSessionServer = grpc.BidiStreamingServer[ContextSessionCommand, ContextSessionEvent]
 
 // EngineService_ServiceDesc is the grpc.ServiceDesc for EngineService service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -170,14 +170,14 @@ var EngineService_ServiceDesc = grpc.ServiceDesc{
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "BrowserSession",
-			Handler:       _EngineService_BrowserSession_Handler,
+			StreamName:    "SurfaceSession",
+			Handler:       _EngineService_SurfaceSession_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
 		{
-			StreamName:    "TabSession",
-			Handler:       _EngineService_TabSession_Handler,
+			StreamName:    "ContextSession",
+			Handler:       _EngineService_ContextSession_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

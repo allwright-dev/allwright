@@ -1,15 +1,15 @@
 package dev.allwright.client;
 
 public final class AndroidLocator {
-    private final AndroidPage page;
+    private final AndroidApp page;
     private final String selector;
 
-    AndroidLocator(AndroidPage page, String selector) {
+    AndroidLocator(AndroidApp page, String selector) {
         this.page = page;
         this.selector = selector;
     }
 
-    public AndroidPage page() {
+    public AndroidApp app() {
         return page;
     }
 

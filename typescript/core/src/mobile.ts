@@ -1,82 +1,34 @@
-import { invokePlugin } from "./bootstrap.js";
+import { createBrowserSessionHandle, createPageHandle, getRuntime } from "./runtime.js";
 import { chainMobileSelectorForTransport, normalizeMobileSelectorForTransport } from "./mobileSelectors.js";
 import type {
+  SurfaceSessionEvent,
+  SurfaceSessionStream,
   ClickResult,
   CommandOptions,
+  EventQueue,
   FillResult,
   MobileAndroidConnectOptions,
   MobileAndroidDevice,
   MobileAndroidLaunchOptions,
   MobileAndroidLocator,
-  MobileAndroidPage,
+  MobileAndroidApp,
   MobileSurfaceNamespace,
+  PageHandle,
+  RuntimeClient,
 } from "./types.js";
 
-type MobilePlatform = "android" | "ios";
-type DeviceConnectionKind = "usb" | "emulator" | "remote_adb";
-
-type MobileBrowserSessionHandle = {
-  platform: MobilePlatform;
-  automation: {
-    backend: string;
-    session_id: string;
-    note: string;
-  };
-  device: {
-    platform: MobilePlatform;
-    device_id: string;
-    connection_kind: DeviceConnectionKind;
-  };
-};
-
-type MobilePageSessionHandle = {
-  page_id: string;
-  package_name?: string | null;
-  activity_name?: string | null;
-  webview_context?: string | null;
-};
-
-type MobilePageInfo = {
-  note: string;
-  page_session: MobilePageSessionHandle;
-};
-
-type MobileConnectInfo = {
-  browser: string;
-  note: string;
-  browser_session: MobileBrowserSessionHandle;
-  initial_page: MobilePageInfo;
-};
-
-type MobilePluginEnvelope<T> = {
-  ok: boolean;
-  result?: T;
-  error?: string;
-};
-
-function timeoutMsOf(options?: CommandOptions | MobileAndroidConnectOptions | MobileAndroidLaunchOptions): number | undefined {
-  return options?.timeoutMs;
+function retryOptions(timeoutMs?: number): { timeoutMs?: number } | undefined {
+  return timeoutMs ? { timeoutMs } : undefined;
 }
 
-async function invokeAndroidExpected<T>(commandName: string, request: unknown): Promise<T> {
-  const envelope = await invokePlugin<MobilePluginEnvelope<T>>("mobile-android", request);
-  if (!envelope.ok) {
-    throw new Error(envelope.error ?? `mobile-android plugin ${commandName} failed`);
-  }
-  if (envelope.result === undefined) {
-    throw new Error(`mobile-android plugin ${commandName} returned no result`);
-  }
-  return envelope.result;
-}
+class MobileAndroidAppImpl implements MobileAndroidApp {
+  #runtime: RuntimeClient;
+  #surfaceSessionId: string;
+  #handlePromise: Promise<PageHandle> | null = null;
 
-class MobileAndroidPageImpl implements MobileAndroidPage {
-  constructor(
-    private readonly browserSession: MobileBrowserSessionHandle,
-    private pageSession: MobilePageSessionHandle,
-  ) {}
-
-  get sessionId(): string {
-    return this.pageSession.page_id;
+  constructor(runtime: RuntimeClient, surfaceSessionId: string, readonly sessionId: string) {
+    this.#runtime = runtime;
+    this.#surfaceSessionId = surfaceSessionId;
   }
 
   locator(selector: string): MobileAndroidLocator {
@@ -84,50 +36,85 @@ class MobileAndroidPageImpl implements MobileAndroidPage {
   }
 
   async click(selector: string, options: CommandOptions = {}): Promise<ClickResult> {
-    const result = await invokeAndroidExpected<{
-      result: "click_element";
-      selector: string;
-      note: string;
-      session_id: string;
-    }>("click", {
-      command: "click_element",
-      browser_session: this.browserSession,
-      page_session: this.pageSession,
-      selector: normalizeMobileSelectorForTransport(selector),
-      timeout_ms: timeoutMsOf(options),
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.#surfaceSessionId,
+      contextSessionId: this.sessionId,
+      clickElement: {
+        cssSelector: normalizeMobileSelectorForTransport(selector),
+        retryOptions: retryOptions(options.timeoutMs),
+      },
     });
-    return {
-      selector: result.selector,
-      note: result.note,
-      bidiSessionId: result.session_id,
-    };
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.elementClicked) {
+        return {
+          selector: event.elementClicked.cssSelector ?? "",
+          note: event.elementClicked.note ?? "",
+          bidiSessionId: event.elementClicked.bidiSessionId ?? "",
+        };
+      }
+      if (event.error?.message) {
+        throw new Error(event.error.message);
+      }
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`android app session ${this.sessionId} closed while clicking`);
+      }
+    }
   }
 
   async fill(selector: string, value: string, options: CommandOptions = {}): Promise<FillResult> {
-    const result = await invokeAndroidExpected<{
-      result: "fill_element";
-      selector: string;
-      value: string;
-      note: string;
-    }>("fill", {
-      command: "fill_element",
-      browser_session: this.browserSession,
-      page_session: this.pageSession,
-      selector: normalizeMobileSelectorForTransport(selector),
-      value,
-      timeout_ms: timeoutMsOf(options),
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.#surfaceSessionId,
+      contextSessionId: this.sessionId,
+      fillElement: {
+        cssSelector: normalizeMobileSelectorForTransport(selector),
+        value,
+        retryOptions: retryOptions(options.timeoutMs),
+      },
     });
-    return {
-      selector: result.selector,
-      value: result.value,
-      note: result.note,
-    };
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.elementFilled) {
+        return {
+          selector: event.elementFilled.cssSelector ?? "",
+          value: event.elementFilled.value ?? "",
+          note: event.elementFilled.note ?? "",
+        };
+      }
+      if (event.error?.message) {
+        throw new Error(event.error.message);
+      }
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`android app session ${this.sessionId} closed while filling`);
+      }
+    }
+  }
+
+  async #getHandle(): Promise<PageHandle> {
+    if (!this.#handlePromise) {
+      this.#handlePromise = createPageHandle(this.#runtime);
+    }
+    return this.#handlePromise;
+  }
+
+  #ensureOpen(handle: PageHandle): void {
+    if (handle.closed) {
+      throw new Error(`android app session ${this.sessionId} is closed`);
+    }
   }
 }
 
 class MobileAndroidLocatorImpl implements MobileAndroidLocator {
   constructor(
-    readonly page: MobileAndroidPage,
+    readonly page: MobileAndroidApp,
     readonly selector: string,
   ) {}
 
@@ -145,57 +132,101 @@ class MobileAndroidLocatorImpl implements MobileAndroidLocator {
 }
 
 class MobileAndroidDeviceImpl implements MobileAndroidDevice {
-  #initialPage: MobileAndroidPageImpl;
+  #stream: SurfaceSessionStream;
+  #queue: EventQueue<SurfaceSessionEvent>;
+  #closed = false;
+  #currentApp: MobileAndroidApp;
 
   constructor(
-    private readonly connectInfoRaw: MobileConnectInfo,
+    readonly sessionId: string,
+    private readonly surfaceSessionId: string,
+    private readonly runtime: RuntimeClient,
+    stream: Awaited<ReturnType<typeof createBrowserSessionHandle>>["stream"],
+    queue: Awaited<ReturnType<typeof createBrowserSessionHandle>>["queue"],
+    initialAppSessionId: string,
   ) {
-    this.#initialPage = new MobileAndroidPageImpl(
-      this.connectInfoRaw.browser_session,
-      this.connectInfoRaw.initial_page.page_session,
-    );
+    this.#stream = stream;
+    this.#queue = queue;
+    this.#currentApp = new MobileAndroidAppImpl(runtime, surfaceSessionId, initialAppSessionId);
   }
 
-  get sessionId(): string {
-    return this.connectInfoRaw.browser_session.automation.session_id;
+  app(): MobileAndroidApp {
+    return this.#currentApp;
   }
 
-  page(): MobileAndroidPage {
-    return this.#initialPage;
+  initialApp(): MobileAndroidApp {
+    return this.#currentApp;
   }
 
-  initialPage(): MobileAndroidPage {
-    return this.#initialPage;
-  }
-
-  async launch(options: MobileAndroidLaunchOptions = {}): Promise<MobileAndroidPage> {
-    const page = await invokeAndroidExpected<MobilePageInfo>("launch", {
-      command: "launch_app",
-      browser_session: this.connectInfoRaw.browser_session,
-      options: {
-        apk_path: options.apkPath,
-        app_id: options.appId,
-        launch_activity: options.launchActivity,
-        stop_before_launch: options.stopBeforeLaunch ?? false,
-        timeout_ms: timeoutMsOf(options),
+  async launch(options: MobileAndroidLaunchOptions = {}): Promise<MobileAndroidApp> {
+    this.#ensureOpen();
+    this.#stream.write({
+      launchApp: {
+        apkPath: options.apkPath,
+        appId: options.appId,
+        launchActivity: options.launchActivity,
+        stopBeforeLaunch: options.stopBeforeLaunch ?? false,
+        retryOptions: retryOptions(options.timeoutMs),
       },
     });
-    this.#initialPage = new MobileAndroidPageImpl(this.connectInfoRaw.browser_session, page.page_session);
-    return this.#initialPage;
+
+    while (true) {
+      const event = await this.#queue.next();
+      if (event.appLaunched?.appSessionId) {
+        this.#currentApp = new MobileAndroidAppImpl(
+          this.runtime,
+          this.surfaceSessionId,
+          event.appLaunched.appSessionId,
+        );
+        return this.#currentApp;
+      }
+      if (event.error?.message) {
+        throw new Error(event.error.message);
+      }
+      if (event.closed) {
+        this.#closed = true;
+        throw new Error(`android device session ${this.sessionId} closed while launching app`);
+      }
+    }
+  }
+
+  #ensureOpen(): void {
+    if (this.#closed) {
+      throw new Error(`android device session ${this.sessionId} is closed`);
+    }
   }
 }
 
 class MobileAndroidSurfaceImpl {
   async connect(options: MobileAndroidConnectOptions = {}): Promise<MobileAndroidDevice> {
-    const connectInfo = await invokeAndroidExpected<MobileConnectInfo>("connect", {
-      command: "connect",
-      platform: "android",
-      device: options.device,
-      adb_endpoint: options.adbEndpoint,
-      preserve_app_state: options.preserveAppState ?? false,
-      timeout_ms: timeoutMsOf(options),
+    const runtime = await getRuntime();
+    const { stream, queue } = await createBrowserSessionHandle(runtime);
+    stream.write({
+      connectMobile: {
+        platform: 1,
+        device: options.device,
+        adbEndpoint: options.adbEndpoint,
+        preserveAppState: options.preserveAppState ?? false,
+        retryOptions: retryOptions(options.timeoutMs),
+      },
     });
-    return new MobileAndroidDeviceImpl(connectInfo);
+
+    while (true) {
+      const event: SurfaceSessionEvent = await queue.next();
+      if (event.mobileConnected?.initialAppSessionId) {
+        return new MobileAndroidDeviceImpl(
+          event.mobileConnected.deviceSessionId ?? event.sessionId ?? "",
+          event.sessionId ?? "",
+          runtime,
+          stream,
+          queue,
+          event.mobileConnected.initialAppSessionId,
+        );
+      }
+      if (event.error?.message) {
+        throw new Error(event.error.message);
+      }
+    }
   }
 }
 

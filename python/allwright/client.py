@@ -8,7 +8,7 @@ from ._locator import Locator
 from ._mobile import (
     AndroidLocator,
     AndroidDevice,
-    AndroidPage,
+    AndroidApp,
     MobileAndroidConnectOptions,
     MobileAndroidLaunchOptions,
     mobile,

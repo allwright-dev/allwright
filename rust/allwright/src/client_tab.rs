@@ -1,7 +1,7 @@
-use crate::proto::tab_session_command::Command as TabCommand;
-use crate::proto::tab_session_event::Event as TabEvent;
+use crate::proto::context_session_command::Command as ContextCommand;
+use crate::proto::context_session_event::Event as ContextEvent;
 use crate::proto::{
-    CloseTabSessionCommand, NavigateTabCommand, TabSessionCommand, TabSessionPingCommand,
+    CloseContextSessionCommand, NavigatePageCommand, ContextSessionCommand, ContextSessionPingCommand,
 };
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -33,15 +33,15 @@ impl Tab {
 
         handle
             .command_tx
-            .send(TabSessionCommand {
-                browser_session_id: self.inner.browser_session_id.clone(),
-                tab_session_id: self.inner.session_id.clone(),
-                command: Some(TabCommand::Ping(TabSessionPingCommand {
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::Ping(ContextSessionPingCommand {
                     message: message.into(),
                 })),
             })
             .await
-            .map_err(|_| Error::new("failed to send TabSessionPingCommand"))?;
+            .map_err(|_| Error::new("failed to send ContextSessionPingCommand"))?;
 
         loop {
             let event = handle
@@ -51,15 +51,15 @@ impl Tab {
                 .ok_or_else(|| Error::new("tab session closed while waiting for pong"))?;
 
             match event.event {
-                Some(TabEvent::Attached(_)) => {}
-                Some(TabEvent::Pong(pong)) => return Ok(pong.message),
-                Some(TabEvent::Error(error)) => {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::Pong(pong)) => return Ok(pong.message),
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while pinging: {}",
                         error.message
                     )));
                 }
-                Some(TabEvent::Closed(_)) => {
+                Some(ContextEvent::Closed(_)) => {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "tab session {} closed while waiting for pong",
@@ -87,16 +87,16 @@ impl Tab {
 
         handle
             .command_tx
-            .send(TabSessionCommand {
-                browser_session_id: self.inner.browser_session_id.clone(),
-                tab_session_id: self.inner.session_id.clone(),
-                command: Some(TabCommand::Navigate(NavigateTabCommand {
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::Navigate(NavigatePageCommand {
                     url: url.into(),
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
             })
             .await
-            .map_err(|_| Error::new("failed to send NavigateTabCommand"))?;
+            .map_err(|_| Error::new("failed to send NavigatePageCommand"))?;
 
         let mut navigated = None;
         let mut injection = None;
@@ -109,20 +109,20 @@ impl Tab {
                 .ok_or_else(|| Error::new("tab session closed while waiting for navigation"))?;
 
             match event.event {
-                Some(TabEvent::Attached(_)) => {}
-                Some(TabEvent::Navigated(navigated_event)) => {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::Navigated(navigated_event)) => {
                     navigated = Some(navigated_event);
                 }
-                Some(TabEvent::ChromiumBidiInjection(injection_event)) => {
+                Some(ContextEvent::ChromiumBidiInjection(injection_event)) => {
                     injection = Some(injection_event);
                 }
-                Some(TabEvent::Error(error)) => {
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while navigating: {}",
                         error.message
                     )));
                 }
-                Some(TabEvent::Closed(_)) => {
+                Some(ContextEvent::Closed(_)) => {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "tab session {} closed while navigating",
@@ -160,13 +160,13 @@ impl Tab {
 
         handle
             .command_tx
-            .send(TabSessionCommand {
-                browser_session_id: self.inner.browser_session_id.clone(),
-                tab_session_id: self.inner.session_id.clone(),
-                command: Some(TabCommand::Close(CloseTabSessionCommand {})),
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::Close(CloseContextSessionCommand {})),
             })
             .await
-            .map_err(|_| Error::new("failed to send CloseTabSessionCommand"))?;
+            .map_err(|_| Error::new("failed to send CloseContextSessionCommand"))?;
 
         loop {
             let event = handle
@@ -176,12 +176,12 @@ impl Tab {
                 .ok_or_else(|| Error::new("tab session closed before close confirmation"))?;
 
             match event.event {
-                Some(TabEvent::Attached(_)) => {}
-                Some(TabEvent::Closed(_)) => {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::Closed(_)) => {
                     handle.closed = true;
                     return Ok(());
                 }
-                Some(TabEvent::Error(error)) => {
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while closing: {}",
                         error.message
@@ -200,7 +200,7 @@ impl Tab {
             let mut engine = self.inner.runtime.engine.clone();
             let (command_tx, command_rx) = mpsc::channel(16);
             let response = engine
-                .tab_session(tonic::Request::new(ReceiverStream::new(command_rx)))
+                .context_session(tonic::Request::new(ReceiverStream::new(command_rx)))
                 .await?;
             state.handle = Some(TabHandle {
                 command_tx,

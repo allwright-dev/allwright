@@ -5,8 +5,8 @@ import type {
   BrowserInfo,
   BrowserKind,
   BrowserLaunchState,
-  BrowserSessionEvent,
-  BrowserSessionStream,
+  SurfaceSessionEvent,
+  SurfaceSessionStream,
   BrowserType,
   CommandOptions,
   LaunchOptions,
@@ -31,8 +31,8 @@ export class BrowserTypeImpl implements BrowserType {
 export class BrowserImpl implements Browser {
   #closed = false;
   #runtime: RuntimeClient;
-  #stream: BrowserSessionStream;
-  #queue: EventQueue<BrowserSessionEvent>;
+  #stream: SurfaceSessionStream;
+  #queue: EventQueue<SurfaceSessionEvent>;
   #pages = new Map<string, Page>();
   #initialPage: Page;
 
@@ -54,7 +54,7 @@ export class BrowserImpl implements Browser {
     this.cdpWebSocketURL = browserInfo.cdpWebSocketURL;
     this.userDataDir = browserInfo.userDataDir;
 
-    this.#initialPage = this.#createPage(state.launched.initialTabSessionId ?? "");
+    this.#initialPage = this.#createPage(state.launched.initialPageSessionId ?? "");
   }
 
   readonly sessionId: string;
@@ -78,18 +78,18 @@ export class BrowserImpl implements Browser {
   async newPage(options: CommandOptions = {}): Promise<Page> {
     this.#ensureOpen();
     this.#stream.write({
-      openTab: {
+      openContext: {
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });
 
     while (true) {
       const event = await this.#queue.next();
-      if (event.tabOpened?.tabSessionId) {
-        return this.#createPage(event.tabOpened.tabSessionId);
+      if (event.contextOpened?.contextSessionId) {
+        return this.#createPage(event.contextOpened.contextSessionId);
       }
       if (event.error?.message) {
-        throw formatActionError("open tab", event.error.message);
+        throw formatActionError("open page", event.error.message);
       }
     }
   }

@@ -60,8 +60,8 @@ class Browser:
             self._ensure_open()
             command_options = options or CommandOptions()
             self._stream.send(
-                engine_pb2.BrowserSessionCommand(
-                    open_tab=engine_pb2.OpenTabCommand(
+                engine_pb2.SurfaceSessionCommand(
+                    open_context=engine_pb2.OpenContextCommand(
                         retry_options=retry_options(command_options.timeout_ms),
                     ),
                 )
@@ -70,11 +70,11 @@ class Browser:
             while True:
                 event = self._stream.recv("receive browser session event while opening page")
                 match event.WhichOneof("event"):
-                    case "tab_opened":
+                    case "context_opened":
                         page = Page(
                             runtime=self._runtime,
-                            browser_session_id=self.session_id,
-                            session_id=event.tab_opened.tab_session_id,
+                            surface_session_id=self.session_id,
+                            session_id=event.context_opened.context_session_id,
                         )
                         self._pages[page.session_id] = page
                         return page
@@ -90,7 +90,7 @@ class Browser:
         with self._lock:
             self._ensure_open()
             self._stream.send(
-                engine_pb2.BrowserSessionCommand(
+                engine_pb2.SurfaceSessionCommand(
                     ping=engine_pb2.SessionPingCommand(message=message),
                 )
             )
@@ -111,8 +111,8 @@ class Browser:
                 return
 
             self._stream.send(
-                engine_pb2.BrowserSessionCommand(
-                    close=engine_pb2.CloseBrowserSessionCommand(),
+                engine_pb2.SurfaceSessionCommand(
+                    close=engine_pb2.CloseSurfaceSessionCommand(),
                 )
             )
 
