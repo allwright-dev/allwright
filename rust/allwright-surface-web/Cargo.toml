@@ -15,8 +15,8 @@ categories = ["development-tools::testing", "api-bindings"]
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-allwright = { package = "allwright-core", path = "../allwright", version = "0.0.49" }
-allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.49" }
+allwright = { package = "allwright-core", path = "../allwright", version = "0.0.50" }
+allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.50" }
 futures-util = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
