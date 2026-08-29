@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "allwright"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",
@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-core"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "allwright-plugin-sdk",
  "clap",
@@ -55,7 +55,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-plugin-sdk"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "serde",
  "serde_json",
@@ -63,7 +63,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "allwright-plugin-sdk",
  "tokio",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-linux"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -80,7 +80,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-mac"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -89,7 +89,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-windows"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -98,7 +98,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "allwright-plugin-sdk",
  "serde",
@@ -108,7 +108,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile-android"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
@@ -121,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile-ios"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
@@ -130,7 +130,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-web"
-version = "0.0.50"
+version = "0.0.51"
 dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",

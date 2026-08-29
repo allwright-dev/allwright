@@ -23,7 +23,7 @@ name = "playground"
 required-features = ["client"]
 
 [dependencies]
-allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.50" }
+allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.51" }
 flate2 = { workspace = true }
 libloading = { workspace = true }
 prost = { workspace = true }
