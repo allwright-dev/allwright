@@ -25,9 +25,9 @@ PATH="$bin_dir:$PATH" protoc \
   --go-grpc_out="$go_output_root" \
   --go-grpc_opt=paths=import \
   --go-grpc_opt=module=allwright.dev \
-  "$proto_root/core/v1/browser.proto" \
+  "$proto_root/core/v1/surface.proto" \
   "$proto_root/core/v1/common.proto" \
-  "$proto_root/core/v1/tab.proto" \
+  "$proto_root/core/v1/context.proto" \
   "$proto_root/engine/v1/engine.proto" \
   "$proto_root/surfaces/mobile/v1/mobile.proto" \
   "$proto_root/surfaces/web/v1/web.proto"

@@ -15,6 +15,7 @@ import type {
   MobileSurfaceNamespace,
   PageHandle,
   RuntimeClient,
+  ScreenshotResult,
 } from "./types.js";
 
 function retryOptions(timeoutMs?: number): { timeoutMs?: number } | undefined {
@@ -94,6 +95,35 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
       if (event.closed) {
         handle.closed = true;
         throw new Error(`android app session ${this.sessionId} closed while filling`);
+      }
+    }
+  }
+
+  async screenshot(options: CommandOptions = {}): Promise<ScreenshotResult> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.#surfaceSessionId,
+      contextSessionId: this.sessionId,
+      screenshot: {
+        retryOptions: retryOptions(options.timeoutMs),
+      },
+    });
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.screenshotCaptured?.pngData) {
+        return {
+          pngData: event.screenshotCaptured.pngData,
+          note: event.screenshotCaptured.note ?? "",
+        };
+      }
+      if (event.error?.message) {
+        throw new Error(event.error.message);
+      }
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`android app session ${this.sessionId} closed while capturing screenshot`);
       }
     }
   }

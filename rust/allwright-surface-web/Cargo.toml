@@ -17,6 +17,7 @@ crate-type = ["rlib", "cdylib"]
 [dependencies]
 allwright = { package = "allwright-core", path = "../allwright", version = "0.0.53" }
 allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.53" }
+base64 = { workspace = true }
 futures-util = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

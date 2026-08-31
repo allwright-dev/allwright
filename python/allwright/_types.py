@@ -139,3 +139,9 @@ class WaitForSelectorResult:
     selector: str
     visible: bool
     note: str
+
+
+@dataclass(slots=True)
+class ScreenshotResult:
+    png_data: bytes
+    note: str

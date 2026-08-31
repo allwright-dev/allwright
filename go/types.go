@@ -183,6 +183,11 @@ type WaitForSelectorResult struct {
 	Note     string
 }
 
+type ScreenshotResult struct {
+	PNGData []byte
+	Note    string
+}
+
 type Browser struct {
 	mu              sync.Mutex
 	runtime         *runtimeClient

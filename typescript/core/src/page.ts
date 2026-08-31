@@ -18,6 +18,7 @@ import type {
   PressOptions,
   PressResult,
   RuntimeClient,
+  ScreenshotResult,
   ContextSessionEvent,
   TextResult,
   WaitForSelectorOptions,
@@ -351,6 +352,35 @@ export class PageImpl implements Page {
       if (event.closed) {
         handle.closed = true;
         throw new Error(`page session ${this.sessionId} closed while waiting for selector result`);
+      }
+    }
+  }
+
+  async screenshot(options: CommandOptions = {}): Promise<ScreenshotResult> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
+      screenshot: {
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.screenshotCaptured?.pngData) {
+        return {
+          pngData: event.screenshotCaptured.pngData,
+          note: event.screenshotCaptured.note ?? "",
+        };
+      }
+      if (event.error?.message) {
+        throw formatActionError("screenshot", event.error.message);
+      }
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`page session ${this.sessionId} closed while waiting for screenshot`);
       }
     }
   }

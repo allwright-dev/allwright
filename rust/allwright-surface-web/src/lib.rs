@@ -2,9 +2,11 @@ use allwright_plugin_sdk::{
     ALLWRIGHT_PLUGIN_API_VERSION, AutomationSessionInfo, BrowserKind, BrowserLaunchInfo,
     BrowserSessionHandle, ChromeLaunchInfo, ChromeTabInfo, ChromiumBidiMapperInfo, ClickInfo,
     ElementCountInfo, FillInfo, FocusInfo, HighlightElementsInfo, HoverInfo, PageInfo,
-    PageSessionHandle, PluginCommand, PluginEnvelope, PluginResult, PressKeyInfo, SurfaceFamily,
-    SurfacePlugin, SurfacePluginDescriptor, TabNavigationInfo, TextInfo, WaitForSelectorInfo,
+    PageSessionHandle, PluginCommand, PluginEnvelope, PluginResult, PressKeyInfo, ScreenshotInfo,
+    SurfaceFamily, SurfacePlugin, SurfacePluginDescriptor, TabNavigationInfo, TextInfo,
+    WaitForSelectorInfo,
 };
+use base64::Engine as _;
 use std::borrow::Cow;
 use std::ffi::{CStr, CString, c_char};
 use std::fs;
@@ -1475,6 +1477,64 @@ pub async fn wait_for_selector(
     }
 }
 
+pub async fn screenshot_via_cdp(
+    cdp_websocket_url: &str,
+    target_id: &str,
+) -> Result<ScreenshotInfo, String> {
+    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+    let session_id = cdp.prepare_page_target_session(target_id).await?;
+    let response = cdp
+        .send_command("Page.captureScreenshot", json!({}), Some(&session_id))
+        .await?;
+    cdp.detach_from_target(&session_id).await?;
+
+    Ok(ScreenshotInfo {
+        png_data: decode_base64_field(&response, "/data", "CDP screenshot data")?,
+        note: "captured Chromium screenshot via CDP Page.captureScreenshot".to_string(),
+    })
+}
+
+pub async fn screenshot(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+) -> Result<ScreenshotInfo, String> {
+    match (browser_session, page_session) {
+        (
+            BrowserSessionHandle::Chromium { cdp_websocket_url },
+            PageSessionHandle::Chromium { target_id, .. },
+        ) => screenshot_via_cdp(cdp_websocket_url, target_id).await,
+        (
+            BrowserSessionHandle::Firefox { connection_id, .. },
+            PageSessionHandle::Firefox {
+                browsing_context_id,
+            },
+        ) => {
+            let mut sessions = firefox_session_guard(connection_id).await?;
+            let bidi = &mut sessions
+                .get_mut(connection_id)
+                .expect("Firefox session guard validated connection id")
+                .connection;
+            let response = bidi
+                .send_command(
+                    "browsingContext.captureScreenshot",
+                    json!({
+                        "context": browsing_context_id,
+                    }),
+                )
+                .await?;
+            Ok(ScreenshotInfo {
+                png_data: decode_base64_field(
+                    &response,
+                    "/result/data",
+                    "Firefox screenshot data",
+                )?,
+                note: "captured Firefox screenshot via native WebDriver BiDi".to_string(),
+            })
+        }
+        _ => Err("browser/page backend mismatch while capturing screenshot".to_string()),
+    }
+}
+
 async fn discover_elements_via_cdp(
     cdp: &mut CdpConnection,
     session_id: &str,
@@ -2280,6 +2340,16 @@ fn selector_kind_label(kind: SelectorKind) -> &'static str {
         SelectorKind::Css => "css selector",
         SelectorKind::XPath => "xpath selector",
     }
+}
+
+fn decode_base64_field(value: &Value, pointer: &str, label: &str) -> Result<Vec<u8>, String> {
+    let encoded = value
+        .pointer(pointer)
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("{label} is missing from protocol response: {value}"))?;
+    base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|error| format!("failed to decode {label}: {error}"))
 }
 
 fn selector_query_all_js(kind: SelectorKind) -> &'static str {
@@ -3633,6 +3703,14 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
                 .await
                 .map(PluginResult::WaitForSelector)
         }),
+        PluginCommand::Screenshot {
+            browser_session,
+            page_session,
+        } => block_on_plugin_future(async move {
+            screenshot(&browser_session, &page_session)
+                .await
+                .map(PluginResult::Screenshot)
+        }),
         PluginCommand::OpenChromeWindow { chrome_binary } => {
             open_chrome_window(chrome_binary.as_deref()).map(PluginResult::OpenChromeWindow)
         }
@@ -3797,6 +3875,13 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
                 wait_for_selector_via_cdp(&cdp_websocket_url, &target_id, &css_selector, visible)
                     .await?;
             Ok(PluginResult::WaitForSelectorViaCdp(result))
+        }),
+        PluginCommand::ScreenshotViaCdp {
+            cdp_websocket_url,
+            target_id,
+        } => block_on_plugin_future(async move {
+            let result = screenshot_via_cdp(&cdp_websocket_url, &target_id).await?;
+            Ok(PluginResult::ScreenshotViaCdp(result))
         }),
     }
 }

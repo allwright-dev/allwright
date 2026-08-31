@@ -171,6 +171,12 @@ pub struct WaitForSelectorInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ScreenshotInfo {
+    pub png_data: Vec<u8>,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum PluginCommand {
     LaunchBrowser {
@@ -243,6 +249,10 @@ pub enum PluginCommand {
         page_session: PageSessionHandle,
         css_selector: String,
         visible: bool,
+    },
+    Screenshot {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
     },
     OpenChromeWindow {
         chrome_binary: Option<String>,
@@ -329,6 +339,10 @@ pub enum PluginCommand {
         css_selector: String,
         visible: bool,
     },
+    ScreenshotViaCdp {
+        cdp_websocket_url: String,
+        target_id: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -348,6 +362,7 @@ pub enum PluginResult {
     GetTextContent(TextInfo),
     GetInnerText(TextInfo),
     WaitForSelector(WaitForSelectorInfo),
+    Screenshot(ScreenshotInfo),
     OpenChromeWindow(ChromeLaunchInfo),
     DiscoverInitialTab(ChromeTabInfo),
     OpenChromeTab(ChromeTabInfo),
@@ -369,6 +384,7 @@ pub enum PluginResult {
     GetTextContentViaCdp(TextInfo),
     GetInnerTextViaCdp(TextInfo),
     WaitForSelectorViaCdp(WaitForSelectorInfo),
+    ScreenshotViaCdp(ScreenshotInfo),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

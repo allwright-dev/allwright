@@ -1,0 +1,216 @@
+syntax = "proto3";
+
+package allwright.engine.v1;
+option go_package = "allwright.dev/gen/allwright/engine/v1;enginev1";
+option java_package = "dev.allwright.engine.v1";
+option java_multiple_files = true;
+
+import "core/v1/common.proto";
+
+message ContextSessionCommand {
+  string surface_session_id = 1;
+  string context_session_id = 2;
+
+  oneof command {
+    ContextSessionPingCommand ping = 3;
+    CloseContextSessionCommand close = 4;
+    NavigatePageCommand navigate = 5;
+    ClickElementCommand click_element = 6;
+    CountElementsCommand count_elements = 7;
+    HighlightElementsCommand highlight_elements = 8;
+    FocusElementCommand focus_element = 9;
+    FillElementCommand fill_element = 10;
+    HoverElementCommand hover_element = 11;
+    PressKeyCommand press_key = 12;
+    GetTextContentCommand get_text_content = 13;
+    GetInnerTextCommand get_inner_text = 14;
+    WaitForSelectorCommand wait_for_selector = 15;
+    ScreenshotCommand screenshot = 16;
+  }
+}
+
+message ContextSessionPingCommand {
+  string message = 1;
+}
+
+message CloseContextSessionCommand {}
+
+message ContextSessionEvent {
+  string context_session_id = 1;
+
+  oneof event {
+    ContextSessionAttachedEvent attached = 2;
+    ContextSessionPongEvent pong = 3;
+    ContextSessionClosedEvent closed = 4;
+    ContextSessionErrorEvent error = 5;
+    PageNavigatedEvent navigated = 6;
+    ChromiumBidiInjectionEvent chromium_bidi_injection = 7;
+    ElementClickedEvent element_clicked = 8;
+    ElementCountedEvent element_counted = 9;
+    ElementsHighlightedEvent elements_highlighted = 10;
+    ElementFocusedEvent element_focused = 11;
+    ElementFilledEvent element_filled = 12;
+    ElementHoveredEvent element_hovered = 13;
+    KeyPressedEvent key_pressed = 14;
+    TextContentResolvedEvent text_content_resolved = 15;
+    InnerTextResolvedEvent inner_text_resolved = 16;
+    SelectorWaitSatisfiedEvent selector_wait_satisfied = 17;
+    ScreenshotCapturedEvent screenshot_captured = 18;
+  }
+}
+
+message ContextSessionAttachedEvent {
+  string note = 1;
+}
+
+message ContextSessionPongEvent {
+  string message = 1;
+}
+
+message ContextSessionClosedEvent {
+  string reason = 1;
+}
+
+message ContextSessionErrorEvent {
+  string message = 1;
+}
+
+message NavigatePageCommand {
+  string url = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message ClickElementCommand {
+  string css_selector = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message CountElementsCommand {
+  string css_selector = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message HighlightElementsCommand {
+  string css_selector = 1;
+  optional uint32 duration_ms = 2;
+  optional CommandRetryOptions retry_options = 3;
+}
+
+message FocusElementCommand {
+  string css_selector = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message FillElementCommand {
+  string css_selector = 1;
+  string value = 2;
+  optional CommandRetryOptions retry_options = 3;
+}
+
+message HoverElementCommand {
+  string css_selector = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message PressKeyCommand {
+  string css_selector = 1;
+  string key = 2;
+  optional string text = 3;
+  optional CommandRetryOptions retry_options = 4;
+}
+
+message GetTextContentCommand {
+  string css_selector = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message GetInnerTextCommand {
+  string css_selector = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message WaitForSelectorCommand {
+  string css_selector = 1;
+  optional bool visible = 2;
+  optional CommandRetryOptions retry_options = 3;
+}
+
+message ScreenshotCommand {
+  optional CommandRetryOptions retry_options = 1;
+}
+
+message PageNavigatedEvent {
+  string url = 1;
+  string note = 2;
+}
+
+message ChromiumBidiInjectionEvent {
+  string note = 1;
+  string bidi_session_id = 2;
+  string mapper_target_id = 3;
+  string mapper_session_id = 4;
+  string package_version = 5;
+}
+
+message ElementClickedEvent {
+  string css_selector = 1;
+  string note = 2;
+  string bidi_session_id = 3;
+}
+
+message ElementCountedEvent {
+  string css_selector = 1;
+  uint32 count = 2;
+  string note = 3;
+}
+
+message ElementsHighlightedEvent {
+  string css_selector = 1;
+  uint32 count = 2;
+  string note = 3;
+}
+
+message ElementFocusedEvent {
+  string css_selector = 1;
+  string note = 2;
+}
+
+message ElementFilledEvent {
+  string css_selector = 1;
+  string value = 2;
+  string note = 3;
+}
+
+message ElementHoveredEvent {
+  string css_selector = 1;
+  string note = 2;
+}
+
+message KeyPressedEvent {
+  string css_selector = 1;
+  string key = 2;
+  string note = 3;
+}
+
+message TextContentResolvedEvent {
+  string css_selector = 1;
+  string text = 2;
+  string note = 3;
+}
+
+message InnerTextResolvedEvent {
+  string css_selector = 1;
+  string text = 2;
+  string note = 3;
+}
+
+message SelectorWaitSatisfiedEvent {
+  string css_selector = 1;
+  bool visible = 2;
+  string note = 3;
+}
+
+message ScreenshotCapturedEvent {
+  bytes png_data = 1;
+  string note = 2;
+}

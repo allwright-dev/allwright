@@ -213,6 +213,89 @@ function EngineHero({ variant }: { variant?: HeroVariant }) {
   );
 }
 
+// Same TS-client-into-core language as TypeScriptHero, but the core now fans
+// out to two targets instead of one: the existing browser node, plus a new
+// phone node for the androidApp fixture. That fan-out is the actual claim of
+// the post — one client, one core, both surfaces in the same test.
+function AndroidHero({ variant }: { variant?: HeroVariant }) {
+  return (
+    <HeroFrame
+      variant={variant}
+      label="A TypeScript client node with an arrow into the allwright core, and two arrows out of the core: one into a real browser window labelled page.goto and page.click, and one into an Android phone labelled androidApp.click and androidApp.fill, showing one test driving both surfaces"
+    >
+      <defs>
+        <ArrowMarker id="hero-android-arrow" />
+      </defs>
+
+      <text x={380} y={196} textAnchor="middle" fontSize="14" fontFamily="var(--font-mono)" fill="var(--muted)">
+        @allwright.dev/vitest
+      </text>
+
+      <line x1={230} y1={230} x2={494} y2={230} stroke="currentColor" strokeWidth="1.4" markerEnd="url(#hero-android-arrow)" />
+
+      {/* TypeScript node */}
+      <rect x={90} y={170} width={140} height={120} rx={24} fill="#3178C6" />
+      <text x={160} y={246} textAnchor="middle" fontSize="52" fontWeight="700" fill="#ffffff" fontFamily="var(--font-mono)">
+        TS
+      </text>
+      <text x={160} y={140} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--ink)">
+        TypeScript client
+      </text>
+
+      {/* allwright core */}
+      <circle cx={560} cy={230} r={66} fill="var(--accent-soft)" stroke="var(--accent-2)" strokeWidth="1.6" />
+      <text x={560} y={224} textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--accent-2)">
+        allwright
+      </text>
+      <text x={560} y={246} textAnchor="middle" fontSize="13" fill="var(--accent-2)">
+        core
+      </text>
+
+      {/* Fan-out to browser (top) and Android device (bottom) */}
+      <line x1={624} y1={205} x2={860} y2={140} stroke="currentColor" strokeWidth="1.4" markerEnd="url(#hero-android-arrow)" />
+      <line x1={624} y1={255} x2={860} y2={335} stroke="currentColor" strokeWidth="1.4" markerEnd="url(#hero-android-arrow)" />
+
+      <text x={745} y={122} textAnchor="middle" fontSize="12.5" fontFamily="var(--font-mono)" fill="var(--muted)">
+        page.goto · page.click
+      </text>
+      <text x={745} y={358} textAnchor="middle" fontSize="12.5" fontFamily="var(--font-mono)" fill="var(--muted)">
+        androidApp.click · fill
+      </text>
+
+      {/* Browser node */}
+      <rect x={860} y={85} width={172} height={110} rx={16} fill="var(--background)" stroke="currentColor" strokeWidth="1" />
+      <rect x={860} y={85} width={172} height={28} rx={16} fill="var(--card)" stroke="currentColor" strokeWidth="1" />
+      <circle cx={876} cy={99} r={4} fill="var(--muted)" opacity="0.5" />
+      <circle cx={890} cy={99} r={4} fill="var(--muted)" opacity="0.5" />
+      <circle cx={904} cy={99} r={4} fill="var(--muted)" opacity="0.5" />
+      <path
+        d="M930 150c0-14.4 11.6-26 26-26s26 11.6 26 26-11.6 26-26 26-26-11.6-26-26Z"
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth="1.6"
+      />
+      <path d="M930 150h52M956 124v52" stroke="var(--accent)" strokeWidth="1.2" opacity="0.6" />
+      <text x={946} y={68} textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--ink)">
+        Real browser
+      </text>
+
+      {/* Android device node: phone outline with a tap-ripple glyph */}
+      <rect x={900} y={270} width={92} height={150} rx={18} fill="var(--background)" stroke="currentColor" strokeWidth="1" />
+      <rect x={936} y={282} width={20} height={4} rx={2} fill="var(--muted)" opacity="0.6" />
+      <rect x={928} y={392} width={36} height={4} rx={2} fill="var(--muted)" opacity="0.6" />
+      <circle cx={946} cy={345} r={20} fill="none" stroke="var(--accent)" strokeWidth="1.4" opacity="0.55" />
+      <circle cx={946} cy={345} r={10} fill="none" stroke="var(--accent)" strokeWidth="1.4" />
+      <circle cx={946} cy={345} r={3} fill="var(--accent)" />
+      <text x={946} y={253} textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--ink)">
+        Android device
+      </text>
+      <text x={946} y={438} textAnchor="middle" fontSize="11.5" fill="var(--muted)">
+        experimental · via adb
+      </text>
+    </HeroFrame>
+  );
+}
+
 function DefaultHero({ variant }: { variant?: HeroVariant }) {
   return (
     <HeroFrame variant={variant} label="The allwright logo mark on a gradient card">
@@ -237,6 +320,7 @@ function DefaultHero({ variant }: { variant?: HeroVariant }) {
 const heroRegistry: Record<string, (props: { variant?: HeroVariant }) => React.ReactElement> = {
   "get-started-with-typescript": TypeScriptHero,
   "why-allwright-if-playwright-exists": EngineHero,
+  "android-testing-playwright-style": AndroidHero,
 };
 
 export function HeroImage({ slug, variant }: { slug: string; variant?: HeroVariant }) {

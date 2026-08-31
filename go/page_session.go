@@ -179,6 +179,54 @@ func (t *Tab) WaitForSelector(ctx context.Context, cssSelector string, options .
 	}
 }
 
+func (t *Tab) Screenshot(ctx context.Context, options ...CommandOptions) (*ScreenshotResult, error) {
+	if t == nil {
+		return nil, fmt.Errorf("tab is nil")
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if err := t.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if t.closed {
+		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
+	}
+
+	commandOptions := firstCommandOptions(options)
+	if err := t.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: t.browserSessionID,
+		ContextSessionId: t.sessionID,
+		Command: &enginev1.ContextSessionCommand_Screenshot{
+			Screenshot: &enginev1.ScreenshotCommand{
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send ScreenshotCommand: %w", err)
+	}
+
+	for {
+		event, err := t.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive tab session event during screenshot: %w", err)
+		}
+
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.ContextSessionEvent_Attached:
+			t.attached = true
+			_ = payload
+		case *enginev1.ContextSessionEvent_ScreenshotCaptured:
+			return &ScreenshotResult{
+				PNGData: payload.ScreenshotCaptured.GetPngData(),
+				Note:    payload.ScreenshotCaptured.GetNote(),
+			}, nil
+		case *enginev1.ContextSessionEvent_Error:
+			return nil, fmt.Errorf("tab session error while capturing screenshot: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
 func (t *Tab) Ping(ctx context.Context, message string) (string, error) {
 	if t == nil {
 		return "", fmt.Errorf("tab is nil")

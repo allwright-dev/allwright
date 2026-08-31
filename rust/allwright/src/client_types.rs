@@ -285,6 +285,12 @@ pub struct WaitForSelectorResult {
     pub note: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct ScreenshotResult {
+    pub png_data: Vec<u8>,
+    pub note: String,
+}
+
 #[derive(Clone)]
 pub struct Browser {
     pub(crate) inner: Arc<BrowserInner>,

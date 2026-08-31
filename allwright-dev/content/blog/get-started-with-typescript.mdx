@@ -42,9 +42,34 @@ same five files, built up one at a time.
 
 - Node.js 18 or newer
 - npm (or your package manager of choice — the sample uses npm)
+- A real Chrome/Chromium or Firefox already installed on the machine —
+  allwright drives whatever browser it finds locally, it doesn't download
+  one for you
 
-That's it. `@allwright.dev/vitest` pulls in everything else it needs,
-including bootstrapping the allwright engine itself on first run.
+That's it for the browser plugin path. `@allwright.dev/vitest` can bootstrap
+the allwright engine and the `web` plugin itself on first run, or you can
+install both explicitly first — see the next section.
+
+## Install the engine and web plugin (optional)
+
+`@allwright.dev/vitest` bootstraps the allwright engine and installs the
+`web` plugin for you automatically, so feel free to skip straight to the
+next section if you don't care what's happening underneath. If you'd
+rather have the CLI and plugin already in place before
+your first test — CI, an offline environment, or just wanting to watch the
+install happen once instead of on your first assertion — do it yourself:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/allwright-dev/allwright/main/scripts/install.sh | bash
+allwright serve --listen-addr 127.0.0.1:50051 &
+allwright plugin install web
+```
+
+`allwright serve` starts the gRPC engine that `@allwright.dev/vitest` talks
+to over `127.0.0.1:50051` by default; `allwright plugin install web` fetches
+the driverless Chromium/Firefox plugin from GitHub Releases ahead of time.
+Skip this, and the exact same two things happen automatically the moment
+your test needs them.
 
 ## 1. Start a new project
 
@@ -163,9 +188,12 @@ instead:
 npm run test:watch
 ```
 
-The first run bootstraps the allwright engine and downloads a managed
-browser build if one isn't already available locally — expect that one to
-take a little longer than the ones after it.
+If you skipped the optional install step above, the first run downloads and
+launches the allwright CLI, then lets the engine auto-install the `web`
+plugin the moment your test issues its first command — expect that one to
+take a little longer than the ones after it. Either way, allwright drives
+whatever Chrome/Chromium or Firefox is already installed on the machine; it
+doesn't download a browser for you.
 
 ## Project structure, for reference
 

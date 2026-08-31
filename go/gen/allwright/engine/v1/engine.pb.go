@@ -24,7 +24,7 @@ var File_engine_v1_engine_proto protoreflect.FileDescriptor
 
 const file_engine_v1_engine_proto_rawDesc = "" +
 	"\n" +
-	"\x16engine/v1/engine.proto\x12\x13allwright.engine.v1\x1a\x15core/v1/browser.proto\x1a\x14core/v1/common.proto\x1a\x11core/v1/tab.proto2\xb4\x02\n" +
+	"\x16engine/v1/engine.proto\x12\x13allwright.engine.v1\x1a\x15core/v1/surface.proto\x1a\x14core/v1/common.proto\x1a\x15core/v1/context.proto2\xb4\x02\n" +
 	"\rEngineService\x12K\n" +
 	"\x04Ping\x12 .allwright.engine.v1.PingRequest\x1a!.allwright.engine.v1.PingResponse\x12j\n" +
 	"\x0eSurfaceSession\x12*.allwright.engine.v1.SurfaceSessionCommand\x1a(.allwright.engine.v1.SurfaceSessionEvent(\x010\x01\x12j\n" +
@@ -58,9 +58,9 @@ func file_engine_v1_engine_proto_init() {
 	if File_engine_v1_engine_proto != nil {
 		return
 	}
-	file_core_v1_browser_proto_init()
+	file_core_v1_surface_proto_init()
 	file_core_v1_common_proto_init()
-	file_core_v1_tab_proto_init()
+	file_core_v1_context_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

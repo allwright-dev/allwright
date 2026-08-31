@@ -14,6 +14,7 @@ import dev.allwright.engine.v1.PressKeyCommand;
 import dev.allwright.engine.v1.ContextSessionCommand;
 import dev.allwright.engine.v1.ContextSessionEvent;
 import dev.allwright.engine.v1.ContextSessionPingCommand;
+import dev.allwright.engine.v1.ScreenshotCommand;
 import dev.allwright.engine.v1.WaitForSelectorCommand;
 
 public final class Page implements AutoCloseable {
@@ -431,6 +432,47 @@ public final class Page implements AutoCloseable {
                 }
                 case ERROR -> throw new AllwrightException(
                         "page session error while waiting for selector: " + event.getError().getMessage()
+                );
+                default -> {
+                }
+            }
+        }
+    }
+
+    public synchronized ScreenshotResult screenshot() {
+        return screenshot(new CommandOptions());
+    }
+
+    public synchronized ScreenshotResult screenshot(CommandOptions options) {
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
+        ensureOpen();
+        CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+        ScreenshotCommand.Builder screenshot = ScreenshotCommand.newBuilder();
+        if (CommandSupport.hasTimeout(resolvedOptions.timeoutMs())) {
+            screenshot.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
+        }
+        handle.send(
+                ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
+                        .setScreenshot(screenshot)
+                        .build()
+        );
+        while (true) {
+            ContextSessionEvent event = handle.recv("receive tab session event while capturing screenshot");
+            switch (event.getEventCase()) {
+                case SCREENSHOT_CAPTURED -> {
+                    return new ScreenshotResult(
+                            event.getScreenshotCaptured().getPngData().toByteArray(),
+                            event.getScreenshotCaptured().getNote()
+                    );
+                }
+                case CLOSED -> {
+                    closed = true;
+                    throw new AllwrightException("page session " + sessionId + " closed while capturing screenshot");
+                }
+                case ERROR -> throw new AllwrightException(
+                        "page session error while capturing screenshot: " + event.getError().getMessage()
                 );
                 default -> {
                 }

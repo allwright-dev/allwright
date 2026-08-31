@@ -1,6 +1,7 @@
 use allwright::{
-    mobile::{android, MobileAndroidConnectOptions, MobileAndroidLaunchOptions},
-    set_server_addr, shutdown, CommandOptions,
+    CommandOptions,
+    mobile::{MobileAndroidConnectOptions, MobileAndroidLaunchOptions, android},
+    set_server_addr, shutdown,
 };
 
 const DEFAULT_ANDROID_DEVICE: &str = "emulator-5554";
@@ -47,7 +48,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     )
     .await?;
     app.fill(
-        &env_or("ALLWRIGHT_ANDROID_FILL_SELECTOR", DEFAULT_ANDROID_FILL_SELECTOR),
+        &env_or(
+            "ALLWRIGHT_ANDROID_FILL_SELECTOR",
+            DEFAULT_ANDROID_FILL_SELECTOR,
+        ),
         &env_or("ALLWRIGHT_ANDROID_FILL_VALUE", DEFAULT_ANDROID_FILL_VALUE),
         CommandOptions::default(),
     )

@@ -135,6 +135,7 @@ version = "0.0.53"
 dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",
+ "base64",
  "futures-util",
  "serde_json",
  "tokio",

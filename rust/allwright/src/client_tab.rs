@@ -1,7 +1,8 @@
 use crate::proto::context_session_command::Command as ContextCommand;
 use crate::proto::context_session_event::Event as ContextEvent;
 use crate::proto::{
-    CloseContextSessionCommand, NavigatePageCommand, ContextSessionCommand, ContextSessionPingCommand,
+    CloseContextSessionCommand, ContextSessionCommand, ContextSessionPingCommand,
+    NavigatePageCommand,
 };
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;

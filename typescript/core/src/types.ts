@@ -84,6 +84,11 @@ export interface WaitForSelectorResult {
   note: string;
 }
 
+export interface ScreenshotResult {
+  pngData: Uint8Array;
+  note: string;
+}
+
 export interface BrowserInfo {
   sessionId: string;
   browserName: string;
@@ -132,6 +137,7 @@ export interface Page extends PageInfo {
   textContent(selector: string, options?: CommandOptions): Promise<TextResult>;
   innerText(selector: string, options?: CommandOptions): Promise<TextResult>;
   waitForSelector(selector: string, options?: WaitForSelectorOptions): Promise<WaitForSelectorResult>;
+  screenshot(options?: CommandOptions): Promise<ScreenshotResult>;
   close(): Promise<void>;
   ping(message?: string): Promise<string>;
   pageInfo(): PageInfo;
@@ -165,6 +171,7 @@ export interface MobileAndroidApp {
   locator(selector: string): MobileAndroidLocator;
   click(selector: string, options?: CommandOptions): Promise<ClickResult>;
   fill(selector: string, value: string, options?: CommandOptions): Promise<FillResult>;
+  screenshot(options?: CommandOptions): Promise<ScreenshotResult>;
 }
 
 export interface MobileAndroidDevice {
@@ -436,6 +443,10 @@ export interface ContextSessionEvent {
     visible?: boolean;
     note?: string;
   };
+  screenshotCaptured?: {
+    pngData?: Uint8Array;
+    note?: string;
+  };
 }
 
 export interface LaunchChromeRequest {
@@ -633,6 +644,16 @@ export interface WaitForSelectorRequest {
   };
 }
 
+export interface ScreenshotRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
+  screenshot: {
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
 export interface CloseContextRequest {
   surfaceSessionId: string;
   contextSessionId: string;
@@ -661,6 +682,7 @@ export type ContextSessionRequest =
   | TextContentRequest
   | InnerTextRequest
   | WaitForSelectorRequest
+  | ScreenshotRequest
   | CloseContextRequest;
 
 export type SurfaceSessionStream = grpc.ClientDuplexStream<SurfaceSessionRequest, SurfaceSessionEvent>;

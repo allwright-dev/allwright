@@ -3,12 +3,12 @@ use allwright_plugin_sdk::{
     BrowserKind, BrowserLaunchInfo, BrowserSessionHandle, ChromeLaunchInfo, ChromeTabInfo,
     ChromiumBidiMapperInfo, ClickInfo, ElementCountInfo, FillInfo, FocusInfo,
     HighlightElementsInfo, HoverInfo, PageInfo, PageSessionHandle, PluginCommand, PluginEnvelope,
-    PluginResult, PressKeyInfo, TabNavigationInfo, TextInfo, WaitForSelectorInfo,
+    PluginResult, PressKeyInfo, ScreenshotInfo, TabNavigationInfo, TextInfo, WaitForSelectorInfo,
 };
 use allwright_surface_mobile::{
     ConnectOptions as MobileConnectOptions, MobileBrowserSessionHandle, MobileClickInfo,
     MobileCommand, MobileCommandResult, MobileConnectInfo, MobileFillInfo, MobilePageInfo,
-    MobilePageSessionHandle, MobilePlatform,
+    MobilePageSessionHandle, MobilePlatform, MobileScreenshotInfo,
 };
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -61,9 +61,7 @@ async fn invoke_web_expected(
     tokio::task::block_in_place(move || invoke_web(command))
 }
 
-async fn invoke_mobile_expected(
-    command: MobileCommand,
-) -> Result<MobileCommandResult, String> {
+async fn invoke_mobile_expected(command: MobileCommand) -> Result<MobileCommandResult, String> {
     tokio::task::block_in_place(move || invoke_mobile(command))
 }
 
@@ -90,6 +88,9 @@ fn mobile_plugin_id_for_command(command: &MobileCommand) -> Result<&'static str,
             browser_session, ..
         }
         | MobileCommand::WaitForSelector {
+            browser_session, ..
+        }
+        | MobileCommand::Screenshot {
             browser_session, ..
         } => browser_session.platform,
     };
@@ -190,6 +191,23 @@ pub async fn fill_mobile_element(
     {
         MobileCommandResult::FillElement(result) => Ok(result),
         _ => Err("mobile plugin returned an unexpected response for FillElement".to_string()),
+    }
+}
+
+pub async fn screenshot_mobile(
+    surface_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    timeout_ms: Option<u32>,
+) -> Result<MobileScreenshotInfo, String> {
+    match invoke_mobile_expected(MobileCommand::Screenshot {
+        browser_session: surface_session.clone(),
+        page_session: page_session.clone(),
+        timeout_ms,
+    })
+    .await?
+    {
+        MobileCommandResult::Screenshot(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected response for Screenshot".to_string()),
     }
 }
 
@@ -484,6 +502,24 @@ pub async fn wait_for_selector(
     {
         PluginResult::WaitForSelector(result) => Ok(result),
         _ => Err("web plugin returned an unexpected response for WaitForSelector".to_string()),
+    }
+}
+
+pub async fn screenshot_page(
+    surface_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+) -> Result<ScreenshotInfo, String> {
+    match invoke_web_expected(
+        "ScreenshotCommand",
+        PluginCommand::Screenshot {
+            browser_session: surface_session.clone(),
+            page_session: page_session.clone(),
+        },
+    )
+    .await?
+    {
+        PluginResult::Screenshot(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for Screenshot".to_string()),
     }
 }
 

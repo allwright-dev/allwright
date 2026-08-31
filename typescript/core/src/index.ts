@@ -21,6 +21,7 @@ import type {
   Page,
   ResolveConfigOptions,
   ResolvedAllwrightConfig,
+  ScreenshotResult,
 } from "./types.js";
 
 export { findConfigFile, loadConfigFile, resolveConfig, setServerAddr, shutdown };
@@ -54,6 +55,7 @@ export type {
   ResolveConfigOptions,
   ResolvedAllwrightConfig,
   RetryConfig,
+  ScreenshotResult,
   TextResult,
   WaitForSelectorOptions,
   WaitForSelectorResult,

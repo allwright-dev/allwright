@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        v7.35.1
-// source: core/v1/browser.proto
+// source: core/v1/surface.proto
 
 package enginev1
 
@@ -39,7 +39,7 @@ type SurfaceSessionCommand struct {
 
 func (x *SurfaceSessionCommand) Reset() {
 	*x = SurfaceSessionCommand{}
-	mi := &file_core_v1_browser_proto_msgTypes[0]
+	mi := &file_core_v1_surface_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -51,7 +51,7 @@ func (x *SurfaceSessionCommand) String() string {
 func (*SurfaceSessionCommand) ProtoMessage() {}
 
 func (x *SurfaceSessionCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_browser_proto_msgTypes[0]
+	mi := &file_core_v1_surface_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -64,7 +64,7 @@ func (x *SurfaceSessionCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SurfaceSessionCommand.ProtoReflect.Descriptor instead.
 func (*SurfaceSessionCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_browser_proto_rawDescGZIP(), []int{0}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *SurfaceSessionCommand) GetCommand() isSurfaceSessionCommand_Command {
@@ -192,7 +192,7 @@ type OpenContextCommand struct {
 
 func (x *OpenContextCommand) Reset() {
 	*x = OpenContextCommand{}
-	mi := &file_core_v1_browser_proto_msgTypes[1]
+	mi := &file_core_v1_surface_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -204,7 +204,7 @@ func (x *OpenContextCommand) String() string {
 func (*OpenContextCommand) ProtoMessage() {}
 
 func (x *OpenContextCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_browser_proto_msgTypes[1]
+	mi := &file_core_v1_surface_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -217,7 +217,7 @@ func (x *OpenContextCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenContextCommand.ProtoReflect.Descriptor instead.
 func (*OpenContextCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_browser_proto_rawDescGZIP(), []int{1}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *OpenContextCommand) GetRetryOptions() *CommandRetryOptions {
@@ -236,7 +236,7 @@ type SessionPingCommand struct {
 
 func (x *SessionPingCommand) Reset() {
 	*x = SessionPingCommand{}
-	mi := &file_core_v1_browser_proto_msgTypes[2]
+	mi := &file_core_v1_surface_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -248,7 +248,7 @@ func (x *SessionPingCommand) String() string {
 func (*SessionPingCommand) ProtoMessage() {}
 
 func (x *SessionPingCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_browser_proto_msgTypes[2]
+	mi := &file_core_v1_surface_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -261,7 +261,7 @@ func (x *SessionPingCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionPingCommand.ProtoReflect.Descriptor instead.
 func (*SessionPingCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_browser_proto_rawDescGZIP(), []int{2}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SessionPingCommand) GetMessage() string {
@@ -279,7 +279,7 @@ type CloseSurfaceSessionCommand struct {
 
 func (x *CloseSurfaceSessionCommand) Reset() {
 	*x = CloseSurfaceSessionCommand{}
-	mi := &file_core_v1_browser_proto_msgTypes[3]
+	mi := &file_core_v1_surface_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -291,7 +291,7 @@ func (x *CloseSurfaceSessionCommand) String() string {
 func (*CloseSurfaceSessionCommand) ProtoMessage() {}
 
 func (x *CloseSurfaceSessionCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_browser_proto_msgTypes[3]
+	mi := &file_core_v1_surface_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -304,7 +304,7 @@ func (x *CloseSurfaceSessionCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseSurfaceSessionCommand.ProtoReflect.Descriptor instead.
 func (*CloseSurfaceSessionCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_browser_proto_rawDescGZIP(), []int{3}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{3}
 }
 
 type SurfaceSessionEvent struct {
@@ -327,7 +327,7 @@ type SurfaceSessionEvent struct {
 
 func (x *SurfaceSessionEvent) Reset() {
 	*x = SurfaceSessionEvent{}
-	mi := &file_core_v1_browser_proto_msgTypes[4]
+	mi := &file_core_v1_surface_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -339,7 +339,7 @@ func (x *SurfaceSessionEvent) String() string {
 func (*SurfaceSessionEvent) ProtoMessage() {}
 
 func (x *SurfaceSessionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_browser_proto_msgTypes[4]
+	mi := &file_core_v1_surface_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -352,7 +352,7 @@ func (x *SurfaceSessionEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SurfaceSessionEvent.ProtoReflect.Descriptor instead.
 func (*SurfaceSessionEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_browser_proto_rawDescGZIP(), []int{4}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SurfaceSessionEvent) GetSessionId() string {
@@ -503,7 +503,7 @@ type ContextOpenedEvent struct {
 
 func (x *ContextOpenedEvent) Reset() {
 	*x = ContextOpenedEvent{}
-	mi := &file_core_v1_browser_proto_msgTypes[5]
+	mi := &file_core_v1_surface_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -515,7 +515,7 @@ func (x *ContextOpenedEvent) String() string {
 func (*ContextOpenedEvent) ProtoMessage() {}
 
 func (x *ContextOpenedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_browser_proto_msgTypes[5]
+	mi := &file_core_v1_surface_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -528,7 +528,7 @@ func (x *ContextOpenedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContextOpenedEvent.ProtoReflect.Descriptor instead.
 func (*ContextOpenedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_browser_proto_rawDescGZIP(), []int{5}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ContextOpenedEvent) GetContextSessionId() string {
@@ -554,7 +554,7 @@ type SessionPongEvent struct {
 
 func (x *SessionPongEvent) Reset() {
 	*x = SessionPongEvent{}
-	mi := &file_core_v1_browser_proto_msgTypes[6]
+	mi := &file_core_v1_surface_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -566,7 +566,7 @@ func (x *SessionPongEvent) String() string {
 func (*SessionPongEvent) ProtoMessage() {}
 
 func (x *SessionPongEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_browser_proto_msgTypes[6]
+	mi := &file_core_v1_surface_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -579,7 +579,7 @@ func (x *SessionPongEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionPongEvent.ProtoReflect.Descriptor instead.
 func (*SessionPongEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_browser_proto_rawDescGZIP(), []int{6}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SessionPongEvent) GetMessage() string {
@@ -598,7 +598,7 @@ type SurfaceSessionClosedEvent struct {
 
 func (x *SurfaceSessionClosedEvent) Reset() {
 	*x = SurfaceSessionClosedEvent{}
-	mi := &file_core_v1_browser_proto_msgTypes[7]
+	mi := &file_core_v1_surface_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -610,7 +610,7 @@ func (x *SurfaceSessionClosedEvent) String() string {
 func (*SurfaceSessionClosedEvent) ProtoMessage() {}
 
 func (x *SurfaceSessionClosedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_browser_proto_msgTypes[7]
+	mi := &file_core_v1_surface_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -623,7 +623,7 @@ func (x *SurfaceSessionClosedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SurfaceSessionClosedEvent.ProtoReflect.Descriptor instead.
 func (*SurfaceSessionClosedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_browser_proto_rawDescGZIP(), []int{7}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SurfaceSessionClosedEvent) GetReason() string {
@@ -642,7 +642,7 @@ type SurfaceSessionErrorEvent struct {
 
 func (x *SurfaceSessionErrorEvent) Reset() {
 	*x = SurfaceSessionErrorEvent{}
-	mi := &file_core_v1_browser_proto_msgTypes[8]
+	mi := &file_core_v1_surface_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -654,7 +654,7 @@ func (x *SurfaceSessionErrorEvent) String() string {
 func (*SurfaceSessionErrorEvent) ProtoMessage() {}
 
 func (x *SurfaceSessionErrorEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_browser_proto_msgTypes[8]
+	mi := &file_core_v1_surface_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -667,7 +667,7 @@ func (x *SurfaceSessionErrorEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SurfaceSessionErrorEvent.ProtoReflect.Descriptor instead.
 func (*SurfaceSessionErrorEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_browser_proto_rawDescGZIP(), []int{8}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SurfaceSessionErrorEvent) GetMessage() string {
@@ -677,11 +677,11 @@ func (x *SurfaceSessionErrorEvent) GetMessage() string {
 	return ""
 }
 
-var File_core_v1_browser_proto protoreflect.FileDescriptor
+var File_core_v1_surface_proto protoreflect.FileDescriptor
 
-const file_core_v1_browser_proto_rawDesc = "" +
+const file_core_v1_surface_proto_rawDesc = "" +
 	"\n" +
-	"\x15core/v1/browser.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x1fsurfaces/mobile/v1/mobile.proto\x1a\x19surfaces/web/v1/web.proto\"\xb9\x04\n" +
+	"\x15core/v1/surface.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x1fsurfaces/mobile/v1/mobile.proto\x1a\x19surfaces/web/v1/web.proto\"\xb9\x04\n" +
 	"\x15SurfaceSessionCommand\x12O\n" +
 	"\rlaunch_chrome\x18\x01 \x01(\v2(.allwright.engine.v1.LaunchChromeCommandH\x00R\flaunchChrome\x12L\n" +
 	"\fopen_context\x18\x02 \x01(\v2'.allwright.engine.v1.OpenContextCommandH\x00R\vopenContext\x12=\n" +
@@ -722,19 +722,19 @@ const file_core_v1_browser_proto_rawDesc = "" +
 	"\x17dev.allwright.engine.v1P\x01Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
 
 var (
-	file_core_v1_browser_proto_rawDescOnce sync.Once
-	file_core_v1_browser_proto_rawDescData []byte
+	file_core_v1_surface_proto_rawDescOnce sync.Once
+	file_core_v1_surface_proto_rawDescData []byte
 )
 
-func file_core_v1_browser_proto_rawDescGZIP() []byte {
-	file_core_v1_browser_proto_rawDescOnce.Do(func() {
-		file_core_v1_browser_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_core_v1_browser_proto_rawDesc), len(file_core_v1_browser_proto_rawDesc)))
+func file_core_v1_surface_proto_rawDescGZIP() []byte {
+	file_core_v1_surface_proto_rawDescOnce.Do(func() {
+		file_core_v1_surface_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_core_v1_surface_proto_rawDesc), len(file_core_v1_surface_proto_rawDesc)))
 	})
-	return file_core_v1_browser_proto_rawDescData
+	return file_core_v1_surface_proto_rawDescData
 }
 
-var file_core_v1_browser_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
-var file_core_v1_browser_proto_goTypes = []any{
+var file_core_v1_surface_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_core_v1_surface_proto_goTypes = []any{
 	(*SurfaceSessionCommand)(nil),      // 0: allwright.engine.v1.SurfaceSessionCommand
 	(*OpenContextCommand)(nil),         // 1: allwright.engine.v1.OpenContextCommand
 	(*SessionPingCommand)(nil),         // 2: allwright.engine.v1.SessionPingCommand
@@ -754,7 +754,7 @@ var file_core_v1_browser_proto_goTypes = []any{
 	(*MobileConnectedEvent)(nil),       // 16: allwright.engine.v1.MobileConnectedEvent
 	(*AppLaunchedEvent)(nil),           // 17: allwright.engine.v1.AppLaunchedEvent
 }
-var file_core_v1_browser_proto_depIdxs = []int32{
+var file_core_v1_surface_proto_depIdxs = []int32{
 	9,  // 0: allwright.engine.v1.SurfaceSessionCommand.launch_chrome:type_name -> allwright.engine.v1.LaunchChromeCommand
 	1,  // 1: allwright.engine.v1.SurfaceSessionCommand.open_context:type_name -> allwright.engine.v1.OpenContextCommand
 	2,  // 2: allwright.engine.v1.SurfaceSessionCommand.ping:type_name -> allwright.engine.v1.SessionPingCommand
@@ -778,15 +778,15 @@ var file_core_v1_browser_proto_depIdxs = []int32{
 	0,  // [0:16] is the sub-list for field type_name
 }
 
-func init() { file_core_v1_browser_proto_init() }
-func file_core_v1_browser_proto_init() {
-	if File_core_v1_browser_proto != nil {
+func init() { file_core_v1_surface_proto_init() }
+func file_core_v1_surface_proto_init() {
+	if File_core_v1_surface_proto != nil {
 		return
 	}
 	file_core_v1_common_proto_init()
 	file_surfaces_mobile_v1_mobile_proto_init()
 	file_surfaces_web_v1_web_proto_init()
-	file_core_v1_browser_proto_msgTypes[0].OneofWrappers = []any{
+	file_core_v1_surface_proto_msgTypes[0].OneofWrappers = []any{
 		(*SurfaceSessionCommand_LaunchChrome)(nil),
 		(*SurfaceSessionCommand_OpenContext)(nil),
 		(*SurfaceSessionCommand_Ping)(nil),
@@ -795,8 +795,8 @@ func file_core_v1_browser_proto_init() {
 		(*SurfaceSessionCommand_ConnectMobile)(nil),
 		(*SurfaceSessionCommand_LaunchApp)(nil),
 	}
-	file_core_v1_browser_proto_msgTypes[1].OneofWrappers = []any{}
-	file_core_v1_browser_proto_msgTypes[4].OneofWrappers = []any{
+	file_core_v1_surface_proto_msgTypes[1].OneofWrappers = []any{}
+	file_core_v1_surface_proto_msgTypes[4].OneofWrappers = []any{
 		(*SurfaceSessionEvent_ChromeLaunched)(nil),
 		(*SurfaceSessionEvent_ContextOpened)(nil),
 		(*SurfaceSessionEvent_Pong)(nil),
@@ -810,17 +810,17 @@ func file_core_v1_browser_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_core_v1_browser_proto_rawDesc), len(file_core_v1_browser_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_core_v1_surface_proto_rawDesc), len(file_core_v1_surface_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_core_v1_browser_proto_goTypes,
-		DependencyIndexes: file_core_v1_browser_proto_depIdxs,
-		MessageInfos:      file_core_v1_browser_proto_msgTypes,
+		GoTypes:           file_core_v1_surface_proto_goTypes,
+		DependencyIndexes: file_core_v1_surface_proto_depIdxs,
+		MessageInfos:      file_core_v1_surface_proto_msgTypes,
 	}.Build()
-	File_core_v1_browser_proto = out.File
-	file_core_v1_browser_proto_goTypes = nil
-	file_core_v1_browser_proto_depIdxs = nil
+	File_core_v1_surface_proto = out.File
+	file_core_v1_surface_proto_goTypes = nil
+	file_core_v1_surface_proto_depIdxs = nil
 }

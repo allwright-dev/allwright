@@ -1,16 +1,16 @@
 use crate::proto::context_session_command::Command as ContextCommand;
 use crate::proto::context_session_event::Event as ContextEvent;
 use crate::proto::{
-    CountElementsCommand, GetInnerTextCommand, GetTextContentCommand, HighlightElementsCommand,
-    ContextSessionCommand, WaitForSelectorCommand,
+    ContextSessionCommand, CountElementsCommand, GetInnerTextCommand, GetTextContentCommand,
+    HighlightElementsCommand, ScreenshotCommand, WaitForSelectorCommand,
 };
 
 use super::command::{command_retry_options, count_result_from_event, highlight_result_from_event};
 use super::selectors::normalize_selector_for_transport;
 use super::tab::ensure_tab_open;
 use super::types::{
-    CommandOptions, Error, HighlightOptions, HighlightResult, Result, Tab, TextResult,
-    WaitForSelectorOptions, WaitForSelectorResult,
+    CommandOptions, Error, HighlightOptions, HighlightResult, Result, ScreenshotResult, Tab,
+    TextResult, WaitForSelectorOptions, WaitForSelectorResult,
 };
 
 impl Tab {
@@ -94,11 +94,13 @@ impl Tab {
             .send(ContextSessionCommand {
                 surface_session_id: self.inner.surface_session_id.clone(),
                 context_session_id: self.inner.session_id.clone(),
-                command: Some(ContextCommand::HighlightElements(HighlightElementsCommand {
-                    css_selector: css_selector.clone(),
-                    duration_ms: options.duration_ms,
-                    retry_options: command_retry_options(options.timeout_ms),
-                })),
+                command: Some(ContextCommand::HighlightElements(
+                    HighlightElementsCommand {
+                        css_selector: css_selector.clone(),
+                        duration_ms: options.duration_ms,
+                        retry_options: command_retry_options(options.timeout_ms),
+                    },
+                )),
             })
             .await
             .map_err(|_| Error::new("failed to send HighlightElementsCommand"))?;
@@ -222,6 +224,61 @@ impl Tab {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "tab session {} closed while waiting for selector result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn screenshot(&self) -> Result<ScreenshotResult> {
+        self.screenshot_with_options(CommandOptions::default())
+            .await
+    }
+
+    pub async fn screenshot_with_options(
+        &self,
+        options: CommandOptions,
+    ) -> Result<ScreenshotResult> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_tab_open(handle, &self.inner.session_id)?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::Screenshot(ScreenshotCommand {
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send ScreenshotCommand"))?;
+        loop {
+            let event = handle
+                .events
+                .message()
+                .await?
+                .ok_or_else(|| Error::new("tab session closed while waiting for screenshot"))?;
+            match event.event {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::ScreenshotCaptured(screenshot)) => {
+                    return Ok(ScreenshotResult {
+                        png_data: screenshot.png_data,
+                        note: screenshot.note,
+                    });
+                }
+                Some(ContextEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "tab session error while capturing screenshot: {}",
+                        error.message
+                    )));
+                }
+                Some(ContextEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "tab session {} closed while waiting for screenshot result",
                         self.inner.session_id
                     )));
                 }

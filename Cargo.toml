@@ -23,6 +23,7 @@ repository = "https://github.com/allwright-dev/allwright"
 homepage = "https://allwright.dev"
 
 [workspace.dependencies]
+base64 = "0.22.1"
 clap = "4.6.6"
 flate2 = "1.1.2"
 futures-util = "0.3.31"

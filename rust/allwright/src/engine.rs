@@ -19,20 +19,21 @@ use tonic::{Request, Response, Status, transport::Server};
 
 use proto::engine_service_server::{EngineService, EngineServiceServer};
 use proto::{
-    BrowserKind, BrowserLaunchedEvent, SurfaceSessionClosedEvent, SurfaceSessionCommand,
-    SurfaceSessionErrorEvent, SurfaceSessionEvent, ChromeLaunchedEvent, ChromiumBidiInjectionEvent,
-    ClickElementCommand, CloseSurfaceSessionCommand, CloseContextSessionCommand, CommandRetryOptions,
-    ConnectMobileCommand, CountElementsCommand, DeviceConnectionKind, ElementClickedEvent,
+    AppLaunchedEvent, BrowserKind, BrowserLaunchedEvent, ChromeLaunchedEvent,
+    ChromiumBidiInjectionEvent, ClickElementCommand, CloseContextSessionCommand,
+    CloseSurfaceSessionCommand, CommandRetryOptions, ConnectMobileCommand, ContextOpenedEvent,
+    ContextSessionAttachedEvent, ContextSessionClosedEvent, ContextSessionCommand,
+    ContextSessionErrorEvent, ContextSessionEvent, ContextSessionPingCommand,
+    ContextSessionPongEvent, CountElementsCommand, DeviceConnectionKind, ElementClickedEvent,
     ElementCountedEvent, ElementFilledEvent, ElementFocusedEvent, ElementHoveredEvent,
     ElementsHighlightedEvent, FillElementCommand, FocusElementCommand, GetInnerTextCommand,
     GetTextContentCommand, HighlightElementsCommand, HoverElementCommand, InnerTextResolvedEvent,
     KeyPressedEvent, LaunchAppCommand, LaunchBrowserCommand, LaunchChromeCommand,
     MobileConnectedEvent, MobilePlatform as ProtoMobilePlatform, NavigatePageCommand,
-    OpenContextCommand, PingRequest, PingResponse, PressKeyCommand, SelectorWaitSatisfiedEvent,
-    SessionPingCommand, SessionPongEvent, PageNavigatedEvent, ContextOpenedEvent,
-    ContextSessionAttachedEvent, ContextSessionClosedEvent, ContextSessionCommand, ContextSessionErrorEvent,
-    ContextSessionEvent, ContextSessionPingCommand, ContextSessionPongEvent, TextContentResolvedEvent,
-    WaitForSelectorCommand, AppLaunchedEvent,
+    OpenContextCommand, PageNavigatedEvent, PingRequest, PingResponse, PressKeyCommand,
+    ScreenshotCapturedEvent, ScreenshotCommand, SelectorWaitSatisfiedEvent, SessionPingCommand,
+    SessionPongEvent, SurfaceSessionClosedEvent, SurfaceSessionCommand, SurfaceSessionErrorEvent,
+    SurfaceSessionEvent, TextContentResolvedEvent, WaitForSelectorCommand,
     context_session_command::Command as ContextCommand,
     context_session_event::Event as ContextEvent,
     surface_session_command::Command as SurfaceCommand,
@@ -398,9 +399,11 @@ async fn handle_browser_command(
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let page = retry_with_timeout(retry_policy, || async {
                 match &surface_session {
-                    EngineBrowserSessionHandle::Web(surface_session) => web_lib::open_page(surface_session)
-                        .await
-                        .map(EnginePageSessionHandle::from_web_page),
+                    EngineBrowserSessionHandle::Web(surface_session) => {
+                        web_lib::open_page(surface_session)
+                            .await
+                            .map(EnginePageSessionHandle::from_web_page)
+                    }
                     EngineBrowserSessionHandle::Mobile(surface_session) => {
                         web_lib::open_mobile_page(surface_session)
                             .await
@@ -445,7 +448,9 @@ async fn handle_browser_command(
                     device: device.clone(),
                     adb_endpoint: adb_endpoint.clone(),
                     preserve_app_state,
-                    timeout_ms: retry_options.as_ref().and_then(|options| options.timeout_ms),
+                    timeout_ms: retry_options
+                        .as_ref()
+                        .and_then(|options| options.timeout_ms),
                 })
                 .await
             })
@@ -558,7 +563,9 @@ async fn handle_browser_command(
                         app_id: app_id.clone(),
                         launch_activity: launch_activity.clone(),
                         stop_before_launch,
-                        timeout_ms: retry_options.as_ref().and_then(|options| options.timeout_ms),
+                        timeout_ms: retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
                     },
                 )
                 .await
@@ -731,22 +738,27 @@ async fn handle_tab_command(
     };
 
     match command.command {
-        Some(ContextCommand::Ping(ContextSessionPingCommand { message })) => Ok(TabCommandOutcome {
-            events: vec![tab_event(
-                &context_session_id,
-                ContextEvent::Pong(ContextSessionPongEvent {
-                    message: if message.is_empty() {
-                        "tab-pong".to_string()
-                    } else {
-                        format!("tab-pong: {message}")
-                    },
-                }),
-            )],
-            should_close: false,
-        }),
+        Some(ContextCommand::Ping(ContextSessionPingCommand { message })) => {
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &context_session_id,
+                    ContextEvent::Pong(ContextSessionPongEvent {
+                        message: if message.is_empty() {
+                            "tab-pong".to_string()
+                        } else {
+                            format!("tab-pong: {message}")
+                        },
+                    }),
+                )],
+                should_close: false,
+            })
+        }
         Some(ContextCommand::Close(CloseContextSessionCommand {})) => {
             match (&surface_session, &page_session) {
-                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                (
+                    EngineBrowserSessionHandle::Web(surface_session),
+                    EnginePageSessionHandle::Web(page_session),
+                ) => {
                     web_lib::close_page(surface_session, page_session)
                         .await
                         .map_err(Status::internal)?;
@@ -784,15 +796,17 @@ async fn handle_tab_command(
         }
         Some(ContextCommand::Navigate(NavigatePageCommand { url, retry_options })) => {
             let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
-                    (surface_session, page_session)
-                }
+                (
+                    EngineBrowserSessionHandle::Web(surface_session),
+                    EnginePageSessionHandle::Web(page_session),
+                ) => (surface_session, page_session),
                 (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "navigate is not supported for mobile tab sessions".to_string(),
+                                message: "navigate is not supported for mobile tab sessions"
+                                    .to_string(),
                             }),
                         )],
                         should_close: false,
@@ -873,11 +887,12 @@ async fn handle_tab_command(
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let click = retry_with_timeout(retry_policy, || async {
                 match (&surface_session, &page_session) {
-                    (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
-                        web_lib::click_element(surface_session, page_session, &css_selector)
-                            .await
-                            .map(|click| (click.css_selector, click.note, click.bidi_session_id))
-                    }
+                    (
+                        EngineBrowserSessionHandle::Web(surface_session),
+                        EnginePageSessionHandle::Web(page_session),
+                    ) => web_lib::click_element(surface_session, page_session, &css_selector)
+                        .await
+                        .map(|click| (click.css_selector, click.note, click.bidi_session_id)),
                     (
                         EngineBrowserSessionHandle::Mobile(surface_session),
                         EnginePageSessionHandle::Mobile(page_session),
@@ -885,7 +900,9 @@ async fn handle_tab_command(
                         surface_session,
                         page_session,
                         &css_selector,
-                        retry_options.as_ref().and_then(|options| options.timeout_ms),
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
                     )
                     .await
                     .map(|click| (click.selector, click.note, click.session_id)),
@@ -918,15 +935,18 @@ async fn handle_tab_command(
             retry_options,
         })) => {
             let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
-                    (surface_session, page_session)
-                }
+                (
+                    EngineBrowserSessionHandle::Web(surface_session),
+                    EnginePageSessionHandle::Web(page_session),
+                ) => (surface_session, page_session),
                 (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "count_elements is not supported for mobile tab sessions yet".to_string(),
+                                message:
+                                    "count_elements is not supported for mobile tab sessions yet"
+                                        .to_string(),
                             }),
                         )],
                         should_close: false,
@@ -968,15 +988,18 @@ async fn handle_tab_command(
             retry_options,
         })) => {
             let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
-                    (surface_session, page_session)
-                }
+                (
+                    EngineBrowserSessionHandle::Web(surface_session),
+                    EnginePageSessionHandle::Web(page_session),
+                ) => (surface_session, page_session),
                 (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "highlight_elements is not supported for mobile tab sessions".to_string(),
+                                message:
+                                    "highlight_elements is not supported for mobile tab sessions"
+                                        .to_string(),
                             }),
                         )],
                         should_close: false,
@@ -1023,15 +1046,17 @@ async fn handle_tab_command(
             retry_options,
         })) => {
             let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
-                    (surface_session, page_session)
-                }
+                (
+                    EngineBrowserSessionHandle::Web(surface_session),
+                    EnginePageSessionHandle::Web(page_session),
+                ) => (surface_session, page_session),
                 (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "focus_element is not supported for mobile tab sessions".to_string(),
+                                message: "focus_element is not supported for mobile tab sessions"
+                                    .to_string(),
                             }),
                         )],
                         should_close: false,
@@ -1074,7 +1099,10 @@ async fn handle_tab_command(
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let fill = retry_with_timeout(retry_policy, || async {
                 match (&surface_session, &page_session) {
-                    (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
+                    (
+                        EngineBrowserSessionHandle::Web(surface_session),
+                        EnginePageSessionHandle::Web(page_session),
+                    ) => {
                         web_lib::fill_element(surface_session, page_session, &css_selector, &value)
                             .await
                             .map(|fill| (fill.css_selector, fill.value, fill.note))
@@ -1087,7 +1115,9 @@ async fn handle_tab_command(
                         page_session,
                         &css_selector,
                         &value,
-                        retry_options.as_ref().and_then(|options| options.timeout_ms),
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
                     )
                     .await
                     .map(|fill| (fill.selector, fill.value, fill.note)),
@@ -1113,15 +1143,17 @@ async fn handle_tab_command(
             retry_options,
         })) => {
             let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
-                    (surface_session, page_session)
-                }
+                (
+                    EngineBrowserSessionHandle::Web(surface_session),
+                    EnginePageSessionHandle::Web(page_session),
+                ) => (surface_session, page_session),
                 (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "hover_element is not supported for mobile tab sessions".to_string(),
+                                message: "hover_element is not supported for mobile tab sessions"
+                                    .to_string(),
                             }),
                         )],
                         should_close: false,
@@ -1163,15 +1195,17 @@ async fn handle_tab_command(
             retry_options,
         })) => {
             let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
-                    (surface_session, page_session)
-                }
+                (
+                    EngineBrowserSessionHandle::Web(surface_session),
+                    EnginePageSessionHandle::Web(page_session),
+                ) => (surface_session, page_session),
                 (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "press_key is not supported for mobile tab sessions".to_string(),
+                                message: "press_key is not supported for mobile tab sessions"
+                                    .to_string(),
                             }),
                         )],
                         should_close: false,
@@ -1219,15 +1253,18 @@ async fn handle_tab_command(
             retry_options,
         })) => {
             let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
-                    (surface_session, page_session)
-                }
+                (
+                    EngineBrowserSessionHandle::Web(surface_session),
+                    EnginePageSessionHandle::Web(page_session),
+                ) => (surface_session, page_session),
                 (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "get_text_content is not supported for mobile tab sessions yet".to_string(),
+                                message:
+                                    "get_text_content is not supported for mobile tab sessions yet"
+                                        .to_string(),
                             }),
                         )],
                         should_close: false,
@@ -1268,15 +1305,18 @@ async fn handle_tab_command(
             retry_options,
         })) => {
             let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
-                    (surface_session, page_session)
-                }
+                (
+                    EngineBrowserSessionHandle::Web(surface_session),
+                    EnginePageSessionHandle::Web(page_session),
+                ) => (surface_session, page_session),
                 (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "get_inner_text is not supported for mobile tab sessions yet".to_string(),
+                                message:
+                                    "get_inner_text is not supported for mobile tab sessions yet"
+                                        .to_string(),
                             }),
                         )],
                         should_close: false,
@@ -1318,15 +1358,18 @@ async fn handle_tab_command(
             retry_options,
         })) => {
             let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (EngineBrowserSessionHandle::Web(surface_session), EnginePageSessionHandle::Web(page_session)) => {
-                    (surface_session, page_session)
-                }
+                (
+                    EngineBrowserSessionHandle::Web(surface_session),
+                    EnginePageSessionHandle::Web(page_session),
+                ) => (surface_session, page_session),
                 (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "wait_for_selector is not supported for mobile tab sessions yet".to_string(),
+                                message:
+                                    "wait_for_selector is not supported for mobile tab sessions yet"
+                                        .to_string(),
                             }),
                         )],
                         should_close: false,
@@ -1363,6 +1406,44 @@ async fn handle_tab_command(
                         css_selector: wait.css_selector,
                         visible: wait.visible,
                         note: wait.note,
+                    }),
+                )],
+                should_close: false,
+            })
+        }
+        Some(ContextCommand::Screenshot(ScreenshotCommand { retry_options })) => {
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let screenshot = retry_with_timeout(retry_policy, || async {
+                match (&surface_session, &page_session) {
+                    (
+                        EngineBrowserSessionHandle::Web(surface_session),
+                        EnginePageSessionHandle::Web(page_session),
+                    ) => web_lib::screenshot_page(surface_session, page_session)
+                        .await
+                        .map(|shot| (shot.png_data, shot.note)),
+                    (
+                        EngineBrowserSessionHandle::Mobile(surface_session),
+                        EnginePageSessionHandle::Mobile(page_session),
+                    ) => web_lib::screenshot_mobile(
+                        surface_session,
+                        page_session,
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|shot| (shot.png_data, shot.note)),
+                    _ => Err("tab session backend metadata is inconsistent".to_string()),
+                }
+            })
+            .await
+            .map_err(Status::internal)?;
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &context_session_id,
+                    ContextEvent::ScreenshotCaptured(ScreenshotCapturedEvent {
+                        png_data: screenshot.0,
+                        note: screenshot.1,
                     }),
                 )],
                 should_close: false,

@@ -60,9 +60,11 @@ desktop, and API today."
 ## What's actually different underneath
 
 allwright is a small [Rust core engine](https://github.com/allwright-dev/allwright)
-that speaks one gRPC contract, plus a plugin per automation surface:
+that speaks one gRPC contract, plus a plugin per automation surface. Install
+the CLI once, start the engine, then install a plugin per surface you test:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/allwright-dev/allwright/main/scripts/install.sh | bash
 allwright serve --listen-addr 127.0.0.1:50051
 allwright plugin install web
 ```

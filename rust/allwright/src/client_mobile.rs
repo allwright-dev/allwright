@@ -6,15 +6,17 @@ use crate::proto::surface_session_command::Command as SurfaceCommand;
 use crate::proto::surface_session_event::Event as SurfaceEvent;
 use crate::proto::{
     AppLaunchedEvent, ClickElementCommand, ConnectMobileCommand, ContextSessionCommand,
-    FillElementCommand, LaunchAppCommand, MobileConnectedEvent, MobilePlatform as ProtoMobilePlatform,
-    SurfaceSessionCommand,
+    FillElementCommand, LaunchAppCommand, MobileConnectedEvent,
+    MobilePlatform as ProtoMobilePlatform, ScreenshotCommand, SurfaceSessionCommand,
 };
 use tokio::sync::{Mutex as AsyncMutex, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 
 use super::command::command_retry_options;
 use super::runtime::get_runtime;
-use super::types::{ClickResult, CommandOptions, Error, FillResult, Result, RuntimeClient};
+use super::types::{
+    ClickResult, CommandOptions, Error, FillResult, Result, RuntimeClient, ScreenshotResult,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct MobileAndroidConnectOptions {
@@ -107,10 +109,9 @@ pub mod android {
             .map_err(|_| Error::new("failed to send ConnectMobileCommand"))?;
 
         loop {
-            let event = events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("surface session closed before mobile connect response"))?;
+            let event = events.message().await?.ok_or_else(|| {
+                Error::new("surface session closed before mobile connect response")
+            })?;
 
             match event.event {
                 Some(SurfaceEvent::MobileConnected(MobileConnectedEvent {
@@ -192,16 +193,13 @@ impl AndroidDevice {
             .map_err(|_| Error::new("failed to send LaunchAppCommand"))?;
 
         loop {
-            let event = state
-                .events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("surface session closed before app launch response"))?;
+            let event =
+                state.events.message().await?.ok_or_else(|| {
+                    Error::new("surface session closed before app launch response")
+                })?;
 
             match event.event {
-                Some(SurfaceEvent::AppLaunched(AppLaunchedEvent {
-                    app_session_id, ..
-                })) => {
+                Some(SurfaceEvent::AppLaunched(AppLaunchedEvent { app_session_id, .. })) => {
                     let app = AndroidApp {
                         inner: Arc::new(AndroidAppInner {
                             runtime: Arc::clone(&self.inner.runtime),
@@ -265,11 +263,10 @@ impl AndroidApp {
             .map_err(|_| Error::new("failed to send ClickElementCommand"))?;
 
         loop {
-            let event = handle
-                .events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("app session closed while waiting for click result"))?;
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("app session closed while waiting for click result")
+                })?;
 
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
@@ -324,11 +321,10 @@ impl AndroidApp {
             .map_err(|_| Error::new("failed to send FillElementCommand"))?;
 
         loop {
-            let event = handle
-                .events
-                .message()
-                .await?
-                .ok_or_else(|| Error::new("app session closed while waiting for fill result"))?;
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("app session closed while waiting for fill result")
+                })?;
 
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
@@ -349,6 +345,62 @@ impl AndroidApp {
                     handle.closed = true;
                     return Err(Error::new(format!(
                         "app session {} closed while waiting for fill result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn screenshot(&self) -> Result<ScreenshotResult> {
+        self.screenshot_with_options(CommandOptions::default())
+            .await
+    }
+
+    pub async fn screenshot_with_options(
+        &self,
+        options: CommandOptions,
+    ) -> Result<ScreenshotResult> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.inner.session_id)?;
+
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::Screenshot(ScreenshotCommand {
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send ScreenshotCommand"))?;
+
+        loop {
+            let event = handle.events.message().await?.ok_or_else(|| {
+                Error::new("app session closed while waiting for screenshot result")
+            })?;
+
+            match event.event {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::ScreenshotCaptured(screenshot)) => {
+                    return Ok(ScreenshotResult {
+                        png_data: screenshot.png_data,
+                        note: screenshot.note,
+                    });
+                }
+                Some(ContextEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "app session error while capturing Android screenshot: {}",
+                        error.message
+                    )));
+                }
+                Some(ContextEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "app session {} closed while waiting for screenshot result",
                         self.inner.session_id
                     )));
                 }

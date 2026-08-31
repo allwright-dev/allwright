@@ -38,11 +38,11 @@ const webAvailable = [
   "Count matching elements",
   "Read visible or raw text from an element",
   "Wait for an element to appear or become visible",
+  "Capture screenshots",
   "Retrying, Playwright-style text/count/visibility assertions (via @allwright.dev/vitest)",
 ];
 
 const webNotYetAvailable = [
-  "Screenshots and visual snapshots",
   "File upload and download handling",
   "Browser dialogs (alerts, confirms, prompts)",
   "Network mocking or request interception",

@@ -4,7 +4,7 @@ import threading
 
 from ._proto import engine_pb2
 from ._transport import RuntimeClient, StreamHandle
-from ._types import AllwrightError, ClickResult, CommandOptions, FillResult
+from ._types import AllwrightError, ClickResult, CommandOptions, FillResult, ScreenshotResult
 
 
 class MobileAndroidConnectOptions:
@@ -140,6 +140,43 @@ class AndroidApp:
                     case "error":
                         raise AllwrightError(
                             f"android app session error while filling: {event.error.message}"
+                        )
+
+    def screenshot(self, options: CommandOptions | None = None) -> ScreenshotResult:
+        from ._runtime import retry_options
+
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            handle.send(
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self._surface_session_id,
+                    context_session_id=self._session_id,
+                    screenshot=engine_pb2.ScreenshotCommand(
+                        retry_options=retry_options((options or CommandOptions()).timeout_ms),
+                    ),
+                )
+            )
+
+            while True:
+                event = handle.recv("receive tab session event while capturing Android screenshot")
+                match event.WhichOneof("event"):
+                    case "attached":
+                        pass
+                    case "screenshot_captured":
+                        captured = event.screenshot_captured
+                        return ScreenshotResult(
+                            png_data=captured.png_data,
+                            note=captured.note,
+                        )
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(
+                            f"android app session {self._session_id} closed while capturing screenshot"
+                        )
+                    case "error":
+                        raise AllwrightError(
+                            f"android app session error while capturing screenshot: {event.error.message}"
                         )
 
     def _ensure_handle(self) -> StreamHandle:

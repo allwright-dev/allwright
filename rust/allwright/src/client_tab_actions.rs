@@ -1,8 +1,8 @@
 use crate::proto::context_session_command::Command as ContextCommand;
 use crate::proto::context_session_event::Event as ContextEvent;
 use crate::proto::{
-    ClickElementCommand, FillElementCommand, FocusElementCommand, HoverElementCommand,
-    PressKeyCommand, ContextSessionCommand,
+    ClickElementCommand, ContextSessionCommand, FillElementCommand, FocusElementCommand,
+    HoverElementCommand, PressKeyCommand,
 };
 
 use super::command::command_retry_options;

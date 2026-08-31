@@ -6,8 +6,8 @@ use allwright_surface_mobile::{
     MobileAutomationBackend, MobileAutomationSessionInfo, MobileBrowserSessionHandle,
     MobileCapabilitySet, MobileClickInfo, MobileCommand, MobileCommandResult, MobileConnectInfo,
     MobileFillInfo, MobilePageInfo, MobilePageSessionHandle, MobilePlatform,
-    MobileRuntimeReadiness, MobileSurfaceProfile, RuntimeMaturity, boot_surface,
-    normalize_selector_for_transport,
+    MobileRuntimeReadiness, MobileScreenshotInfo, MobileSurfaceProfile, RuntimeMaturity,
+    boot_surface, normalize_selector_for_transport,
 };
 use regex::Regex;
 use std::env;
@@ -536,6 +536,12 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
         MobileCommand::WaitForSelector { .. } => {
             Err("mobile-android plugin does not implement `wait_for_selector` yet".to_string())
         }
+        MobileCommand::Screenshot {
+            browser_session,
+            page_session,
+            timeout_ms,
+        } => screenshot(&browser_session, &page_session, timeout_ms)
+            .map(MobileCommandResult::Screenshot),
     }
 }
 
@@ -634,17 +640,32 @@ fn run_adb_for_device(device_id: &str, args: &[&str]) -> Result<String, String> 
     run_command(&adb_command_path(), &all_args)
 }
 
+fn run_adb_bytes_for_device(device_id: &str, args: &[&str]) -> Result<Vec<u8>, String> {
+    let mut all_args = vec!["-s", device_id];
+    all_args.extend_from_slice(args);
+    run_command_bytes(&adb_command_path(), &all_args)
+}
+
 fn adb_command_path() -> String {
     env::var("ALLWRIGHT_ANDROID_ADB").unwrap_or_else(|_| "adb".to_string())
 }
 
 fn run_command(command: &str, args: &[&str]) -> Result<String, String> {
+    let output = run_command_output(command, args)?;
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn run_command_bytes(command: &str, args: &[&str]) -> Result<Vec<u8>, String> {
+    Ok(run_command_output(command, args)?.stdout)
+}
+
+fn run_command_output(command: &str, args: &[&str]) -> Result<std::process::Output, String> {
     let output = Command::new(command)
         .args(args)
         .output()
         .map_err(|error| format!("failed to run `{command}`: {error}"))?;
     if output.status.success() {
-        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
+        return Ok(output);
     }
 
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
@@ -839,6 +860,28 @@ fn adb_fill(
     })
 }
 
+fn adb_screenshot(
+    device_id: &str,
+    _timeout_ms: Option<u32>,
+) -> Result<MobileScreenshotInfo, String> {
+    let png_data = run_adb_bytes_for_device(device_id, &["exec-out", "screencap", "-p"])?;
+    if png_data.is_empty() {
+        return Err("adb returned an empty screenshot payload".to_string());
+    }
+    let foreground = current_foreground_app(device_id)?;
+    Ok(MobileScreenshotInfo {
+        png_data,
+        note: format!(
+            "captured Android screenshot via adb exec-out screencap on {}/{}",
+            foreground.current_package.as_deref().unwrap_or("<unknown>"),
+            foreground
+                .current_activity
+                .as_deref()
+                .unwrap_or("<unknown>")
+        ),
+    })
+}
+
 fn adb_dump_source(device_id: &str) -> Result<UiAutomator2SourceInfo, String> {
     let remote_path = "/data/local/tmp/allwright-window.xml";
     let _ = run_adb_for_device(device_id, &["shell", "uiautomator", "dump", remote_path])?;
@@ -849,6 +892,14 @@ fn adb_dump_source(device_id: &str) -> Result<UiAutomator2SourceInfo, String> {
         current_package: foreground.current_package,
         current_activity: foreground.current_activity,
     })
+}
+
+fn screenshot(
+    browser_session: &MobileBrowserSessionHandle,
+    _page_session: &MobilePageSessionHandle,
+    timeout_ms: Option<u32>,
+) -> Result<MobileScreenshotInfo, String> {
+    adb_screenshot(&browser_session.device.device_id, timeout_ms)
 }
 
 struct ResolvedSelectorSnapshot {

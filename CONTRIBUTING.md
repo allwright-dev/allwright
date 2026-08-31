@@ -11,6 +11,7 @@ Thank you for your interest in contributing to allwright.
 
 ## Development Guidelines
 
+- For local setup, scripts, and day-to-day repo workflow details, see [DEVELOPMENT.md](DEVELOPMENT.md).
 - Keep changes scoped to the problem you are solving.
 - Update documentation when behavior, architecture, or developer workflow changes.
 - Keep `README.md` and `Codex.md` aligned when either one needs to reflect a project-level change.

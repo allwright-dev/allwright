@@ -55,7 +55,9 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `typescript/vitest/` now also owns mobile-friendly fixtures such as `android` and `androidApp`, and should support hybrid tests that use both web and Android in the same test run
 - `proto/`: shared protobuf and gRPC contract root for all stacks
 - `proto/engine/v1/engine.proto`: umbrella engine service contract that imports the split proto ownership layers
-- `proto/core/v1/`: core-owned shared engine/session/browser/tab message contracts
+- `proto/core/v1/`: core-owned shared engine/session/context message contracts
+- `proto/core/v1/surface.proto`: core-owned surface-session lifecycle contract
+- `proto/core/v1/context.proto`: core-owned context-session command and event contract for shared page/app actions such as navigation, selector actions, text reads, waits, and screenshots
 - `proto/surfaces/web/v1/`: web surface-owned command and event contracts
 - `rust/allwright` now contains the lightweight Rust engine/client implementation and compiles against the shared top-level `proto/` contract during builds
 - `rust/allwright/src/proto_generated.rs` is a checked-in shim module for publishability, and `rust/allwright/src/allwright.engine.v1.rs` is the checked-in generated Rust output; both must be regenerated from the top-level `proto/` tree via `./scripts/generate-rust-proto.sh` rather than edited by hand
@@ -98,7 +100,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - The engine direction is driverless browser automation.
 - Do not introduce ChromeDriver into the primary browser control path.
 - The current gRPC layout lives in top-level `proto/`.
-- The proto contract is now split by ownership: `engine/v1` is the umbrella service surface, `core/v1` owns shared engine/session messages, and `surfaces/web/v1` owns the current web-specific messages.
+- The proto contract is now split by ownership: `engine/v1` is the umbrella service surface, `core/v1` owns shared engine/session messages plus shared context actions, and `surfaces/web/v1` owns web-specific browser launch/session messages.
 - The current proto package is `allwright.engine.v1`.
 - The current starter service is `EngineService`.
 - Generated gRPC client code is enabled and currently consumed by `rust/allwright` and its examples.
@@ -217,7 +219,8 @@ This instruction should be treated as ongoing project policy for all future AI c
 - Before finishing any change, review newly created local artifacts and update `.gitignore` when needed; this is especially important for Java/Gradle outputs such as `java/bin/`, `java/build/`, `.gradle-user-home/`, and similar generated directories.
 - Browser launch is being generalized away from Chrome-only protocol naming:
 - `proto/surfaces/web/v1/web.proto` now defines `BrowserKind`, `LaunchBrowserCommand`, and `BrowserLaunchedEvent`
-- `proto/core/v1/browser.proto` routes browser-session launch through the neutral `launch_browser` / `browser_launched` path while keeping the older Chrome path for compatibility
+- `proto/core/v1/surface.proto` routes browser-session launch through the neutral `launch_browser` / `browser_launched` path while keeping the older Chrome path for compatibility
+- `proto/core/v1/context.proto` owns the shared context-session command/event surface used by both web pages and Android app contexts, including screenshots
 - `rust/allwright-plugin-sdk` now exposes neutral `PluginCommand::LaunchBrowser`, `PluginResult::LaunchBrowser`, `BrowserKind`, and `BrowserLaunchInfo`
 - `rust/allwright-surface-web` now implements both Chromium and Firefox on the neutral launch path: Chromium still uses CDP plus the pinned `chromium-bidi` mapper, while Firefox launches the browser binary directly and talks to its native WebDriver BiDi Remote Agent without `geckodriver`
 - `rust/allwright/src/engine.rs` now stores opaque backend browser/page handles from the web plugin instead of top-level `cdp_websocket_url` / `target_id` fields, while the public gRPC events remain compatibility-shaped for existing clients

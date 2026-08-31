@@ -180,199 +180,6 @@ pub struct ChromeLaunchedEvent {
     #[prost(string, tag = "5")]
     pub initial_page_session_id: ::prost::alloc::string::String,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct NavigatePageCommand {
-    #[prost(string, tag = "1")]
-    pub url: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
-    pub retry_options: ::core::option::Option<CommandRetryOptions>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ClickElementCommand {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
-    pub retry_options: ::core::option::Option<CommandRetryOptions>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CountElementsCommand {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
-    pub retry_options: ::core::option::Option<CommandRetryOptions>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct HighlightElementsCommand {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(uint32, optional, tag = "2")]
-    pub duration_ms: ::core::option::Option<u32>,
-    #[prost(message, optional, tag = "3")]
-    pub retry_options: ::core::option::Option<CommandRetryOptions>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FocusElementCommand {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
-    pub retry_options: ::core::option::Option<CommandRetryOptions>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FillElementCommand {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub value: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "3")]
-    pub retry_options: ::core::option::Option<CommandRetryOptions>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct HoverElementCommand {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
-    pub retry_options: ::core::option::Option<CommandRetryOptions>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct PressKeyCommand {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub key: ::prost::alloc::string::String,
-    #[prost(string, optional, tag = "3")]
-    pub text: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(message, optional, tag = "4")]
-    pub retry_options: ::core::option::Option<CommandRetryOptions>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetTextContentCommand {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
-    pub retry_options: ::core::option::Option<CommandRetryOptions>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetInnerTextCommand {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
-    pub retry_options: ::core::option::Option<CommandRetryOptions>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct WaitForSelectorCommand {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(bool, optional, tag = "2")]
-    pub visible: ::core::option::Option<bool>,
-    #[prost(message, optional, tag = "3")]
-    pub retry_options: ::core::option::Option<CommandRetryOptions>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct PageNavigatedEvent {
-    #[prost(string, tag = "1")]
-    pub url: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub note: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ChromiumBidiInjectionEvent {
-    #[prost(string, tag = "1")]
-    pub note: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub bidi_session_id: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub mapper_target_id: ::prost::alloc::string::String,
-    #[prost(string, tag = "4")]
-    pub mapper_session_id: ::prost::alloc::string::String,
-    #[prost(string, tag = "5")]
-    pub package_version: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ElementClickedEvent {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub note: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub bidi_session_id: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ElementCountedEvent {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(uint32, tag = "2")]
-    pub count: u32,
-    #[prost(string, tag = "3")]
-    pub note: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ElementsHighlightedEvent {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(uint32, tag = "2")]
-    pub count: u32,
-    #[prost(string, tag = "3")]
-    pub note: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ElementFocusedEvent {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub note: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ElementFilledEvent {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub value: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub note: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ElementHoveredEvent {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub note: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct KeyPressedEvent {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub key: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub note: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TextContentResolvedEvent {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub text: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub note: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct InnerTextResolvedEvent {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub text: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub note: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SelectorWaitSatisfiedEvent {
-    #[prost(string, tag = "1")]
-    pub css_selector: ::prost::alloc::string::String,
-    #[prost(bool, tag = "2")]
-    pub visible: bool,
-    #[prost(string, tag = "3")]
-    pub note: ::prost::alloc::string::String,
-}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum BrowserKind {
@@ -498,7 +305,7 @@ pub struct ContextSessionCommand {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_command::Command",
-        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15"
+        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16"
     )]
     pub command: ::core::option::Option<context_session_command::Command>,
 }
@@ -532,6 +339,8 @@ pub mod context_session_command {
         GetInnerText(super::GetInnerTextCommand),
         #[prost(message, tag = "15")]
         WaitForSelector(super::WaitForSelectorCommand),
+        #[prost(message, tag = "16")]
+        Screenshot(super::ScreenshotCommand),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -547,7 +356,7 @@ pub struct ContextSessionEvent {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_event::Event",
-        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17"
+        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18"
     )]
     pub event: ::core::option::Option<context_session_event::Event>,
 }
@@ -587,6 +396,8 @@ pub mod context_session_event {
         InnerTextResolved(super::InnerTextResolvedEvent),
         #[prost(message, tag = "17")]
         SelectorWaitSatisfied(super::SelectorWaitSatisfiedEvent),
+        #[prost(message, tag = "18")]
+        ScreenshotCaptured(super::ScreenshotCapturedEvent),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -608,6 +419,211 @@ pub struct ContextSessionClosedEvent {
 pub struct ContextSessionErrorEvent {
     #[prost(string, tag = "1")]
     pub message: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NavigatePageCommand {
+    #[prost(string, tag = "1")]
+    pub url: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ClickElementCommand {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CountElementsCommand {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct HighlightElementsCommand {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(uint32, optional, tag = "2")]
+    pub duration_ms: ::core::option::Option<u32>,
+    #[prost(message, optional, tag = "3")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FocusElementCommand {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FillElementCommand {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub value: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "3")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct HoverElementCommand {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PressKeyCommand {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub key: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "3")]
+    pub text: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(message, optional, tag = "4")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetTextContentCommand {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetInnerTextCommand {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct WaitForSelectorCommand {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(bool, optional, tag = "2")]
+    pub visible: ::core::option::Option<bool>,
+    #[prost(message, optional, tag = "3")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct ScreenshotCommand {
+    #[prost(message, optional, tag = "1")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PageNavigatedEvent {
+    #[prost(string, tag = "1")]
+    pub url: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ChromiumBidiInjectionEvent {
+    #[prost(string, tag = "1")]
+    pub note: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub bidi_session_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub mapper_target_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub mapper_session_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "5")]
+    pub package_version: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ElementClickedEvent {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub note: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub bidi_session_id: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ElementCountedEvent {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "2")]
+    pub count: u32,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ElementsHighlightedEvent {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "2")]
+    pub count: u32,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ElementFocusedEvent {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ElementFilledEvent {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub value: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ElementHoveredEvent {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct KeyPressedEvent {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub key: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TextContentResolvedEvent {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub text: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct InnerTextResolvedEvent {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub text: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SelectorWaitSatisfiedEvent {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(bool, tag = "2")]
+    pub visible: bool,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ScreenshotCapturedEvent {
+    #[prost(bytes = "vec", tag = "1")]
+    pub png_data: ::prost::alloc::vec::Vec<u8>,
+    #[prost(string, tag = "2")]
+    pub note: ::prost::alloc::string::String,
 }
 /// Generated client implementations.
 pub mod engine_service_client {

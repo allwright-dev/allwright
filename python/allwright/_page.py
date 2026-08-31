@@ -19,6 +19,7 @@ from ._types import (
     NavigateResult,
     PressOptions,
     PressResult,
+    ScreenshotResult,
     TextResult,
     WaitForSelectorOptions,
     WaitForSelectorResult,
@@ -387,6 +388,42 @@ class Page:
                     case "error":
                         raise AllwrightError(
                             f"page session error while waiting for selector: {event.error.message}"
+                        )
+
+    def screenshot(self, options: CommandOptions | None = None) -> ScreenshotResult:
+        from ._runtime import retry_options
+
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            command_options = options or CommandOptions()
+            handle.send(
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
+                    screenshot=engine_pb2.ScreenshotCommand(
+                        retry_options=retry_options(command_options.timeout_ms),
+                    ),
+                )
+            )
+
+            while True:
+                event = handle.recv("receive tab session event while capturing screenshot")
+                match event.WhichOneof("event"):
+                    case "screenshot_captured":
+                        captured = event.screenshot_captured
+                        return ScreenshotResult(
+                            png_data=captured.png_data,
+                            note=captured.note,
+                        )
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(
+                            f"page session {self.session_id} closed while capturing screenshot"
+                        )
+                    case "error":
+                        raise AllwrightError(
+                            f"page session error while capturing screenshot: {event.error.message}"
                         )
 
     def ping(self, message: str = "ping") -> str:

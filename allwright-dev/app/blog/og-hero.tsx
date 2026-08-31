@@ -118,9 +118,54 @@ function EngineOgDiagram() {
   );
 }
 
+// Same TS-client-into-core shape as TypeScriptOgDiagram, but fanned out to
+// two right-hand targets instead of one: the browser plus a phone standing
+// in for the androidApp fixture, so the thumbnail reads as "one client, two
+// surfaces" at a glance.
+function AndroidOgDiagram() {
+  const { width, height } = DIAGRAM_SIZE;
+  const midY = 132;
+  const coreX = 172;
+
+  return (
+    <div style={{ position: "relative", width, height, display: "flex" }}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ position: "absolute", left: 0, top: 0 }}>
+        <rect x={0} y={midY - 40} width={84} height={80} rx={16} fill="#3178C6" />
+        <line x1={90} y1={midY} x2={coreX - 44} y2={midY} stroke={MUTED} strokeWidth={2} />
+
+        <circle cx={coreX} cy={midY} r={44} fill="rgba(14,159,142,0.16)" stroke={BRAND_TO} strokeWidth={2} />
+
+        <line x1={coreX + 44} y1={midY - 14} x2={306} y2={midY - 44} stroke={BRAND_TO} strokeWidth={2} />
+        <line x1={coreX + 44} y1={midY + 14} x2={306} y2={midY + 62} stroke={BRAND_TO} strokeWidth={2} />
+
+        {/* Browser node */}
+        <rect x={312} y={midY - 74} width={100} height={64} rx={12} fill="none" stroke={LINE} strokeWidth={2} />
+        {/* Phone node */}
+        <rect x={330} y={midY + 26} width={64} height={86} rx={14} fill="none" stroke={LINE} strokeWidth={2} />
+        <rect x={352} y={midY + 96} width={20} height={3} rx={1.5} fill={MUTED} />
+      </svg>
+
+      <div style={{ position: "absolute", left: 42, top: midY - 22, transform: "translate(-50%,-50%)", display: "flex", fontSize: 24, fontWeight: 700, color: "#ffffff" }}>
+        TS
+      </div>
+      <div style={{ position: "absolute", left: coreX, top: midY - 20, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ display: "flex", fontSize: 14, fontWeight: 700, color: INK_SOFT }}>allwright</div>
+        <div style={{ display: "flex", fontSize: 11, color: MUTED, marginTop: 2 }}>core</div>
+      </div>
+      <div style={{ position: "absolute", left: 362, top: midY - 42, transform: "translateX(-50%)", display: "flex", fontSize: 13, fontWeight: 600, color: INK }}>
+        Browser
+      </div>
+      <div style={{ position: "absolute", left: 362, top: midY + 69, transform: "translateX(-50%)", display: "flex", fontSize: 13, fontWeight: 600, color: INK }}>
+        Android
+      </div>
+    </div>
+  );
+}
+
 const ogHeroRegistry: Record<string, () => React.ReactElement> = {
   "get-started-with-typescript": TypeScriptOgDiagram,
   "why-allwright-if-playwright-exists": EngineOgDiagram,
+  "android-testing-playwright-style": AndroidOgDiagram,
 };
 
 /** Returns the post's diagram element for its social-preview card, or null for posts without one (their card falls back to a text-only layout). */

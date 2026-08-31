@@ -3,8 +3,8 @@ use std::sync::Arc;
 use crate::proto::surface_session_command::Command as SurfaceCommand;
 use crate::proto::surface_session_event::Event as SurfaceEvent;
 use crate::proto::{
-    BrowserKind as ProtoBrowserKind, BrowserLaunchedEvent, SurfaceSessionCommand,
-    LaunchBrowserCommand,
+    BrowserKind as ProtoBrowserKind, BrowserLaunchedEvent, LaunchBrowserCommand,
+    SurfaceSessionCommand,
 };
 use tokio::sync::{Mutex as AsyncMutex, mpsc};
 use tokio_stream::wrappers::ReceiverStream;

@@ -211,6 +211,53 @@ func (p *AndroidApp) Fill(ctx context.Context, selector string, value string, op
 	}
 }
 
+func (p *AndroidApp) Screenshot(ctx context.Context, options ...CommandOptions) (*ScreenshotResult, error) {
+	if p == nil {
+		return nil, fmt.Errorf("android app is nil")
+	}
+	if err := p.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if p.closed {
+		return nil, fmt.Errorf("android tab session %s is closed", p.sessionID)
+	}
+
+	commandOptions := firstCommandOptions(options)
+	if err := p.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: p.surfaceSessionID,
+		ContextSessionId: p.sessionID,
+		Command: &enginev1.ContextSessionCommand_Screenshot{
+			Screenshot: &enginev1.ScreenshotCommand{
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send Android ScreenshotCommand: %w", err)
+	}
+
+	for {
+		event, err := p.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive Android tab session event during screenshot: %w", err)
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.ContextSessionEvent_Attached:
+			p.attached = true
+			_ = payload
+		case *enginev1.ContextSessionEvent_ScreenshotCaptured:
+			return &ScreenshotResult{
+				PNGData: payload.ScreenshotCaptured.GetPngData(),
+				Note:    payload.ScreenshotCaptured.GetNote(),
+			}, nil
+		case *enginev1.ContextSessionEvent_Closed:
+			p.closed = true
+			return nil, fmt.Errorf("android app session %s closed while capturing screenshot", p.sessionID)
+		case *enginev1.ContextSessionEvent_Error:
+			return nil, fmt.Errorf("android app session error while capturing screenshot: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
 func (d *AndroidDevice) SessionID() string {
 	if d == nil {
 		return ""

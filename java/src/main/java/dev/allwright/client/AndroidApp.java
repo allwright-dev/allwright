@@ -4,6 +4,7 @@ import dev.allwright.engine.v1.ClickElementCommand;
 import dev.allwright.engine.v1.FillElementCommand;
 import dev.allwright.engine.v1.ContextSessionCommand;
 import dev.allwright.engine.v1.ContextSessionEvent;
+import dev.allwright.engine.v1.ScreenshotCommand;
 
 public final class AndroidApp {
     private final RuntimeSupport.RuntimeClient runtime;
@@ -112,6 +113,50 @@ public final class AndroidApp {
                 }
                 case ERROR -> throw new AllwrightException(
                         "android app session error while filling: " + event.getError().getMessage()
+                );
+                default -> {
+                }
+            }
+        }
+    }
+
+    public synchronized ScreenshotResult screenshot() {
+        return screenshot(new CommandOptions());
+    }
+
+    public synchronized ScreenshotResult screenshot(CommandOptions options) {
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
+        ensureOpen();
+        CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+        ScreenshotCommand.Builder screenshot = ScreenshotCommand.newBuilder();
+        if (CommandSupport.hasTimeout(resolvedOptions.timeoutMs())) {
+            screenshot.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
+        }
+        handle.send(
+                ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(surfaceSessionId)
+                        .setContextSessionId(sessionId)
+                        .setScreenshot(screenshot)
+                        .build()
+        );
+
+        while (true) {
+            ContextSessionEvent event = handle.recv("receive tab session event while capturing Android screenshot");
+            switch (event.getEventCase()) {
+                case ATTACHED -> {
+                }
+                case SCREENSHOT_CAPTURED -> {
+                    return new ScreenshotResult(
+                            event.getScreenshotCaptured().getPngData().toByteArray(),
+                            event.getScreenshotCaptured().getNote()
+                    );
+                }
+                case CLOSED -> {
+                    closed = true;
+                    throw new AllwrightException("android app session " + sessionId + " closed while capturing screenshot");
+                }
+                case ERROR -> throw new AllwrightException(
+                        "android app session error while capturing screenshot: " + event.getError().getMessage()
                 );
                 default -> {
                 }

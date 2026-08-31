@@ -237,6 +237,12 @@ pub struct MobileWaitForSelectorInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MobileScreenshotInfo {
+    pub png_data: Vec<u8>,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum MobileCommand {
     Connect(ConnectOptions),
@@ -283,6 +289,11 @@ pub enum MobileCommand {
         visible: bool,
         timeout_ms: Option<u32>,
     },
+    Screenshot {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+        timeout_ms: Option<u32>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -297,6 +308,7 @@ pub enum MobileCommandResult {
     FillElement(MobileFillInfo),
     GetText(MobileTextInfo),
     WaitForSelector(MobileWaitForSelectorInfo),
+    Screenshot(MobileScreenshotInfo),
 }
 
 pub fn shared_descriptor() -> SurfacePluginDescriptor {

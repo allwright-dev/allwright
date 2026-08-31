@@ -138,8 +138,8 @@ bun run --filter @allwright.dev/core example:android
 
 Files:
 
-- [typescript/core/examples/web-basic.ts](/Users/atmaramn/data/personal/gh/allwright/typescript/core/examples/web-basic.ts)
-- [typescript/core/examples/android-basic.ts](/Users/atmaramn/data/personal/gh/allwright/typescript/core/examples/android-basic.ts)
+- [typescript/core/examples/web-basic.ts](typescript/core/examples/web-basic.ts)
+- [typescript/core/examples/android-basic.ts](typescript/core/examples/android-basic.ts)
 
 ## Python examples
 
@@ -163,8 +163,8 @@ PYTHONPATH=python python3 python/examples/android_basic.py
 
 Files:
 
-- [python/examples/web_basic.py](/Users/atmaramn/data/personal/gh/allwright/python/examples/web_basic.py)
-- [python/examples/android_basic.py](/Users/atmaramn/data/personal/gh/allwright/python/examples/android_basic.py)
+- [python/examples/web_basic.py](python/examples/web_basic.py)
+- [python/examples/android_basic.py](python/examples/android_basic.py)
 
 ## Go examples
 
@@ -184,8 +184,8 @@ go run ./examples/android-basic
 
 Files:
 
-- [go/examples/web-basic/main.go](/Users/atmaramn/data/personal/gh/allwright/go/examples/web-basic/main.go)
-- [go/examples/android-basic/main.go](/Users/atmaramn/data/personal/gh/allwright/go/examples/android-basic/main.go)
+- [go/examples/web-basic/main.go](go/examples/web-basic/main.go)
+- [go/examples/android-basic/main.go](go/examples/android-basic/main.go)
 
 ## Rust examples
 
@@ -203,8 +203,8 @@ cargo run -p allwright-core --example android_basic
 
 Files:
 
-- [rust/allwright/examples/web_basic.rs](/Users/atmaramn/data/personal/gh/allwright/rust/allwright/examples/web_basic.rs)
-- [rust/allwright/examples/android_basic.rs](/Users/atmaramn/data/personal/gh/allwright/rust/allwright/examples/android_basic.rs)
+- [rust/allwright/examples/web_basic.rs](rust/allwright/examples/web_basic.rs)
+- [rust/allwright/examples/android_basic.rs](rust/allwright/examples/android_basic.rs)
 
 ## Java examples
 
@@ -234,8 +234,8 @@ ALLWRIGHT_RUN_ANDROID_EXAMPLE=true ./gradlew --no-daemon test --tests dev.allwri
 
 Files:
 
-- [java/src/test/java/dev/allwright/examples/WebBasicTest.java](/Users/atmaramn/data/personal/gh/allwright/java/src/test/java/dev/allwright/examples/WebBasicTest.java)
-- [java/src/test/java/dev/allwright/examples/AndroidBasicTest.java](/Users/atmaramn/data/personal/gh/allwright/java/src/test/java/dev/allwright/examples/AndroidBasicTest.java)
+- [java/src/test/java/dev/allwright/examples/WebBasicTest.java](java/src/test/java/dev/allwright/examples/WebBasicTest.java)
+- [java/src/test/java/dev/allwright/examples/AndroidBasicTest.java](java/src/test/java/dev/allwright/examples/AndroidBasicTest.java)
 
 ## Quick verification commands
 

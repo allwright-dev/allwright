@@ -1,0 +1,219 @@
+---
+title: "What's cooking: Android testing, Playwright-style"
+description: "allwright shipped Playwright-style Android testing over adb and never announced it. What works, what's missing, and a step-by-step Vitest example."
+date: "2026-08-31"
+author: "The allwright team"
+published: true
+tags: ["android", "playwright", "vitest", "mobile", "changelog"]
+keywords:
+  [
+    "playwright style android testing",
+    "android test automation typescript",
+    "android testing without appium",
+    "adb based ui testing",
+    "vitest android testing",
+    "allwright android",
+    "cross platform test automation",
+  ]
+---
+
+Our own [Availability](/availability) page still says Mobile is "Not yet
+available." Our own [How it works](/how-it-works) diagram still draws Mobile —
+Android as an outlined, reserved slot. Both of those are, as of this post,
+wrong, and have been wrong for a couple of days.
+
+`@allwright.dev/vitest@0.0.53` — the exact version pinned in
+[`allwright-typescript-sample`](https://github.com/allwright-dev/allwright-typescript-sample) —
+already ships an `androidApp` fixture that installs a real APK, taps real
+Android views through `adb`, and fills real text fields. Nobody announced it.
+The sample repo's own test file quietly calls it:
+
+```ts
+test("locator assertions", { timeout: 180000 }, async ({ page, androidApp }) => {
+  await page.goto("https://themoderninternet.vercel.app");
+  await page.click("//*[@data-slot='card' and .//*[text()='Form Inputs']]//button");
+  await expect(page.locator("//h1[text()='Form Inputs']")).toBeVisible();
+  await androidApp.click("text=Account");
+  await androidApp.click("text=Login");
+  await androidApp.click("text=Sign Up");
+});
+```
+
+Two fixtures, one test, one process. That's the whole pitch of the "one
+engine, one plugin per surface" architecture we [wrote about
+already](/blog/why-allwright-if-playwright-exists) — mobile was supposed to
+be a case of "same client, same locator model, new surface plugin," not a new
+tool to learn. This is the first proof that held up in practice, and it's
+been sitting in a public repo unannounced. Consider this the announcement.
+
+## What actually shipped
+
+The Android surface plugin (`rust/allwright-surface-mobile-android`) is a
+native Rust runtime that drives Android purely through `adb` — no Appium,
+no UiAutomator2 Python bridge, no separate driver server to run alongside
+your tests. Today it can:
+
+- **`connect`** — discover devices via `adb devices -l`, attach to a named
+  device/serial or the first one available.
+- **`launch_app`** — install an APK with `adb install -r` (from a local
+  path or a remote URL allwright downloads for you), resolve the package
+  from `appId` or the APK's own metadata, then start it.
+- **`click_element`** / **`fill_element`** — dump the live UI hierarchy via
+  `uiautomator`, resolve your selector against it, and drive the tap or text
+  entry through `adb shell input`.
+
+The project labels this maturity level `Scaffolding` in its own source, and
+means it: `count_elements`, `get_text`, and `wait_for_selector` aren't wired
+up yet and return an explicit "not implemented" error rather than silently
+lying to you. Connect, launch, click, and fill are real and working — that's
+enough to drive an actual login-and-navigate flow, which is exactly what the
+sample test above does.
+
+## Step by step: your first Android test
+
+This walks through adding an Android test to the same
+[`allwright-typescript-sample`](https://github.com/allwright-dev/allwright-typescript-sample)
+project from our [TypeScript getting-started post](/blog/get-started-with-typescript).
+If you already have that project, skip to step 4.
+
+### 1. Prerequisites
+
+- Everything from the [web getting-started guide](/blog/get-started-with-typescript):
+  Node.js 18+, npm, `@allwright.dev/vitest`.
+- `adb` on your `PATH` (it ships with Android Studio's platform-tools, or
+  install `platform-tools` standalone).
+- An Android emulator running, or a real device connected over USB with
+  debugging enabled. Check allwright can see it the same way you'd check
+  `adb` can:
+
+```bash
+adb devices -l
+```
+
+You don't need your own APK to try this — allwright hosts a small debug
+demo app for exactly this purpose.
+
+### 2. Install the allwright engine and Android plugin
+
+`androidApp` will auto-install the `mobile-android` plugin the first time
+you call it, the same lazy bootstrap `page` uses for `web`. Since that
+plugin is still `Scaffolding`-maturity and your first real run is already
+busy talking to `adb` and installing your APK, it's worth pulling the
+engine and plugin ahead of time instead of stacking a download on top:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/allwright-dev/allwright/main/scripts/install.sh | bash
+allwright serve --listen-addr 127.0.0.1:50051 &
+allwright plugin install mobile-android
+```
+
+Skip this, and the exact same two things — the engine, then the plugin —
+still happen automatically the first time your test touches `androidApp`.
+
+### 3. Point your config at an Android app
+
+Add (or extend) `allwright.config.yaml` at your project root:
+
+```yaml
+schemaVersion: 1
+
+web:
+  browser:
+    name: chromium
+
+mobile:
+  android:
+    # device: emulator-5554   # optional — omit to use the first device adb sees
+    app:
+      id: com.example.airticket
+      binary: "https://allwright.dev/Flights-debug.apk"
+```
+
+`binary` accepts a local path or, as above, a URL — allwright downloads and
+installs it for you on first launch. `id` is the package name allwright
+resolves the app by if it can't infer one from the APK.
+
+### 4. Write the test
+
+```ts
+import { expect, test } from "@allwright.dev/vitest";
+
+test(
+  "android app opens and navigates",
+  { timeout: 180000 },
+  async ({ androidApp }) => {
+    await androidApp.click("text=Account");
+    await androidApp.click("text=Login");
+    await androidApp.click("text=Sign Up");
+  },
+);
+```
+
+That's the same shape as `page.click()` — no `AndroidDriver`, no capabilities
+object, no session URL to stand up separately. `androidApp` is injected,
+lazy, and torn down for you the same way `page` is: the device connects and
+the app installs and launches only the first time the fixture is actually
+used, not the moment it's requested.
+
+### 5. Run it
+
+```bash
+npm test
+```
+
+If you skipped step 2, the first run also installs the `mobile-android`
+plugin before it installs the APK, so give it a little longer than a
+pure-web test. `text=Account` and friends are UiAutomator2-style selectors —
+you can reach into the hierarchy the same way, whichever your app actually
+exposes:
+
+| Selector | Matches |
+|---|---|
+| `text=Account` | Exact visible text |
+| `textContains=Sign` | Partial visible text |
+| `resourceId=com.example.airticket:id/bottom_nav_account` | Android resource id |
+| `className=android.widget.Button` | Widget class |
+| `xpath=//*[@text="Email"]` | XPath over the dumped hierarchy |
+| `clickable=true` | State flag |
+
+### 6. Mix web and Android in one test
+
+Nothing stops you from asserting on your marketing site and your Android app
+in the same spec, which is the actual point of one engine underneath both:
+
+```ts
+test("web and android, one process", async ({ page, androidApp }) => {
+  await page.goto("https://themoderninternet.vercel.app");
+  await expect(page.locator("//h1[text()='Form Inputs']")).toBeVisible();
+
+  await androidApp.click("text=Account");
+  await androidApp.click("text=Login");
+});
+```
+
+One `npm test`, one config file, one retrying `expect`, two surfaces.
+
+## The honest status line
+
+This is experimental, and we mean that plainly, the same way we meant it when
+we said web was "driverless but early." `count_elements`, `get_text`, and
+`wait_for_selector` don't exist yet, so assertions today have to route
+through what `click`/`fill` can already see rather than reading state
+directly — plan your first Android tests around actions, not deep text
+assertions. iOS, desktop, and API are still exactly where our
+[architecture post](/blog/why-allwright-if-playwright-exists) left them:
+reserved plugin slots, not yet installable. We'll update
+[Availability](/availability) and [How it works](/how-it-works) to reflect
+Android's new status shortly — this post got ahead of the site because the
+code got ahead of us first.
+
+## Where to go next
+
+- Clone [`allwright-typescript-sample`](https://github.com/allwright-dev/allwright-typescript-sample)
+  and run its test as-is — it already exercises both `page` and `androidApp`.
+- Read the [`@allwright.dev/vitest` README](https://github.com/allwright-dev/allwright/tree/main/typescript/vitest)
+  for the full fixture list and config precedence.
+- Read [why "Playwright-style" was never the whole pitch](/blog/why-allwright-if-playwright-exists)
+  for the architecture this fixture is actually proving out.
+- Star or watch [the repo](https://github.com/allwright-dev/allwright) —
+  `count_elements`/`get_text`/`wait_for_selector` and iOS are next.

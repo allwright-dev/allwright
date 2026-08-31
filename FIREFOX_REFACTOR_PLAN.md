@@ -22,11 +22,12 @@ The current implementation is deeply Chromium-shaped in three layers:
 
 The main seams today are:
 
-- [proto/core/v1/browser.proto](/Users/atmaramn/data/personal/gh/allwright/proto/core/v1/browser.proto:1)
-- [proto/surfaces/web/v1/web.proto](/Users/atmaramn/data/personal/gh/allwright/proto/surfaces/web/v1/web.proto:1)
-- [rust/allwright/src/engine.rs](/Users/atmaramn/data/personal/gh/allwright/rust/allwright/src/engine.rs:1)
-- [rust/allwright-plugin-sdk/src/lib.rs](/Users/atmaramn/data/personal/gh/allwright/rust/allwright-plugin-sdk/src/lib.rs:1)
-- [rust/allwright-surface-web/src/lib.rs](/Users/atmaramn/data/personal/gh/allwright/rust/allwright-surface-web/src/lib.rs:1)
+- [proto/core/v1/surface.proto](proto/core/v1/surface.proto)
+- [proto/core/v1/context.proto](proto/core/v1/context.proto)
+- [proto/surfaces/web/v1/web.proto](proto/surfaces/web/v1/web.proto)
+- [rust/allwright/src/engine.rs](rust/allwright/src/engine.rs)
+- [rust/allwright-plugin-sdk/src/lib.rs](rust/allwright-plugin-sdk/src/lib.rs)
+- [rust/allwright-surface-web/src/lib.rs](rust/allwright-surface-web/src/lib.rs)
 
 ## What Is Too Chrome-Specific Right Now
 
@@ -46,7 +47,7 @@ Problem:
 
 ### 2. Engine state
 
-Current engine state in [rust/allwright/src/engine.rs](/Users/atmaramn/data/personal/gh/allwright/rust/allwright/src/engine.rs:1) stores:
+Current engine state in [rust/allwright/src/engine.rs](rust/allwright/src/engine.rs) stores:
 
 - `cdp_websocket_url`
 - `process_id`
@@ -61,7 +62,7 @@ Problem:
 
 ### 3. Plugin SDK
 
-Current SDK types in [rust/allwright-plugin-sdk/src/lib.rs](/Users/atmaramn/data/personal/gh/allwright/rust/allwright-plugin-sdk/src/lib.rs:1) include:
+Current SDK types in [rust/allwright-plugin-sdk/src/lib.rs](rust/allwright-plugin-sdk/src/lib.rs) include:
 
 - `ChromeLaunchInfo`
 - `ChromeTabInfo`
@@ -77,7 +78,7 @@ Problem:
 
 ### 4. Web plugin implementation
 
-Current implementation in [rust/allwright-surface-web/src/lib.rs](/Users/atmaramn/data/personal/gh/allwright/rust/allwright-surface-web/src/lib.rs:1) is a single Chromium/CDP codepath:
+Current implementation in [rust/allwright-surface-web/src/lib.rs](rust/allwright-surface-web/src/lib.rs) is a single Chromium/CDP codepath:
 
 - Chrome discovery and launch
 - CDP websocket lifecycle
@@ -162,7 +163,7 @@ Purpose:
 
 - stop storing Chromium transport details directly in engine structs
 
-Refactor [rust/allwright/src/engine.rs](/Users/atmaramn/data/personal/gh/allwright/rust/allwright/src/engine.rs:1):
+Refactor [rust/allwright/src/engine.rs](rust/allwright/src/engine.rs):
 
 Replace:
 
@@ -199,7 +200,7 @@ Purpose:
 
 - let the engine ask the plugin for browser-agnostic behavior
 
-Refactor [rust/allwright-plugin-sdk/src/lib.rs](/Users/atmaramn/data/personal/gh/allwright/rust/allwright-plugin-sdk/src/lib.rs:1) to add neutral command/result types.
+Refactor [rust/allwright-plugin-sdk/src/lib.rs](rust/allwright-plugin-sdk/src/lib.rs) to add neutral command/result types.
 
 Add neutral equivalents for:
 
@@ -242,7 +243,7 @@ Purpose:
 
 - isolate Chromium code and make room for Firefox
 
-Refactor [rust/allwright-surface-web/src/lib.rs](/Users/atmaramn/data/personal/gh/allwright/rust/allwright-surface-web/src/lib.rs:1) into modules like:
+Refactor [rust/allwright-surface-web/src/lib.rs](rust/allwright-surface-web/src/lib.rs) into modules like:
 
 - `backend/mod.rs`
 - `backend/chromium.rs`
