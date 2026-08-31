@@ -33,8 +33,8 @@ export class BrowserImpl implements Browser {
   #runtime: RuntimeClient;
   #stream: SurfaceSessionStream;
   #queue: EventQueue<SurfaceSessionEvent>;
-  #pages = new Map<string, Page>();
-  #initialPage: Page;
+  #pages = new Map<string, PageImpl>();
+  #initialPage: PageImpl;
 
   constructor(state: BrowserLaunchState) {
     const browserInfo: BrowserInfo = {
@@ -107,6 +107,9 @@ export class BrowserImpl implements Browser {
       const event = await this.#queue.next();
       if (event.closed) {
         this.#closed = true;
+        for (const page of this.#pages.values()) {
+          page.dispose();
+        }
         this.#stream.end();
         return;
       }
@@ -153,7 +156,7 @@ export class BrowserImpl implements Browser {
     return this.newPage(options);
   }
 
-  #createPage(sessionId: string): Page {
+  #createPage(sessionId: string): PageImpl {
     const existing = this.#pages.get(sessionId);
     if (existing) {
       return existing;

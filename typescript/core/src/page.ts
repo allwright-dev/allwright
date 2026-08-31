@@ -401,7 +401,7 @@ export class PageImpl implements Page {
       const event = await handle.queue.next();
       if (event.closed) {
         handle.closed = true;
-        handle.stream.end();
+        this.dispose();
         return;
       }
       if (event.error?.message) {
@@ -512,5 +512,28 @@ export class PageImpl implements Page {
       this.#handlePromise = createPageHandle(this.#runtime);
     }
     return this.#handlePromise;
+  }
+
+  dispose(): void {
+    const handlePromise = this.#handlePromise;
+    if (!handlePromise) {
+      return;
+    }
+    void handlePromise.then((handle) => {
+      if (handle.closed) {
+        return;
+      }
+      handle.closed = true;
+      try {
+        handle.stream.end();
+      } catch {
+        // Best-effort local teardown during page disposal.
+      }
+      try {
+        handle.stream.cancel();
+      } catch {
+        // grpc-js may reject cancel/end ordering depending on stream state.
+      }
+    });
   }
 }

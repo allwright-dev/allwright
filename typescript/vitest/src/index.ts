@@ -223,6 +223,9 @@ function createLazyPage(pageResource: LazyResource<Page>): Page {
     async waitForSelector(selector: string, options?: WaitForSelectorOptions) {
       return (await pageResource.get()).waitForSelector(selector, options);
     },
+    async screenshot(options?: CommandOptions) {
+      return (await pageResource.get()).screenshot(options);
+    },
     async close() {
       await (await pageResource.get()).close();
     },
@@ -320,6 +323,9 @@ function createLazyAndroidApp(appResource: LazyResource<MobileAndroidApp>): Mobi
     },
     async fill(selector: string, value: string, options?: CommandOptions) {
       return (await appResource.get()).fill(selector, value, options);
+    },
+    async screenshot(options?: CommandOptions) {
+      return (await appResource.get()).screenshot(options);
     },
   } satisfies MobileAndroidApp;
 

@@ -710,6 +710,9 @@ export interface EngineProtoRoot {
 
 export interface RuntimeClient {
   client: EngineServiceClientShape;
+  openStreams: Set<SurfaceSessionStream | ContextSessionStream>;
+  registerStream(stream: SurfaceSessionStream | ContextSessionStream): void;
+  unregisterStream(stream: SurfaceSessionStream | ContextSessionStream): void;
 }
 
 export interface BrowserLaunchState {

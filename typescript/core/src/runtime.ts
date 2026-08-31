@@ -11,6 +11,7 @@ import type {
   SurfaceSessionStream,
   Browser,
   BrowserKind,
+  ContextSessionStream,
   ContextSessionEvent,
   EngineProtoRoot,
   EngineServiceClientShape,
@@ -40,6 +41,10 @@ export async function shutdown(): Promise<void> {
     return;
   }
   const runtime = await runtimePromise;
+  for (const stream of runtime.openStreams ?? []) {
+    closeTrackedStream(stream);
+    runtime.unregisterStream(stream);
+  }
   runtime.client.close();
   runtimePromise = null;
   await shutdownManagedServer();
@@ -67,6 +72,11 @@ export async function getRuntime(): Promise<RuntimeClient> {
 
 export async function createPageHandle(runtime: RuntimeClient): Promise<PageHandle> {
   const stream = runtime.client.ContextSession();
+  runtime.registerStream(stream);
+  const unregister = () => runtime.unregisterStream(stream);
+  stream.on("close", unregister);
+  stream.on("end", unregister);
+  stream.on("error", unregister);
   const queue = bindStreamQueue(stream);
   return {
     stream,
@@ -79,6 +89,11 @@ export async function createBrowserSessionHandle(
   runtime: RuntimeClient,
 ): Promise<{ stream: SurfaceSessionStream; queue: EventQueue<SurfaceSessionEvent> }> {
   const stream = runtime.client.SurfaceSession();
+  runtime.registerStream(stream);
+  const unregister = () => runtime.unregisterStream(stream);
+  stream.on("close", unregister);
+  stream.on("end", unregister);
+  stream.on("error", unregister);
   const queue = bindStreamQueue(stream);
   return { stream, queue };
 }
@@ -131,7 +146,17 @@ async function createRuntime(): Promise<RuntimeClient> {
     resolvedServerAddr,
     grpc.credentials.createInsecure(),
   ) as unknown as EngineServiceClientShape;
-  return { client };
+  const openStreams = new Set<SurfaceSessionStream | ContextSessionStream>();
+  return {
+    client,
+    openStreams,
+    registerStream(stream) {
+      openStreams.add(stream);
+    },
+    unregisterStream(stream) {
+      openStreams.delete(stream);
+    },
+  };
 }
 
 function configuredServerAddr(): string {
@@ -153,4 +178,17 @@ function bindStreamQueue<TEvent>(stream: grpc.ClientReadableStream<TEvent>): Eve
     queue.fail(new Error("grpc stream ended"));
   });
   return queue;
+}
+
+function closeTrackedStream(stream: SurfaceSessionStream | ContextSessionStream): void {
+  try {
+    stream.end();
+  } catch {
+    // Some grpc-js stream states reject end() during teardown; keep going.
+  }
+  try {
+    stream.cancel();
+  } catch {
+    // Best-effort shutdown so dangling streams do not keep the process alive.
+  }
 }
