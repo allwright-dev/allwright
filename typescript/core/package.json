@@ -1,6 +1,6 @@
 {
   "name": "@allwright.dev/core",
-  "version": "0.0.54",
+  "version": "0.0.55",
   "description": "High-level TypeScript client for the allwright automation engine.",
   "license": "MIT",
   "type": "module",
