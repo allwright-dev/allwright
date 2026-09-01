@@ -253,6 +253,7 @@ pub enum PluginCommand {
     Screenshot {
         browser_session: BrowserSessionHandle,
         page_session: PageSessionHandle,
+        full_page: bool,
     },
     OpenChromeWindow {
         chrome_binary: Option<String>,

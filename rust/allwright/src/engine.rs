@@ -1411,16 +1411,23 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
-        Some(ContextCommand::Screenshot(ScreenshotCommand { retry_options })) => {
+        Some(ContextCommand::Screenshot(ScreenshotCommand {
+            retry_options,
+            full_page,
+        })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let screenshot = retry_with_timeout(retry_policy, || async {
                 match (&surface_session, &page_session) {
                     (
                         EngineBrowserSessionHandle::Web(surface_session),
                         EnginePageSessionHandle::Web(page_session),
-                    ) => web_lib::screenshot_page(surface_session, page_session)
-                        .await
-                        .map(|shot| (shot.png_data, shot.note)),
+                    ) => web_lib::screenshot_page(
+                        surface_session,
+                        page_session,
+                        full_page.unwrap_or(false),
+                    )
+                    .await
+                    .map(|shot| (shot.png_data, shot.note)),
                     (
                         EngineBrowserSessionHandle::Mobile(surface_session),
                         EnginePageSessionHandle::Mobile(page_session),
@@ -1430,6 +1437,7 @@ async fn handle_tab_command(
                         retry_options
                             .as_ref()
                             .and_then(|options| options.timeout_ms),
+                        full_page.unwrap_or(false),
                     )
                     .await
                     .map(|shot| (shot.png_data, shot.note)),

@@ -1,5 +1,8 @@
 package dev.allwright.client;
 
+import java.io.IOException;
+import java.nio.file.Files;
+
 import dev.allwright.engine.v1.ClickElementCommand;
 import dev.allwright.engine.v1.CloseContextSessionCommand;
 import dev.allwright.engine.v1.CountElementsCommand;
@@ -440,16 +443,19 @@ public final class Page implements AutoCloseable {
     }
 
     public synchronized ScreenshotResult screenshot() {
-        return screenshot(new CommandOptions());
+        return screenshot(new ScreenshotOptions());
     }
 
-    public synchronized ScreenshotResult screenshot(CommandOptions options) {
+    public synchronized ScreenshotResult screenshot(ScreenshotOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
-        CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+        ScreenshotOptions resolvedOptions = options == null ? new ScreenshotOptions() : options;
         ScreenshotCommand.Builder screenshot = ScreenshotCommand.newBuilder();
         if (CommandSupport.hasTimeout(resolvedOptions.timeoutMs())) {
             screenshot.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
+        }
+        if (resolvedOptions.fullPage()) {
+            screenshot.setFullPage(true);
         }
         handle.send(
                 ContextSessionCommand.newBuilder()
@@ -462,10 +468,21 @@ public final class Page implements AutoCloseable {
             ContextSessionEvent event = handle.recv("receive tab session event while capturing screenshot");
             switch (event.getEventCase()) {
                 case SCREENSHOT_CAPTURED -> {
-                    return new ScreenshotResult(
+                    ScreenshotResult result = new ScreenshotResult(
                             event.getScreenshotCaptured().getPngData().toByteArray(),
                             event.getScreenshotCaptured().getNote()
                     );
+                    if (resolvedOptions.path() != null) {
+                        try {
+                            Files.write(resolvedOptions.path(), result.pngData());
+                        } catch (IOException error) {
+                            throw new AllwrightException(
+                                    "write screenshot to " + resolvedOptions.path(),
+                                    error
+                            );
+                        }
+                    }
+                    return result;
                 }
                 case CLOSED -> {
                     closed = true;

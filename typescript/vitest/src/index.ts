@@ -16,6 +16,7 @@ import {
   type MobileAndroidLocator,
   type Page,
   type ResolvedAllwrightConfig,
+  type ScreenshotOptions,
   type WaitForSelectorOptions,
 } from "@allwright.dev/core";
 import { expect as vitestExpect, test as base } from "vitest";
@@ -223,7 +224,7 @@ function createLazyPage(pageResource: LazyResource<Page>): Page {
     async waitForSelector(selector: string, options?: WaitForSelectorOptions) {
       return (await pageResource.get()).waitForSelector(selector, options);
     },
-    async screenshot(options?: CommandOptions) {
+    async screenshot(options?: ScreenshotOptions) {
       return (await pageResource.get()).screenshot(options);
     },
     async close() {
@@ -324,7 +325,7 @@ function createLazyAndroidApp(appResource: LazyResource<MobileAndroidApp>): Mobi
     async fill(selector: string, value: string, options?: CommandOptions) {
       return (await appResource.get()).fill(selector, value, options);
     },
-    async screenshot(options?: CommandOptions) {
+    async screenshot(options?: ScreenshotOptions) {
       return (await appResource.get()).screenshot(options);
     },
   } satisfies MobileAndroidApp;

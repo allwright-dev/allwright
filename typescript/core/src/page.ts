@@ -1,4 +1,5 @@
 import { LocatorImpl } from "./locator.js";
+import { writeFile } from "node:fs/promises";
 import { formatActionError } from "./errors.js";
 import { normalizeSelectorForTransport } from "./selectors.js";
 import { createPageHandle } from "./runtime.js";
@@ -18,6 +19,7 @@ import type {
   PressOptions,
   PressResult,
   RuntimeClient,
+  ScreenshotOptions,
   ScreenshotResult,
   ContextSessionEvent,
   TextResult,
@@ -356,7 +358,7 @@ export class PageImpl implements Page {
     }
   }
 
-  async screenshot(options: CommandOptions = {}): Promise<ScreenshotResult> {
+  async screenshot(options: ScreenshotOptions = {}): Promise<ScreenshotResult> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -364,16 +366,21 @@ export class PageImpl implements Page {
       contextSessionId: this.sessionId,
       screenshot: {
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+        fullPage: options.fullPage,
       },
     });
 
     while (true) {
       const event = await handle.queue.next();
       if (event.screenshotCaptured?.pngData) {
-        return {
+        const screenshot = {
           pngData: event.screenshotCaptured.pngData,
           note: event.screenshotCaptured.note ?? "",
         };
+        if (options.path) {
+          await writeFile(options.path, screenshot.pngData);
+        }
+        return screenshot;
       }
       if (event.error?.message) {
         throw formatActionError("screenshot", event.error.message);

@@ -3,6 +3,7 @@ package allwright
 import (
 	"context"
 	"fmt"
+	"os"
 
 	enginev1 "allwright.dev/gen/allwright/engine/v1"
 )
@@ -179,7 +180,7 @@ func (t *Tab) WaitForSelector(ctx context.Context, cssSelector string, options .
 	}
 }
 
-func (t *Tab) Screenshot(ctx context.Context, options ...CommandOptions) (*ScreenshotResult, error) {
+func (t *Tab) Screenshot(ctx context.Context, options ...ScreenshotOptions) (*ScreenshotResult, error) {
 	if t == nil {
 		return nil, fmt.Errorf("tab is nil")
 	}
@@ -193,13 +194,14 @@ func (t *Tab) Screenshot(ctx context.Context, options ...CommandOptions) (*Scree
 		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
 	}
 
-	commandOptions := firstCommandOptions(options)
+	screenshotOptions := firstScreenshotOptions(options)
 	if err := t.stream.Send(&enginev1.ContextSessionCommand{
 		SurfaceSessionId: t.browserSessionID,
 		ContextSessionId: t.sessionID,
 		Command: &enginev1.ContextSessionCommand_Screenshot{
 			Screenshot: &enginev1.ScreenshotCommand{
-				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+				RetryOptions: retryOptionsProto(screenshotOptions.Timeout),
+				FullPage:     optionalBool(screenshotOptions.FullPage),
 			},
 		},
 	}); err != nil {
@@ -217,10 +219,16 @@ func (t *Tab) Screenshot(ctx context.Context, options ...CommandOptions) (*Scree
 			t.attached = true
 			_ = payload
 		case *enginev1.ContextSessionEvent_ScreenshotCaptured:
-			return &ScreenshotResult{
+			screenshot := &ScreenshotResult{
 				PNGData: payload.ScreenshotCaptured.GetPngData(),
 				Note:    payload.ScreenshotCaptured.GetNote(),
-			}, nil
+			}
+			if screenshotOptions.Path != "" {
+				if err := os.WriteFile(screenshotOptions.Path, screenshot.PNGData, 0o644); err != nil {
+					return nil, fmt.Errorf("write screenshot to %q: %w", screenshotOptions.Path, err)
+				}
+			}
+			return screenshot, nil
 		case *enginev1.ContextSessionEvent_Error:
 			return nil, fmt.Errorf("tab session error while capturing screenshot: %s", payload.Error.GetMessage())
 		}

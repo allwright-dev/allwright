@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import threading
+from pathlib import Path
 
 from ._proto import engine_pb2
 from ._transport import RuntimeClient, StreamHandle
-from ._types import AllwrightError, ClickResult, CommandOptions, FillResult, ScreenshotResult
+from ._types import AllwrightError, ClickResult, CommandOptions, FillResult, ScreenshotOptions, ScreenshotResult
 
 
 class MobileAndroidConnectOptions:
@@ -142,18 +143,20 @@ class AndroidApp:
                             f"android app session error while filling: {event.error.message}"
                         )
 
-    def screenshot(self, options: CommandOptions | None = None) -> ScreenshotResult:
+    def screenshot(self, options: ScreenshotOptions | None = None) -> ScreenshotResult:
         from ._runtime import retry_options
 
         with self._lock:
             handle = self._ensure_handle()
             self._ensure_open()
+            command_options = options or ScreenshotOptions()
             handle.send(
                 engine_pb2.ContextSessionCommand(
                     surface_session_id=self._surface_session_id,
                     context_session_id=self._session_id,
                     screenshot=engine_pb2.ScreenshotCommand(
-                        retry_options=retry_options((options or CommandOptions()).timeout_ms),
+                        retry_options=retry_options(command_options.timeout_ms),
+                        full_page=command_options.full_page,
                     ),
                 )
             )
@@ -165,10 +168,13 @@ class AndroidApp:
                         pass
                     case "screenshot_captured":
                         captured = event.screenshot_captured
-                        return ScreenshotResult(
+                        screenshot = ScreenshotResult(
                             png_data=captured.png_data,
                             note=captured.note,
                         )
+                        if command_options.path is not None:
+                            Path(command_options.path).write_bytes(screenshot.png_data)
+                        return screenshot
                     case "closed":
                         self._closed = True
                         raise AllwrightError(

@@ -40,6 +40,10 @@ func optionalUint32(value uint32) *uint32 {
 	return &value
 }
 
+func optionalBool(value bool) *bool {
+	return &value
+}
+
 func optionalString(value string) *string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
@@ -53,6 +57,13 @@ func firstCommandOptions(options []CommandOptions) CommandOptions {
 		return options[0]
 	}
 	return CommandOptions{}
+}
+
+func firstScreenshotOptions(options []ScreenshotOptions) ScreenshotOptions {
+	if len(options) > 0 {
+		return options[0]
+	}
+	return ScreenshotOptions{}
 }
 
 func firstHighlightOptions(options []HighlightOptions) HighlightOptions {

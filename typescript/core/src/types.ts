@@ -89,6 +89,11 @@ export interface ScreenshotResult {
   note: string;
 }
 
+export interface ScreenshotOptions extends CommandOptions {
+  fullPage?: boolean;
+  path?: string;
+}
+
 export interface BrowserInfo {
   sessionId: string;
   browserName: string;
@@ -137,7 +142,7 @@ export interface Page extends PageInfo {
   textContent(selector: string, options?: CommandOptions): Promise<TextResult>;
   innerText(selector: string, options?: CommandOptions): Promise<TextResult>;
   waitForSelector(selector: string, options?: WaitForSelectorOptions): Promise<WaitForSelectorResult>;
-  screenshot(options?: CommandOptions): Promise<ScreenshotResult>;
+  screenshot(options?: ScreenshotOptions): Promise<ScreenshotResult>;
   close(): Promise<void>;
   ping(message?: string): Promise<string>;
   pageInfo(): PageInfo;
@@ -171,7 +176,7 @@ export interface MobileAndroidApp {
   locator(selector: string): MobileAndroidLocator;
   click(selector: string, options?: CommandOptions): Promise<ClickResult>;
   fill(selector: string, value: string, options?: CommandOptions): Promise<FillResult>;
-  screenshot(options?: CommandOptions): Promise<ScreenshotResult>;
+  screenshot(options?: ScreenshotOptions): Promise<ScreenshotResult>;
 }
 
 export interface MobileAndroidDevice {
@@ -651,6 +656,7 @@ export interface ScreenshotRequest {
     retryOptions?: {
       timeoutMs?: number;
     };
+    fullPage?: boolean;
   };
 }
 

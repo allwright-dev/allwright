@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -211,7 +212,7 @@ func (p *AndroidApp) Fill(ctx context.Context, selector string, value string, op
 	}
 }
 
-func (p *AndroidApp) Screenshot(ctx context.Context, options ...CommandOptions) (*ScreenshotResult, error) {
+func (p *AndroidApp) Screenshot(ctx context.Context, options ...ScreenshotOptions) (*ScreenshotResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("android app is nil")
 	}
@@ -222,13 +223,14 @@ func (p *AndroidApp) Screenshot(ctx context.Context, options ...CommandOptions) 
 		return nil, fmt.Errorf("android tab session %s is closed", p.sessionID)
 	}
 
-	commandOptions := firstCommandOptions(options)
+	screenshotOptions := firstScreenshotOptions(options)
 	if err := p.stream.Send(&enginev1.ContextSessionCommand{
 		SurfaceSessionId: p.surfaceSessionID,
 		ContextSessionId: p.sessionID,
 		Command: &enginev1.ContextSessionCommand_Screenshot{
 			Screenshot: &enginev1.ScreenshotCommand{
-				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+				RetryOptions: retryOptionsProto(screenshotOptions.Timeout),
+				FullPage:     optionalBool(screenshotOptions.FullPage),
 			},
 		},
 	}); err != nil {
@@ -245,10 +247,16 @@ func (p *AndroidApp) Screenshot(ctx context.Context, options ...CommandOptions) 
 			p.attached = true
 			_ = payload
 		case *enginev1.ContextSessionEvent_ScreenshotCaptured:
-			return &ScreenshotResult{
+			screenshot := &ScreenshotResult{
 				PNGData: payload.ScreenshotCaptured.GetPngData(),
 				Note:    payload.ScreenshotCaptured.GetNote(),
-			}, nil
+			}
+			if screenshotOptions.Path != "" {
+				if err := os.WriteFile(screenshotOptions.Path, screenshot.PNGData, 0o644); err != nil {
+					return nil, fmt.Errorf("write screenshot to %q: %w", screenshotOptions.Path, err)
+				}
+			}
+			return screenshot, nil
 		case *enginev1.ContextSessionEvent_Closed:
 			p.closed = true
 			return nil, fmt.Errorf("android app session %s closed while capturing screenshot", p.sessionID)

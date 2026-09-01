@@ -1512,6 +1512,7 @@ func (x *WaitForSelectorCommand) GetRetryOptions() *CommandRetryOptions {
 type ScreenshotCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,1,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	FullPage      *bool                  `protobuf:"varint,2,opt,name=full_page,json=fullPage,proto3,oneof" json:"full_page,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1551,6 +1552,13 @@ func (x *ScreenshotCommand) GetRetryOptions() *CommandRetryOptions {
 		return x.RetryOptions
 	}
 	return nil
+}
+
+func (x *ScreenshotCommand) GetFullPage() bool {
+	if x != nil && x.FullPage != nil {
+		return *x.FullPage
+	}
+	return false
 }
 
 type PageNavigatedEvent struct {
@@ -2429,10 +2437,13 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\rretry_options\x18\x03 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x01R\fretryOptions\x88\x01\x01B\n" +
 	"\n" +
 	"\b_visibleB\x10\n" +
-	"\x0e_retry_options\"y\n" +
+	"\x0e_retry_options\"\xa9\x01\n" +
 	"\x11ScreenshotCommand\x12R\n" +
-	"\rretry_options\x18\x01 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
-	"\x0e_retry_options\":\n" +
+	"\rretry_options\x18\x01 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01\x12 \n" +
+	"\tfull_page\x18\x02 \x01(\bH\x01R\bfullPage\x88\x01\x01B\x10\n" +
+	"\x0e_retry_optionsB\f\n" +
+	"\n" +
+	"_full_page\":\n" +
 	"\x12PageNavigatedEvent\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x12\n" +
 	"\x04note\x18\x02 \x01(\tR\x04note\"\xd7\x01\n" +

@@ -511,6 +511,8 @@ pub struct WaitForSelectorCommand {
 pub struct ScreenshotCommand {
     #[prost(message, optional, tag = "1")]
     pub retry_options: ::core::option::Option<CommandRetryOptions>,
+    #[prost(bool, optional, tag = "2")]
+    pub full_page: ::core::option::Option<bool>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PageNavigatedEvent {

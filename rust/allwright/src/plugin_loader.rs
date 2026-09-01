@@ -198,11 +198,13 @@ pub async fn screenshot_mobile(
     surface_session: &MobileBrowserSessionHandle,
     page_session: &MobilePageSessionHandle,
     timeout_ms: Option<u32>,
+    full_page: bool,
 ) -> Result<MobileScreenshotInfo, String> {
     match invoke_mobile_expected(MobileCommand::Screenshot {
         browser_session: surface_session.clone(),
         page_session: page_session.clone(),
         timeout_ms,
+        full_page,
     })
     .await?
     {
@@ -508,12 +510,14 @@ pub async fn wait_for_selector(
 pub async fn screenshot_page(
     surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
+    full_page: bool,
 ) -> Result<ScreenshotInfo, String> {
     match invoke_web_expected(
         "ScreenshotCommand",
         PluginCommand::Screenshot {
             browser_session: surface_session.clone(),
             page_session: page_session.clone(),
+            full_page,
         },
     )
     .await?

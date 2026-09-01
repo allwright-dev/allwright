@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+from pathlib import Path
 from typing import Any
 
 from ._locator import Locator
@@ -19,6 +20,7 @@ from ._types import (
     NavigateResult,
     PressOptions,
     PressResult,
+    ScreenshotOptions,
     ScreenshotResult,
     TextResult,
     WaitForSelectorOptions,
@@ -390,19 +392,20 @@ class Page:
                             f"page session error while waiting for selector: {event.error.message}"
                         )
 
-    def screenshot(self, options: CommandOptions | None = None) -> ScreenshotResult:
+    def screenshot(self, options: ScreenshotOptions | None = None) -> ScreenshotResult:
         from ._runtime import retry_options
 
         with self._lock:
             handle = self._ensure_handle()
             self._ensure_open()
-            command_options = options or CommandOptions()
+            command_options = options or ScreenshotOptions()
             handle.send(
                 engine_pb2.ContextSessionCommand(
                     surface_session_id=self.surface_session_id,
                     context_session_id=self.session_id,
                     screenshot=engine_pb2.ScreenshotCommand(
                         retry_options=retry_options(command_options.timeout_ms),
+                        full_page=command_options.full_page,
                     ),
                 )
             )
@@ -412,10 +415,13 @@ class Page:
                 match event.WhichOneof("event"):
                     case "screenshot_captured":
                         captured = event.screenshot_captured
-                        return ScreenshotResult(
+                        screenshot = ScreenshotResult(
                             png_data=captured.png_data,
                             note=captured.note,
                         )
+                        if command_options.path is not None:
+                            Path(command_options.path).write_bytes(screenshot.png_data)
+                        return screenshot
                     case "closed":
                         self._closed = True
                         raise AllwrightError(

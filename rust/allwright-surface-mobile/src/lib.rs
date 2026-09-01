@@ -293,6 +293,7 @@ pub enum MobileCommand {
         browser_session: MobileBrowserSessionHandle,
         page_session: MobilePageSessionHandle,
         timeout_ms: Option<u32>,
+        full_page: bool,
     },
 }
 

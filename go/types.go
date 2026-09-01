@@ -112,6 +112,12 @@ type CommandOptions struct {
 	Timeout time.Duration
 }
 
+type ScreenshotOptions struct {
+	Timeout  time.Duration
+	FullPage bool
+	Path     string
+}
+
 type NavigateResult struct {
 	URL             string
 	Note            string

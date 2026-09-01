@@ -9,8 +9,8 @@ use super::command::{command_retry_options, count_result_from_event, highlight_r
 use super::selectors::normalize_selector_for_transport;
 use super::tab::ensure_tab_open;
 use super::types::{
-    CommandOptions, Error, HighlightOptions, HighlightResult, Result, ScreenshotResult, Tab,
-    TextResult, WaitForSelectorOptions, WaitForSelectorResult,
+    CommandOptions, Error, HighlightOptions, HighlightResult, Result, ScreenshotOptions,
+    ScreenshotResult, Tab, TextResult, WaitForSelectorOptions, WaitForSelectorResult,
 };
 
 impl Tab {
@@ -233,13 +233,13 @@ impl Tab {
     }
 
     pub async fn screenshot(&self) -> Result<ScreenshotResult> {
-        self.screenshot_with_options(CommandOptions::default())
+        self.screenshot_with_options(ScreenshotOptions::default())
             .await
     }
 
     pub async fn screenshot_with_options(
         &self,
-        options: CommandOptions,
+        options: ScreenshotOptions,
     ) -> Result<ScreenshotResult> {
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -251,6 +251,7 @@ impl Tab {
                 context_session_id: self.inner.session_id.clone(),
                 command: Some(ContextCommand::Screenshot(ScreenshotCommand {
                     retry_options: command_retry_options(options.timeout_ms),
+                    full_page: Some(options.full_page),
                 })),
             })
             .await
@@ -264,10 +265,16 @@ impl Tab {
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
                 Some(ContextEvent::ScreenshotCaptured(screenshot)) => {
-                    return Ok(ScreenshotResult {
+                    let result = ScreenshotResult {
                         png_data: screenshot.png_data,
                         note: screenshot.note,
-                    });
+                    };
+                    if let Some(path) = options.path.as_ref() {
+                        std::fs::write(path, &result.png_data).map_err(|error| {
+                            Error::new(format!("write screenshot to {}: {error}", path.display()))
+                        })?;
+                    }
+                    return Ok(result);
                 }
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(

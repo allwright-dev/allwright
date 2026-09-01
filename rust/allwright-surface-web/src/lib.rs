@@ -1480,11 +1480,16 @@ pub async fn wait_for_selector(
 pub async fn screenshot_via_cdp(
     cdp_websocket_url: &str,
     target_id: &str,
+    full_page: bool,
 ) -> Result<ScreenshotInfo, String> {
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
     let session_id = cdp.prepare_page_target_session(target_id).await?;
     let response = cdp
-        .send_command("Page.captureScreenshot", json!({}), Some(&session_id))
+        .send_command(
+            "Page.captureScreenshot",
+            json!({ "captureBeyondViewport": full_page }),
+            Some(&session_id),
+        )
         .await?;
     cdp.detach_from_target(&session_id).await?;
 
@@ -1497,12 +1502,13 @@ pub async fn screenshot_via_cdp(
 pub async fn screenshot(
     browser_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
+    full_page: bool,
 ) -> Result<ScreenshotInfo, String> {
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
             PageSessionHandle::Chromium { target_id, .. },
-        ) => screenshot_via_cdp(cdp_websocket_url, target_id).await,
+        ) => screenshot_via_cdp(cdp_websocket_url, target_id, full_page).await,
         (
             BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
@@ -1519,6 +1525,7 @@ pub async fn screenshot(
                     "browsingContext.captureScreenshot",
                     json!({
                         "context": browsing_context_id,
+                        "origin": if full_page { "document" } else { "viewport" },
                     }),
                 )
                 .await?;
@@ -1528,7 +1535,11 @@ pub async fn screenshot(
                     "/result/data",
                     "Firefox screenshot data",
                 )?,
-                note: "captured Firefox screenshot via native WebDriver BiDi".to_string(),
+                note: if full_page {
+                    "captured full-page Firefox screenshot via native WebDriver BiDi".to_string()
+                } else {
+                    "captured Firefox screenshot via native WebDriver BiDi".to_string()
+                },
             })
         }
         _ => Err("browser/page backend mismatch while capturing screenshot".to_string()),
@@ -3706,8 +3717,9 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
         PluginCommand::Screenshot {
             browser_session,
             page_session,
+            full_page,
         } => block_on_plugin_future(async move {
-            screenshot(&browser_session, &page_session)
+            screenshot(&browser_session, &page_session, full_page)
                 .await
                 .map(PluginResult::Screenshot)
         }),
@@ -3880,7 +3892,7 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             cdp_websocket_url,
             target_id,
         } => block_on_plugin_future(async move {
-            let result = screenshot_via_cdp(&cdp_websocket_url, &target_id).await?;
+            let result = screenshot_via_cdp(&cdp_websocket_url, &target_id, false).await?;
             Ok(PluginResult::ScreenshotViaCdp(result))
         }),
     }

@@ -1,4 +1,5 @@
 import { createBrowserSessionHandle, createPageHandle, getRuntime } from "./runtime.js";
+import { writeFile } from "node:fs/promises";
 import { chainMobileSelectorForTransport, normalizeMobileSelectorForTransport } from "./mobileSelectors.js";
 import type {
   SurfaceSessionEvent,
@@ -15,6 +16,7 @@ import type {
   MobileSurfaceNamespace,
   PageHandle,
   RuntimeClient,
+  ScreenshotOptions,
   ScreenshotResult,
 } from "./types.js";
 
@@ -99,7 +101,7 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     }
   }
 
-  async screenshot(options: CommandOptions = {}): Promise<ScreenshotResult> {
+  async screenshot(options: ScreenshotOptions = {}): Promise<ScreenshotResult> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -107,16 +109,21 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
       contextSessionId: this.sessionId,
       screenshot: {
         retryOptions: retryOptions(options.timeoutMs),
+        fullPage: options.fullPage,
       },
     });
 
     while (true) {
       const event = await handle.queue.next();
       if (event.screenshotCaptured?.pngData) {
-        return {
+        const screenshot = {
           pngData: event.screenshotCaptured.pngData,
           note: event.screenshotCaptured.note ?? "",
         };
+        if (options.path) {
+          await writeFile(options.path, screenshot.pngData);
+        }
+        return screenshot;
       }
       if (event.error?.message) {
         throw new Error(event.error.message);

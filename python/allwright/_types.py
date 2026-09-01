@@ -59,6 +59,12 @@ class CommandOptions:
 
 
 @dataclass(slots=True)
+class ScreenshotOptions(CommandOptions):
+    full_page: bool = False
+    path: str | Path | None = None
+
+
+@dataclass(slots=True)
 class HighlightOptions:
     timeout_ms: int | None = None
     duration_ms: int | None = None

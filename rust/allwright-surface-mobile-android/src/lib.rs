@@ -540,8 +540,14 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             browser_session,
             page_session,
             timeout_ms,
-        } => screenshot(&browser_session, &page_session, timeout_ms)
-            .map(MobileCommandResult::Screenshot),
+            full_page,
+        } => {
+            if full_page {
+                return Err("full-page screenshots are not supported on Android".to_string());
+            }
+            screenshot(&browser_session, &page_session, timeout_ms)
+                .map(MobileCommandResult::Screenshot)
+        }
     }
 }
 

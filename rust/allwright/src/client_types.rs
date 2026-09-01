@@ -202,6 +202,13 @@ pub struct CommandOptions {
     pub timeout_ms: Option<u32>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct ScreenshotOptions {
+    pub timeout_ms: Option<u32>,
+    pub full_page: bool,
+    pub path: Option<PathBuf>,
+}
+
 #[derive(Debug, Clone)]
 pub struct NavigateResult {
     pub url: String,
