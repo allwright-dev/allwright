@@ -306,7 +306,7 @@ function RoadmapHero({ variant }: { variant?: HeroVariant }) {
   return (
     <HeroFrame
       variant={variant}
-      label="A release timeline: v0.0.7 at the start, a solid line traveled to today's v0.0.57 milestone marked 'you are here', then a dashed line ahead to v0.1.0 marked 'coming soon'. Two small chips labelled Web and Android hang off today's milestone, showing the small set of tangible features already real today."
+      label="A release timeline: v0.0.7 at the start, a solid line traveled to today's v0.0.58 milestone marked 'you are here', then a dashed line ahead to v0.1.0 marked 'coming soon'. Two small chips labelled Web and Android hang off today's milestone, showing the small set of tangible features already real today."
     >
       <defs>
         <ArrowMarker id="hero-roadmap-arrow" />
@@ -336,7 +336,7 @@ function RoadmapHero({ variant }: { variant?: HeroVariant }) {
       {/* Today */}
       <circle cx={600} cy={210} r={30} fill="var(--accent-soft)" stroke="var(--accent-2)" strokeWidth="2" />
       <text x={600} y={204} textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--accent-2)">
-        v0.0.57
+        v0.0.58
       </text>
       <text x={600} y={224} textAnchor="middle" fontSize="11.5" fill="var(--accent-2)">
         you are here

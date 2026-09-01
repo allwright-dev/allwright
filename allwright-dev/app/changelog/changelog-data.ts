@@ -15,7 +15,7 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "v0.0.57",
+    version: "v0.0.57 – v0.0.58",
     date: "2026-09-01",
     title: "Android automation reaches parity with web",
     highlights: [
