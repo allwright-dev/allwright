@@ -1,6 +1,6 @@
 {
   "name": "@allwright.dev/vitest",
-  "version": "0.0.55",
+  "version": "0.0.57",
   "description": "Vitest fixtures for the allwright TypeScript client.",
   "license": "MIT",
   "type": "module",
@@ -47,7 +47,7 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@allwright.dev/core": "0.0.55"
+    "@allwright.dev/core": "0.0.57"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

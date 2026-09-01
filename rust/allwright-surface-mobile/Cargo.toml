@@ -11,7 +11,7 @@ keywords = ["automation", "mobile", "plugin"]
 categories = ["development-tools::testing", "api-bindings"]
 
 [dependencies]
-allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.56" }
+allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.0.57" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
