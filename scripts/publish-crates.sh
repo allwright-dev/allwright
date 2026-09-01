@@ -7,6 +7,7 @@ set -euo pipefail
 
 web_crates=(
   allwright-plugin-sdk
+  allwright-surface-mobile
   allwright-core
   allwright-surface-web
   allwright
@@ -38,6 +39,7 @@ publish_interval_seconds="${PUBLISH_INTERVAL_SECONDS:-20}"
 allow_experimental_surfaces="${ALLOW_EXPERIMENTAL_SURFACES:-0}"
 allow_dirty="${CARGO_PUBLISH_ALLOW_DIRTY:-0}"
 dependency_retry_seconds="${DEPENDENCY_RETRY_SECONDS:-20}"
+max_dependency_retry_attempts="${MAX_DEPENDENCY_RETRY_ATTEMPTS:-15}"
 
 if [[ "$mode" != "publish" && "$mode" != "dry-run" ]]; then
   echo "usage: $0 [publish|dry-run] [web|mobile-android|full]" >&2
@@ -124,6 +126,7 @@ sleep_until_retry_window() {
 publish_one() {
   local crate="$1"
   local tmp
+  local dependency_retry_attempts=0
   tmp="$(mktemp)"
 
   while true; do
@@ -145,6 +148,12 @@ publish_one() {
     fi
 
     if grep -q "failed to select a version for the requirement" "$tmp"; then
+      dependency_retry_attempts=$((dependency_retry_attempts + 1))
+      if (( dependency_retry_attempts > max_dependency_retry_attempts )); then
+        echo "dependency version was still unavailable after ${max_dependency_retry_attempts} retries; check the publish order and crates.io package visibility" >&2
+        rm -f "$tmp"
+        return 1
+      fi
       echo "dependency version is not visible on crates.io yet; retrying in ${dependency_retry_seconds}s" >&2
       sleep "$dependency_retry_seconds"
       continue
@@ -161,9 +170,10 @@ echo "publish mode: ${mode}"
 echo "publish interval: ${publish_interval_seconds}s"
 echo "allow dirty working tree: ${allow_dirty}"
 echo "dependency retry interval: ${dependency_retry_seconds}s"
+echo "maximum dependency visibility retries: ${max_dependency_retry_attempts}"
 
 if [[ "$profile" == "web" ]]; then
-  echo "this publishes Rust crates for the lightweight core + CLI + web plugin path."
+  echo "this publishes the shared mobile dependency before the lightweight core + CLI + web plugin path."
   echo "release archives for end users still come from GitHub Releases."
 elif [[ "$profile" == "mobile-android" ]]; then
   echo "this publishes the shared mobile crate plus the Android plugin crate to crates.io."

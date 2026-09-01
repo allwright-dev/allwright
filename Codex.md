@@ -93,7 +93,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - Go by creating a secondary `go/vX.Y.Z` tag from the root release tag and warming the Go proxy
 - Python by syncing `python/` to the release version, building from `python/`, and using PyPI trusted publishing with the GitHub `pypi` environment
 - npm by syncing the workspace package versions, running the root workspace build, and publishing `@allwright.dev/core` plus `@allwright.dev/vitest` through npm trusted publishing with the GitHub `Prod` environment
-- Rust crates by syncing workspace Cargo versions and running `scripts/publish-crates.sh publish web` with `CARGO_REGISTRY_TOKEN`; the workflow currently sets `CARGO_PUBLISH_ALLOW_DIRTY=1` because version sync edits manifests during the job
+- Rust crates by syncing workspace Cargo versions and running `scripts/publish-crates.sh publish web` with `CARGO_REGISTRY_TOKEN`; the web profile publishes `allwright-plugin-sdk`, then `allwright-surface-mobile`, before `allwright-core` because core depends on the shared mobile crate. The workflow currently sets `CARGO_PUBLISH_ALLOW_DIRTY=1` because version sync edits manifests during the job
 - The release tag is the source of truth for release versioning; committed Cargo manifest versions may be rewritten during release automation.
 - Unix and Windows installer scripts should prefer common human-owned install directories first and should avoid tool-managed bins such as `pnpm`, `npm`, `yarn`, `cargo`, `volta`, `bun`, and similar package-manager-owned paths.
 - Installer examples in docs should default to direct GitHub script execution (`curl`, `wget`, or PowerShell `irm`) rather than assuming the repo has already been cloned.

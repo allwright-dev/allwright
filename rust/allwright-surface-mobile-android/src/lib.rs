@@ -1580,6 +1580,17 @@ fn matching_nodes_by_selector<'a>(
     Ok(matches)
 }
 
+#[cfg(test)]
+fn find_node_by_selector<'a>(
+    nodes: &'a [AndroidUiNode],
+    selector: &str,
+) -> Result<&'a AndroidUiNode, String> {
+    matching_nodes_by_selector(nodes, selector)?
+        .into_iter()
+        .next()
+        .ok_or_else(|| format!("no Android element matched selector {selector:?}"))
+}
+
 fn node_is_visible(node: &AndroidUiNode) -> bool {
     if node.enabled == Some(false) {
         return false;
