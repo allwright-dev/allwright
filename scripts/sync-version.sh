@@ -41,7 +41,9 @@ version_source_files = [
 ]
 
 workspace_pattern = re.compile(r'(?m)^version = "[^"]+"$')
-dependency_pattern = re.compile(r'version = "\d+\.\d+\.\d+"')
+internal_dependency_pattern = re.compile(
+    r'(?m)^(?P<prefix>\s*allwright(?:-[A-Za-z0-9-]+)?\s*=\s*\{[^\n]*\bversion\s*=\s*")[^"]+(?P<suffix>")'
+)
 java_version_pattern = re.compile(r'\.orElse\("\d+\.\d+\.\d+"\)')
 release_version_pattern = re.compile(r'(?m)^(?P<prefix>\s*(?:private\s+static\s+final\s+String|const|DEFAULT_RELEASE_VERSION)\s+\w*\s*=?\s*"?DEFAULT_RELEASE_VERSION"?\s*(?:=|:)\s*"?)\d+\.\d+\.\d+(?P<suffix>"[;]?)$')
 
@@ -67,7 +69,7 @@ for path in cargo_files:
         if count != 1:
             raise SystemExit(f"failed to update workspace version in {path}")
     else:
-        text = dependency_pattern.sub(f'version = "{version}"', text)
+        text = internal_dependency_pattern.sub(rf'\g<prefix>{version}\g<suffix>', text)
     path.write_text(text)
 
 java_text = java_build_file.read_text()
