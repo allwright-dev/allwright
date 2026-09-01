@@ -28,7 +28,7 @@ export function PostSocialCard({
         fontFamily: "sans-serif",
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", flex: "1 1 auto", maxWidth: diagram ? 650 : undefined }}>
+      <div style={{ display: "flex", flexDirection: "column", flex: "1 1 auto", ...(diagram ? { maxWidth: 650 } : {}) }}>
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <LogoMark size={52} />
           <span

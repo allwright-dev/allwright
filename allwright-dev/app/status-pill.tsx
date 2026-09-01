@@ -2,7 +2,7 @@
 // same way, whether it's a surface plugin's install status or a client
 // library's publish status.
 
-const READY_STATUSES = new Set(["Available now", "Published"]);
+const READY_STATUSES = new Set(["Available now", "Android available", "Published"]);
 
 export function StatusPill({ status }: { status: string }) {
   const ready = READY_STATUSES.has(status);

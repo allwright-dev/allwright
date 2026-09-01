@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/how-it-works", label: "How it works" },
   { href: "/availability", label: "Availability" },
+  { href: "/changelog", label: "Changelog" },
   { href: "/blog", label: "Blog" },
 ];
 
@@ -18,8 +19,8 @@ export function SiteHeader() {
   const pathname = usePathname();
 
   return (
-    <header className="relative mx-auto flex w-full max-w-6xl flex-col items-center gap-4 px-4 py-6 sm:flex-row sm:justify-between sm:px-6 sm:py-8">
-      <Link href="/" className="flex items-center gap-2.5">
+    <header className="relative mx-auto flex w-full max-w-6xl flex-col items-center gap-4 px-4 py-6 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:px-6 sm:py-8">
+      <Link href="/" className="flex items-center gap-2.5 sm:justify-self-start">
         <Image src="/logo.svg" alt="" width={28} height={28} priority className="rounded-[8px]" />
         <span className="font-mono text-[0.95rem] font-medium tracking-[-0.02em] text-[var(--ink)]">
           allwright
@@ -28,7 +29,7 @@ export function SiteHeader() {
 
       <nav
         aria-label="Primary"
-        className="flex items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--card)] p-1 backdrop-blur-xl"
+        className="flex items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--card)] p-1 backdrop-blur-xl sm:justify-self-center"
       >
         {NAV_LINKS.map((link) => {
           const active = pathname === link.href;
@@ -49,7 +50,7 @@ export function SiteHeader() {
         })}
       </nav>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 sm:justify-self-end">
         <a
           href={GITHUB_URL}
           target="_blank"

@@ -296,6 +296,82 @@ function AndroidHero({ variant }: { variant?: HeroVariant }) {
   );
 }
 
+// A release-timeline hero instead of the usual client/core/surface diagram:
+// the traveled road from day one to today is a solid line, today's "you are
+// here" milestone is the filled node, and the road ahead to v0.1.0 is
+// dashed — still coming, not yet arrived. The two chips hanging off today's
+// node are the small, real, tangible feature set the post is actually
+// about, not a promise about what v0.1.0 itself will contain.
+function RoadmapHero({ variant }: { variant?: HeroVariant }) {
+  return (
+    <HeroFrame
+      variant={variant}
+      label="A release timeline: v0.0.7 at the start, a solid line traveled to today's v0.0.57 milestone marked 'you are here', then a dashed line ahead to v0.1.0 marked 'coming soon'. Two small chips labelled Web and Android hang off today's milestone, showing the small set of tangible features already real today."
+    >
+      <defs>
+        <ArrowMarker id="hero-roadmap-arrow" />
+      </defs>
+
+      <line x1={130} y1={210} x2={600} y2={210} stroke="currentColor" strokeWidth="2" />
+      <line
+        x1={600}
+        y1={210}
+        x2={1050}
+        y2={210}
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeDasharray="6 6"
+        markerEnd="url(#hero-roadmap-arrow)"
+      />
+
+      {/* Day one */}
+      <circle cx={130} cy={210} r={10} fill="var(--card)" stroke="currentColor" strokeWidth="1.6" />
+      <text x={130} y={172} textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--ink)">
+        v0.0.7
+      </text>
+      <text x={130} y={252} textAnchor="middle" fontSize="12" fill="var(--muted)">
+        Day one
+      </text>
+
+      {/* Today */}
+      <circle cx={600} cy={210} r={30} fill="var(--accent-soft)" stroke="var(--accent-2)" strokeWidth="2" />
+      <text x={600} y={204} textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--accent-2)">
+        v0.0.57
+      </text>
+      <text x={600} y={224} textAnchor="middle" fontSize="11.5" fill="var(--accent-2)">
+        you are here
+      </text>
+
+      {/* Two tangible-today chips hanging off "today" */}
+      <line x1={560} y1={236} x2={470} y2={310} stroke="currentColor" strokeWidth="1.2" opacity="0.6" />
+      <line x1={640} y1={236} x2={730} y2={310} stroke="currentColor" strokeWidth="1.2" opacity="0.6" />
+      <rect x={390} y={310} width={160} height={56} rx={14} fill="var(--card)" stroke="var(--accent)" strokeWidth="1.4" />
+      <text x={470} y={334} textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--ink)">
+        Web
+      </text>
+      <text x={470} y={352} textAnchor="middle" fontSize="10.5" fill="var(--accent)">
+        ● real today
+      </text>
+      <rect x={650} y={310} width={160} height={56} rx={14} fill="var(--card)" stroke="var(--accent)" strokeWidth="1.4" />
+      <text x={730} y={334} textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--ink)">
+        Android
+      </text>
+      <text x={730} y={352} textAnchor="middle" fontSize="10.5" fill="var(--accent)">
+        ● real today
+      </text>
+
+      {/* Coming soon */}
+      <circle cx={1050} cy={210} r={22} fill="var(--card)" stroke="currentColor" strokeWidth="1.6" strokeDasharray="4 3" />
+      <text x={1050} y={160} textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--ink)">
+        v0.1.0
+      </text>
+      <text x={1050} y={180} textAnchor="middle" fontSize="12" fill="var(--muted)">
+        coming soon
+      </text>
+    </HeroFrame>
+  );
+}
+
 function DefaultHero({ variant }: { variant?: HeroVariant }) {
   return (
     <HeroFrame variant={variant} label="The allwright logo mark on a gradient card">
@@ -321,6 +397,7 @@ const heroRegistry: Record<string, (props: { variant?: HeroVariant }) => React.R
   "get-started-with-typescript": TypeScriptHero,
   "why-allwright-if-playwright-exists": EngineHero,
   "android-testing-playwright-style": AndroidHero,
+  "road-to-v0-1-0": RoadmapHero,
 };
 
 export function HeroImage({ slug, variant }: { slug: string; variant?: HeroVariant }) {

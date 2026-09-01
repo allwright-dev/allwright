@@ -18,8 +18,8 @@ const surfaces = [
   },
   {
     label: "Mobile",
-    description: "The same test logic driving native and hybrid apps on real devices.",
-    status: "Not yet available",
+    description: "Android is real today over adb — tap, fill, and read a live app. iOS isn't wired up yet.",
+    status: "Android available",
     position: { left: "94%", top: "10%" },
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -170,7 +170,7 @@ export default function Home() {
                 y2={surface.position.top}
                 stroke="currentColor"
                 strokeWidth="0.5"
-                strokeDasharray={surface.status === "Available now" ? undefined : "2 2"}
+                strokeDasharray={surface.status !== "Not yet available" ? undefined : "2 2"}
                 markerEnd="url(#hero-arrow)"
               />
             ))}
@@ -191,7 +191,7 @@ export default function Home() {
             >
               <span
                 className={`flex h-12 w-12 items-center justify-center rounded-full border bg-[var(--card)] text-[var(--accent-2)] shadow-sm backdrop-blur-xl ${
-                  surface.status === "Available now" ? "border-[var(--line)]" : "border-dashed border-[var(--line)]"
+                  surface.status !== "Not yet available" ? "border-[var(--line)]" : "border-dashed border-[var(--line)]"
                 }`}
               >
                 {surface.icon}

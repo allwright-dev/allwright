@@ -6,6 +6,7 @@ import { PostSocialCard } from "../social-card";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+export const alt = "allwright blog post social preview card";
 
 export function generateStaticParams() {
   return getAllPosts().map((post) => ({ slug: post.slug }));

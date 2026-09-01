@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { languages, surfaceStatus } from "../availability-data";
-import { GITHUB_URL } from "../brand";
+import { GITHUB_URL, SITE_NAME } from "../brand";
 import { StatusPill } from "../status-pill";
 
 const description =
-  "The honest, current picture of allwright: what web automation can do today, what mobile, desktop, and API testing still need, and which client languages are published versus build-from-source.";
+  "The honest, current picture of allwright: what web and Android automation can do today, what iOS, desktop, and API testing still need, and which client languages are published versus build-from-source.";
 
 export const metadata: Metadata = {
   title: "Availability",
@@ -15,6 +15,8 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: "/availability",
+    siteName: SITE_NAME,
+    locale: "en_US",
     title: "Availability: what's real today, what isn't yet",
     description,
   },
@@ -54,7 +56,34 @@ const webNotYetAvailable = [
   "Safari / WebKit (Chromium and Firefox only today)",
 ];
 
-const otherSurfaces = surfaceStatus.filter((surface) => surface.label !== "Web");
+const androidAvailable = [
+  "Connect to a running emulator or a real device over adb — no separate driver server to run",
+  "Install and launch a real app from a local APK or a URL",
+  "Click an element",
+  "Type into a field",
+  "Focus an element",
+  "Press a key",
+  "Read visible or raw text from an element",
+  "Wait for an element to appear",
+  "Count matching elements",
+  "Capture screenshots, including a full-page scroll-and-stitch capture",
+  "Text, partial-text, resource id, class name, XPath, and state-based (e.g. clickable) selectors",
+];
+
+const androidNotYetAvailable = [
+  "Hover and highlight (web-only for now)",
+  "iOS (Android is the only mobile platform today)",
+  "Broader session and state management as the surface matures",
+];
+
+// Mobile only gets one card in the shared `surfaceStatus` list (used by the
+// home page and how-it-works diagrams), but Android and iOS are at very
+// different points, so this page splits Mobile into its own explicit iOS
+// entry alongside the shared Desktop and API entries.
+const plannedSurfaces = [
+  { label: "Mobile — iOS", detail: "Native and hybrid iOS apps.", status: "Not yet available" as const },
+  ...surfaceStatus.filter((surface) => surface.label === "Desktop" || surface.label === "API"),
+];
 
 export default function Availability() {
   return (
@@ -70,11 +99,12 @@ export default function Availability() {
           allwright is being built in public, and &ldquo;available&rdquo;
           should mean something specific: real and working, not finished.
           Web automation runs today against real Chromium and Firefox
-          browsers, but only through a small, minimal set of actions —
-          nowhere near full web test coverage yet. This page is the
-          detailed, continuously updated picture behind the status pills you
-          see elsewhere on the site — surface by surface, capability by
-          capability, and language by language.
+          browsers, and Android automation runs today over adb — both
+          through a small, minimal set of actions, nowhere near full test
+          coverage yet. This page is the detailed, continuously updated
+          picture behind the status pills you see elsewhere on the site —
+          surface by surface, capability by capability, and language by
+          language.
         </p>
       </section>
 
@@ -84,10 +114,10 @@ export default function Availability() {
             Surfaces
           </h2>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
-            Web is the only surface with a real, installable plugin today.
-            The rest have a reserved place in the plugin catalog but no
-            runtime build yet — installing them isn&apos;t possible until
-            that changes.
+            Web and Mobile (Android) are the only surfaces with a real,
+            installable plugin today. The rest have a reserved place in the
+            plugin catalog but no runtime build yet — installing them
+            isn&apos;t possible until that changes.
           </p>
         </div>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -163,10 +193,66 @@ export default function Availability() {
         </p>
       </section>
 
+      <section aria-label="android capabilities" className="mx-auto mt-14 w-full sm:mt-16">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
+            Mobile — Android, capability by capability
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
+            &ldquo;Available now&rdquo; means the mobile-android plugin is
+            real, installable, and drives a genuine app over adb — no Appium,
+            no separate driver server. It&apos;s an even smaller, newer
+            action set than web today, so plan early Android tests around
+            actions more than deep assertions.
+          </p>
+        </div>
+        <div className="mt-8 grid gap-6 sm:grid-cols-2">
+          <div className="rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl sm:p-8">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
+              <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--ink)]">
+                Available now
+              </h3>
+            </div>
+            <ul className="mt-5 space-y-3">
+              {androidAvailable.map((item) => (
+                <li key={item} className="flex gap-2.5 text-sm leading-6 text-[var(--muted)]">
+                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" aria-hidden="true" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-[2rem] border border-dashed border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl sm:p-8">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full border border-dashed border-[var(--muted)]" />
+              <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--ink)]">
+                Not yet available
+              </h3>
+            </div>
+            <ul className="mt-5 space-y-3">
+              {androidNotYetAvailable.map((item) => (
+                <li key={item} className="flex gap-2.5 text-sm leading-6 text-[var(--muted)]">
+                  <span
+                    className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full border border-dashed border-[var(--muted)]"
+                    aria-hidden="true"
+                  />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <p className="mx-auto mt-6 max-w-[56ch] text-center text-sm leading-6 text-[var(--muted)]">
+          Every client language exposes this same Android capability set —
+          same as web, nothing here is language-exclusive.
+        </p>
+      </section>
+
       <section aria-label="planned surfaces" className="mx-auto mt-14 w-full sm:mt-16">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
-            Mobile, desktop, and API
+            iOS, desktop, and API
           </h2>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
             These have a reserved slot in the plugin catalog and are part of
@@ -175,7 +261,7 @@ export default function Availability() {
           </p>
         </div>
         <div className="mt-8 grid gap-4 sm:grid-cols-3">
-          {otherSurfaces.map((surface) => (
+          {plannedSurfaces.map((surface) => (
             <div
               key={surface.label}
               className="rounded-[1.5rem] border border-dashed border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl"

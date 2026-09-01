@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { compileMDX } from "next-mdx-remote/rsc";
 
-import { GITHUB_URL, SITE_URL } from "../../brand";
+import { GITHUB_URL, SITE_NAME, SITE_URL } from "../../brand";
 import { formatPostDate, getAllPosts, getPostBySlug } from "../blog-data";
 import { HeroImage } from "../hero-image";
 import { blogMdxComponents } from "../mdx-components";
@@ -33,6 +33,8 @@ export async function generateMetadata({
     openGraph: {
       type: "article",
       url,
+      siteName: SITE_NAME,
+      locale: "en_US",
       title,
       description,
       publishedTime: date,

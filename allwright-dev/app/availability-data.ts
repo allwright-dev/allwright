@@ -44,7 +44,11 @@ export const surfaceStatus = [
     detail: "Chromium and Firefox both work, but only a small core action set — not yet full web test coverage.",
     status: "Available now" as const,
   },
-  { label: "Mobile", detail: "Android & iOS, native and hybrid apps.", status: "Not yet available" as const },
+  {
+    label: "Mobile",
+    detail: "Android runs today over adb — tap, fill, read, and screenshot a real app. iOS isn't wired up yet.",
+    status: "Android available" as const,
+  },
   { label: "Desktop", detail: "macOS, Windows, and Linux applications.", status: "Not yet available" as const },
   { label: "API", detail: "Backend checks in the same test run.", status: "Not yet available" as const },
 ];

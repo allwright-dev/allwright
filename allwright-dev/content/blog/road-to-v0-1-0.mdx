@@ -1,0 +1,77 @@
+---
+title: "On the road to allwright v0.1.0"
+description: "allwright's next release is its first minor version, v0.1.0 — and it's coming soon. Here's the small, tangible set of features that already work today, plus a new Changelog page tracking everything on the way there."
+date: "2026-09-01"
+author: "The allwright team"
+published: true
+tags: ["roadmap", "changelog", "release notes", "android", "web testing"]
+keywords:
+  [
+    "allwright roadmap",
+    "allwright v0.1.0",
+    "allwright changelog",
+    "allwright release notes",
+    "android web test automation",
+    "test automation engine updates",
+  ]
+---
+
+allwright has cut close to sixty small `0.0.x` releases so far — most of them
+packaging fixes and internal hardening nobody needed to read about. That
+pace is deliberate: build in public, ship the moment something real works,
+don't wait for a big-bang launch. But it also means the version number has
+never really meant anything on its own.
+
+That changes soon. **v0.1.0 — allwright's first minor version — is coming
+next**, and we wanted to be upfront about where things actually stand on the
+way there, instead of letting the number speak for itself.
+
+## What's tangible today
+
+v0.1.0 isn't shipping a pile of brand-new surfaces out of nowhere. It's the
+first checkpoint on top of a small, deliberately narrow set of things that
+already work, right now:
+
+- **Web automation** — launch a real Chromium or Firefox browser, click,
+  type, hover, focus, read text, wait for an element, and capture
+  screenshots (including full-page). No separate driver to install or
+  version-match.
+- **Android automation** — connect to a device or emulator over adb, install
+  and launch a real app, and drive it with the same locator model as web:
+  click, fill, count, read text, wait for an element, and screenshot,
+  including a full-page, scroll-and-stitch capture.
+- **Five client languages, one API shape** — Rust, Go, Java, Python, and
+  TypeScript all speak the same `Browser` / `Page` / `Locator` model, with a
+  zero-install path: install a client, write a test, and it downloads and
+  manages the engine and plugin it needs on first run.
+
+That's deliberately not a long list. It's small enough to actually be real,
+which is the entire point of calling anything "available" on this site in
+the first place.
+
+## What v0.1.0 means
+
+Think of v0.1.0 less as a feature drop and more as a line in the sand: the
+point where what's been landing in patch releases adds up to something
+worth calling a first real milestone, rather than another `0.0.x` bump. iOS,
+desktop, and API automation are still ahead of it, not part of it — the
+[Availability](/availability) page is the honest, continuously updated
+picture of exactly what's real versus still a reserved plugin slot.
+
+## Tracking it as it lands
+
+We also just published a [Changelog](/changelog) page that groups every
+release by what it actually shipped, from the very first release through
+today. It's where we'll keep tracking progress toward v0.1.0 as it happens,
+instead of everyone finding out from a diff.
+
+## Where to go next
+
+- Read the [Changelog](/changelog) for the full release history so far.
+- Check [Availability](/availability) for the current, capability-by-capability
+  picture of web and Android automation.
+- Try the [TypeScript getting-started guide](/blog/get-started-with-typescript)
+  or the [Android testing walkthrough](/blog/android-testing-playwright-style)
+  to see today's tangible feature set firsthand.
+- Star or watch [the repo](https://github.com/allwright-dev/allwright) to
+  catch v0.1.0 the moment it ships.

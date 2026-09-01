@@ -105,9 +105,15 @@ built to reach.
 | | Playwright | allwright |
 |---|---|---|
 | Web automation maturity | Production-hardened, feature-complete | Early, driverless, functional for core flows |
-| Mobile / desktop / API | Out of scope | Reserved plugin slots, not yet installable |
+| Mobile | Out of scope | Android installable and functional; iOS reserved, not yet installable |
+| Desktop / API | Out of scope | Reserved plugin slots, not yet installable |
 | Automation model | One per surface you bolt on separately | One core model, extended by plugins |
 | Client languages | JS/TS, Python, Java, .NET | Rust, Go, Java, Python, TypeScript |
+
+**Update:** the Android plugin shipped shortly after this post first went
+up — see [our Android testing post](/blog/android-testing-playwright-style)
+and the current [Availability](/availability) page for what actually works
+today.
 
 If you only test a web app, that table doesn't tell you to switch: it tells
 you allwright hasn't earned that yet, and says so plainly. If your suite

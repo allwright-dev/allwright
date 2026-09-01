@@ -196,16 +196,16 @@ One `npm test`, one config file, one retrying `expect`, two surfaces.
 ## The honest status line
 
 This is experimental, and we mean that plainly, the same way we meant it when
-we said web was "driverless but early." `count_elements`, `get_text`, and
-`wait_for_selector` don't exist yet, so assertions today have to route
-through what `click`/`fill` can already see rather than reading state
-directly — plan your first Android tests around actions, not deep text
-assertions. iOS, desktop, and API are still exactly where our
+we said web was "driverless but early." **Update:** `count_elements`,
+`get_text`, `focus`, and `press` have since landed too, and screenshots now
+support a full-page scroll-and-stitch capture the same way web does — so
+Android assertions can read state directly now, not just infer it from
+`click`/`fill`. `hover` and `highlight` stay web-only for now. iOS, desktop,
+and API are still exactly where our
 [architecture post](/blog/why-allwright-if-playwright-exists) left them:
-reserved plugin slots, not yet installable. We'll update
-[Availability](/availability) and [How it works](/how-it-works) to reflect
-Android's new status shortly — this post got ahead of the site because the
-code got ahead of us first.
+reserved plugin slots, not yet installable. [Availability](/availability) and
+[How it works](/how-it-works) now reflect Android's real status — this post
+originally got ahead of the site; it's caught up since.
 
 ## Where to go next
 
@@ -216,4 +216,5 @@ code got ahead of us first.
 - Read [why "Playwright-style" was never the whole pitch](/blog/why-allwright-if-playwright-exists)
   for the architecture this fixture is actually proving out.
 - Star or watch [the repo](https://github.com/allwright-dev/allwright) —
-  `count_elements`/`get_text`/`wait_for_selector` and iOS are next.
+  `count_elements`/`get_text`/`wait_for_selector` shipped since this post
+  went up (see the update above) — iOS is next.

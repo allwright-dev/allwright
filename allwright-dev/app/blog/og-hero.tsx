@@ -162,10 +162,44 @@ function AndroidOgDiagram() {
   );
 }
 
+// Same "today, then dashed road ahead" story as RoadmapHero in
+// hero-image.tsx, compressed to fit the thumbnail: a solid line from day
+// one to today's filled milestone, a dashed line on to v0.1.0.
+function RoadmapOgDiagram() {
+  const { width, height } = DIAGRAM_SIZE;
+  const midY = 132;
+
+  return (
+    <div style={{ position: "relative", width, height, display: "flex" }}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ position: "absolute", left: 0, top: 0 }}>
+        <line x1={30} y1={midY} x2={210} y2={midY} stroke={MUTED} strokeWidth={2} />
+        <line x1={210} y1={midY} x2={390} y2={midY} stroke={LINE} strokeWidth={2} strokeDasharray="6 6" />
+
+        <circle cx={30} cy={midY} r={8} fill="rgba(16,41,45,0.55)" stroke={MUTED} strokeWidth={1.6} />
+        <circle cx={210} cy={midY} r={30} fill="rgba(14,159,142,0.16)" stroke={BRAND_TO} strokeWidth={2} />
+        <circle cx={390} cy={midY} r={20} fill="none" stroke={LINE} strokeWidth={1.6} strokeDasharray="4 3" />
+      </svg>
+
+      <div style={{ position: "absolute", left: 30, top: midY - 34, transform: "translateX(-50%)", display: "flex", fontSize: 13, fontWeight: 600, color: INK }}>
+        v0.0.7
+      </div>
+      <div style={{ position: "absolute", left: 210, top: midY - 6, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ display: "flex", fontSize: 16, fontWeight: 700, color: INK_SOFT }}>v0.0.57</div>
+        <div style={{ display: "flex", fontSize: 10.5, color: MUTED, marginTop: 2 }}>you are here</div>
+      </div>
+      <div style={{ position: "absolute", left: 390, top: midY - 52, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ display: "flex", fontSize: 15, fontWeight: 700, color: INK_SOFT }}>v0.1.0</div>
+        <div style={{ display: "flex", fontSize: 10.5, color: MUTED, marginTop: 2 }}>coming soon</div>
+      </div>
+    </div>
+  );
+}
+
 const ogHeroRegistry: Record<string, () => React.ReactElement> = {
   "get-started-with-typescript": TypeScriptOgDiagram,
   "why-allwright-if-playwright-exists": EngineOgDiagram,
   "android-testing-playwright-style": AndroidOgDiagram,
+  "road-to-v0-1-0": RoadmapOgDiagram,
 };
 
 /** Returns the post's diagram element for its social-preview card, or null for posts without one (their card falls back to a text-only layout). */

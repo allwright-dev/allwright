@@ -103,7 +103,7 @@ Your `package.json` should now look like this:
   },
   "devDependencies": {
     "typescript": "^5.6.3",
-    "@allwright.dev/vitest": "^0.0.53"
+    "@allwright.dev/vitest": "^0.0.57"
   }
 }
 ```
@@ -134,17 +134,24 @@ them in every file if you choose to use the globals style:
 
 A `vitest.config.ts` at the project root turns on globals and runs in the
 `node` environment — allwright drives a real, separate browser process, so
-your test file itself doesn't need a DOM environment like `jsdom`:
+your test file itself doesn't need a DOM environment like `jsdom`. Wrap your
+config in `allwrightVitestConfig` from `@allwright.dev/vitest/config`: it
+adds a Vitest global setup step that starts the allwright engine once for
+the whole run and shuts it down when your suite finishes, instead of every
+fixture bootstrapping its own:
 
 ```ts
 import { defineConfig } from "vitest/config";
+import { allwrightVitestConfig } from "@allwright.dev/vitest/config";
 
-export default defineConfig({
-  test: {
-    globals: true,
-    environment: "node",
-  },
-});
+export default allwrightVitestConfig(
+  defineConfig({
+    test: {
+      globals: true,
+      environment: "node",
+    },
+  }),
+);
 ```
 
 ## 5. Write your first test

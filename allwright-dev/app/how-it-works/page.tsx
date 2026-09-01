@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { languages, surfaceStatus } from "../availability-data";
-import { GITHUB_URL } from "../brand";
+import { GITHUB_URL, SITE_NAME } from "../brand";
 import { StatusPill } from "../status-pill";
 
 const description =
@@ -15,6 +15,8 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: "/how-it-works",
+    siteName: SITE_NAME,
+    locale: "en_US",
     title: "How it works: à la carte, not a buffet",
     description,
   },
@@ -30,7 +32,7 @@ export const metadata: Metadata = {
 // everything else already has a reserved slot but ships nothing yet.
 const pluginCatalog = [
   { label: "Web", center: { x: 240, y: 60 }, status: "Available now" as const },
-  { label: "Mobile — Android", center: { x: 370, y: 135 }, status: "Not yet available" as const },
+  { label: "Mobile — Android", center: { x: 370, y: 135 }, status: "Available now" as const },
   { label: "Mobile — iOS", center: { x: 370, y: 285 }, status: "Not yet available" as const },
   { label: "Desktop — Windows", center: { x: 240, y: 360 }, status: "Not yet available" as const },
   { label: "Desktop — Linux", center: { x: 110, y: 285 }, status: "Not yet available" as const },
@@ -95,7 +97,7 @@ function WithEngineDiagram() {
       <svg
         viewBox="0 0 260 240"
         role="img"
-        aria-label="One small allwright core in the center, reaching web with a solid line for an installed plugin, and mobile, desktop, and API with dashed lines for not-yet-available plugins"
+        aria-label="One small allwright core in the center, reaching web and mobile with solid lines for installed plugins, and desktop and API with dashed lines for not-yet-available plugins"
         className="h-auto w-full max-w-[280px] text-[var(--line)]"
       >
         <defs>
@@ -103,7 +105,7 @@ function WithEngineDiagram() {
         </defs>
         {surfaceStatus.map((surface, i) => {
           const boxCenterY = ys[i] + 20;
-          const ready = surface.status === "Available now";
+          const ready = surface.status !== "Not yet available";
           return (
             <line
               key={surface.label}
@@ -123,7 +125,7 @@ function WithEngineDiagram() {
           core
         </text>
         {surfaceStatus.map((surface, i) => {
-          const ready = surface.status === "Available now";
+          const ready = surface.status !== "Not yet available";
           return (
             <g key={surface.label}>
               <rect
@@ -232,8 +234,8 @@ function PluginCatalogDiagram() {
         })}
       </svg>
       <figcaption className="mt-4 max-w-[46ch] text-center text-sm leading-6 text-[var(--muted)]">
-        Web is installed and ready; every other slot is already reserved,
-        waiting on a real runtime build.
+        Web and Mobile — Android are installed and ready; every other slot is
+        already reserved, waiting on a real runtime build.
       </figcaption>
     </figure>
   );
@@ -270,7 +272,7 @@ function ClientFlowDiagram() {
         ))}
 
         {surfaceStatus.map((surface, i) => {
-          const ready = surface.status === "Available now";
+          const ready = surface.status !== "Not yet available";
           return (
             <line
               key={surface.label}
@@ -320,7 +322,7 @@ function ClientFlowDiagram() {
         </text>
 
         {surfaceStatus.map((surface, i) => {
-          const ready = surface.status === "Available now";
+          const ready = surface.status !== "Not yet available";
           return (
             <g key={surface.label}>
               <rect
@@ -394,6 +396,7 @@ export default function HowItWorks() {
           <div className="mx-auto mt-8 max-w-xl rounded-2xl border border-[var(--line)] bg-[var(--background)]/60 p-4 font-mono text-xs leading-6 text-[var(--muted)] sm:text-sm">
             <p className="text-[var(--ink)]">$ allwright plugin list</p>
             <p className="text-[var(--ink)]">$ allwright plugin install web</p>
+            <p className="text-[var(--ink)]">$ allwright plugin install mobile-android</p>
           </div>
         </div>
       </section>
@@ -471,8 +474,13 @@ export default function HowItWorks() {
           your app would.
         </p>
         <p className="mt-4 text-sm leading-7 text-[var(--muted)] sm:text-base">
-          Mobile, desktop, and API testing will work the same way once their
-          plugins ship — no new tool to learn, just one more{" "}
+          Android works the same way already: install the{" "}
+          <code className="font-mono text-[var(--ink)]">mobile-android</code>{" "}
+          plugin and the same client code taps, types, and reads a real app
+          over <code className="font-mono text-[var(--ink)]">adb</code> —
+          no Appium, no separate driver server. iOS, desktop, and API testing
+          will work the same way once their plugins ship — no new tool to
+          learn, just one more{" "}
           <code className="font-mono text-[var(--ink)]">plugin install</code>{" "}
           for whichever surface you need next.
         </p>

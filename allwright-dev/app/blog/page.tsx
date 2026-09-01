@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { SITE_URL } from "../brand";
+import { SITE_NAME, SITE_URL } from "../brand";
 import { formatPostDate, getAllPosts } from "./blog-data";
 import { HeroImage } from "./hero-image";
 
@@ -24,6 +24,8 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: "/blog",
+    siteName: SITE_NAME,
+    locale: "en_US",
     title: "The allwright blog",
     description,
   },
