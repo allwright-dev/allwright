@@ -9,6 +9,7 @@ use allwright_surface_mobile::{
     MobileRuntimeReadiness, MobileScreenshotInfo, MobileSurfaceProfile, RuntimeMaturity,
     boot_surface, normalize_selector_for_transport,
 };
+use image::{DynamicImage, ImageFormat, RgbaImage};
 use regex::Regex;
 use std::env;
 use std::ffi::{CStr, CString, c_char};
@@ -16,6 +17,7 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -541,13 +543,8 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             page_session,
             timeout_ms,
             full_page,
-        } => {
-            if full_page {
-                return Err("full-page screenshots are not supported on Android".to_string());
-            }
-            screenshot(&browser_session, &page_session, timeout_ms)
-                .map(MobileCommandResult::Screenshot)
-        }
+        } => screenshot(&browser_session, &page_session, timeout_ms, full_page)
+            .map(MobileCommandResult::Screenshot),
     }
 }
 
@@ -904,8 +901,136 @@ fn screenshot(
     browser_session: &MobileBrowserSessionHandle,
     _page_session: &MobilePageSessionHandle,
     timeout_ms: Option<u32>,
+    full_page: bool,
 ) -> Result<MobileScreenshotInfo, String> {
-    adb_screenshot(&browser_session.device.device_id, timeout_ms)
+    if full_page {
+        adb_full_page_screenshot(&browser_session.device.device_id, timeout_ms)
+    } else {
+        adb_screenshot(&browser_session.device.device_id, timeout_ms)
+    }
+}
+
+const MAX_FULL_PAGE_SCREENSHOTS: usize = 20;
+
+fn adb_full_page_screenshot(
+    device_id: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobileScreenshotInfo, String> {
+    let first = decode_android_screenshot(adb_screenshot(device_id, timeout_ms)?.png_data)?;
+    let width = first.width();
+    let height = first.height();
+    if width == 0 || height < 4 {
+        return Err("Android returned an invalid screenshot size".to_string());
+    }
+
+    let mut previous = first.clone();
+    let mut stitched = first;
+    let swipe_start = (height * 3 / 4) as i32;
+    let swipe_end = (height / 4) as i32;
+    for _ in 1..MAX_FULL_PAGE_SCREENSHOTS {
+        run_adb_for_device(
+            device_id,
+            &[
+                "shell",
+                "input",
+                "swipe",
+                &(width as i32 / 2).to_string(),
+                &swipe_start.to_string(),
+                &(width as i32 / 2).to_string(),
+                &swipe_end.to_string(),
+                "250",
+            ],
+        )?;
+        std::thread::sleep(Duration::from_millis(300));
+
+        let next = decode_android_screenshot(adb_screenshot(device_id, timeout_ms)?.png_data)?;
+        if next.dimensions() != (width, height) {
+            return Err(
+                "Android screenshot dimensions changed while capturing a full page".to_string(),
+            );
+        }
+        let overlap = find_screenshot_overlap(&previous, &next)?;
+        if overlap == height {
+            break;
+        }
+        append_screenshot(&mut stitched, &next, overlap)?;
+        previous = next;
+    }
+
+    let mut png_data = Vec::new();
+    DynamicImage::ImageRgba8(stitched)
+        .write_to(&mut std::io::Cursor::new(&mut png_data), ImageFormat::Png)
+        .map_err(|error| format!("encode Android full-page screenshot: {error}"))?;
+    let foreground = current_foreground_app(device_id)?;
+    Ok(MobileScreenshotInfo {
+        png_data,
+        note: format!(
+            "captured full-page Android screenshot via ADB scrolling on {}/{}",
+            foreground.current_package.as_deref().unwrap_or("<unknown>"),
+            foreground
+                .current_activity
+                .as_deref()
+                .unwrap_or("<unknown>")
+        ),
+    })
+}
+
+fn decode_android_screenshot(png_data: Vec<u8>) -> Result<RgbaImage, String> {
+    image::load_from_memory_with_format(&png_data, ImageFormat::Png)
+        .map_err(|error| format!("decode Android screenshot: {error}"))
+        .map(DynamicImage::into_rgba8)
+}
+
+fn find_screenshot_overlap(previous: &RgbaImage, next: &RgbaImage) -> Result<u32, String> {
+    let (width, height) = previous.dimensions();
+    if next.dimensions() != (width, height) {
+        return Err("cannot stitch Android screenshots with different dimensions".to_string());
+    }
+    for overlap in ((height / 4)..=height).rev() {
+        if screenshots_match_at_overlap(previous, next, overlap) {
+            return Ok(overlap);
+        }
+    }
+    Err(
+        "could not align Android screenshots after scrolling; the foreground content changed"
+            .to_string(),
+    )
+}
+
+fn screenshots_match_at_overlap(previous: &RgbaImage, next: &RgbaImage, overlap: u32) -> bool {
+    let (width, height) = previous.dimensions();
+    let row_step = (overlap / 24).max(1);
+    let column_step = (width / 24).max(1);
+    let mut matched = 0_u32;
+    let mut sampled = 0_u32;
+    for row in (0..overlap).step_by(row_step as usize) {
+        for column in (0..width).step_by(column_step as usize) {
+            let before = previous.get_pixel(column, height - overlap + row);
+            let after = next.get_pixel(column, row);
+            sampled += 1;
+            if before == after {
+                matched += 1;
+            }
+        }
+    }
+    sampled > 0 && matched * 100 >= sampled * 98
+}
+
+fn append_screenshot(
+    stitched: &mut RgbaImage,
+    next: &RgbaImage,
+    overlap: u32,
+) -> Result<(), String> {
+    let (width, height) = stitched.dimensions();
+    let appended_height = next.height() - overlap;
+    let combined_height = height
+        .checked_add(appended_height)
+        .ok_or_else(|| "Android full-page screenshot is too tall".to_string())?;
+    let mut combined = RgbaImage::new(width, combined_height);
+    image::imageops::replace(&mut combined, stitched, 0, 0);
+    image::imageops::replace(&mut combined, next, 0, i64::from(height - overlap));
+    *stitched = combined;
+    Ok(())
 }
 
 struct ResolvedSelectorSnapshot {
@@ -1969,6 +2094,23 @@ mod tests {
             bare_by_css_id.resource_id.as_deref(),
             Some("signup_first_name")
         );
+    }
+
+    #[test]
+    fn stitches_scrolled_screenshots_without_duplicate_overlap() {
+        let first =
+            RgbaImage::from_fn(4, 10, |x, y| image::Rgba([(x * 11) as u8, y as u8, 0, 255]));
+        let second = RgbaImage::from_fn(4, 10, |x, y| {
+            image::Rgba([(x * 11) as u8, (y + 4) as u8, 0, 255])
+        });
+
+        let overlap = find_screenshot_overlap(&first, &second).expect("screenshots align");
+        assert_eq!(overlap, 6);
+
+        let mut stitched = first;
+        append_screenshot(&mut stitched, &second, overlap).expect("screenshots stitch");
+        assert_eq!(stitched.dimensions(), (4, 14));
+        assert_eq!(stitched.get_pixel(0, 13), second.get_pixel(0, 9));
     }
 
     fn sample_ui_hierarchy() -> &'static str {
