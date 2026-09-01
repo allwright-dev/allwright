@@ -5,7 +5,21 @@ from pathlib import Path
 
 from ._proto import engine_pb2
 from ._transport import RuntimeClient, StreamHandle
-from ._types import AllwrightError, ClickResult, CommandOptions, FillResult, ScreenshotOptions, ScreenshotResult
+from ._types import (
+    AllwrightError,
+    ClickResult,
+    CommandOptions,
+    CountResult,
+    ElementResult,
+    FillResult,
+    PressOptions,
+    PressResult,
+    ScreenshotOptions,
+    ScreenshotResult,
+    TextResult,
+    WaitForSelectorOptions,
+    WaitForSelectorResult,
+)
 
 
 class MobileAndroidConnectOptions:
@@ -97,6 +111,62 @@ class AndroidApp:
                             f"android app session error while clicking: {event.error.message}"
                         )
 
+    def count(self, selector: str, options: CommandOptions | None = None) -> CountResult:
+        from ._runtime import retry_options
+
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            transport_selector = normalize_mobile_selector_for_transport(selector)
+            handle.send(
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self._surface_session_id,
+                    context_session_id=self._session_id,
+                    count_elements=engine_pb2.CountElementsCommand(
+                        css_selector=transport_selector,
+                        retry_options=retry_options((options or CommandOptions()).timeout_ms),
+                    ),
+                )
+            )
+
+            while True:
+                event = handle.recv("receive tab session event while counting Android elements")
+                match event.WhichOneof("event"):
+                    case "attached":
+                        pass
+                    case "element_counted":
+                        counted = event.element_counted
+                        return CountResult(
+                            selector=counted.css_selector,
+                            count=counted.count,
+                            note=counted.note,
+                        )
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(
+                            f"android app session {self._session_id} closed while counting elements"
+                        )
+                    case "error":
+                        raise AllwrightError(
+                            f"android app session error while counting elements: {event.error.message}"
+                        )
+
+    def focus(self, selector: str, options: CommandOptions | None = None) -> ElementResult:
+        from ._runtime import retry_options
+
+        return self._element_command(
+            action="focusing Android element",
+            event_name="element_focused",
+            command=engine_pb2.ContextSessionCommand(
+                surface_session_id=self._surface_session_id,
+                context_session_id=self._session_id,
+                focus_element=engine_pb2.FocusElementCommand(
+                    css_selector=normalize_mobile_selector_for_transport(selector),
+                    retry_options=retry_options((options or CommandOptions()).timeout_ms),
+                ),
+            ),
+        )
+
     def fill(
         self,
         selector: str,
@@ -141,6 +211,121 @@ class AndroidApp:
                     case "error":
                         raise AllwrightError(
                             f"android app session error while filling: {event.error.message}"
+                        )
+
+    def press(
+        self,
+        selector: str,
+        key: str,
+        options: PressOptions | None = None,
+    ) -> PressResult:
+        from ._runtime import retry_options
+
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            resolved = options or PressOptions()
+            handle.send(
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self._surface_session_id,
+                    context_session_id=self._session_id,
+                    press_key=engine_pb2.PressKeyCommand(
+                        css_selector=normalize_mobile_selector_for_transport(selector),
+                        key=key,
+                        text=resolved.text,
+                        retry_options=retry_options(resolved.timeout_ms),
+                    ),
+                )
+            )
+
+            while True:
+                event = handle.recv("receive tab session event while pressing Android key")
+                match event.WhichOneof("event"):
+                    case "attached":
+                        pass
+                    case "key_pressed":
+                        pressed = event.key_pressed
+                        return PressResult(
+                            selector=pressed.css_selector,
+                            key=pressed.key,
+                            note=pressed.note,
+                        )
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(
+                            f"android app session {self._session_id} closed while pressing key"
+                        )
+                    case "error":
+                        raise AllwrightError(
+                            f"android app session error while pressing key: {event.error.message}"
+                        )
+
+    def text_content(
+        self,
+        selector: str,
+        options: CommandOptions | None = None,
+    ) -> TextResult:
+        return self._read_text(
+            selector,
+            options or CommandOptions(),
+            text_content=True,
+        )
+
+    def inner_text(
+        self,
+        selector: str,
+        options: CommandOptions | None = None,
+    ) -> TextResult:
+        return self._read_text(
+            selector,
+            options or CommandOptions(),
+            text_content=False,
+        )
+
+    def wait_for_selector(
+        self,
+        selector: str,
+        options: WaitForSelectorOptions | None = None,
+    ) -> WaitForSelectorResult:
+        from ._runtime import retry_options
+
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            wait_options = options or WaitForSelectorOptions()
+            transport_selector = normalize_mobile_selector_for_transport(selector)
+            handle.send(
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self._surface_session_id,
+                    context_session_id=self._session_id,
+                    wait_for_selector=engine_pb2.WaitForSelectorCommand(
+                        css_selector=transport_selector,
+                        visible=wait_options.visible,
+                        retry_options=retry_options(wait_options.timeout_ms),
+                    ),
+                )
+            )
+
+            while True:
+                event = handle.recv("receive tab session event while waiting for Android selector")
+                match event.WhichOneof("event"):
+                    case "attached":
+                        pass
+                    case "selector_wait_satisfied":
+                        satisfied = event.selector_wait_satisfied
+                        return WaitForSelectorResult(
+                            selector=satisfied.css_selector,
+                            visible=satisfied.visible,
+                            note=satisfied.note,
+                        )
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(
+                            f"android app session {self._session_id} closed while waiting for selector"
+                        )
+                    case "error":
+                        raise AllwrightError(
+                            f"android app session error while waiting for selector: {event.error.message}"
                         )
 
     def screenshot(self, options: ScreenshotOptions | None = None) -> ScreenshotResult:
@@ -209,8 +394,26 @@ class AndroidLocator:
     def click(self, options: CommandOptions | None = None) -> ClickResult:
         return self.page.click(self.selector, options)
 
+    def count(self, options: CommandOptions | None = None) -> CountResult:
+        return self.page.count(self.selector, options)
+
+    def focus(self, options: CommandOptions | None = None) -> ElementResult:
+        return self.page.focus(self.selector, options)
+
     def fill(self, value: str, options: CommandOptions | None = None) -> FillResult:
         return self.page.fill(self.selector, value, options)
+
+    def press(self, key: str, options: PressOptions | None = None) -> PressResult:
+        return self.page.press(self.selector, key, options)
+
+    def text_content(self, options: CommandOptions | None = None) -> TextResult:
+        return self.page.text_content(self.selector, options)
+
+    def inner_text(self, options: CommandOptions | None = None) -> TextResult:
+        return self.page.inner_text(self.selector, options)
+
+    def wait_for(self, options: WaitForSelectorOptions | None = None) -> WaitForSelectorResult:
+        return self.page.wait_for_selector(self.selector, options)
 
 
 class AndroidDevice:

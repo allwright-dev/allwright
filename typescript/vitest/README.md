@@ -2,6 +2,19 @@
 
 Vitest fixtures for allwright with Playwright-style `browser` and `page` injection, plus Android mobile fixtures for hybrid tests.
 
+Wrap the Vitest configuration with `allwrightVitestConfig`. It starts Allwright once before workers run and shuts it down once after the complete test run. Existing user global setup files remain supported and run after Allwright starts, then tear down before Allwright stops.
+
+```ts
+import { allwrightVitestConfig } from "@allwright.dev/vitest/config";
+import { defineConfig } from "vitest/config";
+
+export default allwrightVitestConfig(defineConfig({
+  test: {
+    globalSetup: ["./test/my-global-setup.ts"],
+  },
+}));
+```
+
 Install:
 
 ```bash
@@ -54,11 +67,11 @@ suites:
 Vitest can override or select from that shared config without switching to a Vitest-specific file:
 
 ```ts
-import { test } from "@allwright.dev/vitest";
+import { expect, test as base } from "@allwright.dev/vitest";
 
-test.use({
-  allwright: {
-    suite: "smoke"
+const test = base.extend({
+  allwright: async ({}, use) => {
+    await use({ suite: "smoke" });
   }
 });
 ```
@@ -66,21 +79,24 @@ test.use({
 Android fixtures are available alongside the web fixtures:
 
 ```ts
-import { test } from "@allwright.dev/vitest";
+import { expect, test as base } from "@allwright.dev/vitest";
 
-test.use({
-  allwright: {
-    android: {
-      launchOptions: {
-        apkPath: "/absolute/path/to/app.apk",
-        appId: "com.example.airticket",
+const test = base.extend({
+  allwright: async ({}, use) => {
+    await use({
+      android: {
+        launchOptions: {
+          apkPath: "/absolute/path/to/app.apk",
+          appId: "com.example.airticket",
+        },
       },
-    },
+    });
   },
 });
 
 test("android only", async ({ androidApp }) => {
   await androidApp.fill('xpath=//*[@text="Email"]', "user@example.com");
+  await expect(androidApp.locator('xpath=//*[@text="Email"]')).toHaveText("user@example.com");
 });
 
 test("hybrid web and android", async ({ page, androidApp }) => {
@@ -99,3 +115,5 @@ Available fixtures:
 - `androidApp`: launched Android app page
 
 `androidApp` launches using `allwright.android.launchOptions` first, then falls back to `config.mobile.android`.
+
+Android apps and locators support the Android-applicable action and expectation subset: `click`, `count`, `focus`, `fill`, `press`, `textContent`, `innerText`, `waitForSelector`, and `screenshot`. `expect(androidApp)` and `expect(androidApp.locator(...))` provide `toHaveText`, `toContainText`, `toHaveCount`, and `toBeVisible` with the same retry controls as web fixtures. Hover and highlight remain web-only.

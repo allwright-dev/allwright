@@ -7,8 +7,9 @@ use allwright_plugin_sdk::{
 };
 use allwright_surface_mobile::{
     ConnectOptions as MobileConnectOptions, MobileBrowserSessionHandle, MobileClickInfo,
-    MobileCommand, MobileCommandResult, MobileConnectInfo, MobileFillInfo, MobilePageInfo,
-    MobilePageSessionHandle, MobilePlatform, MobileScreenshotInfo,
+    MobileCommand, MobileCommandResult, MobileConnectInfo, MobileElementCountInfo,
+    MobileElementInfo, MobileFillInfo, MobilePageInfo, MobilePageSessionHandle, MobilePlatform,
+    MobilePressInfo, MobileScreenshotInfo, MobileTextInfo, MobileWaitForSelectorInfo,
 };
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -81,10 +82,19 @@ fn mobile_plugin_id_for_command(command: &MobileCommand) -> Result<&'static str,
         | MobileCommand::CountElements {
             browser_session, ..
         }
+        | MobileCommand::FocusElement {
+            browser_session, ..
+        }
         | MobileCommand::FillElement {
             browser_session, ..
         }
+        | MobileCommand::PressKey {
+            browser_session, ..
+        }
         | MobileCommand::GetText {
+            browser_session, ..
+        }
+        | MobileCommand::GetInnerText {
             browser_session, ..
         }
         | MobileCommand::WaitForSelector {
@@ -191,6 +201,126 @@ pub async fn fill_mobile_element(
     {
         MobileCommandResult::FillElement(result) => Ok(result),
         _ => Err("mobile plugin returned an unexpected response for FillElement".to_string()),
+    }
+}
+
+pub async fn count_mobile_elements(
+    surface_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobileElementCountInfo, String> {
+    match invoke_mobile_expected(MobileCommand::CountElements {
+        browser_session: surface_session.clone(),
+        page_session: page_session.clone(),
+        selector: selector.to_string(),
+        timeout_ms,
+    })
+    .await?
+    {
+        MobileCommandResult::CountElements(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected response for CountElements".to_string()),
+    }
+}
+
+pub async fn focus_mobile_element(
+    surface_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobileElementInfo, String> {
+    match invoke_mobile_expected(MobileCommand::FocusElement {
+        browser_session: surface_session.clone(),
+        page_session: page_session.clone(),
+        selector: selector.to_string(),
+        timeout_ms,
+    })
+    .await?
+    {
+        MobileCommandResult::FocusElement(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected response for FocusElement".to_string()),
+    }
+}
+
+pub async fn press_mobile_key(
+    surface_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    key: &str,
+    text: Option<&str>,
+    timeout_ms: Option<u32>,
+) -> Result<MobilePressInfo, String> {
+    match invoke_mobile_expected(MobileCommand::PressKey {
+        browser_session: surface_session.clone(),
+        page_session: page_session.clone(),
+        selector: selector.to_string(),
+        key: key.to_string(),
+        text: text.map(str::to_string),
+        timeout_ms,
+    })
+    .await?
+    {
+        MobileCommandResult::PressKey(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected response for PressKey".to_string()),
+    }
+}
+
+pub async fn get_mobile_text(
+    surface_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobileTextInfo, String> {
+    match invoke_mobile_expected(MobileCommand::GetText {
+        browser_session: surface_session.clone(),
+        page_session: page_session.clone(),
+        selector: selector.to_string(),
+        timeout_ms,
+    })
+    .await?
+    {
+        MobileCommandResult::GetText(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected response for GetText".to_string()),
+    }
+}
+
+pub async fn get_mobile_inner_text(
+    surface_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobileTextInfo, String> {
+    match invoke_mobile_expected(MobileCommand::GetInnerText {
+        browser_session: surface_session.clone(),
+        page_session: page_session.clone(),
+        selector: selector.to_string(),
+        timeout_ms,
+    })
+    .await?
+    {
+        MobileCommandResult::GetInnerText(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected response for GetInnerText".to_string()),
+    }
+}
+
+pub async fn wait_for_mobile_selector(
+    surface_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    visible: bool,
+    timeout_ms: Option<u32>,
+) -> Result<MobileWaitForSelectorInfo, String> {
+    match invoke_mobile_expected(MobileCommand::WaitForSelector {
+        browser_session: surface_session.clone(),
+        page_session: page_session.clone(),
+        selector: selector.to_string(),
+        visible,
+        timeout_ms,
+    })
+    .await?
+    {
+        MobileCommandResult::WaitForSelector(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected response for WaitForSelector".to_string()),
     }
 }
 

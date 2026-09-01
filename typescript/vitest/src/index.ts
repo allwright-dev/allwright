@@ -3,7 +3,6 @@ import {
   mobile,
   resolveConfig,
   setServerAddr,
-  shutdown,
   type MobileAndroidConnectOptions,
   type MobileAndroidDevice,
   type MobileAndroidLaunchOptions,
@@ -322,8 +321,26 @@ function createLazyAndroidApp(appResource: LazyResource<MobileAndroidApp>): Mobi
     async click(selector: string, options?: CommandOptions) {
       return (await appResource.get()).click(selector, options);
     },
+    async count(selector: string, options?: CommandOptions) {
+      return (await appResource.get()).count(selector, options);
+    },
+    async focus(selector: string, options?: CommandOptions) {
+      return (await appResource.get()).focus(selector, options);
+    },
     async fill(selector: string, value: string, options?: CommandOptions) {
       return (await appResource.get()).fill(selector, value, options);
+    },
+    async press(selector: string, key: string, options?: Parameters<MobileAndroidApp["press"]>[2]) {
+      return (await appResource.get()).press(selector, key, options);
+    },
+    async textContent(selector: string, options?: CommandOptions) {
+      return (await appResource.get()).textContent(selector, options);
+    },
+    async innerText(selector: string, options?: CommandOptions) {
+      return (await appResource.get()).innerText(selector, options);
+    },
+    async waitForSelector(selector: string, options?: WaitForSelectorOptions) {
+      return (await appResource.get()).waitForSelector(selector, options);
     },
     async screenshot(options?: ScreenshotOptions) {
       return (await appResource.get()).screenshot(options);
@@ -347,8 +364,26 @@ function createLazyAndroidLocator(
     async click(options?: CommandOptions) {
       return (await appResource.get()).locator(await selectorFactory()).click(options);
     },
+    async count(options?: Parameters<MobileAndroidLocator["count"]>[0]) {
+      return (await appResource.get()).locator(await selectorFactory()).count(options);
+    },
+    async focus(options?: Parameters<MobileAndroidLocator["focus"]>[0]) {
+      return (await appResource.get()).locator(await selectorFactory()).focus(options);
+    },
     async fill(value: string, options?: CommandOptions) {
       return (await appResource.get()).locator(await selectorFactory()).fill(value, options);
+    },
+    async press(key: string, options?: Parameters<MobileAndroidLocator["press"]>[1]) {
+      return (await appResource.get()).locator(await selectorFactory()).press(key, options);
+    },
+    async textContent(options?: Parameters<MobileAndroidLocator["textContent"]>[0]) {
+      return (await appResource.get()).locator(await selectorFactory()).textContent(options);
+    },
+    async innerText(options?: Parameters<MobileAndroidLocator["innerText"]>[0]) {
+      return (await appResource.get()).locator(await selectorFactory()).innerText(options);
+    },
+    async waitFor(options?: Parameters<MobileAndroidLocator["waitFor"]>[0]) {
+      return (await appResource.get()).locator(await selectorFactory()).waitFor(options);
     },
     locator(selector: string) {
       return createLazyAndroidLocator(appResource, async () =>
@@ -404,9 +439,8 @@ export const test = base.extend<AllwrightVitestContext>({
     } finally {
       activeExpectDefaults = {};
       if (browserResource.realized()) {
-        await browserResource.get().then((resolved) => resolved.close()).catch(() => undefined);
+        await browserResource.get().then((resolved) => resolved.close());
       }
-      await shutdown();
     }
   },
 
@@ -420,11 +454,7 @@ export const test = base.extend<AllwrightVitestContext>({
       mobile.android.connect(resolveAndroidConnectOptions(config, allwright)),
     );
 
-    try {
-      await use(androidResource);
-    } finally {
-      await shutdown();
-    }
+    await use(androidResource);
   },
 
   browser: async ({ _browserResource }, use) => {
@@ -656,6 +686,8 @@ type VitestMatcherReturn = ReturnType<VitestExpect>;
 interface AllwrightExpect extends VitestExpect {
   (actual: Page): PageExpectMatchers;
   (actual: Locator): LocatorExpectMatchers;
+  (actual: MobileAndroidApp): PageExpectMatchers;
+  (actual: MobileAndroidLocator): LocatorExpectMatchers;
   <T>(actual: T): VitestMatcherReturn;
 }
 

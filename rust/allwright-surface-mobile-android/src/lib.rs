@@ -5,9 +5,10 @@ use allwright_surface_mobile::{
     ConnectOptions, DeviceConnectionKind, DeviceTarget, LaunchOptions, MobileAppKind,
     MobileAutomationBackend, MobileAutomationSessionInfo, MobileBrowserSessionHandle,
     MobileCapabilitySet, MobileClickInfo, MobileCommand, MobileCommandResult, MobileConnectInfo,
-    MobileFillInfo, MobilePageInfo, MobilePageSessionHandle, MobilePlatform,
-    MobileRuntimeReadiness, MobileScreenshotInfo, MobileSurfaceProfile, RuntimeMaturity,
-    boot_surface, normalize_selector_for_transport,
+    MobileElementCountInfo, MobileElementInfo, MobileFillInfo, MobilePageInfo,
+    MobilePageSessionHandle, MobilePlatform, MobilePressInfo, MobileRuntimeReadiness,
+    MobileScreenshotInfo, MobileSurfaceProfile, MobileTextInfo, MobileWaitForSelectorInfo,
+    RuntimeMaturity, boot_surface, normalize_selector_for_transport,
 };
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use regex::Regex;
@@ -31,11 +32,10 @@ const ANDROID_APP_KINDS: &[MobileAppKind] = &[
 ];
 const ANDROID_MISSING_RUNTIME_ARTIFACTS: &[&str] = &[
     "server-side mobile session routing in allwright-core",
-    "expanded command coverage beyond connect, launch, click, and fill",
+    "expanded command coverage beyond connect, launch, and basic element actions",
 ];
 const ANDROID_NEXT_MILESTONES: &[&str] = &[
-    "route Android mobile commands through the core engine session server",
-    "add text and waitForSelector on top of the native ADB-driven runtime",
+    "polish Android-native command semantics across focus, key input, and waits",
     "expand runtime packaging validation across macOS, Linux, and Windows release assets",
 ];
 
@@ -435,6 +435,154 @@ pub fn fill_element(
     })
 }
 
+pub fn count_elements(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobileElementCountInfo, String> {
+    let normalized = normalize_selector_for_transport(selector);
+    if normalized.trim().is_empty() {
+        return Err("count_elements requires a non-empty selector".to_string());
+    }
+
+    let count = adb_count_elements(&browser_session.device.device_id, &normalized, timeout_ms)?;
+    Ok(MobileElementCountInfo {
+        selector: normalized,
+        count,
+        note: format!(
+            "counted Android elements via UiAutomator source matching; page={}",
+            page_session.page_id
+        ),
+    })
+}
+
+pub fn focus_element(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobileElementInfo, String> {
+    let normalized = normalize_selector_for_transport(selector);
+    if normalized.trim().is_empty() {
+        return Err("focus_element requires a non-empty selector".to_string());
+    }
+
+    let focused = adb_focus(&browser_session.device.device_id, &normalized, timeout_ms)?;
+    Ok(MobileElementInfo {
+        selector: focused.resolved_selector,
+        note: format!("{}; page={}", focused.note, page_session.page_id),
+    })
+}
+
+pub fn press_key(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    key: &str,
+    text: Option<&str>,
+    timeout_ms: Option<u32>,
+) -> Result<MobilePressInfo, String> {
+    let normalized = normalize_selector_for_transport(selector);
+    if normalized.trim().is_empty() {
+        return Err("press_key requires a non-empty selector".to_string());
+    }
+
+    let note = adb_press_key(
+        &browser_session.device.device_id,
+        &normalized,
+        key,
+        text,
+        timeout_ms,
+    )?;
+    Ok(MobilePressInfo {
+        selector: normalized,
+        key: key.to_string(),
+        note: format!("{note}; page={}", page_session.page_id),
+    })
+}
+
+pub fn get_text(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobileTextInfo, String> {
+    get_text_like(
+        browser_session,
+        page_session,
+        selector,
+        timeout_ms,
+        "text_content",
+    )
+}
+
+pub fn get_inner_text(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobileTextInfo, String> {
+    get_text_like(
+        browser_session,
+        page_session,
+        selector,
+        timeout_ms,
+        "inner_text",
+    )
+}
+
+fn get_text_like(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    timeout_ms: Option<u32>,
+    mode: &str,
+) -> Result<MobileTextInfo, String> {
+    let normalized = normalize_selector_for_transport(selector);
+    if normalized.trim().is_empty() {
+        return Err(format!("{mode} requires a non-empty selector"));
+    }
+
+    let text = adb_get_text(&browser_session.device.device_id, &normalized, timeout_ms)?;
+    Ok(MobileTextInfo {
+        selector: normalized,
+        text,
+        note: format!(
+            "read Android element text via UiAutomator source; page={}",
+            page_session.page_id
+        ),
+    })
+}
+
+pub fn wait_for_selector(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    visible: bool,
+    timeout_ms: Option<u32>,
+) -> Result<MobileWaitForSelectorInfo, String> {
+    let normalized = normalize_selector_for_transport(selector);
+    if normalized.trim().is_empty() {
+        return Err("wait_for_selector requires a non-empty selector".to_string());
+    }
+
+    adb_wait_for_selector(
+        &browser_session.device.device_id,
+        &normalized,
+        visible,
+        timeout_ms,
+    )?;
+    Ok(MobileWaitForSelectorInfo {
+        selector: normalized,
+        visible,
+        note: format!(
+            "resolved Android selector via UiAutomator source wait; page={}",
+            page_session.page_id
+        ),
+    })
+}
+
 pub fn dump_source(
     browser_session: &MobileBrowserSessionHandle,
     _page_session: &MobilePageSessionHandle,
@@ -515,9 +663,20 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             timeout_ms,
         } => click_element(&browser_session, &page_session, &selector, timeout_ms)
             .map(MobileCommandResult::ClickElement),
-        MobileCommand::CountElements { .. } => {
-            Err("mobile-android plugin does not implement `count_elements` yet".to_string())
-        }
+        MobileCommand::CountElements {
+            browser_session,
+            page_session,
+            selector,
+            timeout_ms,
+        } => count_elements(&browser_session, &page_session, &selector, timeout_ms)
+            .map(MobileCommandResult::CountElements),
+        MobileCommand::FocusElement {
+            browser_session,
+            page_session,
+            selector,
+            timeout_ms,
+        } => focus_element(&browser_session, &page_session, &selector, timeout_ms)
+            .map(MobileCommandResult::FocusElement),
         MobileCommand::FillElement {
             browser_session,
             page_session,
@@ -532,12 +691,50 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             timeout_ms,
         )
         .map(MobileCommandResult::FillElement),
-        MobileCommand::GetText { .. } => {
-            Err("mobile-android plugin does not implement `get_text` yet".to_string())
-        }
-        MobileCommand::WaitForSelector { .. } => {
-            Err("mobile-android plugin does not implement `wait_for_selector` yet".to_string())
-        }
+        MobileCommand::PressKey {
+            browser_session,
+            page_session,
+            selector,
+            key,
+            text,
+            timeout_ms,
+        } => press_key(
+            &browser_session,
+            &page_session,
+            &selector,
+            &key,
+            text.as_deref(),
+            timeout_ms,
+        )
+        .map(MobileCommandResult::PressKey),
+        MobileCommand::GetText {
+            browser_session,
+            page_session,
+            selector,
+            timeout_ms,
+        } => get_text(&browser_session, &page_session, &selector, timeout_ms)
+            .map(MobileCommandResult::GetText),
+        MobileCommand::GetInnerText {
+            browser_session,
+            page_session,
+            selector,
+            timeout_ms,
+        } => get_inner_text(&browser_session, &page_session, &selector, timeout_ms)
+            .map(MobileCommandResult::GetInnerText),
+        MobileCommand::WaitForSelector {
+            browser_session,
+            page_session,
+            selector,
+            visible,
+            timeout_ms,
+        } => wait_for_selector(
+            &browser_session,
+            &page_session,
+            &selector,
+            visible,
+            timeout_ms,
+        )
+        .map(MobileCommandResult::WaitForSelector),
         MobileCommand::Screenshot {
             browser_session,
             page_session,
@@ -863,6 +1060,114 @@ fn adb_fill(
     })
 }
 
+fn adb_count_elements(
+    device_id: &str,
+    selector: &str,
+    _timeout_ms: Option<u32>,
+) -> Result<u32, String> {
+    let source = adb_dump_source(device_id)?;
+    let nodes = parse_android_ui_nodes(&source.source)?;
+    let count = matching_nodes_by_selector(&nodes, selector)?.len() as u32;
+    Ok(count)
+}
+
+fn adb_focus(
+    device_id: &str,
+    selector: &str,
+    timeout_ms: Option<u32>,
+) -> Result<UiAutomator2ClickInfo, String> {
+    let snapshot = resolve_selector_snapshot(device_id, selector, timeout_ms)?;
+    let bounds = snapshot
+        .node
+        .bounds
+        .ok_or_else(|| format!("selector resolved without bounds: {}", snapshot.selector))?;
+    let (x, y) = bounds.center();
+    let _ = run_adb_for_device(
+        device_id,
+        &["shell", "input", "tap", &x.to_string(), &y.to_string()],
+    )?;
+    Ok(UiAutomator2ClickInfo {
+        resolved_selector: snapshot.selector,
+        note: format!(
+            "focused Android element via native ADB tap on {}/{}",
+            snapshot
+                .foreground
+                .current_package
+                .as_deref()
+                .unwrap_or("<unknown>"),
+            snapshot
+                .foreground
+                .current_activity
+                .as_deref()
+                .unwrap_or("<unknown>")
+        ),
+    })
+}
+
+fn adb_press_key(
+    device_id: &str,
+    selector: &str,
+    key: &str,
+    text: Option<&str>,
+    timeout_ms: Option<u32>,
+) -> Result<String, String> {
+    let focused = adb_focus(device_id, selector, timeout_ms)?;
+    if let Some(text) = text.filter(|value| !value.is_empty()) {
+        let encoded = encode_adb_text(text);
+        if !encoded.is_empty() {
+            let _ = run_adb_for_device(device_id, &["shell", "input", "text", &encoded])?;
+        }
+        return Ok(format!("{} and inserted Android text input", focused.note));
+    }
+
+    if let Some(keyevent) = android_keyevent_for(key) {
+        let _ = run_adb_for_device(device_id, &["shell", "input", "keyevent", keyevent])?;
+        return Ok(format!("{} and pressed Android key `{key}`", focused.note));
+    }
+
+    if key.chars().count() == 1 {
+        let encoded = encode_adb_text(key);
+        if !encoded.is_empty() {
+            let _ = run_adb_for_device(device_id, &["shell", "input", "text", &encoded])?;
+        }
+        return Ok(format!(
+            "{} and inserted Android character input `{key}`",
+            focused.note
+        ));
+    }
+
+    Err(format!(
+        "unsupported Android key `{key}`; provide a single character, `text`, or a supported special key"
+    ))
+}
+
+fn adb_get_text(
+    device_id: &str,
+    selector: &str,
+    timeout_ms: Option<u32>,
+) -> Result<String, String> {
+    let snapshot = resolve_selector_snapshot(device_id, selector, timeout_ms)?;
+    Ok(snapshot
+        .node
+        .text
+        .clone()
+        .or_else(|| snapshot.node.content_desc.clone())
+        .unwrap_or_default())
+}
+
+fn adb_wait_for_selector(
+    device_id: &str,
+    selector: &str,
+    visible: bool,
+    _timeout_ms: Option<u32>,
+) -> Result<(), String> {
+    let snapshot = resolve_selector_snapshot(device_id, selector, None)?;
+    if visible && !node_is_visible(&snapshot.node) {
+        return Err(format!("selector found but not visible: {selector}"));
+    }
+    Ok(())
+}
+
 fn adb_screenshot(
     device_id: &str,
     _timeout_ms: Option<u32>,
@@ -1046,11 +1351,14 @@ fn resolve_selector_snapshot(
 ) -> Result<ResolvedSelectorSnapshot, String> {
     let source = adb_dump_source(device_id)?;
     let nodes = parse_android_ui_nodes(&source.source)?;
-    let node = find_node_by_selector(&nodes, selector).ok_or_else(|| {
-        let package_name = source.current_package.as_deref().unwrap_or("<unknown>");
-        let activity_name = source.current_activity.as_deref().unwrap_or("<unknown>");
-        format!("selector not found: {selector} (current app: {package_name}/{activity_name})")
-    })?;
+    let node = matching_nodes_by_selector(&nodes, selector)?
+        .into_iter()
+        .next()
+        .ok_or_else(|| {
+            let package_name = source.current_package.as_deref().unwrap_or("<unknown>");
+            let activity_name = source.current_activity.as_deref().unwrap_or("<unknown>");
+            format!("selector not found: {selector} (current app: {package_name}/{activity_name})")
+        })?;
     Ok(ResolvedSelectorSnapshot {
         selector: selector.to_string(),
         node: node.clone(),
@@ -1245,17 +1553,18 @@ fn parse_bounds(value: &str) -> Option<AndroidBounds> {
     })
 }
 
-fn find_node_by_selector<'a>(
+fn matching_nodes_by_selector<'a>(
     nodes: &'a [AndroidUiNode],
     selector: &str,
-) -> Option<&'a AndroidUiNode> {
-    let segments = parse_selector_segments(selector).ok()?;
+) -> Result<Vec<&'a AndroidUiNode>, String> {
+    let segments = parse_selector_segments(selector)?;
     let criteria = segments
         .iter()
         .map(selector_segment_to_criteria)
-        .collect::<Result<Vec<_>, _>>()
-        .ok()?;
-    let last = criteria.last()?;
+        .collect::<Result<Vec<_>, _>>()?;
+    let Some(last) = criteria.last() else {
+        return Ok(Vec::new());
+    };
     let mut matches = Vec::new();
     for (index, node) in nodes.iter().enumerate() {
         if !node_matches_criteria(node, last) {
@@ -1266,9 +1575,37 @@ fn find_node_by_selector<'a>(
         }
     }
     if let Some(instance) = last.instance {
-        return matches.get(instance).copied();
+        return Ok(matches.get(instance).copied().into_iter().collect());
     }
-    matches.into_iter().next()
+    Ok(matches)
+}
+
+fn node_is_visible(node: &AndroidUiNode) -> bool {
+    if node.enabled == Some(false) {
+        return false;
+    }
+    let Some(bounds) = node.bounds else {
+        return false;
+    };
+    bounds.right > bounds.left && bounds.bottom > bounds.top
+}
+
+fn android_keyevent_for(key: &str) -> Option<&'static str> {
+    match key.trim().to_ascii_lowercase().as_str() {
+        "enter" => Some("KEYCODE_ENTER"),
+        "tab" => Some("KEYCODE_TAB"),
+        "backspace" | "delete" => Some("KEYCODE_DEL"),
+        "escape" | "esc" => Some("KEYCODE_ESCAPE"),
+        "space" => Some("KEYCODE_SPACE"),
+        "back" => Some("KEYCODE_BACK"),
+        "home" => Some("KEYCODE_HOME"),
+        "arrowleft" | "left" => Some("KEYCODE_DPAD_LEFT"),
+        "arrowright" | "right" => Some("KEYCODE_DPAD_RIGHT"),
+        "arrowup" | "up" => Some("KEYCODE_DPAD_UP"),
+        "arrowdown" | "down" => Some("KEYCODE_DPAD_DOWN"),
+        "center" => Some("KEYCODE_DPAD_CENTER"),
+        _ => None,
+    }
 }
 
 fn ancestor_chain_matches(

@@ -167,7 +167,13 @@ export interface MobileAndroidLocator {
   readonly page: MobileAndroidApp;
   readonly selector: string;
   click(options?: CommandOptions): Promise<ClickResult>;
+  count(options?: CommandOptions): Promise<CountResult>;
+  focus(options?: CommandOptions): Promise<ElementResult>;
   fill(value: string, options?: CommandOptions): Promise<FillResult>;
+  press(key: string, options?: PressOptions): Promise<PressResult>;
+  textContent(options?: CommandOptions): Promise<TextResult>;
+  innerText(options?: CommandOptions): Promise<TextResult>;
+  waitFor(options?: WaitForSelectorOptions): Promise<WaitForSelectorResult>;
   locator(selector: string): MobileAndroidLocator;
 }
 
@@ -175,7 +181,13 @@ export interface MobileAndroidApp {
   readonly sessionId: string;
   locator(selector: string): MobileAndroidLocator;
   click(selector: string, options?: CommandOptions): Promise<ClickResult>;
+  count(selector: string, options?: CommandOptions): Promise<CountResult>;
+  focus(selector: string, options?: CommandOptions): Promise<ElementResult>;
   fill(selector: string, value: string, options?: CommandOptions): Promise<FillResult>;
+  press(selector: string, key: string, options?: PressOptions): Promise<PressResult>;
+  textContent(selector: string, options?: CommandOptions): Promise<TextResult>;
+  innerText(selector: string, options?: CommandOptions): Promise<TextResult>;
+  waitForSelector(selector: string, options?: WaitForSelectorOptions): Promise<WaitForSelectorResult>;
   screenshot(options?: ScreenshotOptions): Promise<ScreenshotResult>;
 }
 

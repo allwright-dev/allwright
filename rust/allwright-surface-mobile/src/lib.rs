@@ -223,6 +223,19 @@ pub struct MobileFillInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MobileElementInfo {
+    pub selector: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MobilePressInfo {
+    pub selector: String,
+    pub key: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MobileTextInfo {
     pub selector: String,
     pub text: String,
@@ -269,6 +282,12 @@ pub enum MobileCommand {
         selector: String,
         timeout_ms: Option<u32>,
     },
+    FocusElement {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+        selector: String,
+        timeout_ms: Option<u32>,
+    },
     FillElement {
         browser_session: MobileBrowserSessionHandle,
         page_session: MobilePageSessionHandle,
@@ -276,7 +295,21 @@ pub enum MobileCommand {
         value: String,
         timeout_ms: Option<u32>,
     },
+    PressKey {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+        selector: String,
+        key: String,
+        text: Option<String>,
+        timeout_ms: Option<u32>,
+    },
     GetText {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+        selector: String,
+        timeout_ms: Option<u32>,
+    },
+    GetInnerText {
         browser_session: MobileBrowserSessionHandle,
         page_session: MobilePageSessionHandle,
         selector: String,
@@ -306,8 +339,11 @@ pub enum MobileCommandResult {
     ClosePage,
     ClickElement(MobileClickInfo),
     CountElements(MobileElementCountInfo),
+    FocusElement(MobileElementInfo),
     FillElement(MobileFillInfo),
+    PressKey(MobilePressInfo),
     GetText(MobileTextInfo),
+    GetInnerText(MobileTextInfo),
     WaitForSelector(MobileWaitForSelectorInfo),
     Screenshot(MobileScreenshotInfo),
 }

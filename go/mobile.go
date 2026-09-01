@@ -212,6 +212,222 @@ func (p *AndroidApp) Fill(ctx context.Context, selector string, value string, op
 	}
 }
 
+func (p *AndroidApp) Count(ctx context.Context, selector string, options ...CommandOptions) (*CountResult, error) {
+	if p == nil {
+		return nil, fmt.Errorf("android app is nil")
+	}
+	if err := p.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if p.closed {
+		return nil, fmt.Errorf("android tab session %s is closed", p.sessionID)
+	}
+
+	commandOptions := firstCommandOptions(options)
+	selector = normalizeMobileSelectorForTransport(selector)
+	if err := p.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: p.surfaceSessionID,
+		ContextSessionId: p.sessionID,
+		Command: &enginev1.ContextSessionCommand_CountElements{
+			CountElements: &enginev1.CountElementsCommand{
+				CssSelector:  selector,
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send Android CountElementsCommand: %w", err)
+	}
+
+	for {
+		event, err := p.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive Android tab session event during count: %w", err)
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.ContextSessionEvent_Attached:
+			p.attached = true
+			_ = payload
+		case *enginev1.ContextSessionEvent_ElementCounted:
+			return &CountResult{
+				Selector: payload.ElementCounted.GetCssSelector(),
+				Count:    payload.ElementCounted.GetCount(),
+				Note:     payload.ElementCounted.GetNote(),
+			}, nil
+		case *enginev1.ContextSessionEvent_Closed:
+			p.closed = true
+			return nil, fmt.Errorf("android app session %s closed while counting elements", p.sessionID)
+		case *enginev1.ContextSessionEvent_Error:
+			return nil, fmt.Errorf("android app session error while counting elements: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func (p *AndroidApp) Focus(ctx context.Context, selector string, options ...CommandOptions) (*ElementResult, error) {
+	if p == nil {
+		return nil, fmt.Errorf("android app is nil")
+	}
+	if err := p.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if p.closed {
+		return nil, fmt.Errorf("android tab session %s is closed", p.sessionID)
+	}
+
+	commandOptions := firstCommandOptions(options)
+	selector = normalizeMobileSelectorForTransport(selector)
+	if err := p.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: p.surfaceSessionID,
+		ContextSessionId: p.sessionID,
+		Command: &enginev1.ContextSessionCommand_FocusElement{
+			FocusElement: &enginev1.FocusElementCommand{
+				CssSelector:  selector,
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send Android FocusElementCommand: %w", err)
+	}
+
+	for {
+		event, err := p.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive Android tab session event during focus: %w", err)
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.ContextSessionEvent_Attached:
+			p.attached = true
+			_ = payload
+		case *enginev1.ContextSessionEvent_ElementFocused:
+			return &ElementResult{
+				Selector: payload.ElementFocused.GetCssSelector(),
+				Note:     payload.ElementFocused.GetNote(),
+			}, nil
+		case *enginev1.ContextSessionEvent_Closed:
+			p.closed = true
+			return nil, fmt.Errorf("android app session %s closed while focusing", p.sessionID)
+		case *enginev1.ContextSessionEvent_Error:
+			return nil, fmt.Errorf("android app session error while focusing: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func (p *AndroidApp) Press(ctx context.Context, selector string, key string, options ...PressOptions) (*PressResult, error) {
+	if p == nil {
+		return nil, fmt.Errorf("android app is nil")
+	}
+	if err := p.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if p.closed {
+		return nil, fmt.Errorf("android tab session %s is closed", p.sessionID)
+	}
+
+	pressOptions := firstPressOptions(options)
+	selector = normalizeMobileSelectorForTransport(selector)
+	command := &enginev1.PressKeyCommand{
+		CssSelector:  selector,
+		Key:          key,
+		RetryOptions: retryOptionsProto(pressOptions.Timeout),
+	}
+	if pressOptions.Text != "" {
+		command.Text = optionalString(pressOptions.Text)
+	}
+	if err := p.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: p.surfaceSessionID,
+		ContextSessionId: p.sessionID,
+		Command: &enginev1.ContextSessionCommand_PressKey{
+			PressKey: command,
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send Android PressKeyCommand: %w", err)
+	}
+
+	for {
+		event, err := p.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive Android tab session event during press: %w", err)
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.ContextSessionEvent_Attached:
+			p.attached = true
+			_ = payload
+		case *enginev1.ContextSessionEvent_KeyPressed:
+			return &PressResult{
+				Selector: payload.KeyPressed.GetCssSelector(),
+				Key:      payload.KeyPressed.GetKey(),
+				Note:     payload.KeyPressed.GetNote(),
+			}, nil
+		case *enginev1.ContextSessionEvent_Closed:
+			p.closed = true
+			return nil, fmt.Errorf("android app session %s closed while pressing key", p.sessionID)
+		case *enginev1.ContextSessionEvent_Error:
+			return nil, fmt.Errorf("android app session error while pressing key: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func (p *AndroidApp) TextContent(ctx context.Context, selector string, options ...CommandOptions) (*TextResult, error) {
+	return p.readText(ctx, selector, true, options...)
+}
+
+func (p *AndroidApp) InnerText(ctx context.Context, selector string, options ...CommandOptions) (*TextResult, error) {
+	return p.readText(ctx, selector, false, options...)
+}
+
+func (p *AndroidApp) WaitForSelector(ctx context.Context, selector string, options ...WaitForSelectorOptions) (*WaitForSelectorResult, error) {
+	if p == nil {
+		return nil, fmt.Errorf("android app is nil")
+	}
+	if err := p.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if p.closed {
+		return nil, fmt.Errorf("android tab session %s is closed", p.sessionID)
+	}
+
+	waitOptions := firstWaitForSelectorOptions(options)
+	selector = normalizeMobileSelectorForTransport(selector)
+	command := &enginev1.WaitForSelectorCommand{
+		CssSelector:  selector,
+		RetryOptions: retryOptionsProto(waitOptions.Timeout),
+	}
+	if waitOptions.Visible != nil {
+		command.Visible = waitOptions.Visible
+	}
+	if err := p.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: p.surfaceSessionID,
+		ContextSessionId: p.sessionID,
+		Command: &enginev1.ContextSessionCommand_WaitForSelector{
+			WaitForSelector: command,
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send Android WaitForSelectorCommand: %w", err)
+	}
+
+	for {
+		event, err := p.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive Android tab session event during wait: %w", err)
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.ContextSessionEvent_Attached:
+			p.attached = true
+			_ = payload
+		case *enginev1.ContextSessionEvent_SelectorWaitSatisfied:
+			return &WaitForSelectorResult{
+				Selector: payload.SelectorWaitSatisfied.GetCssSelector(),
+				Visible:  payload.SelectorWaitSatisfied.GetVisible(),
+				Note:     payload.SelectorWaitSatisfied.GetNote(),
+			}, nil
+		case *enginev1.ContextSessionEvent_Closed:
+			p.closed = true
+			return nil, fmt.Errorf("android app session %s closed while waiting for selector", p.sessionID)
+		case *enginev1.ContextSessionEvent_Error:
+			return nil, fmt.Errorf("android app session error while waiting for selector: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
 func (p *AndroidApp) Screenshot(ctx context.Context, options ...ScreenshotOptions) (*ScreenshotResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("android app is nil")
@@ -262,6 +478,72 @@ func (p *AndroidApp) Screenshot(ctx context.Context, options ...ScreenshotOption
 			return nil, fmt.Errorf("android app session %s closed while capturing screenshot", p.sessionID)
 		case *enginev1.ContextSessionEvent_Error:
 			return nil, fmt.Errorf("android app session error while capturing screenshot: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func (p *AndroidApp) readText(ctx context.Context, selector string, textContent bool, options ...CommandOptions) (*TextResult, error) {
+	if p == nil {
+		return nil, fmt.Errorf("android app is nil")
+	}
+	if err := p.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if p.closed {
+		return nil, fmt.Errorf("android tab session %s is closed", p.sessionID)
+	}
+
+	commandOptions := firstCommandOptions(options)
+	selector = normalizeMobileSelectorForTransport(selector)
+	command := &enginev1.ContextSessionCommand{
+		SurfaceSessionId: p.surfaceSessionID,
+		ContextSessionId: p.sessionID,
+	}
+	if textContent {
+		command.Command = &enginev1.ContextSessionCommand_GetTextContent{
+			GetTextContent: &enginev1.GetTextContentCommand{
+				CssSelector:  selector,
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+			},
+		}
+	} else {
+		command.Command = &enginev1.ContextSessionCommand_GetInnerText{
+			GetInnerText: &enginev1.GetInnerTextCommand{
+				CssSelector:  selector,
+				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+			},
+		}
+	}
+	if err := p.stream.Send(command); err != nil {
+		return nil, fmt.Errorf("send Android text read command: %w", err)
+	}
+
+	for {
+		event, err := p.stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive Android tab session event during text read: %w", err)
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.ContextSessionEvent_Attached:
+			p.attached = true
+			_ = payload
+		case *enginev1.ContextSessionEvent_TextContentResolved:
+			return &TextResult{
+				Selector: payload.TextContentResolved.GetCssSelector(),
+				Text:     payload.TextContentResolved.GetText(),
+				Note:     payload.TextContentResolved.GetNote(),
+			}, nil
+		case *enginev1.ContextSessionEvent_InnerTextResolved:
+			return &TextResult{
+				Selector: payload.InnerTextResolved.GetCssSelector(),
+				Text:     payload.InnerTextResolved.GetText(),
+				Note:     payload.InnerTextResolved.GetNote(),
+			}, nil
+		case *enginev1.ContextSessionEvent_Closed:
+			p.closed = true
+			return nil, fmt.Errorf("android app session %s closed while reading text", p.sessionID)
+		case *enginev1.ContextSessionEvent_Error:
+			return nil, fmt.Errorf("android app session error while reading text: %s", payload.Error.GetMessage())
 		}
 	}
 }
@@ -412,11 +694,53 @@ func (l *AndroidLocator) Click(ctx context.Context, options ...CommandOptions) (
 	return l.page.Click(ctx, l.selector, options...)
 }
 
+func (l *AndroidLocator) Count(ctx context.Context, options ...CommandOptions) (*CountResult, error) {
+	if l == nil || l.page == nil {
+		return nil, fmt.Errorf("android locator page is nil")
+	}
+	return l.page.Count(ctx, l.selector, options...)
+}
+
+func (l *AndroidLocator) Focus(ctx context.Context, options ...CommandOptions) (*ElementResult, error) {
+	if l == nil || l.page == nil {
+		return nil, fmt.Errorf("android locator page is nil")
+	}
+	return l.page.Focus(ctx, l.selector, options...)
+}
+
 func (l *AndroidLocator) Fill(ctx context.Context, value string, options ...CommandOptions) (*FillResult, error) {
 	if l == nil || l.page == nil {
 		return nil, fmt.Errorf("android locator page is nil")
 	}
 	return l.page.Fill(ctx, l.selector, value, options...)
+}
+
+func (l *AndroidLocator) Press(ctx context.Context, key string, options ...PressOptions) (*PressResult, error) {
+	if l == nil || l.page == nil {
+		return nil, fmt.Errorf("android locator page is nil")
+	}
+	return l.page.Press(ctx, l.selector, key, options...)
+}
+
+func (l *AndroidLocator) TextContent(ctx context.Context, options ...CommandOptions) (*TextResult, error) {
+	if l == nil || l.page == nil {
+		return nil, fmt.Errorf("android locator page is nil")
+	}
+	return l.page.TextContent(ctx, l.selector, options...)
+}
+
+func (l *AndroidLocator) InnerText(ctx context.Context, options ...CommandOptions) (*TextResult, error) {
+	if l == nil || l.page == nil {
+		return nil, fmt.Errorf("android locator page is nil")
+	}
+	return l.page.InnerText(ctx, l.selector, options...)
+}
+
+func (l *AndroidLocator) WaitFor(ctx context.Context, options ...WaitForSelectorOptions) (*WaitForSelectorResult, error) {
+	if l == nil || l.page == nil {
+		return nil, fmt.Errorf("android locator page is nil")
+	}
+	return l.page.WaitForSelector(ctx, l.selector, options...)
 }
 
 func parseExplicitMobileSelectorPrefix(selector string) (mobileSelectorFlavor, int, bool) {

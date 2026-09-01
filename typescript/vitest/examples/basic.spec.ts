@@ -1,13 +1,15 @@
-import { expect, test } from "../dist/index.js";
+import { expect, test as base } from "../dist/index.js";
 
 const WEB_URL = "https://themoderninternet.vercel.app";
 const ENTRY_SELECTOR =
   "xpath=//div[contains(@class,'card')][.//h2[normalize-space()='Form Inputs']]//button[normalize-space()='Visit page']";
 const HEADING_SELECTOR = 'xpath=//h1[text()="Form Inputs"]';
 
-test.use({
-  allwright: {
-    suite: "firefox-dev",
+const test = base.extend({
+  allwright: async ({}, use) => {
+    await use({
+      suite: "firefox-dev",
+    });
   },
 });
 

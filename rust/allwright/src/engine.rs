@@ -934,39 +934,30 @@ async fn handle_tab_command(
             css_selector,
             retry_options,
         })) => {
-            let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (
-                    EngineBrowserSessionHandle::Web(surface_session),
-                    EnginePageSessionHandle::Web(page_session),
-                ) => (surface_session, page_session),
-                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
-                    return Ok(TabCommandOutcome {
-                        events: vec![tab_event(
-                            &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message:
-                                    "count_elements is not supported for mobile tab sessions yet"
-                                        .to_string(),
-                            }),
-                        )],
-                        should_close: false,
-                    });
-                }
-                _ => {
-                    return Ok(TabCommandOutcome {
-                        events: vec![tab_event(
-                            &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "tab session backend metadata is inconsistent".to_string(),
-                            }),
-                        )],
-                        should_close: false,
-                    });
-                }
-            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let count = retry_with_timeout(retry_policy, || async {
-                web_lib::count_elements(&surface_session, &page_session, &css_selector).await
+                match (&surface_session, &page_session) {
+                    (
+                        EngineBrowserSessionHandle::Web(surface_session),
+                        EnginePageSessionHandle::Web(page_session),
+                    ) => web_lib::count_elements(surface_session, page_session, &css_selector)
+                        .await
+                        .map(|count| (count.css_selector, count.count, count.note)),
+                    (
+                        EngineBrowserSessionHandle::Mobile(surface_session),
+                        EnginePageSessionHandle::Mobile(page_session),
+                    ) => web_lib::count_mobile_elements(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|count| (count.selector, count.count, count.note)),
+                    _ => Err("tab session backend metadata is inconsistent".to_string()),
+                }
             })
             .await
             .map_err(Status::internal)?;
@@ -974,9 +965,9 @@ async fn handle_tab_command(
                 events: vec![tab_event(
                     &context_session_id,
                     ContextEvent::ElementCounted(ElementCountedEvent {
-                        css_selector: count.css_selector,
-                        count: count.count,
-                        note: count.note,
+                        css_selector: count.0,
+                        count: count.1,
+                        note: count.2,
                     }),
                 )],
                 should_close: false,
@@ -997,9 +988,8 @@ async fn handle_tab_command(
                         events: vec![tab_event(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
-                                message:
-                                    "highlight_elements is not supported for mobile tab sessions"
-                                        .to_string(),
+                                message: "highlight is not supported for Android app sessions"
+                                    .to_string(),
                             }),
                         )],
                         should_close: false,
@@ -1050,13 +1040,30 @@ async fn handle_tab_command(
                     EngineBrowserSessionHandle::Web(surface_session),
                     EnginePageSessionHandle::Web(page_session),
                 ) => (surface_session, page_session),
-                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
+                (
+                    EngineBrowserSessionHandle::Mobile(surface_session),
+                    EnginePageSessionHandle::Mobile(page_session),
+                ) => {
+                    let retry_policy = command_retry_policy(retry_options.as_ref());
+                    let focus = retry_with_timeout(retry_policy, || async {
+                        web_lib::focus_mobile_element(
+                            surface_session,
+                            page_session,
+                            &css_selector,
+                            retry_options
+                                .as_ref()
+                                .and_then(|options| options.timeout_ms),
+                        )
+                        .await
+                    })
+                    .await
+                    .map_err(Status::internal)?;
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
                             &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "focus_element is not supported for mobile tab sessions"
-                                    .to_string(),
+                            ContextEvent::ElementFocused(ElementFocusedEvent {
+                                css_selector: focus.selector,
+                                note: focus.note,
                             }),
                         )],
                         should_close: false,
@@ -1199,13 +1206,33 @@ async fn handle_tab_command(
                     EngineBrowserSessionHandle::Web(surface_session),
                     EnginePageSessionHandle::Web(page_session),
                 ) => (surface_session, page_session),
-                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
+                (
+                    EngineBrowserSessionHandle::Mobile(surface_session),
+                    EnginePageSessionHandle::Mobile(page_session),
+                ) => {
+                    let retry_policy = command_retry_policy(retry_options.as_ref());
+                    let press = retry_with_timeout(retry_policy, || async {
+                        web_lib::press_mobile_key(
+                            surface_session,
+                            page_session,
+                            &css_selector,
+                            &key,
+                            text.as_deref(),
+                            retry_options
+                                .as_ref()
+                                .and_then(|options| options.timeout_ms),
+                        )
+                        .await
+                    })
+                    .await
+                    .map_err(Status::internal)?;
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
                             &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "press_key is not supported for mobile tab sessions"
-                                    .to_string(),
+                            ContextEvent::KeyPressed(KeyPressedEvent {
+                                css_selector: press.selector,
+                                key: press.key,
+                                note: press.note,
                             }),
                         )],
                         should_close: false,
@@ -1252,39 +1279,30 @@ async fn handle_tab_command(
             css_selector,
             retry_options,
         })) => {
-            let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (
-                    EngineBrowserSessionHandle::Web(surface_session),
-                    EnginePageSessionHandle::Web(page_session),
-                ) => (surface_session, page_session),
-                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
-                    return Ok(TabCommandOutcome {
-                        events: vec![tab_event(
-                            &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message:
-                                    "get_text_content is not supported for mobile tab sessions yet"
-                                        .to_string(),
-                            }),
-                        )],
-                        should_close: false,
-                    });
-                }
-                _ => {
-                    return Ok(TabCommandOutcome {
-                        events: vec![tab_event(
-                            &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "tab session backend metadata is inconsistent".to_string(),
-                            }),
-                        )],
-                        should_close: false,
-                    });
-                }
-            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let text = retry_with_timeout(retry_policy, || async {
-                web_lib::get_text_content(&surface_session, &page_session, &css_selector).await
+                match (&surface_session, &page_session) {
+                    (
+                        EngineBrowserSessionHandle::Web(surface_session),
+                        EnginePageSessionHandle::Web(page_session),
+                    ) => web_lib::get_text_content(surface_session, page_session, &css_selector)
+                        .await
+                        .map(|text| (text.css_selector, text.text, text.note)),
+                    (
+                        EngineBrowserSessionHandle::Mobile(surface_session),
+                        EnginePageSessionHandle::Mobile(page_session),
+                    ) => web_lib::get_mobile_text(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|text| (text.selector, text.text, text.note)),
+                    _ => Err("tab session backend metadata is inconsistent".to_string()),
+                }
             })
             .await
             .map_err(Status::internal)?;
@@ -1292,9 +1310,9 @@ async fn handle_tab_command(
                 events: vec![tab_event(
                     &context_session_id,
                     ContextEvent::TextContentResolved(TextContentResolvedEvent {
-                        css_selector: text.css_selector,
-                        text: text.text,
-                        note: text.note,
+                        css_selector: text.0,
+                        text: text.1,
+                        note: text.2,
                     }),
                 )],
                 should_close: false,
@@ -1304,39 +1322,30 @@ async fn handle_tab_command(
             css_selector,
             retry_options,
         })) => {
-            let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (
-                    EngineBrowserSessionHandle::Web(surface_session),
-                    EnginePageSessionHandle::Web(page_session),
-                ) => (surface_session, page_session),
-                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
-                    return Ok(TabCommandOutcome {
-                        events: vec![tab_event(
-                            &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message:
-                                    "get_inner_text is not supported for mobile tab sessions yet"
-                                        .to_string(),
-                            }),
-                        )],
-                        should_close: false,
-                    });
-                }
-                _ => {
-                    return Ok(TabCommandOutcome {
-                        events: vec![tab_event(
-                            &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "tab session backend metadata is inconsistent".to_string(),
-                            }),
-                        )],
-                        should_close: false,
-                    });
-                }
-            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let text = retry_with_timeout(retry_policy, || async {
-                web_lib::get_inner_text(&surface_session, &page_session, &css_selector).await
+                match (&surface_session, &page_session) {
+                    (
+                        EngineBrowserSessionHandle::Web(surface_session),
+                        EnginePageSessionHandle::Web(page_session),
+                    ) => web_lib::get_inner_text(surface_session, page_session, &css_selector)
+                        .await
+                        .map(|text| (text.css_selector, text.text, text.note)),
+                    (
+                        EngineBrowserSessionHandle::Mobile(surface_session),
+                        EnginePageSessionHandle::Mobile(page_session),
+                    ) => web_lib::get_mobile_inner_text(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|text| (text.selector, text.text, text.note)),
+                    _ => Err("tab session backend metadata is inconsistent".to_string()),
+                }
             })
             .await
             .map_err(Status::internal)?;
@@ -1344,9 +1353,9 @@ async fn handle_tab_command(
                 events: vec![tab_event(
                     &context_session_id,
                     ContextEvent::InnerTextResolved(InnerTextResolvedEvent {
-                        css_selector: text.css_selector,
-                        text: text.text,
-                        note: text.note,
+                        css_selector: text.0,
+                        text: text.1,
+                        note: text.2,
                     }),
                 )],
                 should_close: false,
@@ -1357,45 +1366,36 @@ async fn handle_tab_command(
             visible,
             retry_options,
         })) => {
-            let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (
-                    EngineBrowserSessionHandle::Web(surface_session),
-                    EnginePageSessionHandle::Web(page_session),
-                ) => (surface_session, page_session),
-                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
-                    return Ok(TabCommandOutcome {
-                        events: vec![tab_event(
-                            &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message:
-                                    "wait_for_selector is not supported for mobile tab sessions yet"
-                                        .to_string(),
-                            }),
-                        )],
-                        should_close: false,
-                    });
-                }
-                _ => {
-                    return Ok(TabCommandOutcome {
-                        events: vec![tab_event(
-                            &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "tab session backend metadata is inconsistent".to_string(),
-                            }),
-                        )],
-                        should_close: false,
-                    });
-                }
-            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let wait = retry_with_timeout(retry_policy, || async {
-                web_lib::wait_for_selector(
-                    &surface_session,
-                    &page_session,
-                    &css_selector,
-                    visible.unwrap_or(false),
-                )
-                .await
+                match (&surface_session, &page_session) {
+                    (
+                        EngineBrowserSessionHandle::Web(surface_session),
+                        EnginePageSessionHandle::Web(page_session),
+                    ) => web_lib::wait_for_selector(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        visible.unwrap_or(false),
+                    )
+                    .await
+                    .map(|wait| (wait.css_selector, wait.visible, wait.note)),
+                    (
+                        EngineBrowserSessionHandle::Mobile(surface_session),
+                        EnginePageSessionHandle::Mobile(page_session),
+                    ) => web_lib::wait_for_mobile_selector(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        visible.unwrap_or(false),
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|wait| (wait.selector, wait.visible, wait.note)),
+                    _ => Err("tab session backend metadata is inconsistent".to_string()),
+                }
             })
             .await
             .map_err(Status::internal)?;
@@ -1403,9 +1403,9 @@ async fn handle_tab_command(
                 events: vec![tab_event(
                     &context_session_id,
                     ContextEvent::SelectorWaitSatisfied(SelectorWaitSatisfiedEvent {
-                        css_selector: wait.css_selector,
-                        visible: wait.visible,
-                        note: wait.note,
+                        css_selector: wait.0,
+                        visible: wait.1,
+                        note: wait.2,
                     }),
                 )],
                 should_close: false,

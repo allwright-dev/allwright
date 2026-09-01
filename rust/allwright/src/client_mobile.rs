@@ -6,8 +6,10 @@ use crate::proto::surface_session_command::Command as SurfaceCommand;
 use crate::proto::surface_session_event::Event as SurfaceEvent;
 use crate::proto::{
     AppLaunchedEvent, ClickElementCommand, ConnectMobileCommand, ContextSessionCommand,
-    FillElementCommand, LaunchAppCommand, MobileConnectedEvent,
-    MobilePlatform as ProtoMobilePlatform, ScreenshotCommand, SurfaceSessionCommand,
+    CountElementsCommand, FillElementCommand, FocusElementCommand, GetInnerTextCommand,
+    GetTextContentCommand, LaunchAppCommand, MobileConnectedEvent,
+    MobilePlatform as ProtoMobilePlatform, PressKeyCommand, ScreenshotCommand,
+    SurfaceSessionCommand, WaitForSelectorCommand,
 };
 use tokio::sync::{Mutex as AsyncMutex, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
@@ -15,8 +17,9 @@ use tokio_stream::wrappers::ReceiverStream;
 use super::command::command_retry_options;
 use super::runtime::get_runtime;
 use super::types::{
-    ClickResult, CommandOptions, Error, FillResult, Result, RuntimeClient, ScreenshotOptions,
-    ScreenshotResult,
+    ClickResult, CommandOptions, CountResult, ElementResult, Error, FillResult, PressOptions,
+    PressResult, Result, RuntimeClient, ScreenshotOptions, ScreenshotResult, TextResult,
+    WaitForSelectorOptions, WaitForSelectorResult,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -354,6 +357,236 @@ impl AndroidApp {
         }
     }
 
+    pub async fn count(&self, selector: &str, options: CommandOptions) -> Result<CountResult> {
+        let selector = normalize_mobile_selector_for_transport(selector);
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.inner.session_id)?;
+
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::CountElements(CountElementsCommand {
+                    css_selector: selector.clone(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send CountElementsCommand"))?;
+
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("app session closed while waiting for count result")
+                })?;
+
+            match event.event {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::ElementCounted(counted)) => {
+                    return Ok(CountResult {
+                        selector: counted.css_selector,
+                        count: counted.count,
+                        note: counted.note,
+                    });
+                }
+                Some(ContextEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "app session error while counting Android locator {:?}: {}",
+                        selector, error.message,
+                    )));
+                }
+                Some(ContextEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "app session {} closed while waiting for count result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn focus(&self, selector: &str, options: CommandOptions) -> Result<ElementResult> {
+        let selector = normalize_mobile_selector_for_transport(selector);
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.inner.session_id)?;
+
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::FocusElement(FocusElementCommand {
+                    css_selector: selector.clone(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send FocusElementCommand"))?;
+
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("app session closed while waiting for focus result")
+                })?;
+
+            match event.event {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::ElementFocused(focused)) => {
+                    return Ok(ElementResult {
+                        selector: focused.css_selector,
+                        note: focused.note,
+                    });
+                }
+                Some(ContextEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "app session error while focusing Android locator {:?}: {}",
+                        selector, error.message,
+                    )));
+                }
+                Some(ContextEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "app session {} closed while waiting for focus result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn press(
+        &self,
+        selector: &str,
+        key: &str,
+        options: PressOptions,
+    ) -> Result<PressResult> {
+        let selector = normalize_mobile_selector_for_transport(selector);
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.inner.session_id)?;
+
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::PressKey(PressKeyCommand {
+                    css_selector: selector.clone(),
+                    key: key.to_string(),
+                    text: options.text,
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send PressKeyCommand"))?;
+
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("app session closed while waiting for press result")
+                })?;
+
+            match event.event {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::KeyPressed(pressed)) => {
+                    return Ok(PressResult {
+                        selector: pressed.css_selector,
+                        key: pressed.key,
+                        note: pressed.note,
+                    });
+                }
+                Some(ContextEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "app session error while pressing Android key on {:?}: {}",
+                        selector, error.message,
+                    )));
+                }
+                Some(ContextEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "app session {} closed while waiting for press result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn text_content(
+        &self,
+        selector: &str,
+        options: CommandOptions,
+    ) -> Result<TextResult> {
+        self.read_text(selector, options, true).await
+    }
+
+    pub async fn inner_text(&self, selector: &str, options: CommandOptions) -> Result<TextResult> {
+        self.read_text(selector, options, false).await
+    }
+
+    pub async fn wait_for_selector(
+        &self,
+        selector: &str,
+        options: WaitForSelectorOptions,
+    ) -> Result<WaitForSelectorResult> {
+        let selector = normalize_mobile_selector_for_transport(selector);
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.inner.session_id)?;
+
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::WaitForSelector(WaitForSelectorCommand {
+                    css_selector: selector.clone(),
+                    visible: options.visible,
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send WaitForSelectorCommand"))?;
+
+        loop {
+            let event = handle.events.message().await?.ok_or_else(|| {
+                Error::new("app session closed while waiting for selector result")
+            })?;
+
+            match event.event {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::SelectorWaitSatisfied(wait)) => {
+                    return Ok(WaitForSelectorResult {
+                        selector: wait.css_selector,
+                        visible: wait.visible,
+                        note: wait.note,
+                    });
+                }
+                Some(ContextEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "app session error while waiting for Android locator {:?}: {}",
+                        selector, error.message,
+                    )));
+                }
+                Some(ContextEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "app session {} closed while waiting for selector result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+
     pub async fn screenshot(&self) -> Result<ScreenshotResult> {
         self.screenshot_with_options(ScreenshotOptions::default())
             .await
@@ -439,6 +672,79 @@ impl AndroidApp {
             .as_mut()
             .ok_or_else(|| Error::new("android app session handle was not initialized"))
     }
+
+    async fn read_text(
+        &self,
+        selector: &str,
+        options: CommandOptions,
+        text_content: bool,
+    ) -> Result<TextResult> {
+        let selector = normalize_mobile_selector_for_transport(selector);
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.inner.session_id)?;
+
+        let command = if text_content {
+            ContextCommand::GetTextContent(GetTextContentCommand {
+                css_selector: selector.clone(),
+                retry_options: command_retry_options(options.timeout_ms),
+            })
+        } else {
+            ContextCommand::GetInnerText(GetInnerTextCommand {
+                css_selector: selector.clone(),
+                retry_options: command_retry_options(options.timeout_ms),
+            })
+        };
+
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(command),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send text read command"))?;
+
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("app session closed while waiting for text result")
+                })?;
+
+            match event.event {
+                Some(ContextEvent::Attached(_)) => {}
+                Some(ContextEvent::TextContentResolved(text)) => {
+                    return Ok(TextResult {
+                        selector: text.css_selector,
+                        text: text.text,
+                        note: text.note,
+                    });
+                }
+                Some(ContextEvent::InnerTextResolved(text)) => {
+                    return Ok(TextResult {
+                        selector: text.css_selector,
+                        text: text.text,
+                        note: text.note,
+                    });
+                }
+                Some(ContextEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "app session error while reading Android text for {:?}: {}",
+                        selector, error.message,
+                    )));
+                }
+                Some(ContextEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(format!(
+                        "app session {} closed while waiting for text result",
+                        self.inner.session_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 impl AndroidLocator {
@@ -461,8 +767,32 @@ impl AndroidLocator {
         self.page.click(&self.selector, options).await
     }
 
+    pub async fn count(&self, options: CommandOptions) -> Result<CountResult> {
+        self.page.count(&self.selector, options).await
+    }
+
+    pub async fn focus(&self, options: CommandOptions) -> Result<ElementResult> {
+        self.page.focus(&self.selector, options).await
+    }
+
     pub async fn fill(&self, value: &str, options: CommandOptions) -> Result<FillResult> {
         self.page.fill(&self.selector, value, options).await
+    }
+
+    pub async fn press(&self, key: &str, options: PressOptions) -> Result<PressResult> {
+        self.page.press(&self.selector, key, options).await
+    }
+
+    pub async fn text_content(&self, options: CommandOptions) -> Result<TextResult> {
+        self.page.text_content(&self.selector, options).await
+    }
+
+    pub async fn inner_text(&self, options: CommandOptions) -> Result<TextResult> {
+        self.page.inner_text(&self.selector, options).await
+    }
+
+    pub async fn wait_for(&self, options: WaitForSelectorOptions) -> Result<WaitForSelectorResult> {
+        self.page.wait_for_selector(&self.selector, options).await
     }
 }
 
