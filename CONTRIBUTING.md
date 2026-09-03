@@ -23,6 +23,7 @@ Thank you for your interest in contributing to allwright.
   - shared contracts belong under `proto/`.
   - future surface capabilities should extend the single engine through explicit plugin boundaries such as `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux` rather than introducing separate engines.
 - Preserve the project's driverless browser automation direction and avoid introducing ChromeDriver into the primary control path.
+- Hard rule for the web plugin: all Chromium web element operations, including click, hover, focus, fill, key input, selector checks, text reads, highlighting, and screenshots, must execute through WebDriver BiDi. CDP may only support browser/tab lifecycle, Chromium BiDi mapper bootstrap, and mapper transport; it must not perform DOM inspection or user-input actions in a normal web automation path.
 
 ## Testing
 

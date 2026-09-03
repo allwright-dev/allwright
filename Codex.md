@@ -175,7 +175,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `mobile-android` now follows that intended separation in practice: core-owned surface/context routing invokes the plugin, while Android-specific ADB/runtime behavior remains inside the plugin.
 - The injected mapper is sourced from the published `chromium-bidi@17.0.2` package but is checked into `rust/allwright-surface-web/third_party/chromium-bidi/17.0.2/` so the publishable web surface crate does not depend on `npm`.
 - The intended web plugin path persists a real `bidi_session_id` plus mapper target/session ids after mapper injection.
-- The implemented web surface crate includes selector-based click through `script.evaluate` on the tab browsing context.
+- Hard rule for future Chromium web-plugin work: all web element operations must execute through WebDriver BiDi. This includes click, hover, focus, fill, key input, selector checks, text reads, highlighting, and screenshots. CDP is permitted only for browser/tab lifecycle, Chromium BiDi mapper bootstrap, and mapper transport; it must never inspect the DOM or dispatch user input in a normal web automation path.
 - Chrome launching logic currently lives in `allwright-surface-web`, uses the browser binary directly, and discovers the CDP WebSocket endpoint via `DevToolsActivePort`.
 - Shared surface crates support plugin families, while leaf surface crates provide the publishable install targets.
 - `rust/allwright` now hides the engine transport behind a lazy singleton connection and exposes `launch_chrome`, `ping`, `Browser`, `Tab`, and plugin catalog metadata from the lightweight core package.
