@@ -1,0 +1,43 @@
+{
+  "name": "create-allwright",
+  "version": "0.0.58",
+  "description": "Create a new allwright test project with npm init allwright.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/allwright-dev/allwright.git"
+  },
+  "homepage": "https://allwright.dev",
+  "bugs": {
+    "url": "https://github.com/allwright-dev/allwright/issues"
+  },
+  "keywords": [
+    "allwright",
+    "create",
+    "initializer",
+    "npm-init",
+    "testing"
+  ],
+  "bin": {
+    "create-allwright": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.4.0",
+    "typescript": "^5.9.2"
+  }
+}

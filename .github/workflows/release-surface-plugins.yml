@@ -190,6 +190,9 @@ jobs:
       - name: Publish npm Vitest package
         run: npm publish --workspace @allwright.dev/vitest --access public
 
+      - name: Publish npm project initializer
+        run: npm publish --workspace create-allwright --access public
+
   publish-crates:
     name: Publish Rust crates
     runs-on: ubuntu-latest

@@ -18,6 +18,7 @@ const repoRoot = process.argv[2];
 const version = process.argv[3];
 const packageJsonPaths = [
   path.join(repoRoot, "typescript", "core", "package.json"),
+  path.join(repoRoot, "typescript", "create", "package.json"),
   path.join(repoRoot, "typescript", "vitest", "package.json"),
 ];
 

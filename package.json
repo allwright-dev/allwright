@@ -4,11 +4,13 @@
   "packageManager": "bun@1.2.20",
   "workspaces": [
     "typescript/core",
+    "typescript/create",
     "typescript/vitest"
   ],
   "scripts": {
-    "build": "bun run build:core && bun run build:vitest",
+    "build": "bun run build:core && bun run build:create && bun run build:vitest",
     "build:core": "bun run --filter @allwright.dev/core build",
+    "build:create": "bun run --filter create-allwright build",
     "build:vitest": "bun run --filter @allwright.dev/vitest build"
   }
 }

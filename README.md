@@ -94,7 +94,7 @@ Release automation today:
 - that workflow creates the Go submodule tag `go/vX.Y.Z`, verifies the Go client in `go/`, and warms the public Go proxy for `allwright.dev`
 - that workflow publishes the Java client to Maven Central as `dev.allwright:allwright` using the checked-in Gradle wrapper, a Central Portal user token, and a follow-up transfer call through Sonatype's Central Portal OSSRH Staging API compatibility service
 - that workflow publishes the Python client to PyPI as `allwright` using PyPI Trusted Publishing via GitHub Actions OIDC
-- that workflow publishes the npm workspace packages `@allwright.dev/core` and `@allwright.dev/vitest` using npm Trusted Publishing via GitHub Actions OIDC
+- that workflow publishes the npm workspace packages `@allwright.dev/core`, `@allwright.dev/vitest`, and `create-allwright` using npm Trusted Publishing via GitHub Actions OIDC
 - that workflow builds both the `allwright` CLI and `allwright-surface-web` plugin for the current release matrix and uploads the archives to the matching GitHub Release
 - `allwright plugin install web` resolves the local OS and architecture, then downloads the matching release asset
 - the Rust, Go, Java, Python, and TypeScript clients now auto-bootstrap the matching `allwright` CLI and `web` plugin for their own version when they target a local server address and nothing is running yet
@@ -328,6 +328,7 @@ Configure npm Trusted Publishing for `@allwright.dev/core` on npmjs.com before p
 - allowed action: `npm publish`
 
 Configure npm Trusted Publishing for `@allwright.dev/vitest` with the same values.
+Configure npm Trusted Publishing for `create-allwright` with the same values.
 
 The npm publish job uses the `Prod` GitHub environment plus OIDC instead of an `NPM_TOKEN`, which avoids bypass-2FA tokens entirely.
 
@@ -400,6 +401,7 @@ The release workflow syncs `python/pyproject.toml` to `X.Y.Z`, builds the source
 
 The TypeScript client lives in `typescript/core` as `@allwright.dev/core`.
 The Vitest fixture package lives in `typescript/vitest` as `@allwright.dev/vitest`.
+The project initializer lives in `typescript/create` as `create-allwright` and powers `npm init allwright`.
 
 You only create the root release tag manually:
 
@@ -408,7 +410,7 @@ git tag vX.Y.Z
 git push origin vX.Y.Z
 ```
 
-The release workflow syncs both package versions to `X.Y.Z`, updates `@allwright.dev/vitest` to depend on the matching `@allwright.dev/core` version, builds the workspace, then publishes `@allwright.dev/core` first and `@allwright.dev/vitest` second.
+The release workflow syncs all three package versions to `X.Y.Z`, updates `@allwright.dev/vitest` to depend on the matching `@allwright.dev/core` version, builds the workspace, then publishes `@allwright.dev/core`, `@allwright.dev/vitest`, and `create-allwright` in that order.
 
 ## Installer Scripts
 
