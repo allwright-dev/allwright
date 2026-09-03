@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use allwright::proto;
+use allwright_plugin_sdk::{BrowserSessionHandle, PageSessionHandle};
 use allwright_surface_web as web_lib;
 use tokio::sync::{Mutex, mpsc};
 use tokio::time::{Duration, Instant, sleep};
@@ -473,7 +474,7 @@ async fn handle_tab_command(
         });
     }
 
-    let (cdp_websocket_url, target_id, existing_bidi_mapper) = {
+    let (cdp_websocket_url, target_id, browsing_context_id, existing_bidi_mapper) = {
         let state = state.lock().await;
         let browser_session = match state.browser_sessions.get(&browser_session_id) {
             Some(browser_session) => browser_session,
@@ -527,8 +528,19 @@ async fn handle_tab_command(
                 Status::internal("browser session is missing CDP websocket metadata")
             })?,
             tab_session.target_id.clone(),
+            tab_session.browsing_context_id.clone(),
             browser_session.bidi_mapper.clone(),
         )
+    };
+    let surface_session = BrowserSessionHandle::Chromium {
+        cdp_websocket_url: cdp_websocket_url.clone(),
+    };
+    let page_session = PageSessionHandle::Chromium {
+        target_id: target_id.clone(),
+        browsing_context_id,
+        mapper_target_id: existing_bidi_mapper
+            .as_ref()
+            .map(|mapper| mapper.mapper_target_id.clone()),
     };
 
     match command.command {
@@ -647,7 +659,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let click = retry_with_timeout(retry_policy, || async {
-                web_lib::click_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+                web_lib::click_element(&surface_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
@@ -672,7 +684,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let count = retry_with_timeout(retry_policy, || async {
-                web_lib::count_elements_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+                web_lib::count_elements(&surface_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
@@ -695,13 +707,12 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let highlight = retry_with_timeout(retry_policy, || async {
-                web_lib::highlight_elements_via_cdp(
-                    &cdp_websocket_url,
-                    &target_id,
+                web_lib::highlight_elements(
+                    &surface_session,
+                    &page_session,
                     &css_selector,
                     duration_ms.unwrap_or(2_000),
-                )
-                .await
+                ).await
             })
             .await
             .map_err(Status::internal)?;
@@ -723,7 +734,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let focus = retry_with_timeout(retry_policy, || async {
-                web_lib::focus_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+                web_lib::focus_element(&surface_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
@@ -745,8 +756,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let fill = retry_with_timeout(retry_policy, || async {
-                web_lib::fill_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector, &value)
-                    .await
+                web_lib::fill_element(&surface_session, &page_session, &css_selector, &value).await
             })
             .await
             .map_err(Status::internal)?;
@@ -768,7 +778,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let hover = retry_with_timeout(retry_policy, || async {
-                web_lib::hover_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+                web_lib::hover_element(&surface_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
@@ -791,14 +801,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let press = retry_with_timeout(retry_policy, || async {
-                web_lib::press_key_via_cdp(
-                    &cdp_websocket_url,
-                    &target_id,
-                    &css_selector,
-                    &key,
-                    text.as_deref(),
-                )
-                .await
+                web_lib::press_key(&surface_session, &page_session, &css_selector, &key, text.as_deref()).await
             })
             .await
             .map_err(Status::internal)?;
@@ -820,8 +823,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let text = retry_with_timeout(retry_policy, || async {
-                web_lib::get_text_content_via_cdp(&cdp_websocket_url, &target_id, &css_selector)
-                    .await
+                web_lib::get_text_content(&surface_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
@@ -843,7 +845,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let text = retry_with_timeout(retry_policy, || async {
-                web_lib::get_inner_text_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await
+                web_lib::get_inner_text(&surface_session, &page_session, &css_selector).await
             })
             .await
             .map_err(Status::internal)?;
@@ -866,13 +868,7 @@ async fn handle_tab_command(
         })) => {
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let wait = retry_with_timeout(retry_policy, || async {
-                web_lib::wait_for_selector_via_cdp(
-                    &cdp_websocket_url,
-                    &target_id,
-                    &css_selector,
-                    visible.unwrap_or(false),
-                )
-                .await
+                web_lib::wait_for_selector(&surface_session, &page_session, &css_selector, visible.unwrap_or(false)).await
             })
             .await
             .map_err(Status::internal)?;

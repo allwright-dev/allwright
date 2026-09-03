@@ -343,6 +343,7 @@ async fn handle_browser_command(
                     page_session: EnginePageSessionHandle::Web(PageSessionHandle::Chromium {
                         target_id: initial_tab.target_id,
                         browsing_context_id: None,
+                        mapper_target_id: None,
                     }),
                     current_url: None,
                 },

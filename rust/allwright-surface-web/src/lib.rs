@@ -184,6 +184,7 @@ pub fn launch_browser(
                     page_session: PageSessionHandle::Chromium {
                         target_id: initial_page.target_id,
                         browsing_context_id: None,
+                        mapper_target_id: None,
                     },
                 },
             })
@@ -201,6 +202,7 @@ pub async fn open_page(browser_session: &BrowserSessionHandle) -> Result<PageInf
                 page_session: PageSessionHandle::Chromium {
                     target_id: tab.target_id,
                     browsing_context_id: None,
+                    mapper_target_id: None,
                 },
             })
         }
@@ -330,6 +332,7 @@ pub async fn navigate_chrome_tab(
         page_session: PageSessionHandle::Chromium {
             target_id: target_id.to_string(),
             browsing_context_id: Some(browsing_context_id),
+            mapper_target_id: None,
         },
         automation: AutomationSessionInfo {
             bidi_session_id: String::new(),
@@ -352,6 +355,7 @@ pub async fn navigate_page(
             PageSessionHandle::Chromium {
                 target_id,
                 browsing_context_id,
+                ..
             },
         ) => {
             let navigation = navigate_chrome_tab(cdp_websocket_url, target_id, url).await?;
@@ -368,6 +372,7 @@ pub async fn navigate_page(
                 page_session: PageSessionHandle::Chromium {
                     target_id: target_id.to_string(),
                     browsing_context_id: Some(resolved_browsing_context_id),
+                    mapper_target_id: Some(mapper.mapper_target_id.clone()),
                 },
                 automation: AutomationSessionInfo {
                     bidi_session_id: format!("chromium-bidi:{target_id}"),
@@ -899,8 +904,20 @@ pub async fn click_element(
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
-            PageSessionHandle::Chromium { target_id, .. },
-        ) => click_element_via_cdp(cdp_websocket_url, target_id, css_selector).await,
+            PageSessionHandle::Chromium {
+                browsing_context_id,
+                mapper_target_id,
+                ..
+            },
+        ) => {
+            click_element_via_bidi(
+                cdp_websocket_url,
+                mapper_target_id.as_deref(),
+                browsing_context_id.as_deref(),
+                css_selector,
+            )
+            .await
+        }
         (
             BrowserSessionHandle::Firefox {
                 connection_id,
@@ -963,8 +980,32 @@ pub async fn count_elements(
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
-            PageSessionHandle::Chromium { target_id, .. },
-        ) => count_elements_via_cdp(cdp_websocket_url, target_id, css_selector).await,
+            PageSessionHandle::Chromium {
+                browsing_context_id,
+                mapper_target_id,
+                ..
+            },
+        ) => {
+            let parsed = parse_selector("count_elements", css_selector)?;
+            let discovered = discover_elements_via_bidi(
+                cdp_websocket_url,
+                mapper_target_id.as_deref(),
+                browsing_context_id.as_deref(),
+                css_selector,
+                DiscoveryRequirements::default(),
+            )
+            .await?;
+            Ok(ElementCountInfo {
+                css_selector: css_selector.to_string(),
+                count: discovered.count,
+                note: format!(
+                    "counted {} element(s) matching {} {}",
+                    discovered.count,
+                    selector_kind_label(parsed.kind),
+                    parsed.value
+                ),
+            })
+        }
         (
             BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
@@ -1013,15 +1054,27 @@ pub async fn highlight_elements(
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
-            PageSessionHandle::Chromium { target_id, .. },
+            PageSessionHandle::Chromium {
+                browsing_context_id,
+                mapper_target_id,
+                ..
+            },
         ) => {
-            highlight_elements_via_cdp(
-                cdp_websocket_url,
-                target_id,
-                css_selector,
-                u32::try_from(duration_ms).unwrap_or(u32::MAX),
-            )
-            .await
+            let parsed = parse_selector("highlight_elements", css_selector)?;
+            let duration_ms = u32::try_from(duration_ms).unwrap_or(u32::MAX).max(1);
+            let count = chromium_bidi_evaluate_u32(cdp_websocket_url, mapper_target_id.as_deref(), browsing_context_id.as_deref(), &format!(
+                "(() => {{ const selector = {}; const durationMs = {duration_ms}; const elements = {}; for (const element of elements) {{ if (!(element instanceof HTMLElement)) continue; element.scrollIntoView({{ block: 'center', inline: 'center', behavior: 'instant' }}); const outline = element.style.outline; const outlineOffset = element.style.outlineOffset; const backgroundColor = element.style.backgroundColor; element.style.outline = '3px solid #ff5a36'; element.style.outlineOffset = '2px'; element.style.backgroundColor = 'rgba(255, 235, 59, 0.35)'; window.setTimeout(() => {{ element.style.outline = outline; element.style.outlineOffset = outlineOffset; element.style.backgroundColor = backgroundColor; }}, durationMs); }} return elements.length; }})()",
+                json_string_literal(&parsed.value, "highlight selector")?, selector_query_all_js(parsed.kind),
+            )).await?;
+            Ok(HighlightElementsInfo {
+                css_selector: css_selector.to_string(),
+                count,
+                note: format!(
+                    "highlighted {count} element(s) matching {} {} for {duration_ms}ms",
+                    selector_kind_label(parsed.kind),
+                    parsed.value
+                ),
+            })
         }
         (
             BrowserSessionHandle::Firefox { connection_id, .. },
@@ -1090,8 +1143,36 @@ pub async fn focus_element(
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
-            PageSessionHandle::Chromium { target_id, .. },
-        ) => focus_element_via_cdp(cdp_websocket_url, target_id, css_selector).await,
+            PageSessionHandle::Chromium {
+                browsing_context_id,
+                mapper_target_id,
+                ..
+            },
+        ) => {
+            let parsed = parse_selector("focus_element", css_selector)?;
+            discover_elements_via_bidi(
+                cdp_websocket_url,
+                mapper_target_id.as_deref(),
+                browsing_context_id.as_deref(),
+                css_selector,
+                DiscoveryRequirements {
+                    require_match: true,
+                    require_visible: true,
+                    focus_first_match: true,
+                    require_focus: true,
+                    ..DiscoveryRequirements::default()
+                },
+            )
+            .await?;
+            Ok(FocusInfo {
+                css_selector: css_selector.to_string(),
+                note: format!(
+                    "focused element matching {} {}",
+                    selector_kind_label(parsed.kind),
+                    parsed.value
+                ),
+            })
+        }
         (
             BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
@@ -1151,8 +1232,34 @@ pub async fn fill_element(
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
-            PageSessionHandle::Chromium { target_id, .. },
-        ) => fill_element_via_cdp(cdp_websocket_url, target_id, css_selector, value).await,
+            PageSessionHandle::Chromium {
+                browsing_context_id,
+                mapper_target_id,
+                ..
+            },
+        ) => {
+            let parsed = parse_selector("fill_element", css_selector)?;
+            chromium_bidi_evaluate_void(
+                cdp_websocket_url,
+                mapper_target_id.as_deref(),
+                browsing_context_id.as_deref(),
+                &dom_set_value_and_dispatch_events_js(
+                    parsed.kind,
+                    &json_string_literal(&parsed.value, "fill selector")?,
+                    &json_string_literal(value, "fill value")?,
+                ),
+            )
+            .await?;
+            Ok(FillInfo {
+                css_selector: css_selector.to_string(),
+                value: value.to_string(),
+                note: format!(
+                    "filled element matching {} {}",
+                    selector_kind_label(parsed.kind),
+                    parsed.value
+                ),
+            })
+        }
         (
             BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
@@ -1197,8 +1304,50 @@ pub async fn hover_element(
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
-            PageSessionHandle::Chromium { target_id, .. },
-        ) => hover_element_via_cdp(cdp_websocket_url, target_id, css_selector).await,
+            PageSessionHandle::Chromium {
+                browsing_context_id,
+                mapper_target_id,
+                ..
+            },
+        ) => {
+            let parsed = parse_selector("hover_element", css_selector)?;
+            let center = discover_elements_via_bidi(
+                cdp_websocket_url,
+                mapper_target_id.as_deref(),
+                browsing_context_id.as_deref(),
+                css_selector,
+                DiscoveryRequirements {
+                    require_match: true,
+                    require_visible: true,
+                    require_pointer_interactable: true,
+                    ..DiscoveryRequirements::default()
+                },
+            )
+            .await?
+            .first_center
+            .ok_or_else(|| {
+                format!(
+                    "element discovery did not return a hover center for {} {}",
+                    selector_kind_label(parsed.kind),
+                    parsed.value
+                )
+            })?;
+            let (mut cdp, mapper, context) = chromium_bidi_session(
+                cdp_websocket_url,
+                mapper_target_id.as_deref(),
+                browsing_context_id.as_deref(),
+            )
+            .await?;
+            cdp.send_bidi_command(&mapper.mapper_session_id, &json!({"id": 2, "method": "input.performActions", "params": {"context": context, "actions": [{"type":"pointer", "id":"allwright-mouse", "parameters":{"pointerType":"mouse"}, "actions":[{"type":"pointerMove", "origin":"viewport", "x":center.x, "y":center.y}]}]}})).await?;
+            Ok(HoverInfo {
+                css_selector: css_selector.to_string(),
+                note: format!(
+                    "hovered element matching {} {}",
+                    selector_kind_label(parsed.kind),
+                    parsed.value
+                ),
+            })
+        }
         (
             BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
@@ -1261,8 +1410,32 @@ pub async fn press_key(
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
-            PageSessionHandle::Chromium { target_id, .. },
-        ) => press_key_via_cdp(cdp_websocket_url, target_id, css_selector, key, text).await,
+            PageSessionHandle::Chromium {
+                browsing_context_id,
+                mapper_target_id,
+                ..
+            },
+        ) => {
+            let parsed = parse_selector("press_key", css_selector)?;
+            if key.trim().is_empty() {
+                return Err("press_key command requires a non-empty key".to_string());
+            }
+            let query_first_js = selector_query_first_js(parsed.kind);
+            chromium_bidi_evaluate_void(cdp_websocket_url, mapper_target_id.as_deref(), browsing_context_id.as_deref(), &format!(
+                "(() => {{ const selector = {}; const key = {}; const text = {}; const requirements = {}; {} const element = {query_first_js}; const prepared = allwrightPrepareElement(element, selector, '{}', requirements); prepared.element.dispatchEvent(new KeyboardEvent('keydown', {{ key, bubbles: true }})); if (text && 'value' in prepared.element) {{ prepared.element.value += text; prepared.element.dispatchEvent(new Event('input', {{ bubbles: true }})); prepared.element.dispatchEvent(new Event('change', {{ bubbles: true }})); }} prepared.element.dispatchEvent(new KeyboardEvent('keyup', {{ key, bubbles: true }})); }})()",
+                json_string_literal(&parsed.value, "press selector")?, json_string_literal(key, "press key")?, json_string_literal(text.unwrap_or(""), "press text")?,
+                discovery_requirements_literal(DiscoveryRequirements { require_match: true, require_visible: true, focus_first_match: true, require_focus: true, ..DiscoveryRequirements::default() }), actionability_helpers_js(), selector_kind_label(parsed.kind),
+            )).await?;
+            Ok(PressKeyInfo {
+                css_selector: css_selector.to_string(),
+                key: key.to_string(),
+                note: format!(
+                    "pressed key {key} on element matching {} {}",
+                    selector_kind_label(parsed.kind),
+                    parsed.value
+                ),
+            })
+        }
         (
             BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
@@ -1336,8 +1509,23 @@ pub async fn get_text_content(
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
-            PageSessionHandle::Chromium { target_id, .. },
-        ) => get_text_content_via_cdp(cdp_websocket_url, target_id, css_selector).await,
+            PageSessionHandle::Chromium {
+                browsing_context_id,
+                mapper_target_id,
+                ..
+            },
+        ) => chromium_bidi_get_text(
+            cdp_websocket_url,
+            mapper_target_id.as_deref(),
+            browsing_context_id.as_deref(),
+            css_selector,
+            "textContent",
+        )
+        .await
+        .map(|mut info| {
+            info.note = format!("resolved textContent for {}", css_selector);
+            info
+        }),
         (
             BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
@@ -1364,8 +1552,23 @@ pub async fn get_inner_text(
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
-            PageSessionHandle::Chromium { target_id, .. },
-        ) => get_inner_text_via_cdp(cdp_websocket_url, target_id, css_selector).await,
+            PageSessionHandle::Chromium {
+                browsing_context_id,
+                mapper_target_id,
+                ..
+            },
+        ) => chromium_bidi_get_text(
+            cdp_websocket_url,
+            mapper_target_id.as_deref(),
+            browsing_context_id.as_deref(),
+            css_selector,
+            "innerText",
+        )
+        .await
+        .map(|mut info| {
+            info.note = format!("resolved innerText for {}", css_selector);
+            info
+        }),
         (
             BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
@@ -1393,8 +1596,62 @@ pub async fn wait_for_selector(
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
-            PageSessionHandle::Chromium { target_id, .. },
-        ) => wait_for_selector_via_cdp(cdp_websocket_url, target_id, css_selector, visible).await,
+            PageSessionHandle::Chromium {
+                browsing_context_id,
+                mapper_target_id,
+                ..
+            },
+        ) => {
+            let parsed = parse_selector("wait_for_selector", css_selector)?;
+            let discovered = discover_elements_via_bidi(
+                cdp_websocket_url,
+                mapper_target_id.as_deref(),
+                browsing_context_id.as_deref(),
+                css_selector,
+                DiscoveryRequirements {
+                    require_visible: visible,
+                    ..DiscoveryRequirements::default()
+                },
+            )
+            .await?;
+            let success = if visible {
+                discovered.first_center.is_some()
+            } else {
+                discovered.count > 0
+            };
+            if !success {
+                return Err(if visible {
+                    format!(
+                        "no visible element matches {} {}",
+                        selector_kind_label(parsed.kind),
+                        parsed.value
+                    )
+                } else {
+                    format!(
+                        "no element matches {} {}",
+                        selector_kind_label(parsed.kind),
+                        parsed.value
+                    )
+                });
+            }
+            Ok(WaitForSelectorInfo {
+                css_selector: css_selector.to_string(),
+                visible,
+                note: if visible {
+                    format!(
+                        "visible element matched {} {}",
+                        selector_kind_label(parsed.kind),
+                        parsed.value
+                    )
+                } else {
+                    format!(
+                        "element matched {} {}",
+                        selector_kind_label(parsed.kind),
+                        parsed.value
+                    )
+                },
+            })
+        }
         (
             BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
@@ -1507,8 +1764,20 @@ pub async fn screenshot(
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
-            PageSessionHandle::Chromium { target_id, .. },
-        ) => screenshot_via_cdp(cdp_websocket_url, target_id, full_page).await,
+            PageSessionHandle::Chromium {
+                browsing_context_id,
+                mapper_target_id,
+                ..
+            },
+        ) => {
+            chromium_bidi_screenshot(
+                cdp_websocket_url,
+                mapper_target_id.as_deref(),
+                browsing_context_id.as_deref(),
+                full_page,
+            )
+            .await
+        }
         (
             BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
@@ -1843,6 +2112,314 @@ pub async fn resolve_bidi_context_for_tab(
             note: "resolved BiDi browsing context for tab".to_string(),
         },
     ))
+}
+
+async fn chromium_bidi_session(
+    cdp_websocket_url: &str,
+    existing_mapper_target_id: Option<&str>,
+    existing_context_id: Option<&str>,
+) -> Result<(CdpConnection, MapperConnectionInfo, String), String> {
+    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+    let mapper = cdp
+        .ensure_chromium_bidi_mapper(existing_mapper_target_id)
+        .await?;
+    let browsing_context_id = cdp
+        .resolve_bidi_context_id(&mapper.mapper_session_id, existing_context_id, None)
+        .await?;
+    Ok((cdp, mapper, browsing_context_id))
+}
+
+async fn chromium_bidi_evaluate_json_on_session(
+    cdp: &mut CdpConnection,
+    mapper_session_id: &str,
+    browsing_context_id: &str,
+    expression: &str,
+) -> Result<Value, String> {
+    let response = cdp
+        .send_bidi_command(
+            mapper_session_id,
+            &json!({
+                "id": 2,
+                "method": "script.evaluate",
+                "params": {
+                    "expression": expression,
+                    "target": { "context": browsing_context_id },
+                    "awaitPromise": true,
+                },
+            }),
+        )
+        .await?;
+    let result_type = json_string(&response, "/result/type")?;
+    if result_type != "success" {
+        let details = response
+            .pointer("/result/exceptionDetails")
+            .cloned()
+            .unwrap_or(Value::Null);
+        return Err(format!("Chromium BiDi script.evaluate failed: {details}"));
+    }
+    let value = json_string(&response, "/result/result/value")?;
+    serde_json::from_str::<Value>(&value)
+        .map_err(|error| format!("failed to parse Chromium BiDi script result JSON: {error}"))
+}
+
+async fn chromium_bidi_evaluate_json(
+    cdp_websocket_url: &str,
+    existing_mapper_target_id: Option<&str>,
+    existing_context_id: Option<&str>,
+    expression: &str,
+) -> Result<Value, String> {
+    let (mut cdp, mapper, browsing_context_id) = chromium_bidi_session(
+        cdp_websocket_url,
+        existing_mapper_target_id,
+        existing_context_id,
+    )
+    .await?;
+    chromium_bidi_evaluate_json_on_session(
+        &mut cdp,
+        &mapper.mapper_session_id,
+        &browsing_context_id,
+        expression,
+    )
+    .await
+}
+
+async fn chromium_bidi_evaluate_void(
+    cdp_websocket_url: &str,
+    existing_mapper_target_id: Option<&str>,
+    existing_context_id: Option<&str>,
+    expression: &str,
+) -> Result<(), String> {
+    chromium_bidi_evaluate_json(
+        cdp_websocket_url,
+        existing_mapper_target_id,
+        existing_context_id,
+        &format!("JSON.stringify((() => {{ {expression}; return null; }})())"),
+    )
+    .await
+    .map(|_| ())
+}
+
+async fn chromium_bidi_evaluate_u32(
+    cdp_websocket_url: &str,
+    existing_mapper_target_id: Option<&str>,
+    existing_context_id: Option<&str>,
+    expression: &str,
+) -> Result<u32, String> {
+    let value = chromium_bidi_evaluate_json(
+        cdp_websocket_url,
+        existing_mapper_target_id,
+        existing_context_id,
+        &format!("JSON.stringify({expression})"),
+    )
+    .await?;
+    json_u32(&value, "")
+}
+
+pub async fn click_element_via_bidi(
+    cdp_websocket_url: &str,
+    existing_mapper_target_id: Option<&str>,
+    existing_context_id: Option<&str>,
+    css_selector: &str,
+) -> Result<ClickInfo, String> {
+    let parsed = parse_selector("click_element", css_selector)?;
+    let selector_literal = json_string_literal(&parsed.value, "click selector")?;
+    let query_first_js = selector_query_first_js(parsed.kind);
+    let expression = format!(
+        "JSON.stringify((() => {{
+            const selector = {selector_literal};
+            const requirements = {};
+            {}
+            const element = {query_first_js};
+            return allwrightPrepareElement(element, selector, '{}', requirements).center;
+        }})())",
+        discovery_requirements_literal(DiscoveryRequirements {
+            require_match: true,
+            require_visible: true,
+            require_pointer_interactable: true,
+            ..DiscoveryRequirements::default()
+        }),
+        actionability_helpers_js(),
+        selector_kind_label(parsed.kind),
+    );
+    let (mut cdp, mapper, browsing_context_id) = chromium_bidi_session(
+        cdp_websocket_url,
+        existing_mapper_target_id,
+        existing_context_id,
+    )
+    .await?;
+    let center = chromium_bidi_evaluate_json_on_session(
+        &mut cdp,
+        &mapper.mapper_session_id,
+        &browsing_context_id,
+        &expression,
+    )
+    .await?;
+    let x = json_f64(&center, "/x")?;
+    let y = json_f64(&center, "/y")?;
+    cdp.send_bidi_command(
+        &mapper.mapper_session_id,
+        &json!({
+            "id": 3,
+            "method": "input.performActions",
+            "params": {
+                "context": browsing_context_id,
+                "actions": [{
+                    "type": "pointer",
+                    "id": "allwright-mouse",
+                    "parameters": { "pointerType": "mouse" },
+                    "actions": [
+                        { "type": "pointerMove", "origin": "viewport", "x": x, "y": y },
+                        { "type": "pointerDown", "button": 0 },
+                        { "type": "pointerUp", "button": 0 }
+                    ]
+                }]
+            }
+        }),
+    )
+    .await?;
+    Ok(ClickInfo {
+        css_selector: css_selector.to_string(),
+        note: format!(
+            "clicked element via Chromium WebDriver BiDi input.performActions using {} {}",
+            selector_kind_label(parsed.kind),
+            parsed.value
+        ),
+        bidi_session_id: format!("chromium-bidi:{browsing_context_id}"),
+    })
+}
+
+async fn discover_elements_via_bidi(
+    cdp_websocket_url: &str,
+    mapper_target_id: Option<&str>,
+    browsing_context_id: Option<&str>,
+    selector: &str,
+    requirements: DiscoveryRequirements,
+) -> Result<DiscoveredElements, String> {
+    let selector_literal = json_string_literal(selector, "selector for discovery")?;
+    let selector_segments_literal = selector_segments_literal("discover_elements", selector)?;
+    let selector_kind_label = selector_chain_kind_label("discover_elements", selector)?;
+    let query_all_js = selector_chain_query_all_js();
+    let requirements_literal = discovery_requirements_literal(requirements);
+    let value = chromium_bidi_evaluate_json(
+        cdp_websocket_url,
+        mapper_target_id,
+        browsing_context_id,
+        &format!(
+            "JSON.stringify((() => {{
+                const selector = {selector_literal};
+                const selectorSegments = {selector_segments_literal};
+                const selectorChainQueryAll = () => {query_all_js};
+                const elements = {query_all_js};
+                const first = elements[0] ?? null;
+                const requirements = {requirements_literal};
+                {}
+                if (requirements.requireMatch && !first) {{
+                    throw new Error(`No element matches {selector_kind_label}: ${{selector}}`);
+                }}
+                const prepared = first
+                    ? allwrightPrepareElement(first, selector, '{selector_kind_label}', requirements)
+                    : null;
+                return {{ count: elements.length, first: prepared?.center ?? null }};
+            }})())",
+            actionability_helpers_js(),
+        ),
+    )
+    .await?;
+    let count = json_u32(&value, "/count")?;
+    let first_center = if value
+        .pointer("/first")
+        .is_some_and(|center| !center.is_null())
+    {
+        Some(ElementCenter {
+            x: json_f64(&value, "/first/x")?,
+            y: json_f64(&value, "/first/y")?,
+        })
+    } else {
+        None
+    };
+    Ok(DiscoveredElements {
+        count,
+        first_center,
+    })
+}
+
+async fn chromium_bidi_get_text(
+    cdp_websocket_url: &str,
+    mapper_target_id: Option<&str>,
+    browsing_context_id: Option<&str>,
+    css_selector: &str,
+    property: &str,
+) -> Result<TextInfo, String> {
+    let parsed = parse_selector("get_text", css_selector)?;
+    discover_elements_via_bidi(
+        cdp_websocket_url,
+        mapper_target_id,
+        browsing_context_id,
+        css_selector,
+        DiscoveryRequirements {
+            require_match: true,
+            ..DiscoveryRequirements::default()
+        },
+    )
+    .await?;
+    let value = chromium_bidi_evaluate_json(
+        cdp_websocket_url,
+        mapper_target_id,
+        browsing_context_id,
+        &format!(
+            "JSON.stringify((() => {{
+                const selector = {};
+                const element = {};
+                if (!element) {{ throw new Error(`No element matches {}: ${{selector}}`); }}
+                const value = element[{}];
+                return typeof value === 'string' ? value : '';
+            }})())",
+            json_string_literal(&parsed.value, "text selector")?,
+            selector_query_first_js(parsed.kind),
+            selector_kind_label(parsed.kind),
+            json_string_literal(property, "text property")?,
+        ),
+    )
+    .await?;
+    let text = value.as_str().ok_or_else(|| {
+        format!("expected Chromium BiDi text result to be a string, found {value}")
+    })?;
+    Ok(TextInfo {
+        css_selector: css_selector.to_string(),
+        text: text.to_string(),
+        note: String::new(),
+    })
+}
+
+async fn chromium_bidi_screenshot(
+    cdp_websocket_url: &str,
+    mapper_target_id: Option<&str>,
+    browsing_context_id: Option<&str>,
+    full_page: bool,
+) -> Result<ScreenshotInfo, String> {
+    let (mut cdp, mapper, browsing_context_id) =
+        chromium_bidi_session(cdp_websocket_url, mapper_target_id, browsing_context_id).await?;
+    let response = cdp
+        .send_bidi_command(
+            &mapper.mapper_session_id,
+            &json!({
+                "id": 2,
+                "method": "browsingContext.captureScreenshot",
+                "params": {
+                    "context": browsing_context_id,
+                    "origin": if full_page { "document" } else { "viewport" },
+                }
+            }),
+        )
+        .await?;
+    Ok(ScreenshotInfo {
+        png_data: decode_base64_field(&response, "/result/data", "Chromium BiDi screenshot data")?,
+        note: if full_page {
+            "captured full-page Chromium screenshot via WebDriver BiDi".to_string()
+        } else {
+            "captured Chromium screenshot via WebDriver BiDi".to_string()
+        },
+    })
 }
 
 #[cfg(target_os = "macos")]

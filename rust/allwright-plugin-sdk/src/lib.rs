@@ -88,6 +88,8 @@ pub enum PageSessionHandle {
     Chromium {
         target_id: String,
         browsing_context_id: Option<String>,
+        #[serde(default)]
+        mapper_target_id: Option<String>,
     },
     Firefox {
         browsing_context_id: String,
