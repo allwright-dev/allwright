@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "v0.0.61",
+    date: "2026-09-04",
+    title: "Web actions hardened onto WebDriver BiDi",
+    highlights: [
+      "Fixed web element actions — click, count, and highlight — that were still going through raw CDP script evaluation instead of WebDriver BiDi, which could make them inconsistent with allwright's driverless automation model.",
+      "Chromium's DevTools Protocol is now used strictly for browser/tab lifecycle and bootstrapping the BiDi mapper; every element interaction runs over BiDi.",
+    ],
+  },
+  {
     version: "v0.0.59 – v0.0.60",
     date: "2026-09-03",
     title: "npm init allwright: a project initializer",

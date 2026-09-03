@@ -184,7 +184,7 @@ function RoadmapOgDiagram() {
         v0.0.7
       </div>
       <div style={{ position: "absolute", left: 210, top: midY - 6, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <div style={{ display: "flex", fontSize: 16, fontWeight: 700, color: INK_SOFT }}>v0.0.60</div>
+        <div style={{ display: "flex", fontSize: 16, fontWeight: 700, color: INK_SOFT }}>v0.0.61</div>
         <div style={{ display: "flex", fontSize: 10.5, color: MUTED, marginTop: 2 }}>you are here</div>
       </div>
       <div style={{ position: "absolute", left: 390, top: midY - 52, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
