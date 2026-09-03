@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "allwright"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",
@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-core"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
@@ -56,7 +56,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-plugin-sdk"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "serde",
  "serde_json",
@@ -64,7 +64,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "allwright-plugin-sdk",
  "tokio",
@@ -72,7 +72,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-linux"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-mac"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -90,7 +90,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-windows"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -99,7 +99,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "allwright-plugin-sdk",
  "serde",
@@ -109,7 +109,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile-android"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
@@ -123,7 +123,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile-ios"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
@@ -132,7 +132,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-web"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",
@@ -1105,9 +1105,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "1.2.2"
+version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30d65c71f1ce40ab09135ce117d742b9f8a19ff91a41a8b57ed50bc2de59c427"
+checksum = "4b18443e9c262bfe8fa82f51666e2642c53393f7e5c27b3e1aeab922cff5b9d8"
 dependencies = [
  "libc",
  "wasi",
@@ -1775,9 +1775,9 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "smallvec"
-version = "1.15.2"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
+checksum = "b9be42f50aa861c555654aa3a37f52f4b1074bacf4e48fe0ef7fa584e80f1f0f"
 
 [[package]]
 name = "socket2"
