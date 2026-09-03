@@ -16,7 +16,7 @@ keywords:
   ]
 ---
 
-allwright has cut close to sixty small `0.0.x` releases so far — most of them
+allwright has cut over sixty small `0.0.x` releases so far — most of them
 packaging fixes and internal hardening nobody needed to read about. That
 pace is deliberate: build in public, ship the moment something real works,
 don't wait for a big-bang launch. But it also means the version number has
@@ -44,6 +44,11 @@ already work, right now:
   TypeScript all speak the same `Browser` / `Page` / `Locator` model, with a
   zero-install path: install a client, write a test, and it downloads and
   manages the engine and plugin it needs on first run.
+- **One-command project scaffolding** — `npm init allwright@latest` now
+  scaffolds a working TypeScript or JavaScript project — config, a starter
+  test for the surfaces you pick, dependencies installed — instead of
+  assembling it by hand. See [our post on the
+  initializer](/blog/npm-init-allwright).
 
 That's deliberately not a long list. It's small enough to actually be real,
 which is the entire point of calling anything "available" on this site in
@@ -70,8 +75,9 @@ instead of everyone finding out from a diff.
 - Read the [Changelog](/changelog) for the full release history so far.
 - Check [Availability](/availability) for the current, capability-by-capability
   picture of web and Android automation.
-- Try the [TypeScript getting-started guide](/blog/get-started-with-typescript)
-  or the [Android testing walkthrough](/blog/android-testing-playwright-style)
-  to see today's tangible feature set firsthand.
+- Try the [TypeScript getting-started guide](/blog/get-started-with-typescript),
+  the [`npm init allwright` walkthrough](/blog/npm-init-allwright), or the
+  [Android testing walkthrough](/blog/android-testing-playwright-style) to
+  see today's tangible feature set firsthand.
 - Star or watch [the repo](https://github.com/allwright-dev/allwright) to
   catch v0.1.0 the moment it ships.

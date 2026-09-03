@@ -15,6 +15,16 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "v0.0.59 – v0.0.60",
+    date: "2026-09-03",
+    title: "npm init allwright: a project initializer",
+    highlights: [
+      "New create-allwright package: run npm init allwright@latest (or npm create allwright@latest) to scaffold a working TypeScript or JavaScript project — config, starter tests for the surfaces you pick, and dependencies installed — in one command.",
+      "Auto-detects your package manager from an existing lockfile, or falls back to whichever manager invoked it.",
+      "Fully scriptable for CI: every prompt has a matching flag (--yes, --typescript/--javascript, --web/--mobile/--both, --package-manager, --no-install, --force).",
+    ],
+  },
+  {
     version: "v0.0.57 – v0.0.58",
     date: "2026-09-01",
     title: "Android automation reaches parity with web",

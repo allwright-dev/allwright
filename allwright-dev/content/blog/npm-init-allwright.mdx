@@ -1,0 +1,119 @@
+---
+title: "npm init allwright: a test project in one command"
+description: "allwright now ships its own project initializer. Run npm init allwright@latest and get a working, installed TypeScript or JavaScript test project — config, starter tests, and all — in under a minute."
+date: "2026-09-03"
+author: "The allwright team"
+published: true
+tags: ["cli", "typescript", "javascript", "getting-started", "vitest", "web testing"]
+keywords:
+  [
+    "npm init allwright",
+    "npm create allwright",
+    "create-allwright",
+    "allwright project scaffold",
+    "allwright cli init",
+    "vitest project generator",
+    "playwright alternative setup",
+  ]
+---
+
+Our [TypeScript getting-started guide](/blog/get-started-with-typescript) walks
+through six steps to go from an empty folder to a passing test: initialize
+the project, install `@allwright.dev/vitest`, write a `tsconfig.json`, write a
+`vitest.config.ts`, write the test, run it. Every step is correct and every
+step is boilerplate you shouldn't have to type by hand. As of `create-allwright@0.0.60`,
+you don't:
+
+```bash
+npm init allwright@latest
+```
+
+One command, and you have a working project — config, a starter test, and
+dependencies installed.
+
+## What it does
+
+`npm init allwright@latest` (or `npm create allwright@latest`, same package)
+asks two questions and scaffolds a project from the answers:
+
+- **TypeScript or JavaScript.**
+- **Which surfaces you want to test** — `Web`, `Mobile Android`, or both.
+
+From there it writes a small, real project, not a maze of generated files:
+
+```text
+.
+├── tests/
+│   ├── web.spec.ts        # if Web is selected
+│   └── mobile.spec.ts     # if Mobile Android is selected
+├── allwright.config.yaml
+├── vitest.config.ts
+├── tsconfig.json          # TypeScript projects only
+├── package.json
+└── README.md
+```
+
+`vitest.config.ts` is already wrapped in `allwrightVitestConfig`, `allwright.config.yaml`
+is already pointed at the surfaces you picked, and each spec file is a real,
+runnable test against a public demo target — the same `themoderninternet`
+site and Airticket demo app used throughout our other guides — so `npm test`
+passes immediately, before you've changed a single line.
+
+Then it detects your package manager — from an existing lockfile if you have
+one (`bun.lock`, `pnpm-lock.yaml`, `yarn.lock`, `package-lock.json`), falling
+back to whichever manager invoked the initializer — and runs the install for
+you. By the time the command finishes, `node_modules` is already there.
+
+## Non-interactive use
+
+Every prompt has a flag, so CI, scripts, and anyone who'd rather not answer
+questions can skip the interactive session entirely:
+
+```bash
+npm init allwright@latest my-app -- --typescript --web --no-install
+```
+
+| Flag | Does |
+|---|---|
+| `--yes` / `-y` | Accept defaults (TypeScript, Web) without prompting |
+| `--typescript` / `--ts` | Skip the language prompt |
+| `--javascript` / `--js` | Skip the language prompt |
+| `--web` | Include the web surface |
+| `--mobile` / `--mobile-android` | Include the Android surface |
+| `--both` | Include web and Android |
+| `--surface <id>` | Add one surface by id, repeatable |
+| `--package-manager <bun\|npm\|pnpm\|yarn>` | Override auto-detection |
+| `--no-install` | Scaffold without installing dependencies |
+| `--force` | Overwrite files in a non-empty target directory without asking |
+
+A target directory is the one positional argument — omit it to scaffold into
+the current folder.
+
+## Try it
+
+```bash
+npm init allwright@latest my-app
+cd my-app
+npm test
+```
+
+That's the same passing test the six-step manual walkthrough in our
+[getting-started guide](/blog/get-started-with-typescript) ends on, minus
+every step in between. The manual guide is still the right read if you want
+to understand what each generated file is actually doing, or you're wiring
+allwright into an existing project instead of starting a new one — the
+initializer is for the blank-folder case specifically.
+
+## Where to go next
+
+- Run `npm init allwright@latest` and see what lands in a real folder.
+- Read the [`create-allwright` README](https://github.com/allwright-dev/allwright/tree/main/typescript/create)
+  for the full flag reference.
+- Prefer to build it up file by file? The
+  [TypeScript getting-started guide](/blog/get-started-with-typescript) is
+  the same project, one step at a time.
+- Selected `Mobile Android`? Jump straight to the
+  [Android testing walkthrough](/blog/android-testing-playwright-style) for
+  what `androidApp` can do.
+- Check the [Changelog](/changelog) for everything else that's shipped since
+  the last post.

@@ -184,7 +184,7 @@ function RoadmapOgDiagram() {
         v0.0.7
       </div>
       <div style={{ position: "absolute", left: 210, top: midY - 6, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <div style={{ display: "flex", fontSize: 16, fontWeight: 700, color: INK_SOFT }}>v0.0.58</div>
+        <div style={{ display: "flex", fontSize: 16, fontWeight: 700, color: INK_SOFT }}>v0.0.60</div>
         <div style={{ display: "flex", fontSize: 10.5, color: MUTED, marginTop: 2 }}>you are here</div>
       </div>
       <div style={{ position: "absolute", left: 390, top: midY - 52, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -195,11 +195,58 @@ function RoadmapOgDiagram() {
   );
 }
 
+// Same terminal-into-scaffolded-project shape as InitHero in hero-image.tsx,
+// compressed to fit the thumbnail: a terminal card on the left, an arrow,
+// then a short file list standing in for the full project tree.
+function InitOgDiagram() {
+  const { width, height } = DIAGRAM_SIZE;
+  const midY = 130;
+  const files = ["package.json", "vitest.config.ts", "tests/web.spec.ts"];
+
+  return (
+    <div style={{ position: "relative", width, height, display: "flex" }}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ position: "absolute", left: 0, top: 0 }}>
+        <rect x={0} y={midY - 54} width={196} height={108} rx={14} fill="rgba(16,41,45,0.55)" stroke={LINE} strokeWidth={2} />
+        <line x1={202} y1={midY} x2={244} y2={midY} stroke={MUTED} strokeWidth={2} />
+        <rect x={250} y={midY - 60} width={170} height={120} rx={14} fill="none" stroke={BRAND_TO} strokeWidth={2} />
+      </svg>
+
+      <div style={{ position: "absolute", left: 16, top: midY - 40, display: "flex", fontSize: 13, fontFamily: "monospace", color: BRAND_TO }}>
+        $ npm init allwright
+      </div>
+      <div style={{ position: "absolute", left: 16, top: midY - 12, display: "flex", fontSize: 12, fontFamily: "monospace", color: MUTED }}>
+        ✔ TypeScript ✔ Web
+      </div>
+      <div style={{ position: "absolute", left: 16, top: midY + 12, display: "flex", fontSize: 12, fontFamily: "monospace", color: MUTED }}>
+        ✔ installed
+      </div>
+
+      {files.map((file, i) => (
+        <div
+          key={file}
+          style={{
+            position: "absolute",
+            left: 266,
+            top: midY - 40 + i * 34,
+            display: "flex",
+            fontSize: 12.5,
+            fontFamily: "monospace",
+            color: INK,
+          }}
+        >
+          {file}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const ogHeroRegistry: Record<string, () => React.ReactElement> = {
   "get-started-with-typescript": TypeScriptOgDiagram,
   "why-allwright-if-playwright-exists": EngineOgDiagram,
   "android-testing-playwright-style": AndroidOgDiagram,
   "road-to-v0-1-0": RoadmapOgDiagram,
+  "npm-init-allwright": InitOgDiagram,
 };
 
 /** Returns the post's diagram element for its social-preview card, or null for posts without one (their card falls back to a text-only layout). */

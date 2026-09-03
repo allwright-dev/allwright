@@ -306,7 +306,7 @@ function RoadmapHero({ variant }: { variant?: HeroVariant }) {
   return (
     <HeroFrame
       variant={variant}
-      label="A release timeline: v0.0.7 at the start, a solid line traveled to today's v0.0.58 milestone marked 'you are here', then a dashed line ahead to v0.1.0 marked 'coming soon'. Two small chips labelled Web and Android hang off today's milestone, showing the small set of tangible features already real today."
+      label="A release timeline: v0.0.7 at the start, a solid line traveled to today's v0.0.60 milestone marked 'you are here', then a dashed line ahead to v0.1.0 marked 'coming soon'. Two small chips labelled Web and Android hang off today's milestone, showing the small set of tangible features already real today."
     >
       <defs>
         <ArrowMarker id="hero-roadmap-arrow" />
@@ -336,7 +336,7 @@ function RoadmapHero({ variant }: { variant?: HeroVariant }) {
       {/* Today */}
       <circle cx={600} cy={210} r={30} fill="var(--accent-soft)" stroke="var(--accent-2)" strokeWidth="2" />
       <text x={600} y={204} textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--accent-2)">
-        v0.0.58
+        v0.0.60
       </text>
       <text x={600} y={224} textAnchor="middle" fontSize="11.5" fill="var(--accent-2)">
         you are here
@@ -372,6 +372,74 @@ function RoadmapHero({ variant }: { variant?: HeroVariant }) {
   );
 }
 
+// A terminal running the initializer on the left, fanning out into the
+// scaffolded project it produces on the right — the whole point of the post
+// is "one command in, a working project out," so the diagram shows exactly
+// that instead of the usual client/core/surface shape.
+function InitHero({ variant }: { variant?: HeroVariant }) {
+  const files = ["package.json", "allwright.config.yaml", "vitest.config.ts", "tests/web.spec.ts"];
+  const fileRowHeight = 42;
+  const filesStartY = 145;
+
+  return (
+    <HeroFrame
+      variant={variant}
+      label="A terminal running npm init allwright, with an arrow into a scaffolded project tree containing package.json, allwright.config.yaml, vitest.config.ts, and tests/web.spec.ts, all already installed and ready to run"
+    >
+      <defs>
+        <ArrowMarker id="hero-init-arrow" />
+      </defs>
+
+      <line x1={478} y1={230} x2={560} y2={230} stroke="currentColor" strokeWidth="1.4" markerEnd="url(#hero-init-arrow)" />
+      <text x={519} y={196} textAnchor="middle" fontSize="12.5" fontFamily="var(--font-mono)" fill="var(--muted)">
+        scaffold
+      </text>
+
+      {/* Terminal node */}
+      <rect x={90} y={150} width={388} height={160} rx={16} fill="var(--background)" stroke="currentColor" strokeWidth="1" />
+      <rect x={90} y={150} width={388} height={30} rx={16} fill="var(--card)" stroke="currentColor" strokeWidth="1" />
+      <circle cx={108} cy={165} r={4} fill="var(--muted)" opacity="0.5" />
+      <circle cx={122} cy={165} r={4} fill="var(--muted)" opacity="0.5" />
+      <circle cx={136} cy={165} r={4} fill="var(--muted)" opacity="0.5" />
+      <text x={114} y={210} fontSize="15" fontFamily="var(--font-mono)" fill="var(--accent)">
+        $
+      </text>
+      <text x={132} y={210} fontSize="15" fontFamily="var(--font-mono)" fontWeight="600" fill="var(--ink)">
+        npm init allwright@latest
+      </text>
+      <text x={114} y={238} fontSize="13" fontFamily="var(--font-mono)" fill="var(--muted)">
+        ✔ TypeScript ✔ Web
+      </text>
+      <text x={114} y={260} fontSize="13" fontFamily="var(--font-mono)" fill="var(--muted)">
+        ✔ installed with npm
+      </text>
+      <text x={230} y={140} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--ink)">
+        One command
+      </text>
+
+      {/* Scaffolded project node */}
+      <rect x={560} y={145} width={550} height={170} rx={16} fill="var(--card)" stroke="var(--accent-2)" strokeWidth="1.4" />
+      {files.map((file, i) => (
+        <g key={file}>
+          <circle cx={588} cy={filesStartY + i * fileRowHeight} r={4} fill="var(--accent)" />
+          <text
+            x={604}
+            y={filesStartY + i * fileRowHeight + 5}
+            fontSize="14.5"
+            fontFamily="var(--font-mono)"
+            fill="var(--ink)"
+          >
+            {file}
+          </text>
+        </g>
+      ))}
+      <text x={835} y={128} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--ink)">
+        Working project, ready to run
+      </text>
+    </HeroFrame>
+  );
+}
+
 function DefaultHero({ variant }: { variant?: HeroVariant }) {
   return (
     <HeroFrame variant={variant} label="The allwright logo mark on a gradient card">
@@ -398,6 +466,7 @@ const heroRegistry: Record<string, (props: { variant?: HeroVariant }) => React.R
   "why-allwright-if-playwright-exists": EngineHero,
   "android-testing-playwright-style": AndroidHero,
   "road-to-v0-1-0": RoadmapHero,
+  "npm-init-allwright": InitHero,
 };
 
 export function HeroImage({ slug, variant }: { slug: string; variant?: HeroVariant }) {
