@@ -397,6 +397,8 @@ class Page:
         from ._runtime import retry_options
 
         options = options or AccessibilitySnapshotOptions()
+        if options.mode not in ("default", "ai", "autoexpect", "codegen"):
+            raise ValueError("invalid accessibility snapshot mode")
         if options.format not in ("json", "yaml"):
             raise ValueError("accessibility snapshot format must be 'json' or 'yaml'")
         with self._lock:
@@ -407,6 +409,7 @@ class Page:
                 context_session_id=self.session_id,
                 accessibility_snapshot=engine_pb2.AccessibilitySnapshotCommand(
                     format=options.format,
+                    mode=options.mode,
                     retry_options=retry_options(options.timeout_ms),
                 ),
             ))

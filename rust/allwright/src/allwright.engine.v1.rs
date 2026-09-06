@@ -183,6 +183,10 @@ pub struct ChromeLaunchedEvent {
 /// Empty format defaults to JSON. Accepted values are "json" and "yaml".
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AccessibilitySnapshotCommand {
+    /// Empty mode defaults to default. AI injects queryable aria-ref attributes.
+    /// Supported: default, ai, autoexpect, codegen.
+    #[prost(string, tag = "3")]
+    pub mode: ::prost::alloc::string::String,
     #[prost(string, tag = "1")]
     pub format: ::prost::alloc::string::String,
     #[prost(message, optional, tag = "2")]

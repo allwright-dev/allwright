@@ -157,3 +157,4 @@ class ScreenshotResult:
 class AccessibilitySnapshotOptions:
     format: str = "json"
     timeout_ms: int | None = None
+    mode: str = "default"

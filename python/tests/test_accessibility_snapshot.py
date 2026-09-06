@@ -27,7 +27,7 @@ class AccessibilitySnapshotTest(unittest.TestCase):
     def test_default_json_and_yaml_options_preserve_serialized_result(self):
         for options, format, text in [
             (None, "json", '{"version":1,"documents":[]}'),
-            (AccessibilitySnapshotOptions(format="yaml", timeout_ms=500), "yaml", '"name": "yes"\n'),
+            (AccessibilitySnapshotOptions(format="yaml", timeout_ms=500, mode="ai"), "yaml", '"name": "yes"\n'),
         ]:
             with self.subTest(format=format):
                 page, stream = self.page(engine_pb2.ContextSessionEvent(
@@ -41,6 +41,7 @@ class AccessibilitySnapshotTest(unittest.TestCase):
                 self.assertEqual(command.context_session_id, "page")
                 self.assertEqual(command.WhichOneof("command"), "accessibility_snapshot")
                 self.assertEqual(command.accessibility_snapshot.format, format)
+                self.assertEqual(command.accessibility_snapshot.mode, options.mode if options else "default")
                 if options:
                     self.assertEqual(command.accessibility_snapshot.retry_options.timeout_ms, 500)
 
@@ -48,6 +49,12 @@ class AccessibilitySnapshotTest(unittest.TestCase):
         page, stream = self.page()
         with self.assertRaisesRegex(ValueError, "format"):
             page.accessibility_snapshot(AccessibilitySnapshotOptions(format="xml"))
+        self.assertFalse(stream.commands)
+
+    def test_invalid_mode_does_not_send(self):
+        page, stream = self.page()
+        with self.assertRaisesRegex(ValueError, "mode"):
+            page.accessibility_snapshot(AccessibilitySnapshotOptions(mode="invalid"))
         self.assertFalse(stream.commands)
 
     def test_closed_and_error_events_are_reported(self):

@@ -41,7 +41,7 @@ const webAvailable = [
   "Read visible or raw text from an element",
   "Wait for an element to appear or become visible",
   "Capture screenshots",
-  "Read page accessibility snapshots as JSON or standard YAML",
+  "Read page accessibility snapshots as JSON or standard YAML, with queryable element references in AI mode",
   "Retrying, Playwright-style text/count/visibility assertions (via @allwright.dev/vitest)",
 ];
 

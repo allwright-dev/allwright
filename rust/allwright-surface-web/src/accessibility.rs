@@ -5,8 +5,11 @@ use allwright_plugin_sdk::AccessibilitySnapshotInfo;
 const ACCESSIBILITY_SEMANTICS: &str = include_str!("accessibility_semantics.js");
 const COLLECTOR: &str = include_str!("accessibility.js");
 
-fn expression() -> String {
-    format!("(() => {{ {ACCESSIBILITY_SEMANTICS}\nreturn JSON.stringify(({COLLECTOR})()); }})()")
+fn expression(mode: &str) -> String {
+    let options = json!({"mode": mode}).to_string();
+    format!(
+        "(() => {{ {ACCESSIBILITY_SEMANTICS}\nreturn JSON.stringify(({COLLECTOR})({options})); }})()"
+    )
 }
 
 fn contexts(tree: &Value) -> Result<Vec<(String, Option<String>)>, String> {
@@ -52,11 +55,27 @@ pub async fn accessibility_snapshot(
     page_session: &PageSessionHandle,
     format: &str,
 ) -> Result<AccessibilitySnapshotInfo, String> {
+    accessibility_snapshot_with_mode(browser_session, page_session, format, "default").await
+}
+
+pub async fn accessibility_snapshot_with_mode(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    format: &str,
+    mode: &str,
+) -> Result<AccessibilitySnapshotInfo, String> {
+    let mode = if mode.is_empty() { "default" } else { mode };
+    if !matches!(mode, "default" | "ai" | "autoexpect" | "codegen") {
+        return Err(
+            "accessibility snapshot mode must be 'default', 'ai', 'autoexpect', or 'codegen'"
+                .into(),
+        );
+    }
     let format = if format.is_empty() { "json" } else { format };
     if !matches!(format, "json" | "yaml") {
         return Err("accessibility snapshot format must be 'json' or 'yaml'".to_string());
     }
-    let expression = expression();
+    let expression = expression(mode);
     let mut documents = Vec::new();
     match (browser_session, page_session) {
         (

@@ -1,6 +1,6 @@
 mod accessibility;
 mod accessibility_yaml;
-pub use accessibility::accessibility_snapshot;
+pub use accessibility::{accessibility_snapshot, accessibility_snapshot_with_mode};
 
 use allwright_plugin_sdk::{
     ALLWRIGHT_PLUGIN_API_VERSION, AutomationSessionInfo, BrowserKind, BrowserLaunchInfo,
@@ -4299,8 +4299,9 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             browser_session,
             page_session,
             format,
+            mode,
         } => block_on_plugin_future(async move {
-            accessibility_snapshot(&browser_session, &page_session, &format)
+            accessibility::accessibility_snapshot_with_mode(&browser_session, &page_session, &format, &mode)
                 .await
                 .map(PluginResult::AccessibilitySnapshot)
         }),

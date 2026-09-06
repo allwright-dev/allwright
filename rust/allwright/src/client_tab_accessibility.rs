@@ -1,6 +1,9 @@
 use super::command::command_retry_options;
 use super::tab::ensure_tab_open;
-use super::types::{AccessibilitySnapshotFormat, AccessibilitySnapshotOptions, Error, Result, Tab};
+use super::types::{
+    AccessibilitySnapshotFormat, AccessibilitySnapshotMode, AccessibilitySnapshotOptions, Error,
+    Result, Tab,
+};
 use crate::proto::context_session_command::Command;
 use crate::proto::context_session_event::Event;
 use crate::proto::{AccessibilitySnapshotCommand, ContextSessionCommand};
@@ -28,6 +31,13 @@ impl Tab {
                         format: match options.format {
                             AccessibilitySnapshotFormat::Json => "json",
                             AccessibilitySnapshotFormat::Yaml => "yaml",
+                        }
+                        .into(),
+                        mode: match options.mode {
+                            AccessibilitySnapshotMode::Default => "default",
+                            AccessibilitySnapshotMode::Ai => "ai",
+                            AccessibilitySnapshotMode::Autoexpect => "autoexpect",
+                            AccessibilitySnapshotMode::Codegen => "codegen",
                         }
                         .into(),
                         retry_options: command_retry_options(options.timeout_ms),

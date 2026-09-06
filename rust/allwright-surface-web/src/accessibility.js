@@ -1,12 +1,42 @@
 // Evaluated inside an IIFE with Allwright-owned accessibility helpers in scope.
 // Tree collection is independent of serialization; no snapshot-specific string grammar.
-function collectAccessibilitySnapshot() {
+function collectAccessibilitySnapshot({ mode = "default" } = {}) {
   const { computeAccessibleName, computeAccessibleDescription, getRole,
     hiddenSubtree, visible: isVisible, cssText, children, normalize } = allwrightA11y;
   const parent = element => element.assignedSlot || element.parentElement || element.getRootNode().host;
   const style = element => element.ownerDocument.defaultView.getComputedStyle(element);
   const nodeFor = (role, name = '') => ({ role, name, states: {}, properties: {}, children: [] });
   const root = nodeFor('document', document.title);
+  const ai = mode === 'ai';
+  const excluded = element => ['HEAD', 'SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT'].includes(element.tagName);
+  const prune = element => excluded(element) || (!ai && hiddenSubtree(element));
+  const rendered = element => {
+    if (style(element).visibility !== 'visible') return false;
+    if (element.checkVisibility && !element.checkVisibility()) return false;
+    return [...element.getClientRects()].some(rect => rect.width > 0 && rect.height > 0);
+  };
+  // State belongs to the document, so references survive captures, not navigation.
+  const registryKey = Symbol.for('allwright.accessibility.references.v1');
+  let registry;
+  const references = new Map();
+  if (ai) {
+    registry = document[registryKey];
+    if (!registry) {
+      const token = Array.from(crypto.getRandomValues(new Uint32Array(4)), n => n.toString(16)).join('');
+      registry = { prefix: `aw-${token}-`, next: 0, elements: new WeakMap(), previous: new Map() };
+      Object.defineProperty(document, registryKey, { value: registry });
+    }
+  }
+  function reference(element, node) {
+    if (!ai || !rendered(element) || style(element).pointerEvents === 'none') return;
+    let entry = registry.elements.get(element);
+    if (!entry || entry.role !== node.role || entry.name !== node.name) {
+      entry = { id: `${registry.prefix}${++registry.next}`, role: node.role, name: node.name };
+      registry.elements.set(element, entry);
+    }
+    node['aria-ref'] = entry.id;
+    references.set(element, entry.id);
+  }
   const visited = new Set();
   const ownedBy = new Map();
   const owns = new Map();
@@ -16,7 +46,7 @@ function collectAccessibilitySnapshot() {
   const pending = document.documentElement ? [document.documentElement] : [];
   while (pending.length) {
     const element = pending.pop();
-    if (element.nodeType !== 1 || hiddenSubtree(element)) continue;
+    if (element.nodeType !== 1 || prune(element)) continue;
     elements.push(element);
     pending.push(...children(element).slice().reverse());
   }
@@ -24,7 +54,7 @@ function collectAccessibilitySnapshot() {
     const owned = [];
     for (const id of (element.getAttribute('aria-owns') || '').split(/\s+/).filter(Boolean)) {
       const target = element.getRootNode().getElementById?.(id);
-      if (!target || target === element || ownedBy.has(target) || hiddenSubtree(target)) continue;
+      if (!target || target === element || ownedBy.has(target) || prune(target)) continue;
       let cyclic = false;
       for (let ancestor = element; ancestor; ancestor = ownedBy.get(ancestor) || parent(ancestor)) {
         if (ancestor === target) { cyclic = true; break; }
@@ -97,14 +127,16 @@ function collectAccessibilitySnapshot() {
     if (visited.has(node) || (ownedBy.has(node) && ownedBy.get(node) !== owner)) return;
     visited.add(node);
     if (node.nodeType === 3) { appendText(destination, node.nodeValue || ''); return; }
-    if (node.nodeType !== 1 || hiddenSubtree(node)) return;
-    const visible = isVisible(node);
+    if (node.nodeType !== 1 || prune(node)) return;
+    const accessible = !hiddenSubtree(node) && isVisible(node);
+    const visible = ai ? accessible || rendered(node) : mode === 'autoexpect' ? accessible && rendered(node) : accessible;
     const name = visible ? normalize(computeAccessibleName(node)) : '';
-    const role = getRole(node);
+    const role = getRole(node) || (ai ? "generic" : null);
     const semantic = visible && role && !['none', 'presentation'].includes(role);
     const current = node === document.documentElement ? root : semantic ? nodeFor(role, name) : destination;
     if (current !== destination) destination.children.push(current);
     if (current !== destination || node === document.documentElement) {
+      reference(node, current);
       addStates(node, current);
       const description = normalize(computeAccessibleDescription(node));
       if (description) current.properties.description = description;
@@ -129,6 +161,16 @@ function collectAccessibilitySnapshot() {
     node.children = node.children.filter(child => child.role !== 'text' || (child.name = normalize(child.name)));
     if (node.children.length === 1 && node.children[0].role === 'text' && node.children[0].name === node.name) node.children = [];
     clean.push(...node.children);
+  }
+  if (ai) {
+    // Commit after traversal so attribute-sensitive styles cannot affect this capture.
+    for (const [element, id] of registry.previous) {
+      if (!references.has(element) && element.getAttribute('aria-ref') === id) element.removeAttribute('aria-ref');
+    }
+    for (const [element, id] of references) {
+      if (element.getAttribute('aria-ref') !== id) element.setAttribute('aria-ref', id);
+    }
+    registry.previous = references;
   }
   return { url: document.URL, title: document.title, root };
 }

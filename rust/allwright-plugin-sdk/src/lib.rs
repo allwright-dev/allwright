@@ -262,6 +262,8 @@ pub enum PluginCommand {
         browser_session: BrowserSessionHandle,
         page_session: PageSessionHandle,
         format: String,
+        #[serde(default)]
+        mode: String,
     },
     Screenshot {
         browser_session: BrowserSessionHandle,

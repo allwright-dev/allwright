@@ -252,4 +252,125 @@ async fn browser_snapshot_round_trip() {
             .await
             .is_err()
     );
+    use allwright_surface_web::{accessibility_snapshot_with_mode, click_element, count_elements};
+    let browser = &browser.browser_session;
+    let page = &navigation.page_session;
+    assert_eq!(
+        count_elements(browser, page, "[aria-ref]")
+            .await
+            .unwrap()
+            .count,
+        0
+    );
+    let ai = accessibility_snapshot_with_mode(browser, page, "json", "ai")
+        .await
+        .unwrap();
+    let ai: Value = serde_json::from_str(&ai.snapshot).unwrap();
+    let yaml = accessibility_snapshot_with_mode(browser, page, "yaml", "ai")
+        .await
+        .unwrap();
+    assert_eq!(ai, serde_yaml::from_str::<Value>(&yaml.snapshot).unwrap());
+    let mut ai_nodes = Vec::new();
+    for document in ai["documents"].as_array().unwrap() {
+        nodes(&document["root"], &mut ai_nodes);
+    }
+    let refs: Vec<_> = ai_nodes
+        .iter()
+        .filter_map(|n| n["aria-ref"].as_str())
+        .collect();
+    assert!(!refs.is_empty());
+    assert_eq!(
+        refs.len(),
+        refs.iter().collect::<std::collections::HashSet<_>>().len()
+    );
+    assert!(ai_nodes.iter().any(|n| n["role"] == "generic"));
+    assert!(
+        find(&ai_nodes, "button", "No pointer action")
+            .get("aria-ref")
+            .is_none()
+    );
+    assert!(
+        find(&ai_nodes, "button", "Zero size action")
+            .get("aria-ref")
+            .is_none()
+    );
+    assert_eq!(
+        count_elements(browser, page, "#visual-action[aria-ref]")
+            .await
+            .unwrap()
+            .count,
+        1
+    );
+    let id = find(&ai_nodes, "button", "Reference action")["aria-ref"]
+        .as_str()
+        .unwrap();
+    let selector = format!("[aria-ref=\"{id}\"]");
+    assert_eq!(
+        count_elements(browser, page, &selector)
+            .await
+            .unwrap()
+            .count,
+        1
+    );
+    click_element(browser, page, &selector).await.unwrap();
+    let changed = accessibility_snapshot_with_mode(browser, page, "json", "ai")
+        .await
+        .unwrap();
+    let changed: Value = serde_json::from_str(&changed.snapshot).unwrap();
+    let mut changed_nodes = Vec::new();
+    nodes(&changed["documents"][0]["root"], &mut changed_nodes);
+    assert_ne!(
+        find(&changed_nodes, "button", "Reference changed")["aria-ref"],
+        id
+    );
+    assert_eq!(
+        count_elements(browser, page, &selector)
+            .await
+            .unwrap()
+            .count,
+        0
+    );
+    for mode in ["default", "codegen", "autoexpect"] {
+        let snapshot = accessibility_snapshot_with_mode(browser, page, "json", mode)
+            .await
+            .unwrap();
+        let snapshot: Value = serde_json::from_str(&snapshot.snapshot).unwrap();
+        let mut items = Vec::new();
+        nodes(&snapshot["documents"][0]["root"], &mut items);
+        assert!(items.iter().all(|n| n.get("aria-ref").is_none()));
+        if mode == "autoexpect" {
+            assert!(!items.iter().any(|n| n["name"] == "Zero size action"));
+        }
+    }
+    // Non-AI captures leave existing attributes intact. The next AI capture
+    // removes our attribute once this element becomes hidden.
+    let changed_id = find(&changed_nodes, "button", "Reference changed")["aria-ref"]
+        .as_str()
+        .unwrap();
+    let changed_selector = format!("[aria-ref=\"{changed_id}\"]");
+    assert_eq!(
+        count_elements(browser, page, &changed_selector)
+            .await
+            .unwrap()
+            .count,
+        1
+    );
+    click_element(browser, page, &changed_selector)
+        .await
+        .unwrap();
+    accessibility_snapshot_with_mode(browser, page, "json", "ai")
+        .await
+        .unwrap();
+    assert_eq!(
+        count_elements(browser, page, &changed_selector)
+            .await
+            .unwrap()
+            .count,
+        0
+    );
+    assert!(
+        accessibility_snapshot_with_mode(browser, page, "json", "invalid")
+            .await
+            .is_err()
+    );
 }

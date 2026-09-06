@@ -507,3 +507,9 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE).
+
+Accessibility snapshots also accept `mode: "ai"` to inject queryable `aria-ref`
+attributes and include matching IDs in JSON or YAML, for example
+`page.accessibilitySnapshot({ mode: "ai", format: "json" })` in TypeScript.
+See the [web snapshot documentation](rust/allwright-surface-web/README.md) for
+all modes and reference lifetime.

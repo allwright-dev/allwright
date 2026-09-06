@@ -11,6 +11,7 @@ import (
 // AccessibilitySnapshotOptions selects the serialized snapshot format.
 // Format defaults to "json"; "yaml" encodes the same structured document.
 type AccessibilitySnapshotOptions struct {
+	Mode    string
 	Format  string
 	Timeout time.Duration
 }
@@ -29,6 +30,14 @@ func (t *Tab) AccessibilitySnapshot(ctx context.Context, options ...Accessibilit
 	if resolved.Format != "json" && resolved.Format != "yaml" {
 		return "", fmt.Errorf("accessibility snapshot format must be 'json' or 'yaml'")
 	}
+	if resolved.Mode == "" {
+		resolved.Mode = "default"
+	}
+	switch resolved.Mode {
+	case "default", "ai", "autoexpect", "codegen":
+	default:
+		return "", fmt.Errorf("invalid accessibility snapshot mode")
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if err := t.ensureStream(ctx); err != nil {
@@ -43,6 +52,7 @@ func (t *Tab) AccessibilitySnapshot(ctx context.Context, options ...Accessibilit
 		Command: &enginev1.ContextSessionCommand_AccessibilitySnapshot{
 			AccessibilitySnapshot: &enginev1.AccessibilitySnapshotCommand{
 				Format:       resolved.Format,
+				Mode:         resolved.Mode,
 				RetryOptions: retryOptionsProto(resolved.Timeout),
 			},
 		},

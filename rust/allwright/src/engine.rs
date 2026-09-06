@@ -1420,7 +1420,7 @@ async fn handle_tab_command(
             };
             let snapshot = retry_with_timeout(
                 command_retry_policy(command.retry_options.as_ref()),
-                || async { web_lib::accessibility_snapshot(surface, page, &command.format).await },
+                || async { web_lib::accessibility_snapshot(surface, page, &command.format, &command.mode).await },
             )
             .await
             .map_err(Status::internal)?;

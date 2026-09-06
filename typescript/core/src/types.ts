@@ -15,6 +15,7 @@ export interface CommandOptions {
 
 export interface AccessibilitySnapshotOptions extends CommandOptions {
   format?: "json" | "yaml";
+  mode?: "default" | "ai" | "autoexpect" | "codegen";
 }
 
 export interface NavigateResult {
@@ -670,7 +671,7 @@ export interface WaitForSelectorRequest {
 export interface AccessibilitySnapshotRequest {
   surfaceSessionId: string;
   contextSessionId: string;
-  accessibilitySnapshot: { format: string; retryOptions?: { timeoutMs?: number } };
+  accessibilitySnapshot: { format: string; mode: string; retryOptions?: { timeoutMs?: number } };
 }
 
 export interface ScreenshotRequest {

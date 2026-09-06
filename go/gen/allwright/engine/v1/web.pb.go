@@ -336,9 +336,12 @@ func (x *ChromeLaunchedEvent) GetInitialPageSessionId() string {
 
 // Empty format defaults to JSON. Accepted values are "json" and "yaml".
 type AccessibilitySnapshotCommand struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Format        string                 `protobuf:"bytes,1,opt,name=format,proto3" json:"format,omitempty"`
-	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty mode defaults to default. AI injects queryable aria-ref attributes.
+	// Supported: default, ai, autoexpect, codegen.
+	Mode          string               `protobuf:"bytes,3,opt,name=mode,proto3" json:"mode,omitempty"`
+	Format        string               `protobuf:"bytes,1,opt,name=format,proto3" json:"format,omitempty"`
+	RetryOptions  *CommandRetryOptions `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -371,6 +374,13 @@ func (x *AccessibilitySnapshotCommand) ProtoReflect() protoreflect.Message {
 // Deprecated: Use AccessibilitySnapshotCommand.ProtoReflect.Descriptor instead.
 func (*AccessibilitySnapshotCommand) Descriptor() ([]byte, []int) {
 	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *AccessibilitySnapshotCommand) GetMode() string {
+	if x != nil {
+		return x.Mode
+	}
+	return ""
 }
 
 func (x *AccessibilitySnapshotCommand) GetFormat() string {
@@ -467,8 +477,9 @@ const file_surfaces_web_v1_web_proto_rawDesc = "" +
 	"\x04note\x18\x02 \x01(\tR\x04note\x12*\n" +
 	"\x11cdp_websocket_url\x18\x03 \x01(\tR\x0fcdpWebsocketUrl\x12\"\n" +
 	"\ruser_data_dir\x18\x04 \x01(\tR\vuserDataDir\x125\n" +
-	"\x17initial_page_session_id\x18\x05 \x01(\tR\x14initialPageSessionId\"\x9c\x01\n" +
-	"\x1cAccessibilitySnapshotCommand\x12\x16\n" +
+	"\x17initial_page_session_id\x18\x05 \x01(\tR\x14initialPageSessionId\"\xb0\x01\n" +
+	"\x1cAccessibilitySnapshotCommand\x12\x12\n" +
+	"\x04mode\x18\x03 \x01(\tR\x04mode\x12\x16\n" +
 	"\x06format\x18\x01 \x01(\tR\x06format\x12R\n" +
 	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
 	"\x0e_retry_options\"X\n" +

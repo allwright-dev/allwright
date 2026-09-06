@@ -992,6 +992,7 @@ pub async fn accessibility_snapshot(
     surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
     format: &str,
+    mode: &str,
 ) -> Result<allwright_plugin_sdk::AccessibilitySnapshotInfo, String> {
     match invoke_web_expected(
         "AccessibilitySnapshotCommand",
@@ -999,6 +1000,7 @@ pub async fn accessibility_snapshot(
             browser_session: surface_session.clone(),
             page_session: page_session.clone(),
             format: format.to_string(),
+            mode: mode.to_string(),
         },
     )
     .await?

@@ -365,6 +365,16 @@ pub enum AccessibilitySnapshotFormat {
 
 #[derive(Debug, Clone, Default)]
 pub struct AccessibilitySnapshotOptions {
+    pub mode: AccessibilitySnapshotMode,
     pub format: AccessibilitySnapshotFormat,
     pub timeout_ms: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub enum AccessibilitySnapshotMode {
+    #[default]
+    Default,
+    Ai,
+    Autoexpect,
+    Codegen,
 }

@@ -57,3 +57,5 @@ all ARIA extension roles, and browser-specific native AX differences are not
 claimed to be covered. The output is a DOM-derived representation, not a native
 platform accessibility tree. Frame sampling and visibility limits are documented
 in the [snapshot README](README.md#accessibility-snapshots).
+
+Snapshot modes and reference lifetime are documented in [README.md](README.md). AI references are Allwright-owned DOM attributes, assigned independently of Playwright and serialized as ordinary `aria-ref` string fields.

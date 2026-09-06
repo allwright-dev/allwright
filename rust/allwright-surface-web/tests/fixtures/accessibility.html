@@ -58,3 +58,7 @@ host.attachShadow({mode:'open'}).innerHTML = 'Shadow name content';
 document.querySelector('#shadow-name').replaceWith(host);
 </script>
 </body></html>
+<button id="ref-action" onclick="if(this.textContent==='Reference changed')this.hidden=true;else this.textContent='Reference changed'">Reference action</button>
+<div aria-hidden="true"><button id="visual-action">Visual only action</button></div>
+<button style="pointer-events:none">No pointer action</button>
+<button style="width:0;height:0;padding:0;border:0;overflow:hidden">Zero size action</button>

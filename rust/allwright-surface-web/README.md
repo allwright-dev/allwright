@@ -76,7 +76,7 @@ accessible descriptions, control values, placeholders, link URLs, and ARIA
 metadata. Password and file input values are omitted.
 
 The collector walks the composed DOM, including open shadow roots, assigned
-slots, and `aria-owns` relationships with cycle/duplicate protection. It excludes
+slots, and `aria-owns` relationships with cycle/duplicate protection. By default it excludes
 hidden and inert subtrees within each document, but includes off-screen content.
 Referenced hidden labels can still contribute to accessible names. Collection
 and serialization live in the web plugin, and execution uses WebDriver BiDi for
@@ -105,3 +105,31 @@ The opt-in browser test launches a temporary browser profile and a local fixture
 server. It covers structured JSON/YAML equivalence, labels/descriptions, typed
 states, hidden content, password values, shadow DOM/slots, ARIA ownership cycles,
 off-screen content, and same-origin/cross-origin frames.
+
+Snapshot modes are independent of the output format:
+
+| Mode | Behavior |
+| --- | --- |
+| `default` (default) | Accessible content; generic wrappers flattened; no DOM writes. |
+| `ai` | Accessible or rendered content, including generic elements. Adds `aria-ref` attributes and matching snapshot fields for rendered elements that receive pointer events. |
+| `autoexpect` | Content must be both accessible and rendered; no DOM writes. |
+| `codegen` | Default semantic tree with the same standard JSON/YAML encoding. No pattern or regular-expression syntax. |
+
+```ts
+const snapshot = JSON.parse(await page.accessibilitySnapshot({ mode: "ai", format: "json" }));
+// For a node in the current document:
+await page.click(`[aria-ref="${node["aria-ref"]}"]`);
+```
+
+References are opaque strings, unique across documents with a random document
+prefix. They stay stable while the element, role, and accessible name remain
+unchanged. Query them in the snapshot document's frame (or within its open shadow
+root); a plain document CSS query does not cross frame or shadow boundaries.
+Text nodes and non-rendered/non-pointer elements have no reference. A reference
+does not guarantee an element is enabled, unobscured, or currently actionable.
+On the next AI capture, stale attributes assigned by the collector are removed;
+other modes leave existing attributes alone. Navigation creates a new reference
+registry. The collector owns `aria-ref` on referenced elements and replaces any
+existing value there. DOM changes can invalidate references; capture again when
+needed. These modes take behavioral inspiration from Playwright but do not claim
+identical tree output.

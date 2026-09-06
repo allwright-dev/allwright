@@ -360,6 +360,10 @@ export class PageImpl implements Page {
   }
 
   async accessibilitySnapshot(options: AccessibilitySnapshotOptions = {}): Promise<string> {
+    const mode = options.mode ?? "default";
+    if (!["default", "ai", "autoexpect", "codegen"].includes(mode)) {
+      throw new Error("invalid accessibility snapshot mode");
+    }
     const format = options.format ?? "json";
     if (format !== "json" && format !== "yaml") {
       throw new Error("accessibility snapshot format must be 'json' or 'yaml'");
@@ -371,6 +375,7 @@ export class PageImpl implements Page {
       contextSessionId: this.sessionId,
       accessibilitySnapshot: {
         format,
+        mode,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });

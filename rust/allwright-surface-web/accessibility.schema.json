@@ -27,6 +27,7 @@
       "type": "object",
       "required": ["role", "name", "states", "properties", "children"],
       "properties": {
+        "aria-ref": { "type": "string", "description": "AI mode DOM attribute value; query in this document with [aria-ref=\"value\"]." },
         "role": { "type": "string" },
         "name": { "type": "string" },
         "states": {

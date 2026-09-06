@@ -450,7 +450,7 @@ public final class Page implements AutoCloseable {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         AccessibilitySnapshotOptions resolved = options == null ? new AccessibilitySnapshotOptions() : options;
-        var command = dev.allwright.engine.v1.AccessibilitySnapshotCommand.newBuilder().setFormat(resolved.format());
+        var command = dev.allwright.engine.v1.AccessibilitySnapshotCommand.newBuilder().setFormat(resolved.format()).setMode(resolved.mode());
         if (CommandSupport.hasTimeout(resolved.timeoutMs())) {
             command.setRetryOptions(CommandSupport.commandRetryOptions(resolved.timeoutMs()));
         }
