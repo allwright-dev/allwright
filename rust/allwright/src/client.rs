@@ -16,6 +16,8 @@ pub mod mobile;
 mod runtime;
 #[path = "client_selectors.rs"]
 mod selectors;
+#[path = "client_tab_accessibility.rs"]
+mod tab_accessibility;
 #[path = "client_tab.rs"]
 mod tab;
 #[path = "client_tab_actions.rs"]

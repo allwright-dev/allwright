@@ -223,6 +223,9 @@ function createLazyPage(pageResource: LazyResource<Page>): Page {
     async waitForSelector(selector: string, options?: WaitForSelectorOptions) {
       return (await pageResource.get()).waitForSelector(selector, options);
     },
+    async accessibilitySnapshot(options?: Parameters<Page["accessibilitySnapshot"]>[0]) {
+      return (await pageResource.get()).accessibilitySnapshot(options);
+    },
     async screenshot(options?: ScreenshotOptions) {
       return (await pageResource.get()).screenshot(options);
     },

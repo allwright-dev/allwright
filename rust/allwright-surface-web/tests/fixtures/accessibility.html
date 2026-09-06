@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head><title>Accessibility fixture</title></head><body>
+<header>Page banner</header><footer>Page footer</footer>
+<main>
+<button>yes</button><button>on</button><button>2026-09-05</button>
+<h1>Snapshot fixture</h1><p>Ordinary page text.</p>
+<label for="email">Email address</label><input id="email" value="yes: no" aria-describedby="help"><span id="help">Enter your email</span>
+<label><input type="checkbox" id="terms">Accept terms</label>
+<button aria-pressed="false" aria-expanded="true">Toggle</button>
+<fieldset disabled><button>Disabled action</button></fieldset>
+<span id="reference" hidden>Referenced hidden label</span><button aria-labelledby="reference">Ignored name</button>
+<button aria-label='yes: "no" # [x] 😀'>Special text</button>
+<input type="password" value="secret-password" aria-label="Password">
+<div aria-hidden="true"><button aria-hidden="false">Hidden button</button></div>
+<div inert><button>Inert button</button></div>
+<details><summary>Details</summary><button>Closed details action</button></details>
+<div style="visibility:hidden"><button style="visibility:visible">Visibility restored</button></div>
+<button style="position:absolute;top:10000px">Off screen action</button>
+<div id="shadow"><span slot="action">Shadow slot action</span><span>Unassigned light DOM</span></div>
+<button id="shadow-name"></button>
+<div role="listitem" id="owned">Owned item</div><div role="list" aria-label="Owned items" aria-owns="owned"></div>
+<div role="group" id="cycle-a" aria-owns="cycle-b"></div><div role="group" id="cycle-b" aria-owns="cycle-a"></div>
+<iframe title="same origin" srcdoc="<button>Same origin frame action</button>"></iframe>
+<iframe title="cross origin" src="http://localhost:FRAME_PORT/frame"></iframe>
+<div role="unknown button">Fallback role</div>
+<article aria-label="Scoped article"><header>Local header</header><footer>Local footer</footer></article>
+<table role="grid" aria-label="Data grid"><tr><th scope="row">Row heading</th><td>Grid value</td></tr></table>
+<ul role="presentation"><li>Presentation item</li></ul>
+<button role="none">Focusable presentation conflict</button>
+<button>Down<span>load</span><span style="display:block">now</span></button>
+<span id="first-name">First</span><span id="last-name">Last</span>
+<button aria-labelledby="missing first-name last-name first-name" aria-label="Lower priority">Lower priority content</button>
+<label for="multi-label">First label</label><label for="multi-label">Second label</label><input id="multi-label">
+<button aria-labelledby="absent" aria-label="Fallback label">Fallback content</button>
+<button id="self-label" aria-labelledby="self-label" aria-label="Self reference">Self content</button>
+<div id="label-cycle-a" aria-labelledby="label-cycle-b">Cycle A</div><div id="label-cycle-b" aria-labelledby="label-cycle-a">Cycle B</div>
+<img alt="Diagram"><img alt="" src="data:,">
+<svg aria-describedby="svg-help"><title>Vector diagram</title><desc>Native SVG description</desc></svg>
+<span id="svg-help" hidden>SVG help</span>
+<fieldset><legend>Contact details</legend><input aria-label="Contact input"></fieldset>
+<button aria-label="Named action" title="Tooltip description">Text</button>
+<button aria-label="Explicit description" aria-description="Description attribute">Text</button>
+<section title="Tooltip only">Not a named region</section>
+<button id="pseudo-name">Center</button><button id="icon-name">Icon action</button>
+<button>Visible name<span hidden>excluded from name</span></button>
+<button aria-label="Empty description" aria-describedby="empty-description" title="Must not fall back">Text</button><span id="empty-description" hidden></span>
+<label for="hidden-native" hidden>Hidden native label</label><input id="hidden-native">
+<label><input type="checkbox">Choose <select><option>Blue</option></select> option</label>
+<div role="radio" aria-checked="mixed" aria-label="Mixed radio"></div>
+<style>#icon-name::before { content: url("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="); } #pseudo-name::before { content: "\53 tart "; } #pseudo-name::after { content: " End"; }</style>
+</main>
+<script>
+document.querySelector('#terms').indeterminate = true;
+document.querySelector('#shadow').attachShadow({mode:'open'}).innerHTML = '<button><slot name="action"></slot></button>';
+// A custom host with role=button permits open shadow content (native button cannot host a shadow root).
+const host = document.createElement('div'); host.setAttribute('role', 'button');
+host.attachShadow({mode:'open'}).innerHTML = 'Shadow name content';
+document.querySelector('#shadow-name').replaceWith(host);
+</script>
+</body></html>

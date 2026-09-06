@@ -442,6 +442,37 @@ public final class Page implements AutoCloseable {
         }
     }
 
+    public synchronized String accessibilitySnapshot() {
+        return accessibilitySnapshot(new AccessibilitySnapshotOptions());
+    }
+
+    public synchronized String accessibilitySnapshot(AccessibilitySnapshotOptions options) {
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
+        ensureOpen();
+        AccessibilitySnapshotOptions resolved = options == null ? new AccessibilitySnapshotOptions() : options;
+        var command = dev.allwright.engine.v1.AccessibilitySnapshotCommand.newBuilder().setFormat(resolved.format());
+        if (CommandSupport.hasTimeout(resolved.timeoutMs())) {
+            command.setRetryOptions(CommandSupport.commandRetryOptions(resolved.timeoutMs()));
+        }
+        handle.send(ContextSessionCommand.newBuilder()
+                .setSurfaceSessionId(browserSessionId)
+                .setContextSessionId(sessionId)
+                .setAccessibilitySnapshot(command)
+                .build());
+        while (true) {
+            ContextSessionEvent event = handle.recv("receive accessibility snapshot");
+            switch (event.getEventCase()) {
+                case ACCESSIBILITY_SNAPSHOT_CAPTURED -> { return event.getAccessibilitySnapshotCaptured().getSnapshot(); }
+                case CLOSED -> {
+                    closed = true;
+                    throw new AllwrightException("page session " + sessionId + " closed while capturing accessibility snapshot");
+                }
+                case ERROR -> throw new AllwrightException("accessibility snapshot failed: " + event.getError().getMessage());
+                default -> { }
+            }
+        }
+    }
+
     public synchronized ScreenshotResult screenshot() {
         return screenshot(new ScreenshotOptions());
     }

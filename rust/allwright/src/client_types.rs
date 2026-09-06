@@ -355,3 +355,16 @@ pub(crate) struct TabHandle {
     pub(crate) events: tonic::Streaming<crate::proto::ContextSessionEvent>,
     pub(crate) closed: bool,
 }
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum AccessibilitySnapshotFormat {
+    #[default]
+    Json,
+    Yaml,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct AccessibilitySnapshotOptions {
+    pub format: AccessibilitySnapshotFormat,
+    pub timeout_ms: Option<u32>,
+}

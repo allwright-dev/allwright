@@ -27,6 +27,7 @@ import type {
 
 export { findConfigFile, loadConfigFile, resolveConfig, setServerAddr, shutdown };
 export type {
+  AccessibilitySnapshotOptions,
   AllwrightConfig,
   Browser,
   BrowserInfo,

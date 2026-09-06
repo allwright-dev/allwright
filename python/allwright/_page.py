@@ -20,6 +20,7 @@ from ._types import (
     NavigateResult,
     PressOptions,
     PressResult,
+    AccessibilitySnapshotOptions,
     ScreenshotOptions,
     ScreenshotResult,
     TextResult,
@@ -391,6 +392,34 @@ class Page:
                         raise AllwrightError(
                             f"page session error while waiting for selector: {event.error.message}"
                         )
+
+    def accessibility_snapshot(self, options: AccessibilitySnapshotOptions | None = None) -> str:
+        from ._runtime import retry_options
+
+        options = options or AccessibilitySnapshotOptions()
+        if options.format not in ("json", "yaml"):
+            raise ValueError("accessibility snapshot format must be 'json' or 'yaml'")
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self.surface_session_id,
+                context_session_id=self.session_id,
+                accessibility_snapshot=engine_pb2.AccessibilitySnapshotCommand(
+                    format=options.format,
+                    retry_options=retry_options(options.timeout_ms),
+                ),
+            ))
+            while True:
+                event = handle.recv("receive accessibility snapshot")
+                match event.WhichOneof("event"):
+                    case "accessibility_snapshot_captured":
+                        return event.accessibility_snapshot_captured.snapshot
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(f"page session {self.session_id} closed while capturing accessibility snapshot")
+                    case "error":
+                        raise AllwrightError(f"accessibility snapshot failed: {event.error.message}")
 
     def screenshot(self, options: ScreenshotOptions | None = None) -> ScreenshotResult:
         from ._runtime import retry_options

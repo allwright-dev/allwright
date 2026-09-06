@@ -4,6 +4,7 @@ import { formatActionError } from "./errors.js";
 import { normalizeSelectorForTransport } from "./selectors.js";
 import { createPageHandle } from "./runtime.js";
 import type {
+  AccessibilitySnapshotOptions,
   ClickResult,
   CommandOptions,
   CountResult,
@@ -354,6 +355,32 @@ export class PageImpl implements Page {
       if (event.closed) {
         handle.closed = true;
         throw new Error(`page session ${this.sessionId} closed while waiting for selector result`);
+      }
+    }
+  }
+
+  async accessibilitySnapshot(options: AccessibilitySnapshotOptions = {}): Promise<string> {
+    const format = options.format ?? "json";
+    if (format !== "json" && format !== "yaml") {
+      throw new Error("accessibility snapshot format must be 'json' or 'yaml'");
+    }
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
+      accessibilitySnapshot: {
+        format,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.accessibilitySnapshotCaptured) return event.accessibilitySnapshotCaptured.snapshot ?? "";
+      if (event.error?.message) throw formatActionError("accessibility snapshot", event.error.message);
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`page session ${this.sessionId} closed while waiting for accessibility snapshot`);
       }
     }
   }

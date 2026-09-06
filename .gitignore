@@ -63,3 +63,6 @@ node_modules/
 .vscode/
 *.swp
 *.swo
+
+# Local Go build cache
+/.gocache/

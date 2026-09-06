@@ -1412,6 +1412,31 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
+        Some(ContextCommand::AccessibilitySnapshot(command)) => {
+            let (EngineBrowserSessionHandle::Web(surface), EnginePageSessionHandle::Web(page)) =
+                (&surface_session, &page_session)
+            else {
+                return Err(Status::invalid_argument("accessibility snapshot requires a web page"));
+            };
+            let snapshot = retry_with_timeout(
+                command_retry_policy(command.retry_options.as_ref()),
+                || async { web_lib::accessibility_snapshot(surface, page, &command.format).await },
+            )
+            .await
+            .map_err(Status::internal)?;
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &context_session_id,
+                    ContextEvent::AccessibilitySnapshotCaptured(
+                        proto::AccessibilitySnapshotCapturedEvent {
+                            snapshot: snapshot.snapshot,
+                            format: snapshot.format,
+                        },
+                    ),
+                )],
+                should_close: false,
+            })
+        }
         Some(ContextCommand::Screenshot(ScreenshotCommand {
             retry_options,
             full_page,

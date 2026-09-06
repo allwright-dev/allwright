@@ -987,3 +987,23 @@ pub async fn wait_for_selector_via_cdp(
         }
     }
 }
+
+pub async fn accessibility_snapshot(
+    surface_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    format: &str,
+) -> Result<allwright_plugin_sdk::AccessibilitySnapshotInfo, String> {
+    match invoke_web_expected(
+        "AccessibilitySnapshotCommand",
+        PluginCommand::AccessibilitySnapshot {
+            browser_session: surface_session.clone(),
+            page_session: page_session.clone(),
+            format: format.to_string(),
+        },
+    )
+    .await?
+    {
+        PluginResult::AccessibilitySnapshot(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for AccessibilitySnapshot".to_string()),
+    }
+}

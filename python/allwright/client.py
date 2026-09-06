@@ -31,6 +31,7 @@ from ._types import (
     PressResult,
     ResolveConfigOptions,
     ResolvedConfig,
+    AccessibilitySnapshotOptions,
     ScreenshotOptions,
     ScreenshotResult,
     TextResult,

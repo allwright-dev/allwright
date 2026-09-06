@@ -41,6 +41,7 @@ type ContextSessionCommand struct {
 	//	*ContextSessionCommand_GetInnerText
 	//	*ContextSessionCommand_WaitForSelector
 	//	*ContextSessionCommand_Screenshot
+	//	*ContextSessionCommand_AccessibilitySnapshot
 	Command       isContextSessionCommand_Command `protobuf_oneof:"command"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -223,6 +224,15 @@ func (x *ContextSessionCommand) GetScreenshot() *ScreenshotCommand {
 	return nil
 }
 
+func (x *ContextSessionCommand) GetAccessibilitySnapshot() *AccessibilitySnapshotCommand {
+	if x != nil {
+		if x, ok := x.Command.(*ContextSessionCommand_AccessibilitySnapshot); ok {
+			return x.AccessibilitySnapshot
+		}
+	}
+	return nil
+}
+
 type isContextSessionCommand_Command interface {
 	isContextSessionCommand_Command()
 }
@@ -283,6 +293,10 @@ type ContextSessionCommand_Screenshot struct {
 	Screenshot *ScreenshotCommand `protobuf:"bytes,16,opt,name=screenshot,proto3,oneof"`
 }
 
+type ContextSessionCommand_AccessibilitySnapshot struct {
+	AccessibilitySnapshot *AccessibilitySnapshotCommand `protobuf:"bytes,17,opt,name=accessibility_snapshot,json=accessibilitySnapshot,proto3,oneof"`
+}
+
 func (*ContextSessionCommand_Ping) isContextSessionCommand_Command() {}
 
 func (*ContextSessionCommand_Close) isContextSessionCommand_Command() {}
@@ -310,6 +324,8 @@ func (*ContextSessionCommand_GetInnerText) isContextSessionCommand_Command() {}
 func (*ContextSessionCommand_WaitForSelector) isContextSessionCommand_Command() {}
 
 func (*ContextSessionCommand_Screenshot) isContextSessionCommand_Command() {}
+
+func (*ContextSessionCommand_AccessibilitySnapshot) isContextSessionCommand_Command() {}
 
 type ContextSessionPingCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -413,6 +429,7 @@ type ContextSessionEvent struct {
 	//	*ContextSessionEvent_InnerTextResolved
 	//	*ContextSessionEvent_SelectorWaitSatisfied
 	//	*ContextSessionEvent_ScreenshotCaptured
+	//	*ContextSessionEvent_AccessibilitySnapshotCaptured
 	Event         isContextSessionEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -615,6 +632,15 @@ func (x *ContextSessionEvent) GetScreenshotCaptured() *ScreenshotCapturedEvent {
 	return nil
 }
 
+func (x *ContextSessionEvent) GetAccessibilitySnapshotCaptured() *AccessibilitySnapshotCapturedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*ContextSessionEvent_AccessibilitySnapshotCaptured); ok {
+			return x.AccessibilitySnapshotCaptured
+		}
+	}
+	return nil
+}
+
 type isContextSessionEvent_Event interface {
 	isContextSessionEvent_Event()
 }
@@ -687,6 +713,10 @@ type ContextSessionEvent_ScreenshotCaptured struct {
 	ScreenshotCaptured *ScreenshotCapturedEvent `protobuf:"bytes,18,opt,name=screenshot_captured,json=screenshotCaptured,proto3,oneof"`
 }
 
+type ContextSessionEvent_AccessibilitySnapshotCaptured struct {
+	AccessibilitySnapshotCaptured *AccessibilitySnapshotCapturedEvent `protobuf:"bytes,19,opt,name=accessibility_snapshot_captured,json=accessibilitySnapshotCaptured,proto3,oneof"`
+}
+
 func (*ContextSessionEvent_Attached) isContextSessionEvent_Event() {}
 
 func (*ContextSessionEvent_Pong) isContextSessionEvent_Event() {}
@@ -720,6 +750,8 @@ func (*ContextSessionEvent_InnerTextResolved) isContextSessionEvent_Event() {}
 func (*ContextSessionEvent_SelectorWaitSatisfied) isContextSessionEvent_Event() {}
 
 func (*ContextSessionEvent_ScreenshotCaptured) isContextSessionEvent_Event() {}
+
+func (*ContextSessionEvent_AccessibilitySnapshotCaptured) isContextSessionEvent_Event() {}
 
 type ContextSessionAttachedEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -2329,7 +2361,8 @@ var File_core_v1_context_proto protoreflect.FileDescriptor
 
 const file_core_v1_context_proto_rawDesc = "" +
 	"\n" +
-	"\x15core/v1/context.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\"\xde\t\n" +
+	"\x15core/v1/context.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x19surfaces/web/v1/web.proto\"\xca\n" +
+	"\n" +
 	"\x15ContextSessionCommand\x12,\n" +
 	"\x12surface_session_id\x18\x01 \x01(\tR\x10surfaceSessionId\x12,\n" +
 	"\x12context_session_id\x18\x02 \x01(\tR\x10contextSessionId\x12D\n" +
@@ -2349,11 +2382,12 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\x11wait_for_selector\x18\x0f \x01(\v2+.allwright.engine.v1.WaitForSelectorCommandH\x00R\x0fwaitForSelector\x12H\n" +
 	"\n" +
 	"screenshot\x18\x10 \x01(\v2&.allwright.engine.v1.ScreenshotCommandH\x00R\n" +
-	"screenshotB\t\n" +
+	"screenshot\x12j\n" +
+	"\x16accessibility_snapshot\x18\x11 \x01(\v21.allwright.engine.v1.AccessibilitySnapshotCommandH\x00R\x15accessibilitySnapshotB\t\n" +
 	"\acommand\"5\n" +
 	"\x19ContextSessionPingCommand\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"\x1c\n" +
-	"\x1aCloseContextSessionCommand\"\x88\f\n" +
+	"\x1aCloseContextSessionCommand\"\x8c\r\n" +
 	"\x13ContextSessionEvent\x12,\n" +
 	"\x12context_session_id\x18\x01 \x01(\tR\x10contextSessionId\x12N\n" +
 	"\battached\x18\x02 \x01(\v20.allwright.engine.v1.ContextSessionAttachedEventH\x00R\battached\x12B\n" +
@@ -2374,7 +2408,8 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\x15text_content_resolved\x18\x0f \x01(\v2-.allwright.engine.v1.TextContentResolvedEventH\x00R\x13textContentResolved\x12]\n" +
 	"\x13inner_text_resolved\x18\x10 \x01(\v2+.allwright.engine.v1.InnerTextResolvedEventH\x00R\x11innerTextResolved\x12i\n" +
 	"\x17selector_wait_satisfied\x18\x11 \x01(\v2/.allwright.engine.v1.SelectorWaitSatisfiedEventH\x00R\x15selectorWaitSatisfied\x12_\n" +
-	"\x13screenshot_captured\x18\x12 \x01(\v2,.allwright.engine.v1.ScreenshotCapturedEventH\x00R\x12screenshotCapturedB\a\n" +
+	"\x13screenshot_captured\x18\x12 \x01(\v2,.allwright.engine.v1.ScreenshotCapturedEventH\x00R\x12screenshotCaptured\x12\x81\x01\n" +
+	"\x1faccessibility_snapshot_captured\x18\x13 \x01(\v27.allwright.engine.v1.AccessibilitySnapshotCapturedEventH\x00R\x1daccessibilitySnapshotCapturedB\a\n" +
 	"\x05event\"1\n" +
 	"\x1bContextSessionAttachedEvent\x12\x12\n" +
 	"\x04note\x18\x01 \x01(\tR\x04note\"3\n" +
@@ -2510,40 +2545,42 @@ func file_core_v1_context_proto_rawDescGZIP() []byte {
 
 var file_core_v1_context_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_core_v1_context_proto_goTypes = []any{
-	(*ContextSessionCommand)(nil),       // 0: allwright.engine.v1.ContextSessionCommand
-	(*ContextSessionPingCommand)(nil),   // 1: allwright.engine.v1.ContextSessionPingCommand
-	(*CloseContextSessionCommand)(nil),  // 2: allwright.engine.v1.CloseContextSessionCommand
-	(*ContextSessionEvent)(nil),         // 3: allwright.engine.v1.ContextSessionEvent
-	(*ContextSessionAttachedEvent)(nil), // 4: allwright.engine.v1.ContextSessionAttachedEvent
-	(*ContextSessionPongEvent)(nil),     // 5: allwright.engine.v1.ContextSessionPongEvent
-	(*ContextSessionClosedEvent)(nil),   // 6: allwright.engine.v1.ContextSessionClosedEvent
-	(*ContextSessionErrorEvent)(nil),    // 7: allwright.engine.v1.ContextSessionErrorEvent
-	(*NavigatePageCommand)(nil),         // 8: allwright.engine.v1.NavigatePageCommand
-	(*ClickElementCommand)(nil),         // 9: allwright.engine.v1.ClickElementCommand
-	(*CountElementsCommand)(nil),        // 10: allwright.engine.v1.CountElementsCommand
-	(*HighlightElementsCommand)(nil),    // 11: allwright.engine.v1.HighlightElementsCommand
-	(*FocusElementCommand)(nil),         // 12: allwright.engine.v1.FocusElementCommand
-	(*FillElementCommand)(nil),          // 13: allwright.engine.v1.FillElementCommand
-	(*HoverElementCommand)(nil),         // 14: allwright.engine.v1.HoverElementCommand
-	(*PressKeyCommand)(nil),             // 15: allwright.engine.v1.PressKeyCommand
-	(*GetTextContentCommand)(nil),       // 16: allwright.engine.v1.GetTextContentCommand
-	(*GetInnerTextCommand)(nil),         // 17: allwright.engine.v1.GetInnerTextCommand
-	(*WaitForSelectorCommand)(nil),      // 18: allwright.engine.v1.WaitForSelectorCommand
-	(*ScreenshotCommand)(nil),           // 19: allwright.engine.v1.ScreenshotCommand
-	(*PageNavigatedEvent)(nil),          // 20: allwright.engine.v1.PageNavigatedEvent
-	(*ChromiumBidiInjectionEvent)(nil),  // 21: allwright.engine.v1.ChromiumBidiInjectionEvent
-	(*ElementClickedEvent)(nil),         // 22: allwright.engine.v1.ElementClickedEvent
-	(*ElementCountedEvent)(nil),         // 23: allwright.engine.v1.ElementCountedEvent
-	(*ElementsHighlightedEvent)(nil),    // 24: allwright.engine.v1.ElementsHighlightedEvent
-	(*ElementFocusedEvent)(nil),         // 25: allwright.engine.v1.ElementFocusedEvent
-	(*ElementFilledEvent)(nil),          // 26: allwright.engine.v1.ElementFilledEvent
-	(*ElementHoveredEvent)(nil),         // 27: allwright.engine.v1.ElementHoveredEvent
-	(*KeyPressedEvent)(nil),             // 28: allwright.engine.v1.KeyPressedEvent
-	(*TextContentResolvedEvent)(nil),    // 29: allwright.engine.v1.TextContentResolvedEvent
-	(*InnerTextResolvedEvent)(nil),      // 30: allwright.engine.v1.InnerTextResolvedEvent
-	(*SelectorWaitSatisfiedEvent)(nil),  // 31: allwright.engine.v1.SelectorWaitSatisfiedEvent
-	(*ScreenshotCapturedEvent)(nil),     // 32: allwright.engine.v1.ScreenshotCapturedEvent
-	(*CommandRetryOptions)(nil),         // 33: allwright.engine.v1.CommandRetryOptions
+	(*ContextSessionCommand)(nil),              // 0: allwright.engine.v1.ContextSessionCommand
+	(*ContextSessionPingCommand)(nil),          // 1: allwright.engine.v1.ContextSessionPingCommand
+	(*CloseContextSessionCommand)(nil),         // 2: allwright.engine.v1.CloseContextSessionCommand
+	(*ContextSessionEvent)(nil),                // 3: allwright.engine.v1.ContextSessionEvent
+	(*ContextSessionAttachedEvent)(nil),        // 4: allwright.engine.v1.ContextSessionAttachedEvent
+	(*ContextSessionPongEvent)(nil),            // 5: allwright.engine.v1.ContextSessionPongEvent
+	(*ContextSessionClosedEvent)(nil),          // 6: allwright.engine.v1.ContextSessionClosedEvent
+	(*ContextSessionErrorEvent)(nil),           // 7: allwright.engine.v1.ContextSessionErrorEvent
+	(*NavigatePageCommand)(nil),                // 8: allwright.engine.v1.NavigatePageCommand
+	(*ClickElementCommand)(nil),                // 9: allwright.engine.v1.ClickElementCommand
+	(*CountElementsCommand)(nil),               // 10: allwright.engine.v1.CountElementsCommand
+	(*HighlightElementsCommand)(nil),           // 11: allwright.engine.v1.HighlightElementsCommand
+	(*FocusElementCommand)(nil),                // 12: allwright.engine.v1.FocusElementCommand
+	(*FillElementCommand)(nil),                 // 13: allwright.engine.v1.FillElementCommand
+	(*HoverElementCommand)(nil),                // 14: allwright.engine.v1.HoverElementCommand
+	(*PressKeyCommand)(nil),                    // 15: allwright.engine.v1.PressKeyCommand
+	(*GetTextContentCommand)(nil),              // 16: allwright.engine.v1.GetTextContentCommand
+	(*GetInnerTextCommand)(nil),                // 17: allwright.engine.v1.GetInnerTextCommand
+	(*WaitForSelectorCommand)(nil),             // 18: allwright.engine.v1.WaitForSelectorCommand
+	(*ScreenshotCommand)(nil),                  // 19: allwright.engine.v1.ScreenshotCommand
+	(*PageNavigatedEvent)(nil),                 // 20: allwright.engine.v1.PageNavigatedEvent
+	(*ChromiumBidiInjectionEvent)(nil),         // 21: allwright.engine.v1.ChromiumBidiInjectionEvent
+	(*ElementClickedEvent)(nil),                // 22: allwright.engine.v1.ElementClickedEvent
+	(*ElementCountedEvent)(nil),                // 23: allwright.engine.v1.ElementCountedEvent
+	(*ElementsHighlightedEvent)(nil),           // 24: allwright.engine.v1.ElementsHighlightedEvent
+	(*ElementFocusedEvent)(nil),                // 25: allwright.engine.v1.ElementFocusedEvent
+	(*ElementFilledEvent)(nil),                 // 26: allwright.engine.v1.ElementFilledEvent
+	(*ElementHoveredEvent)(nil),                // 27: allwright.engine.v1.ElementHoveredEvent
+	(*KeyPressedEvent)(nil),                    // 28: allwright.engine.v1.KeyPressedEvent
+	(*TextContentResolvedEvent)(nil),           // 29: allwright.engine.v1.TextContentResolvedEvent
+	(*InnerTextResolvedEvent)(nil),             // 30: allwright.engine.v1.InnerTextResolvedEvent
+	(*SelectorWaitSatisfiedEvent)(nil),         // 31: allwright.engine.v1.SelectorWaitSatisfiedEvent
+	(*ScreenshotCapturedEvent)(nil),            // 32: allwright.engine.v1.ScreenshotCapturedEvent
+	(*AccessibilitySnapshotCommand)(nil),       // 33: allwright.engine.v1.AccessibilitySnapshotCommand
+	(*AccessibilitySnapshotCapturedEvent)(nil), // 34: allwright.engine.v1.AccessibilitySnapshotCapturedEvent
+	(*CommandRetryOptions)(nil),                // 35: allwright.engine.v1.CommandRetryOptions
 }
 var file_core_v1_context_proto_depIdxs = []int32{
 	1,  // 0: allwright.engine.v1.ContextSessionCommand.ping:type_name -> allwright.engine.v1.ContextSessionPingCommand
@@ -2560,40 +2597,42 @@ var file_core_v1_context_proto_depIdxs = []int32{
 	17, // 11: allwright.engine.v1.ContextSessionCommand.get_inner_text:type_name -> allwright.engine.v1.GetInnerTextCommand
 	18, // 12: allwright.engine.v1.ContextSessionCommand.wait_for_selector:type_name -> allwright.engine.v1.WaitForSelectorCommand
 	19, // 13: allwright.engine.v1.ContextSessionCommand.screenshot:type_name -> allwright.engine.v1.ScreenshotCommand
-	4,  // 14: allwright.engine.v1.ContextSessionEvent.attached:type_name -> allwright.engine.v1.ContextSessionAttachedEvent
-	5,  // 15: allwright.engine.v1.ContextSessionEvent.pong:type_name -> allwright.engine.v1.ContextSessionPongEvent
-	6,  // 16: allwright.engine.v1.ContextSessionEvent.closed:type_name -> allwright.engine.v1.ContextSessionClosedEvent
-	7,  // 17: allwright.engine.v1.ContextSessionEvent.error:type_name -> allwright.engine.v1.ContextSessionErrorEvent
-	20, // 18: allwright.engine.v1.ContextSessionEvent.navigated:type_name -> allwright.engine.v1.PageNavigatedEvent
-	21, // 19: allwright.engine.v1.ContextSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
-	22, // 20: allwright.engine.v1.ContextSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
-	23, // 21: allwright.engine.v1.ContextSessionEvent.element_counted:type_name -> allwright.engine.v1.ElementCountedEvent
-	24, // 22: allwright.engine.v1.ContextSessionEvent.elements_highlighted:type_name -> allwright.engine.v1.ElementsHighlightedEvent
-	25, // 23: allwright.engine.v1.ContextSessionEvent.element_focused:type_name -> allwright.engine.v1.ElementFocusedEvent
-	26, // 24: allwright.engine.v1.ContextSessionEvent.element_filled:type_name -> allwright.engine.v1.ElementFilledEvent
-	27, // 25: allwright.engine.v1.ContextSessionEvent.element_hovered:type_name -> allwright.engine.v1.ElementHoveredEvent
-	28, // 26: allwright.engine.v1.ContextSessionEvent.key_pressed:type_name -> allwright.engine.v1.KeyPressedEvent
-	29, // 27: allwright.engine.v1.ContextSessionEvent.text_content_resolved:type_name -> allwright.engine.v1.TextContentResolvedEvent
-	30, // 28: allwright.engine.v1.ContextSessionEvent.inner_text_resolved:type_name -> allwright.engine.v1.InnerTextResolvedEvent
-	31, // 29: allwright.engine.v1.ContextSessionEvent.selector_wait_satisfied:type_name -> allwright.engine.v1.SelectorWaitSatisfiedEvent
-	32, // 30: allwright.engine.v1.ContextSessionEvent.screenshot_captured:type_name -> allwright.engine.v1.ScreenshotCapturedEvent
-	33, // 31: allwright.engine.v1.NavigatePageCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	33, // 32: allwright.engine.v1.ClickElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	33, // 33: allwright.engine.v1.CountElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	33, // 34: allwright.engine.v1.HighlightElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	33, // 35: allwright.engine.v1.FocusElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	33, // 36: allwright.engine.v1.FillElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	33, // 37: allwright.engine.v1.HoverElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	33, // 38: allwright.engine.v1.PressKeyCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	33, // 39: allwright.engine.v1.GetTextContentCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	33, // 40: allwright.engine.v1.GetInnerTextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	33, // 41: allwright.engine.v1.WaitForSelectorCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	33, // 42: allwright.engine.v1.ScreenshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	43, // [43:43] is the sub-list for method output_type
-	43, // [43:43] is the sub-list for method input_type
-	43, // [43:43] is the sub-list for extension type_name
-	43, // [43:43] is the sub-list for extension extendee
-	0,  // [0:43] is the sub-list for field type_name
+	33, // 14: allwright.engine.v1.ContextSessionCommand.accessibility_snapshot:type_name -> allwright.engine.v1.AccessibilitySnapshotCommand
+	4,  // 15: allwright.engine.v1.ContextSessionEvent.attached:type_name -> allwright.engine.v1.ContextSessionAttachedEvent
+	5,  // 16: allwright.engine.v1.ContextSessionEvent.pong:type_name -> allwright.engine.v1.ContextSessionPongEvent
+	6,  // 17: allwright.engine.v1.ContextSessionEvent.closed:type_name -> allwright.engine.v1.ContextSessionClosedEvent
+	7,  // 18: allwright.engine.v1.ContextSessionEvent.error:type_name -> allwright.engine.v1.ContextSessionErrorEvent
+	20, // 19: allwright.engine.v1.ContextSessionEvent.navigated:type_name -> allwright.engine.v1.PageNavigatedEvent
+	21, // 20: allwright.engine.v1.ContextSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
+	22, // 21: allwright.engine.v1.ContextSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
+	23, // 22: allwright.engine.v1.ContextSessionEvent.element_counted:type_name -> allwright.engine.v1.ElementCountedEvent
+	24, // 23: allwright.engine.v1.ContextSessionEvent.elements_highlighted:type_name -> allwright.engine.v1.ElementsHighlightedEvent
+	25, // 24: allwright.engine.v1.ContextSessionEvent.element_focused:type_name -> allwright.engine.v1.ElementFocusedEvent
+	26, // 25: allwright.engine.v1.ContextSessionEvent.element_filled:type_name -> allwright.engine.v1.ElementFilledEvent
+	27, // 26: allwright.engine.v1.ContextSessionEvent.element_hovered:type_name -> allwright.engine.v1.ElementHoveredEvent
+	28, // 27: allwright.engine.v1.ContextSessionEvent.key_pressed:type_name -> allwright.engine.v1.KeyPressedEvent
+	29, // 28: allwright.engine.v1.ContextSessionEvent.text_content_resolved:type_name -> allwright.engine.v1.TextContentResolvedEvent
+	30, // 29: allwright.engine.v1.ContextSessionEvent.inner_text_resolved:type_name -> allwright.engine.v1.InnerTextResolvedEvent
+	31, // 30: allwright.engine.v1.ContextSessionEvent.selector_wait_satisfied:type_name -> allwright.engine.v1.SelectorWaitSatisfiedEvent
+	32, // 31: allwright.engine.v1.ContextSessionEvent.screenshot_captured:type_name -> allwright.engine.v1.ScreenshotCapturedEvent
+	34, // 32: allwright.engine.v1.ContextSessionEvent.accessibility_snapshot_captured:type_name -> allwright.engine.v1.AccessibilitySnapshotCapturedEvent
+	35, // 33: allwright.engine.v1.NavigatePageCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	35, // 34: allwright.engine.v1.ClickElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	35, // 35: allwright.engine.v1.CountElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	35, // 36: allwright.engine.v1.HighlightElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	35, // 37: allwright.engine.v1.FocusElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	35, // 38: allwright.engine.v1.FillElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	35, // 39: allwright.engine.v1.HoverElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	35, // 40: allwright.engine.v1.PressKeyCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	35, // 41: allwright.engine.v1.GetTextContentCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	35, // 42: allwright.engine.v1.GetInnerTextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	35, // 43: allwright.engine.v1.WaitForSelectorCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	35, // 44: allwright.engine.v1.ScreenshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	45, // [45:45] is the sub-list for method output_type
+	45, // [45:45] is the sub-list for method input_type
+	45, // [45:45] is the sub-list for extension type_name
+	45, // [45:45] is the sub-list for extension extendee
+	0,  // [0:45] is the sub-list for field type_name
 }
 
 func init() { file_core_v1_context_proto_init() }
@@ -2602,6 +2641,7 @@ func file_core_v1_context_proto_init() {
 		return
 	}
 	file_core_v1_common_proto_init()
+	file_surfaces_web_v1_web_proto_init()
 	file_core_v1_context_proto_msgTypes[0].OneofWrappers = []any{
 		(*ContextSessionCommand_Ping)(nil),
 		(*ContextSessionCommand_Close)(nil),
@@ -2617,6 +2657,7 @@ func file_core_v1_context_proto_init() {
 		(*ContextSessionCommand_GetInnerText)(nil),
 		(*ContextSessionCommand_WaitForSelector)(nil),
 		(*ContextSessionCommand_Screenshot)(nil),
+		(*ContextSessionCommand_AccessibilitySnapshot)(nil),
 	}
 	file_core_v1_context_proto_msgTypes[3].OneofWrappers = []any{
 		(*ContextSessionEvent_Attached)(nil),
@@ -2636,6 +2677,7 @@ func file_core_v1_context_proto_init() {
 		(*ContextSessionEvent_InnerTextResolved)(nil),
 		(*ContextSessionEvent_SelectorWaitSatisfied)(nil),
 		(*ContextSessionEvent_ScreenshotCaptured)(nil),
+		(*ContextSessionEvent_AccessibilitySnapshotCaptured)(nil),
 	}
 	file_core_v1_context_proto_msgTypes[8].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[9].OneofWrappers = []any{}

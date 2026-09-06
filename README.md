@@ -181,6 +181,19 @@ The practical path today is:
 
 At the moment, the `web` runtime path is wired through the installable plugin model and loaded into the core at runtime. The other surface crates and split proto ownership are in place, while additional plugin runtime activation is still follow-up work.
 
+Web pages support accessibility snapshots in JSON (default) or standard YAML:
+
+```ts
+const tree = JSON.parse(await page.accessibilitySnapshot());
+const yaml = await page.accessibilitySnapshot({ format: "yaml" });
+```
+
+Both formats decode to the same versioned structure with explicit roles, names,
+states, properties, children, and iframe documents. The method is available in
+all five clients and the Vitest page fixture. Accessibility computation is implemented
+in Allwright-owned JavaScript using specifications and Playwright as references. See the
+[accessibility snapshot contract and limitations](rust/allwright-surface-web/README.md#accessibility-snapshots).
+
 ## Client Experience
 
 allwright is designed around high-level browser objects rather than asking application code to manage raw gRPC connections.

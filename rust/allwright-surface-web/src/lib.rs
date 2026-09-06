@@ -1,3 +1,7 @@
+mod accessibility;
+mod accessibility_yaml;
+pub use accessibility::accessibility_snapshot;
+
 use allwright_plugin_sdk::{
     ALLWRIGHT_PLUGIN_API_VERSION, AutomationSessionInfo, BrowserKind, BrowserLaunchInfo,
     BrowserSessionHandle, ChromeLaunchInfo, ChromeTabInfo, ChromiumBidiMapperInfo, ClickInfo,
@@ -4290,6 +4294,15 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             wait_for_selector(&browser_session, &page_session, &css_selector, visible)
                 .await
                 .map(PluginResult::WaitForSelector)
+        }),
+        PluginCommand::AccessibilitySnapshot {
+            browser_session,
+            page_session,
+            format,
+        } => block_on_plugin_future(async move {
+            accessibility_snapshot(&browser_session, &page_session, &format)
+                .await
+                .map(PluginResult::AccessibilitySnapshot)
         }),
         PluginCommand::Screenshot {
             browser_session,

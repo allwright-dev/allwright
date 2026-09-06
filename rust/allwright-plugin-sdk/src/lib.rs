@@ -173,6 +173,12 @@ pub struct WaitForSelectorInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AccessibilitySnapshotInfo {
+    pub snapshot: String,
+    pub format: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScreenshotInfo {
     pub png_data: Vec<u8>,
     pub note: String,
@@ -251,6 +257,11 @@ pub enum PluginCommand {
         page_session: PageSessionHandle,
         css_selector: String,
         visible: bool,
+    },
+    AccessibilitySnapshot {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        format: String,
     },
     Screenshot {
         browser_session: BrowserSessionHandle,
@@ -365,6 +376,7 @@ pub enum PluginResult {
     GetTextContent(TextInfo),
     GetInnerText(TextInfo),
     WaitForSelector(WaitForSelectorInfo),
+    AccessibilitySnapshot(AccessibilitySnapshotInfo),
     Screenshot(ScreenshotInfo),
     OpenChromeWindow(ChromeLaunchInfo),
     DiscoverInitialTab(ChromeTabInfo),

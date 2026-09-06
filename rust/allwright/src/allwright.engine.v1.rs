@@ -180,6 +180,22 @@ pub struct ChromeLaunchedEvent {
     #[prost(string, tag = "5")]
     pub initial_page_session_id: ::prost::alloc::string::String,
 }
+/// Empty format defaults to JSON. Accepted values are "json" and "yaml".
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AccessibilitySnapshotCommand {
+    #[prost(string, tag = "1")]
+    pub format: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+/// Both formats encode the same versioned, structured document.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AccessibilitySnapshotCapturedEvent {
+    #[prost(string, tag = "1")]
+    pub snapshot: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub format: ::prost::alloc::string::String,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum BrowserKind {
@@ -305,7 +321,7 @@ pub struct ContextSessionCommand {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_command::Command",
-        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16"
+        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17"
     )]
     pub command: ::core::option::Option<context_session_command::Command>,
 }
@@ -341,6 +357,8 @@ pub mod context_session_command {
         WaitForSelector(super::WaitForSelectorCommand),
         #[prost(message, tag = "16")]
         Screenshot(super::ScreenshotCommand),
+        #[prost(message, tag = "17")]
+        AccessibilitySnapshot(super::AccessibilitySnapshotCommand),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -356,7 +374,7 @@ pub struct ContextSessionEvent {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_event::Event",
-        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18"
+        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19"
     )]
     pub event: ::core::option::Option<context_session_event::Event>,
 }
@@ -398,6 +416,8 @@ pub mod context_session_event {
         SelectorWaitSatisfied(super::SelectorWaitSatisfiedEvent),
         #[prost(message, tag = "18")]
         ScreenshotCaptured(super::ScreenshotCapturedEvent),
+        #[prost(message, tag = "19")]
+        AccessibilitySnapshotCaptured(super::AccessibilitySnapshotCapturedEvent),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

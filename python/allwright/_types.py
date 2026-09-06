@@ -151,3 +151,9 @@ class WaitForSelectorResult:
 class ScreenshotResult:
     png_data: bytes
     note: str
+
+
+@dataclass(slots=True)
+class AccessibilitySnapshotOptions:
+    format: str = "json"
+    timeout_ms: int | None = None

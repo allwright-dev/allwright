@@ -13,6 +13,10 @@ export interface CommandOptions {
   timeoutMs?: number;
 }
 
+export interface AccessibilitySnapshotOptions extends CommandOptions {
+  format?: "json" | "yaml";
+}
+
 export interface NavigateResult {
   url: string;
   note: string;
@@ -129,6 +133,7 @@ export interface Browser extends BrowserInfo {
 }
 
 export interface Page extends PageInfo {
+  accessibilitySnapshot(options?: AccessibilitySnapshotOptions): Promise<string>;
   locator(selector: string): Locator;
   goto(url: string, options?: CommandOptions): Promise<NavigateResult>;
   navigate(url: string, options?: CommandOptions): Promise<NavigateResult>;
@@ -387,6 +392,7 @@ export interface SurfaceSessionEvent {
 }
 
 export interface ContextSessionEvent {
+  accessibilitySnapshotCaptured?: { snapshot?: string; format?: string };
   contextSessionId?: string;
   event?: string;
   attached?: {
@@ -661,6 +667,12 @@ export interface WaitForSelectorRequest {
   };
 }
 
+export interface AccessibilitySnapshotRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
+  accessibilitySnapshot: { format: string; retryOptions?: { timeoutMs?: number } };
+}
+
 export interface ScreenshotRequest {
   surfaceSessionId: string;
   contextSessionId: string;
@@ -700,6 +712,7 @@ export type ContextSessionRequest =
   | TextContentRequest
   | InnerTextRequest
   | WaitForSelectorRequest
+  | AccessibilitySnapshotRequest
   | ScreenshotRequest
   | CloseContextRequest;
 

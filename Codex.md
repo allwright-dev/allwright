@@ -230,6 +230,16 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `rust/allwright/src/client.rs` now exposes `launch_browser(...)` plus `launch_firefox(...)`, and Firefox launches through the same high-level `Browser` / `Tab` API
 - `typescript/core/src/index.ts`, `python/allwright/client.py`, and `java/src/main/java/dev/allwright/client/Allwright.java` now expose `firefox` / `launch_firefox` entrypoints on top of the neutral launch command while still preserving the older Chromium entrypoints
 
+## Web Accessibility Snapshots
+
+- Web pages in Rust, Go, Java, Python, TypeScript, and the Vitest page fixture expose `accessibility_snapshot` / `AccessibilitySnapshot` / `accessibilitySnapshot`, returning a serialized string. JSON is the default, and `format` accepts `json` or `yaml`; both encode the same version-1 document structure.
+- The web-owned `AccessibilitySnapshotCommand` and `AccessibilitySnapshotCapturedEvent` live in `proto/surfaces/web/v1/web.proto`, routed through the shared `ContextSession` oneofs. Core only delegates to the web plugin; mobile contexts reject this command.
+- `rust/allwright-surface-web/src/accessibility.js` owns composed-DOM collection. `src/accessibility.rs` executes it using BiDi on Chromium and Firefox, enumerates all iframe browsing contexts, and serializes the resulting data as JSON or standard block YAML. `src/accessibility_yaml.rs` uses JSON scalar escaping in YAML block collections and quotes all strings so YAML 1.1/1.2 parsers preserve types. No DOM inspection through CDP, Playwright renderer syntax, or client-side snapshot implementation is permitted.
+- `rust/allwright-surface-web/accessibility.schema.json` defines the output: `{version, documents}`, each document containing context/parent IDs, URL, title, and a root node; every node has explicit `role`, `name`, `states`, `properties`, and `children`. Frames are collected independently (including cross-origin contexts); they are linked by parent context IDs rather than nested serialized strings. See the plugin README for DOM visibility, frame sampling, and native accessibility limitations.
+- `rust/allwright-surface-web/src/accessibility_semantics.js` contains Allwright-owned role, name, description, visibility, and CSS text helpers. Playwright and W3C specifications are behavioral references only: do not copy or vendor Playwright accessibility code or depend on dom-accessibility-api. There is no accessibility bundle generator or external accessibility runtime dependency. See `rust/allwright-surface-web/ACCESSIBILITY.md` for references, supported cases, and conformance limits.
+- `python/allwright/_proto.py` assembles its internal protobuf facade from imported descriptors because ordinary Python protobuf imports do not re-export the split core/surface message classes and enum constants.
+- `rust/allwright-surface-web/tests/accessibility.rs` is an opt-in local browser fixture test covering Chromium and Firefox snapshots and JSON/YAML round trips.
+
 ## Current Dependency Hierarchy
 
 ```text

@@ -2,8 +2,11 @@ syntax = "proto3";
 
 package allwright.engine.v1;
 option go_package = "allwright.dev/gen/allwright/engine/v1;enginev1";
+option java_package = "dev.allwright.engine.v1";
+option java_multiple_files = true;
 
 import "core/v1/common.proto";
+import "surfaces/web/v1/web.proto";
 
 message ContextSessionCommand {
   string surface_session_id = 1;
@@ -24,6 +27,7 @@ message ContextSessionCommand {
     GetInnerTextCommand get_inner_text = 14;
     WaitForSelectorCommand wait_for_selector = 15;
     ScreenshotCommand screenshot = 16;
+    AccessibilitySnapshotCommand accessibility_snapshot = 17;
   }
 }
 
@@ -54,6 +58,7 @@ message ContextSessionEvent {
     InnerTextResolvedEvent inner_text_resolved = 16;
     SelectorWaitSatisfiedEvent selector_wait_satisfied = 17;
     ScreenshotCapturedEvent screenshot_captured = 18;
+    AccessibilitySnapshotCapturedEvent accessibility_snapshot_captured = 19;
   }
 }
 

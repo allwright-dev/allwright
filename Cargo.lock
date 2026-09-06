@@ -139,6 +139,7 @@ dependencies = [
  "base64",
  "futures-util",
  "serde_json",
+ "serde_yaml",
  "tokio",
  "tokio-tungstenite",
 ]
