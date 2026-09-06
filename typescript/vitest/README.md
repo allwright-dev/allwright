@@ -117,3 +117,17 @@ Available fixtures:
 `androidApp` launches using `allwright.android.launchOptions` first, then falls back to `config.mobile.android`.
 
 Android apps and locators support the Android-applicable action and expectation subset: `click`, `count`, `focus`, `fill`, `press`, `textContent`, `innerText`, `waitForSelector`, and `screenshot`. `expect(androidApp)` and `expect(androidApp.locator(...))` provide `toHaveText`, `toContainText`, `toHaveCount`, and `toBeVisible` with the same retry controls as web fixtures. Hover and highlight remain web-only.
+
+The opt-in accessibility integration test exercises the public page fixture,
+bundled protobuf, running engine and dynamically loaded web plugin. From this
+repository, after building the packages, run:
+
+```sh
+ALLWRIGHT_TEST_BROWSER=chromium bun run --cwd typescript/vitest vitest run tests/accessibility.spec.ts
+ALLWRIGHT_TEST_BROWSER=firefox bun run --cwd typescript/vitest vitest run tests/accessibility.spec.ts
+```
+
+Set `ALLWRIGHT_TEST_LIVE_SITE=1` to reproduce the Form Inputs navigation on the
+public example site. The default fixture is a local data URL. Use
+`ALLWRIGHT_CLI_PATH` and `ALLWRIGHT_SERVER_ADDR` to select the runtime under test;
+client, engine and installed web plugin versions must match.
