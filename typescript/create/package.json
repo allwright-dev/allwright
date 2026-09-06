@@ -1,6 +1,6 @@
 {
   "name": "create-allwright",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Create a new allwright test project with npm init allwright.",
   "license": "MIT",
   "type": "module",
