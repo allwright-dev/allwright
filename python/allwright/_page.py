@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from ._web_locators import WebLocators, TextMatcher, semantic_selector
+
 import threading
 from pathlib import Path
 from typing import Any
@@ -29,7 +31,7 @@ from ._types import (
 )
 
 
-class Page:
+class Page(WebLocators):
     def __init__(self, runtime: RuntimeClient, surface_session_id: str, session_id: str) -> None:
         self._runtime = runtime
         self._surface_session_id = surface_session_id

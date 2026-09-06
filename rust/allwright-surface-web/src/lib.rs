@@ -47,6 +47,7 @@ struct ElementCenter {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SelectorKind {
+    Structured,
     Css,
     XPath,
 }
@@ -2724,6 +2725,25 @@ fn parse_selector<'a>(command_name: &str, selector: &'a str) -> Result<ParsedSel
         ));
     }
 
+    if parse_explicit_selector_prefix(trimmed).is_some()
+        && parse_selector_chain(command_name, trimmed)?.len() > 1
+    {
+        return Ok(ParsedSelector {
+            raw: selector,
+            value: Cow::Owned(format!(
+                "{{\"chain\":{}}}",
+                selector_segments_literal(command_name, trimmed)?
+            )),
+            kind: SelectorKind::Structured,
+        });
+    }
+    if trimmed.to_ascii_lowercase().starts_with("aw=") {
+        return Ok(ParsedSelector {
+            raw: selector,
+            value: parse_selector_value(&trimmed[3..])?,
+            kind: SelectorKind::Structured,
+        });
+    }
     let lowercase = trimmed.to_ascii_lowercase();
     let parsed = if lowercase.starts_with("xpath=") {
         let value = parse_selector_value(&trimmed[6..])?;
@@ -2828,6 +2848,12 @@ fn looks_like_xpath(selector: &str) -> bool {
 
 fn parse_explicit_selector_prefix(selector: &str) -> Option<ExplicitSelectorPrefix> {
     let lower = selector.to_ascii_lowercase();
+    if lower.starts_with("aw=") {
+        return Some(ExplicitSelectorPrefix {
+            kind: SelectorKind::Structured,
+            prefix_len: 3,
+        });
+    }
     if lower.starts_with("xpath=") || lower.starts_with("xpath:") {
         return Some(ExplicitSelectorPrefix {
             kind: SelectorKind::XPath,
@@ -2929,6 +2955,7 @@ fn parse_selector_chain<'a>(
 
 fn selector_kind_label(kind: SelectorKind) -> &'static str {
     match kind {
+        SelectorKind::Structured => "semantic selector",
         SelectorKind::Css => "css selector",
         SelectorKind::XPath => "xpath selector",
     }
@@ -2944,48 +2971,25 @@ fn decode_base64_field(value: &Value, pointer: &str, label: &str) -> Result<Vec<
         .map_err(|error| format!("failed to decode {label}: {error}"))
 }
 
-fn selector_query_all_js(kind: SelectorKind) -> &'static str {
-    match kind {
-        SelectorKind::Css => "Array.from(document.querySelectorAll(selector))",
-        SelectorKind::XPath => {
-            "(() => {
-                const result = document.evaluate(
-                    selector,
-                    document,
-                    null,
-                    XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-                    null
-                );
-                const elements = [];
-                for (let index = 0; index < result.snapshotLength; index += 1) {
-                    const candidate = result.snapshotItem(index);
-                    if (candidate instanceof Element) {
-                        elements.push(candidate);
-                    }
-                }
-                return elements;
-            })()"
-        }
-    }
+fn semantic_query_js(expression: &str) -> String {
+    format!(
+        "(() => {{\n{}\n{}\nreturn allwrightQuery({expression});\n}})()",
+        include_str!("accessibility_semantics.js"),
+        include_str!("selectors.js")
+    )
 }
 
-fn selector_query_first_js(kind: SelectorKind) -> &'static str {
-    match kind {
-        SelectorKind::Css => "document.querySelector(selector)",
-        SelectorKind::XPath => {
-            "(() => {
-                const result = document.evaluate(
-                    selector,
-                    document,
-                    null,
-                    XPathResult.FIRST_ORDERED_NODE_TYPE,
-                    null
-                );
-                const candidate = result.singleNodeValue;
-                return candidate instanceof Element ? candidate : null;
-            })()"
-        }
-    }
+fn selector_query_all_js(kind: SelectorKind) -> String {
+    let kind = match kind {
+        SelectorKind::Css => "css",
+        SelectorKind::XPath => "xpath",
+        SelectorKind::Structured => "aw",
+    };
+    semantic_query_js(&format!("[{{kind: '{kind}', value: selector}}]"))
+}
+
+fn selector_query_first_js(kind: SelectorKind) -> String {
+    format!("({})[0]", selector_query_all_js(kind))
 }
 
 fn selector_segments_literal(command_name: &str, selector: &str) -> Result<String, String> {
@@ -3009,6 +3013,7 @@ fn selector_segments_literal(command_name: &str, selector: &str) -> Result<Strin
             };
             json!({
                 "kind": match segment.kind {
+                    SelectorKind::Structured => "aw",
                     SelectorKind::Css => "css",
                     SelectorKind::XPath => "xpath",
                 },
@@ -3029,39 +3034,8 @@ fn selector_chain_kind_label(command_name: &str, selector: &str) -> Result<Strin
     }
 }
 
-fn selector_chain_query_all_js() -> &'static str {
-    "(() => {
-        let roots = [document];
-        for (const segment of selectorSegments) {
-            const nextRoots = [];
-            for (const root of roots) {
-                if (segment.kind === 'css') {
-                    const matches = root.querySelectorAll(segment.value);
-                    for (const match of matches) {
-                        if (match instanceof Element) {
-                            nextRoots.push(match);
-                        }
-                    }
-                    continue;
-                }
-                const result = document.evaluate(
-                    segment.value,
-                    root,
-                    null,
-                    XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-                    null
-                );
-                for (let index = 0; index < result.snapshotLength; index += 1) {
-                    const candidate = result.snapshotItem(index);
-                    if (candidate instanceof Element) {
-                        nextRoots.push(candidate);
-                    }
-                }
-            }
-            roots = nextRoots;
-        }
-        return roots;
-    })()"
+fn selector_chain_query_all_js() -> String {
+    semantic_query_js("selectorSegments")
 }
 
 fn selector_chain_query_first_js() -> &'static str {
@@ -4301,9 +4275,14 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             format,
             mode,
         } => block_on_plugin_future(async move {
-            accessibility::accessibility_snapshot_with_mode(&browser_session, &page_session, &format, &mode)
-                .await
-                .map(PluginResult::AccessibilitySnapshot)
+            accessibility::accessibility_snapshot_with_mode(
+                &browser_session,
+                &page_session,
+                &format,
+                &mode,
+            )
+            .await
+            .map(PluginResult::AccessibilitySnapshot)
         }),
         PluginCommand::Screenshot {
             browser_session,

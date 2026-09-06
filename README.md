@@ -513,3 +513,23 @@ attributes and include matching IDs in JSON or YAML, for example
 `page.accessibilitySnapshot({ mode: "ai", format: "json" })` in TypeScript.
 See the [web snapshot documentation](rust/allwright-surface-web/README.md) for
 all modes and reference lifetime.
+
+### Semantic web locators
+
+Web pages and locators support `getByRole`, `getByText`, `getByLabel`, `getByPlaceholder`, `getByAltText`, `getByTitle`, and `getByTestId`, with equivalent naming in Rust, Go, Java, and Python. Match strings or regexes, filter role states, and combine semantic locators with CSS/XPath chains:
+
+```ts
+await page.getByRole('listitem')
+  .filter({ has: page.getByRole('heading', { name: 'Beta', exact: true }), visible: true })
+  .getByRole('button', { name: 'Buy', disabled: false })
+  .click();
+await page.getByLabel('Email address').fill('you@example.com');
+```
+
+Filters support `has`, `hasNot`, `hasText`, `hasNotText`, and `visible`; locators also support `first`, `last`, and `nth`. See the [web locator reference](rust/allwright-surface-web/SELECTORS.md) for options, language conventions, and current limits.
+
+Exclude matching web elements with `locator.not(otherLocator)` (Python `not_`, Go
+`Not`, Rust `not(&other)`). Vitest assertions on web and Android support both
+`expect(locator).not.toHaveText('Loading')` and
+`expect(locator).not().toBeVisible()`, with retrying negation. See the
+[Vitest negation examples](typescript/vitest/README.md#negated-assertions-and-locator-exclusion).

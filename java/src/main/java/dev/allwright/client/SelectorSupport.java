@@ -50,6 +50,7 @@ final class SelectorSupport {
     }
 
     private static SelectorPrefix parseExplicitSelectorPrefix(String selector) {
+        if (selector.regionMatches(true, 0, "aw=", 0, 3)) return new SelectorPrefix("aw", 3);
         String lowered = selector.toLowerCase();
         if (lowered.startsWith("xpath=") || lowered.startsWith("xpath:")) {
             return new SelectorPrefix("xpath", 6);

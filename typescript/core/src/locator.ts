@@ -1,3 +1,4 @@
+import { WebLocatorBuilders, semanticSelector, type LocatorFilterOptions } from "./web-locators.js";
 import { chainSelectorForTransport } from "./selectors.js";
 import type {
   ClickResult,
@@ -17,11 +18,12 @@ import type {
   WaitForSelectorResult,
 } from "./types.js";
 
-export class LocatorImpl implements Locator {
+export class LocatorImpl extends WebLocatorBuilders implements Locator {
   readonly page: Page;
   readonly selector: string;
 
   constructor(input: LocatorInfo) {
+    super();
     this.page = input.page;
     this.selector = input.selector;
   }
@@ -66,10 +68,30 @@ export class LocatorImpl implements Locator {
     return this.page.waitForSelector(this.selector, options);
   }
 
-  locator(selector: string): Locator {
-    return new LocatorImpl({
+  not(other: Locator): Locator {
+    if (other.page !== this.page) throw new Error('Excluded locators must belong to the same page');
+    return this.locator(semanticSelector({ kind: 'exclude', selector: other.selector }));
+  }
+
+  filter(options: LocatorFilterOptions = {}): Locator {
+    for (const inner of [options.has, options.hasNot]) {
+      if (inner && inner.page !== this.page) throw new Error('Filter locators must belong to the same page');
+    }
+    return this.locator(semanticSelector({ ...options, kind: 'filter', has: options.has?.selector, hasNot: options.hasNot?.selector }));
+  }
+
+  nth(index: number): Locator {
+    if (!Number.isInteger(index)) throw new Error('Locator index must be an integer');
+    return this.locator(semanticSelector({ kind: 'nth', index }));
+  }
+  first(): Locator { return this.nth(0); }
+  last(): Locator { return this.nth(-1); }
+
+  locator(selector: string, options?: LocatorFilterOptions): Locator {
+    const result = new LocatorImpl({
       page: this.page,
       selector: chainSelectorForTransport(this.selector, selector),
     });
+    return options ? result.filter(options) : result;
   }
 }

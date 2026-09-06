@@ -1,6 +1,6 @@
-export type SelectorFlavor = "css" | "xpath";
+export type SelectorFlavor = "css" | "xpath" | "aw";
 
-const SELECTOR_PREFIXES = ["xpath=", "xpath:", "css=", "css:"] as const;
+const SELECTOR_PREFIXES = ["aw=", "xpath=", "xpath:", "css=", "css:"] as const;
 
 function decodeSelectorBody(body: string): string {
   const candidate = body.trim();
@@ -18,6 +18,7 @@ function parseExplicitSelectorPrefix(
   selector: string,
 ): { flavor: SelectorFlavor; prefixLength: number } | null {
   const lowered = selector.toLowerCase();
+  if (lowered.startsWith("aw=")) return { flavor: "aw", prefixLength: 3 };
   if (lowered.startsWith("xpath=") || lowered.startsWith("xpath:")) {
     return { flavor: "xpath", prefixLength: 6 };
   }

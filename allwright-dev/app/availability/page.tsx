@@ -37,12 +37,13 @@ const webAvailable = [
   "Press a key on an element",
   "Focus an element",
   "Highlight matching elements for debugging",
+  "Find elements by role, text, label, placeholder, alt text, title, or test ID, with filters, exclusions, and chained locators",
   "Count matching elements",
   "Read visible or raw text from an element",
   "Wait for an element to appear or become visible",
   "Capture screenshots",
   "Read page accessibility snapshots as JSON or standard YAML, with queryable element references in AI mode",
-  "Retrying, Playwright-style text/count/visibility assertions (via @allwright.dev/vitest)",
+  "Retrying text/count/visibility assertions, including negation (via @allwright.dev/vitest)",
 ];
 
 const webNotYetAvailable = [

@@ -131,3 +131,5 @@ export async function launchBrowser(
 }
 
 export { BrowserImpl, BrowserTypeImpl, PageImpl };
+
+export type { TextMatcher, TextOptions, RoleOptions, LocatorFilterOptions } from "./web-locators.js";

@@ -20,7 +20,7 @@ import dev.allwright.engine.v1.ContextSessionPingCommand;
 import dev.allwright.engine.v1.ScreenshotCommand;
 import dev.allwright.engine.v1.WaitForSelectorCommand;
 
-public final class Page implements AutoCloseable {
+public final class Page implements AutoCloseable, WebLocators {
     private final RuntimeSupport.RuntimeClient runtime;
     private final String browserSessionId;
     private final String sessionId;

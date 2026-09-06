@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from ._web_locators import WebLocators, TextMatcher, semantic_selector
+
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -24,12 +26,41 @@ if TYPE_CHECKING:
 
 
 @dataclass(slots=True)
-class Locator:
+class Locator(WebLocators):
     page: Page
     selector: str
 
     def locator(self, selector: str) -> Locator:
         return Locator(page=self.page, selector=chain_selector_for_transport(self.selector, selector))
+
+    def not_(self, other: Locator) -> Locator:
+        if other.page is not self.page:
+            raise ValueError('Excluded locators must belong to the same page')
+        return self.locator(semantic_selector(dict(kind='exclude', selector=other.selector)))
+
+    def filter(self, *, has: Locator | None = None, has_not: Locator | None = None,
+               has_text: TextMatcher | None = None, has_not_text: TextMatcher | None = None,
+               visible: bool | None = None) -> Locator:
+        for inner in (has, has_not):
+            if inner is not None and inner.page is not self.page:
+                raise ValueError('Filter locators must belong to the same page')
+        spec = dict(kind='filter', has=has.selector if has else None,
+                    hasNot=has_not.selector if has_not else None, hasText=has_text,
+                    hasNotText=has_not_text, visible=visible)
+        return self.locator(semantic_selector({k: v for k, v in spec.items() if v is not None}))
+
+    def nth(self, index: int) -> Locator:
+        if isinstance(index, bool) or not isinstance(index, int):
+            raise ValueError('Locator index must be an integer')
+        return self.locator(semantic_selector(dict(kind='nth', index=index)))
+
+    @property
+    def first(self) -> Locator:
+        return self.nth(0)
+
+    @property
+    def last(self) -> Locator:
+        return self.nth(-1)
 
     def click(self, options: CommandOptions | None = None) -> ClickResult:
         return self.page.click(self.selector, options)

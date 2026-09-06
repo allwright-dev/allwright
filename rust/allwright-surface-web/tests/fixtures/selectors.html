@@ -1,0 +1,22 @@
+<!doctype html><title>Locator fixture</title>
+<h2>Account settings</h2>
+<section aria-label="Products"><ul>
+<li><h3>Alpha</h3><button title="Purchase">Buy</button></li>
+<li><h3>Beta</h3><button title="Purchase">Buy</button></li>
+<li hidden><h3>Hidden</h3><button>Buy</button></li>
+</ul></section>
+<label for="email">Email address</label><input id="email" placeholder="you@example.com">
+<label><input type="checkbox" checked>Subscribe</label>
+<span id="label">Secret label</span><input aria-labelledby="label">
+<button aria-label="Save changes">Disk icon</button>
+<button aria-pressed="false">Toggle</button>
+<button aria-expanded="true">Expand</button>
+<button disabled>Disabled</button>
+<div role="group" aria-disabled="true"><button>Inherited</button></div>
+<select><option selected>Chosen</option><option>Other</option></select>
+<button hidden aria-label="Hidden action">Invisible</button>
+<img alt="Company logo"><div data-testid="CaseSensitive" title="A title">Hello <span>world</span></div>
+<div id="shadow"></div>
+<script>document.querySelector('#shadow').attachShadow({mode:'open'}).innerHTML='<button>Shadow action</button>';</script>
+
+<div data-testid="a  &quot;b&quot;">Quoted identifier</div>

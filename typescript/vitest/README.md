@@ -131,3 +131,36 @@ Set `ALLWRIGHT_TEST_LIVE_SITE=1` to reproduce the Form Inputs navigation on the
 public example site. The default fixture is a local data URL. Use
 `ALLWRIGHT_CLI_PATH` and `ALLWRIGHT_SERVER_ADDR` to select the runtime under test;
 client, engine and installed web plugin versions must match.
+
+### Negated assertions and locator exclusion
+
+Every Allwright page/app and locator matcher supports both Vitest's `.not` form
+and the callable `.not()` alias. Negation retries the opposite condition using
+the same timeout and interval options:
+
+```ts
+await expect(page.getByRole('status')).not.toHaveText('Loading');
+await expect(page.getByTestId('spinner')).not().toBeVisible();
+await expect(page).not.toHaveCount('.error', 1);
+await expect(androidApp.locator('text="Loading"')).not().toBeVisible();
+```
+
+Negative visibility succeeds when the element is hidden or absent. Selector,
+transport, and session errors still fail; they are not evidence of invisibility.
+Negative text assertions require a successful text read. Matcher objects are
+immutable, and a second `.not` toggles back to positive assertions. Ordinary
+Vitest value assertions retain their native `.not` syntax.
+
+Web locators also support exclusion by element identity, with further chaining:
+
+```ts
+const enabledActions = page.getByRole('button')
+  .not(page.getByRole('button', { disabled: true }));
+await expect(enabledActions).not().toHaveCount(0);
+```
+
+Both locators must belong to the same page. `.not(other)` removes matching nodes;
+`filter({ hasNot: other })` removes candidates containing matching descendants.
+The same exclusion API is available in the core web clients as TypeScript/Java
+`.not(other)`, Go `.Not(other)`, Rust `.not(&other)`, and Python `.not_(other)`.
+Native Android locator exclusion is not exposed by this web selector API.

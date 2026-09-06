@@ -1,3 +1,4 @@
+import { WebLocatorBuilders, type LocatorFilterOptions } from "./web-locators.js";
 import { LocatorImpl } from "./locator.js";
 import { writeFile } from "node:fs/promises";
 import { formatActionError } from "./errors.js";
@@ -28,11 +29,12 @@ import type {
   WaitForSelectorResult,
 } from "./types.js";
 
-export class PageImpl implements Page {
+export class PageImpl extends WebLocatorBuilders implements Page {
   #runtime: RuntimeClient;
   #handlePromise: Promise<PageHandle> | null = null;
 
   constructor(input: PageInfo & { runtime: RuntimeClient }) {
+    super();
     this.#runtime = input.runtime;
     this.sessionId = input.sessionId;
     this.browserSessionId = input.browserSessionId;
@@ -41,8 +43,9 @@ export class PageImpl implements Page {
   readonly sessionId: string;
   readonly browserSessionId: string;
 
-  locator(selector: string): Locator {
-    return new LocatorImpl({ page: this, selector: normalizeSelectorForTransport(selector) });
+  locator(selector: string, options?: LocatorFilterOptions): Locator {
+    const result = new LocatorImpl({ page: this, selector: normalizeSelectorForTransport(selector) });
+    return options ? result.filter(options) : result;
   }
 
   async goto(url: string, options: CommandOptions = {}): Promise<NavigateResult> {

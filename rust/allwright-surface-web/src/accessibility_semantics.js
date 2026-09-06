@@ -149,9 +149,9 @@ const allwrightA11y = (() => {
     }
     return text;
   }
-  function computeAccessibleName(element) {
-    if (noNames.has(getRole(element)) || !visible(element)) return '';
-    return normalize(textAlternative(element, { path: new Set(), referenced: false, content: false, includeHidden: false }));
+  function computeAccessibleName(element, includeHidden = false) {
+    if (noNames.has(getRole(element)) || (!includeHidden && !visible(element))) return '';
+    return normalize(textAlternative(element, { path: new Set(), referenced: false, content: false, includeHidden }));
   }
   function textAlternative(node, context) {
     if (node.nodeType === 3) return node.nodeValue || '';

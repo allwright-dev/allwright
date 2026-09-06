@@ -1,3 +1,4 @@
+import type { WebLocators, LocatorFilterOptions } from "./web-locators.js";
 import grpc from "@grpc/grpc-js";
 
 export { AllwrightError } from "./errors.js";
@@ -133,9 +134,9 @@ export interface Browser extends BrowserInfo {
   browserInfo(): BrowserInfo;
 }
 
-export interface Page extends PageInfo {
+export interface Page extends PageInfo, WebLocators {
   accessibilitySnapshot(options?: AccessibilitySnapshotOptions): Promise<string>;
-  locator(selector: string): Locator;
+  locator(selector: string, options?: LocatorFilterOptions): Locator;
   goto(url: string, options?: CommandOptions): Promise<NavigateResult>;
   navigate(url: string, options?: CommandOptions): Promise<NavigateResult>;
   click(selector: string, options?: CommandOptions): Promise<ClickResult>;
@@ -210,7 +211,12 @@ export interface MobileSurfaceNamespace {
   };
 }
 
-export interface Locator {
+export interface Locator extends WebLocators {
+  not(other: Locator): Locator;
+  filter(options?: LocatorFilterOptions): Locator;
+  nth(index: number): Locator;
+  first(): Locator;
+  last(): Locator;
   readonly page: Page;
   readonly selector: string;
   click(options?: CommandOptions): Promise<ClickResult>;
@@ -223,7 +229,7 @@ export interface Locator {
   textContent(options?: CommandOptions): Promise<TextResult>;
   innerText(options?: CommandOptions): Promise<TextResult>;
   waitFor(options?: WaitForSelectorOptions): Promise<WaitForSelectorResult>;
-  locator(selector: string): Locator;
+  locator(selector: string, options?: LocatorFilterOptions): Locator;
 }
 
 export interface AllwrightConfig {

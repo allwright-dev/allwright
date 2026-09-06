@@ -4,6 +4,8 @@ import json
 
 def parse_explicit_selector_prefix(selector: str) -> tuple[str, int] | None:
     lower = selector.lower()
+    if lower.startswith("aw="):
+        return "aw", 3
     if lower.startswith("xpath=") or lower.startswith("xpath:"):
         return "xpath", 6
     if lower.startswith("css=") or lower.startswith("css:"):

@@ -15,6 +15,9 @@ const (
 
 func parseExplicitSelectorPrefix(selector string) (selectorFlavor, int, bool) {
 	lowered := strings.ToLower(selector)
+	if strings.HasPrefix(lowered, "aw=") {
+		return selectorFlavor("aw"), 3, true
+	}
 	if strings.HasPrefix(lowered, "xpath=") || strings.HasPrefix(lowered, "xpath:") {
 		return selectorFlavorXPath, 6, true
 	}

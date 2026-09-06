@@ -1,5 +1,6 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SelectorFlavor {
+    Structured,
     Css,
     XPath,
 }
@@ -7,6 +8,7 @@ enum SelectorFlavor {
 impl SelectorFlavor {
     fn as_str(self) -> &'static str {
         match self {
+            Self::Structured => "aw",
             Self::Css => "css",
             Self::XPath => "xpath",
         }
@@ -15,6 +17,9 @@ impl SelectorFlavor {
 
 fn parse_explicit_selector_prefix(selector: &str) -> Option<(SelectorFlavor, usize)> {
     let lowered = selector.to_ascii_lowercase();
+    if lowered.starts_with("aw=") {
+        return Some((SelectorFlavor::Structured, 3));
+    }
     if lowered.starts_with("xpath=") || lowered.starts_with("xpath:") {
         return Some((SelectorFlavor::XPath, 6));
     }

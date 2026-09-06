@@ -1,3 +1,6 @@
+import { createLocatorExpect, createPageExpect } from "./expectations.js";
+import type { RetryExpectationOptions, PageExpectMatchers, LocatorExpectMatchers } from "./expectations.js";
+export type { RetryExpectationOptions, TextExpectationOptions, VisibleExpectationOptions, PageExpectMatchers, LocatorExpectMatchers } from "./expectations.js";
 import {
   launchConfiguredBrowser,
   mobile,
@@ -18,7 +21,7 @@ import {
   type ScreenshotOptions,
   type WaitForSelectorOptions,
 } from "@allwright.dev/core";
-import { expect as vitestExpect, test as base } from "vitest";
+import { expect as vitestExpect, test as base, type Assertion } from "vitest";
 
 export interface AllwrightVitestOptions {
   launchOptions?: LaunchOptions;
@@ -42,35 +45,6 @@ export interface AllwrightVitestFixtures {
 
 const DEFAULT_ANDROID_CONNECT_TIMEOUT_MS = 30_000;
 const DEFAULT_ANDROID_LAUNCH_TIMEOUT_MS = 60_000;
-
-export interface RetryExpectationOptions {
-  timeoutMs?: number;
-  intervalMs?: number;
-}
-
-export interface TextExpectationOptions extends RetryExpectationOptions {
-  command?: {
-    timeoutMs?: number;
-  };
-}
-
-export interface VisibleExpectationOptions extends RetryExpectationOptions {
-  command?: WaitForSelectorOptions;
-}
-
-export interface PageExpectMatchers {
-  toHaveText(selector: string, expected: string | RegExp, options?: TextExpectationOptions): Promise<void>;
-  toContainText(selector: string, expected: string | RegExp, options?: TextExpectationOptions): Promise<void>;
-  toHaveCount(selector: string, expected: number, options?: RetryExpectationOptions): Promise<void>;
-  toBeVisible(selector: string, options?: VisibleExpectationOptions): Promise<void>;
-}
-
-export interface LocatorExpectMatchers {
-  toHaveText(expected: string | RegExp, options?: TextExpectationOptions): Promise<void>;
-  toContainText(expected: string | RegExp, options?: TextExpectationOptions): Promise<void>;
-  toHaveCount(expected: number, options?: RetryExpectationOptions): Promise<void>;
-  toBeVisible(options?: VisibleExpectationOptions): Promise<void>;
-}
 
 type AllwrightVitestContext = AllwrightVitestFixtures & {
   allwright: AllwrightVitestOptions;
@@ -125,6 +99,15 @@ function getLazySyncProperty<T extends object, K extends keyof T>(
   );
 }
 
+const lazyLocatorSources = new WeakMap<Locator, { page: LazyResource<Page>; selector: () => Promise<string> }>();
+async function resolveFilterLocator(locator: Locator | undefined, page: LazyResource<Page>): Promise<Locator | undefined> {
+  if (!locator) return undefined;
+  const source = lazyLocatorSources.get(locator);
+  if (!source) return locator;
+  if (source.page !== page) throw new Error('Filter locators must belong to the same page');
+  return (await page.get()).locator(await source.selector());
+}
+
 function createLazyLocator(
   pageResource: LazyResource<Page>,
   selectorFactory: () => Promise<string>,
@@ -166,13 +149,50 @@ function createLazyLocator(
     async waitFor(options?: Parameters<Locator["waitFor"]>[0]) {
       return (await pageResource.get()).locator(await selectorFactory()).waitFor(options);
     },
-    locator(selector: string) {
-      return createLazyLocator(pageResource, async () =>
+    locator(selector: string, options?: Parameters<Locator["filter"]>[0]) {
+      const result = createLazyLocator(pageResource, async () =>
         (await pageResource.get()).locator(await selectorFactory()).locator(selector).selector,
       );
+      return options ? result.filter(options) : result;
     },
+    getByRole(...args: Parameters<Locator["getByRole"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).locator(await selectorFactory()).getByRole(...args).selector);
+    },
+    getByText(...args: Parameters<Locator["getByText"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).locator(await selectorFactory()).getByText(...args).selector);
+    },
+    getByLabel(...args: Parameters<Locator["getByLabel"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).locator(await selectorFactory()).getByLabel(...args).selector);
+    },
+    getByPlaceholder(...args: Parameters<Locator["getByPlaceholder"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).locator(await selectorFactory()).getByPlaceholder(...args).selector);
+    },
+    getByAltText(...args: Parameters<Locator["getByAltText"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).locator(await selectorFactory()).getByAltText(...args).selector);
+    },
+    getByTitle(...args: Parameters<Locator["getByTitle"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).locator(await selectorFactory()).getByTitle(...args).selector);
+    },
+    getByTestId(...args: Parameters<Locator["getByTestId"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).locator(await selectorFactory()).getByTestId(...args).selector);
+    },
+    not(other: Locator): Locator {
+      return createLazyLocator(pageResource, async () =>
+        (await pageResource.get()).locator(await selectorFactory()).not((await resolveFilterLocator(other, pageResource))!).selector);
+    },
+    filter(options: Parameters<Locator["filter"]>[0] = {}) {
+      return createLazyLocator(pageResource, async () =>
+        (await pageResource.get()).locator(await selectorFactory()).filter({ ...options,
+          has: await resolveFilterLocator(options.has, pageResource),
+          hasNot: await resolveFilterLocator(options.hasNot, pageResource),
+        }).selector);
+    },
+    nth(index: number): Locator { return createLazyLocator(pageResource, async () => (await pageResource.get()).locator(await selectorFactory()).nth(index).selector); },
+    first(): Locator { return this.nth(0); },
+    last(): Locator { return this.nth(-1); },
   } satisfies Locator;
 
+  lazyLocatorSources.set(lazyLocator, { page: pageResource, selector: selectorFactory });
   return lazyLocator;
 }
 
@@ -184,8 +204,9 @@ function createLazyPage(pageResource: LazyResource<Page>): Page {
     get browserSessionId() {
       return getLazySyncProperty(pageResource, "browserSessionId");
     },
-    locator(selector: string) {
-      return createLazyLocator(pageResource, async () => selector);
+    locator(selector: string, options?: Parameters<Locator["filter"]>[0]) {
+      const result = createLazyLocator(pageResource, async () => selector);
+      return options ? result.filter(options) : result;
     },
     async goto(url: string, options?: CommandOptions) {
       return (await pageResource.get()).goto(url, options);
@@ -244,6 +265,27 @@ function createLazyPage(pageResource: LazyResource<Page>): Page {
         sessionId: getLazySyncProperty(pageResource, "sessionId"),
         browserSessionId: getLazySyncProperty(pageResource, "browserSessionId"),
       };
+    },
+    getByRole(...args: Parameters<Page["getByRole"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).getByRole(...args).selector);
+    },
+    getByText(...args: Parameters<Page["getByText"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).getByText(...args).selector);
+    },
+    getByLabel(...args: Parameters<Page["getByLabel"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).getByLabel(...args).selector);
+    },
+    getByPlaceholder(...args: Parameters<Page["getByPlaceholder"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).getByPlaceholder(...args).selector);
+    },
+    getByAltText(...args: Parameters<Page["getByAltText"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).getByAltText(...args).selector);
+    },
+    getByTitle(...args: Parameters<Page["getByTitle"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).getByTitle(...args).selector);
+    },
+    getByTestId(...args: Parameters<Page["getByTestId"]>) {
+      return createLazyLocator(pageResource, async () => (await pageResource.get()).getByTestId(...args).selector);
     },
   } satisfies Page;
 
@@ -487,9 +529,6 @@ export const test = base.extend<AllwrightVitestContext>({
   },
 });
 
-const DEFAULT_EXPECT_TIMEOUT_MS = 5_000;
-const DEFAULT_EXPECT_INTERVAL_MS = 100;
-
 function isPage(value: unknown): value is Page {
   return !!value && typeof value === "object" && typeof (value as Page).locator === "function";
 }
@@ -565,118 +604,6 @@ function resolveAndroidLaunchOptions(
   return launchOptions;
 }
 
-async function retryExpectation(
-  callback: () => Promise<void>,
-  options: RetryExpectationOptions = {},
-  defaults: RetryExpectationOptions = {},
-): Promise<void> {
-  const timeoutMs = options.timeoutMs ?? defaults.timeoutMs ?? DEFAULT_EXPECT_TIMEOUT_MS;
-  const intervalMs = options.intervalMs ?? defaults.intervalMs ?? DEFAULT_EXPECT_INTERVAL_MS;
-  const deadline = Date.now() + timeoutMs;
-  let lastError: unknown;
-
-  while (Date.now() <= deadline) {
-    try {
-      await callback();
-      return;
-    } catch (error) {
-      lastError = error;
-      if (Date.now() + intervalMs > deadline) {
-        break;
-      }
-      await new Promise((resolve) => setTimeout(resolve, intervalMs));
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
-}
-
-function createPageExpect(page: Page): PageExpectMatchers {
-  return {
-    async toHaveText(selector, expected, options = {}) {
-      await retryExpectation(async () => {
-        const result = await page.textContent(selector, options.command ?? {});
-        if (expected instanceof RegExp) {
-          vitestExpect(result.text).toMatch(expected);
-          return;
-        }
-        vitestExpect(result.text).toBe(expected);
-      }, options, currentExpectDefaults());
-    },
-
-    async toContainText(selector, expected, options = {}) {
-      await retryExpectation(async () => {
-        const result = await page.textContent(selector, options.command ?? {});
-        if (expected instanceof RegExp) {
-          vitestExpect(result.text).toMatch(expected);
-          return;
-        }
-        vitestExpect(result.text).toContain(expected);
-      }, options, currentExpectDefaults());
-    },
-
-    async toHaveCount(selector, expected, options = {}) {
-      await retryExpectation(async () => {
-        const result = await page.count(selector, {});
-        vitestExpect(result.count).toBe(expected);
-      }, options, currentExpectDefaults());
-    },
-
-    async toBeVisible(selector, options = {}) {
-      await retryExpectation(async () => {
-        const result = await page.waitForSelector(selector, {
-          visible: true,
-          ...(options.command ?? {}),
-        });
-        vitestExpect(result.visible).toBe(true);
-      }, options, currentExpectDefaults());
-    },
-  };
-}
-
-function createLocatorExpect(locator: Locator): LocatorExpectMatchers {
-  return {
-    async toHaveText(expected, options = {}) {
-      await retryExpectation(async () => {
-        const result = await locator.textContent(options.command ?? {});
-        if (expected instanceof RegExp) {
-          vitestExpect(result.text).toMatch(expected);
-          return;
-        }
-        vitestExpect(result.text).toBe(expected);
-      }, options, currentExpectDefaults());
-    },
-
-    async toContainText(expected, options = {}) {
-      await retryExpectation(async () => {
-        const result = await locator.textContent(options.command ?? {});
-        if (expected instanceof RegExp) {
-          vitestExpect(result.text).toMatch(expected);
-          return;
-        }
-        vitestExpect(result.text).toContain(expected);
-      }, options, currentExpectDefaults());
-    },
-
-    async toHaveCount(expected, options = {}) {
-      await retryExpectation(async () => {
-        const result = await locator.count({});
-        vitestExpect(result.count).toBe(expected);
-      }, options, currentExpectDefaults());
-    },
-
-    async toBeVisible(options = {}) {
-      await retryExpectation(async () => {
-        const result = await locator.waitFor({
-          visible: true,
-          ...(options.command ?? {}),
-        });
-        vitestExpect(result.visible).toBe(true);
-      }, options, currentExpectDefaults());
-    },
-  };
-}
-
 let activeExpectDefaults: RetryExpectationOptions = {};
 
 function currentExpectDefaults(): RetryExpectationOptions {
@@ -684,22 +611,21 @@ function currentExpectDefaults(): RetryExpectationOptions {
 }
 
 type VitestExpect = typeof vitestExpect;
-type VitestMatcherReturn = ReturnType<VitestExpect>;
 
 interface AllwrightExpect extends VitestExpect {
   (actual: Page): PageExpectMatchers;
   (actual: Locator): LocatorExpectMatchers;
   (actual: MobileAndroidApp): PageExpectMatchers;
   (actual: MobileAndroidLocator): LocatorExpectMatchers;
-  <T>(actual: T): VitestMatcherReturn;
+  <T>(actual: T): Assertion<T>;
 }
 
 const expectImpl = ((actual: unknown) => {
   if (isLocator(actual)) {
-    return createLocatorExpect(actual);
+    return createLocatorExpect(actual, currentExpectDefaults);
   }
   if (isPage(actual)) {
-    return createPageExpect(actual);
+    return createPageExpect(actual, currentExpectDefaults);
   }
   return vitestExpect(actual);
 }) as AllwrightExpect;

@@ -1,6 +1,6 @@
 package dev.allwright.client;
 
-public final class Locator {
+public final class Locator implements WebLocators {
     private final Page page;
     private final String selector;
 
@@ -20,6 +20,26 @@ public final class Locator {
     public Locator locator(String childSelector) {
         return new Locator(page, SelectorSupport.chainSelectorForTransport(selector, childSelector));
     }
+
+    public Locator not(Locator other) {
+        if (other == null || other.page != page) throw new IllegalArgumentException("Excluded locators must belong to the same page");
+        return locator(WebSelectorSupport.selector(java.util.Map.of("kind", "exclude", "selector", other.selector)));
+    }
+
+    public Locator filter(LocatorFilterOptions options) {
+        java.util.Map<String, Object> spec = new java.util.LinkedHashMap<>();
+        spec.put("kind", "filter");
+        for (Locator inner : new Locator[]{options.has, options.hasNot}) {
+            if (inner != null && inner.page != page) throw new IllegalArgumentException("Filter locators must belong to the same page");
+        }
+        if (options.has != null) spec.put("has", options.has.selector);
+        if (options.hasNot != null) spec.put("hasNot", options.hasNot.selector);
+        spec.put("hasText", options.hasText); spec.put("hasNotText", options.hasNotText); spec.put("visible", options.visible);
+        return locator(WebSelectorSupport.selector(spec));
+    }
+    public Locator nth(int index) { return locator(WebSelectorSupport.selector(java.util.Map.of("kind", "nth", "index", index))); }
+    public Locator first() { return nth(0); }
+    public Locator last() { return nth(-1); }
 
     public ClickResult click() {
         return page.click(selector);
