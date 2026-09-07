@@ -533,3 +533,14 @@ Exclude matching web elements with `locator.not(otherLocator)` (Python `not_`, G
 `expect(locator).not.toHaveText('Loading')` and
 `expect(locator).not().toBeVisible()`, with retrying negation. See the
 [Vitest negation examples](typescript/vitest/README.md#negated-assertions-and-locator-exclusion).
+
+Android apps also expose accessibility snapshots across all clients, including the Vitest `androidApp` fixture:
+
+```ts
+const tree = JSON.parse(await app.accessibilitySnapshot({ mode: "ai" }));
+const yaml = await app.accessibilitySnapshot({ format: "yaml" });
+// Use an aria-ref returned on a node in the AI tree:
+await app.locator(`ref=${node["aria-ref"]}`).click();
+```
+
+Android uses a session-scoped cache of absolute XPath references without modifying the app or source XML. References expire and fail as stale when a fresh hierarchy differs; capture a new AI snapshot after screen changes. See the [Android snapshot contract](rust/allwright-surface-mobile-android/README.md#accessibility-snapshots) for modes and native limitations. iOS is not implemented.

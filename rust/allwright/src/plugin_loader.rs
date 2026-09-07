@@ -100,6 +100,9 @@ fn mobile_plugin_id_for_command(command: &MobileCommand) -> Result<&'static str,
         | MobileCommand::WaitForSelector {
             browser_session, ..
         }
+        | MobileCommand::AccessibilitySnapshot {
+            browser_session, ..
+        }
         | MobileCommand::Screenshot {
             browser_session, ..
         } => browser_session.platform,
@@ -1006,6 +1009,27 @@ pub async fn accessibility_snapshot(
     .await?
     {
         PluginResult::AccessibilitySnapshot(result) => Ok(result),
-        _ => Err("web plugin returned an unexpected response for AccessibilitySnapshot".to_string()),
+        _ => {
+            Err("web plugin returned an unexpected response for AccessibilitySnapshot".to_string())
+        }
+    }
+}
+
+pub async fn accessibility_snapshot_mobile(
+    surface: &MobileBrowserSessionHandle,
+    page: &MobilePageSessionHandle,
+    format: &str,
+    mode: &str,
+) -> Result<allwright_plugin_sdk::AccessibilitySnapshotInfo, String> {
+    match invoke_mobile_expected(MobileCommand::AccessibilitySnapshot {
+        browser_session: surface.clone(),
+        page_session: page.clone(),
+        format: format.into(),
+        mode: mode.into(),
+    })
+    .await?
+    {
+        MobileCommandResult::AccessibilitySnapshot(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected accessibility snapshot response".into()),
     }
 }

@@ -5,9 +5,9 @@ use crate::proto::context_session_event::Event as ContextEvent;
 use crate::proto::surface_session_command::Command as SurfaceCommand;
 use crate::proto::surface_session_event::Event as SurfaceEvent;
 use crate::proto::{
-    AppLaunchedEvent, ClickElementCommand, ConnectMobileCommand, ContextSessionCommand,
-    CountElementsCommand, FillElementCommand, FocusElementCommand, GetInnerTextCommand,
-    GetTextContentCommand, LaunchAppCommand, MobileConnectedEvent,
+    AccessibilitySnapshotCommand, AppLaunchedEvent, ClickElementCommand, ConnectMobileCommand,
+    ContextSessionCommand, CountElementsCommand, FillElementCommand, FocusElementCommand,
+    GetInnerTextCommand, GetTextContentCommand, LaunchAppCommand, MobileConnectedEvent,
     MobilePlatform as ProtoMobilePlatform, PressKeyCommand, ScreenshotCommand,
     SurfaceSessionCommand, WaitForSelectorCommand,
 };
@@ -17,6 +17,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use super::command::command_retry_options;
 use super::runtime::get_runtime;
 use super::types::{
+    AccessibilitySnapshotFormat, AccessibilitySnapshotMode, AccessibilitySnapshotOptions,
     ClickResult, CommandOptions, CountResult, ElementResult, Error, FillResult, PressOptions,
     PressResult, Result, RuntimeClient, ScreenshotOptions, ScreenshotResult, TextResult,
     WaitForSelectorOptions, WaitForSelectorResult,
@@ -1068,4 +1069,63 @@ fn chain_mobile_selector_for_transport(parent: &str, child: &str) -> String {
         return parent;
     }
     format!("{parent} {child}")
+}
+
+impl AndroidApp {
+    pub async fn accessibility_snapshot(&self) -> Result<String> {
+        self.accessibility_snapshot_with_options(AccessibilitySnapshotOptions::default())
+            .await
+    }
+
+    pub async fn accessibility_snapshot_with_options(
+        &self,
+        options: AccessibilitySnapshotOptions,
+    ) -> Result<String> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.inner.session_id)?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::AccessibilitySnapshot(
+                    AccessibilitySnapshotCommand {
+                        format: match options.format {
+                            AccessibilitySnapshotFormat::Json => "json",
+                            AccessibilitySnapshotFormat::Yaml => "yaml",
+                        }
+                        .into(),
+                        mode: match options.mode {
+                            AccessibilitySnapshotMode::Default => "default",
+                            AccessibilitySnapshotMode::Ai => "ai",
+                            AccessibilitySnapshotMode::Autoexpect => "autoexpect",
+                            AccessibilitySnapshotMode::Codegen => "codegen",
+                        }
+                        .into(),
+                        retry_options: command_retry_options(options.timeout_ms),
+                    },
+                )),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send AccessibilitySnapshotCommand"))?;
+        loop {
+            let event = handle.events.message().await?.ok_or_else(|| {
+                Error::new("android app session closed while capturing accessibility snapshot")
+            })?;
+            match event.event {
+                Some(ContextEvent::AccessibilitySnapshotCaptured(result)) => {
+                    return Ok(result.snapshot);
+                }
+                Some(ContextEvent::Error(error)) => return Err(Error::new(error.message)),
+                Some(ContextEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(
+                        "android app session closed while capturing accessibility snapshot",
+                    ));
+                }
+                _ => {}
+            }
+        }
+    }
 }

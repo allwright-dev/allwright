@@ -185,6 +185,7 @@ export interface MobileAndroidLocator {
 }
 
 export interface MobileAndroidApp {
+  accessibilitySnapshot(options?: AccessibilitySnapshotOptions): Promise<string>;
   readonly sessionId: string;
   locator(selector: string): MobileAndroidLocator;
   click(selector: string, options?: CommandOptions): Promise<ClickResult>;

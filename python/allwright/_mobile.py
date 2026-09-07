@@ -6,6 +6,7 @@ from pathlib import Path
 from ._proto import engine_pb2
 from ._transport import RuntimeClient, StreamHandle
 from ._types import (
+    AccessibilitySnapshotOptions,
     AllwrightError,
     ClickResult,
     CommandOptions,
@@ -327,6 +328,37 @@ class AndroidApp:
                         raise AllwrightError(
                             f"android app session error while waiting for selector: {event.error.message}"
                         )
+
+    def accessibility_snapshot(self, options: AccessibilitySnapshotOptions | None = None) -> str:
+        from ._runtime import retry_options
+
+        options = options or AccessibilitySnapshotOptions()
+        if options.mode not in ("default", "ai", "autoexpect", "codegen"):
+            raise ValueError("invalid accessibility snapshot mode")
+        if options.format not in ("json", "yaml"):
+            raise ValueError("accessibility snapshot format must be 'json' or 'yaml'")
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self._surface_session_id,
+                context_session_id=self.session_id,
+                accessibility_snapshot=engine_pb2.AccessibilitySnapshotCommand(
+                    format=options.format,
+                    mode=options.mode,
+                    retry_options=retry_options(options.timeout_ms),
+                ),
+            ))
+            while True:
+                event = handle.recv("receive accessibility snapshot")
+                match event.WhichOneof("event"):
+                    case "accessibility_snapshot_captured":
+                        return event.accessibility_snapshot_captured.snapshot
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError(f"android app session {self.session_id} closed while capturing accessibility snapshot")
+                    case "error":
+                        raise AllwrightError(f"accessibility snapshot failed: {event.error.message}")
 
     def screenshot(self, options: ScreenshotOptions | None = None) -> ScreenshotResult:
         from ._runtime import retry_options

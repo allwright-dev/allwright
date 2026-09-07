@@ -39,6 +39,7 @@ const webAvailable = [
   "Highlight matching elements for debugging",
   "Find elements by role, text, label, placeholder, alt text, title, or test ID, with filters, exclusions, and chained locators",
   "Count matching elements",
+  "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
   "Read visible or raw text from an element",
   "Wait for an element to appear or become visible",
   "Capture screenshots",
@@ -68,6 +69,7 @@ const androidAvailable = [
   "Read visible or raw text from an element",
   "Wait for an element to appear",
   "Count matching elements",
+  "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
   "Capture screenshots, including a full-page scroll-and-stitch capture",
   "Text, partial-text, resource id, class name, XPath, and state-based (e.g. clickable) selectors",
 ];

@@ -2357,11 +2357,127 @@ func (x *ScreenshotCapturedEvent) GetNote() string {
 	return ""
 }
 
+// Empty format defaults to JSON. Accepted values are "json" and "yaml".
+type AccessibilitySnapshotCommand struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty mode defaults to default. AI assigns queryable references; reference storage is surface-owned.
+	// Supported: default, ai, autoexpect, codegen.
+	Mode          string               `protobuf:"bytes,3,opt,name=mode,proto3" json:"mode,omitempty"`
+	Format        string               `protobuf:"bytes,1,opt,name=format,proto3" json:"format,omitempty"`
+	RetryOptions  *CommandRetryOptions `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccessibilitySnapshotCommand) Reset() {
+	*x = AccessibilitySnapshotCommand{}
+	mi := &file_core_v1_context_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccessibilitySnapshotCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccessibilitySnapshotCommand) ProtoMessage() {}
+
+func (x *AccessibilitySnapshotCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccessibilitySnapshotCommand.ProtoReflect.Descriptor instead.
+func (*AccessibilitySnapshotCommand) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *AccessibilitySnapshotCommand) GetMode() string {
+	if x != nil {
+		return x.Mode
+	}
+	return ""
+}
+
+func (x *AccessibilitySnapshotCommand) GetFormat() string {
+	if x != nil {
+		return x.Format
+	}
+	return ""
+}
+
+func (x *AccessibilitySnapshotCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+// Both formats encode the same versioned, structured document.
+type AccessibilitySnapshotCapturedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Snapshot      string                 `protobuf:"bytes,1,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
+	Format        string                 `protobuf:"bytes,2,opt,name=format,proto3" json:"format,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccessibilitySnapshotCapturedEvent) Reset() {
+	*x = AccessibilitySnapshotCapturedEvent{}
+	mi := &file_core_v1_context_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccessibilitySnapshotCapturedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccessibilitySnapshotCapturedEvent) ProtoMessage() {}
+
+func (x *AccessibilitySnapshotCapturedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccessibilitySnapshotCapturedEvent.ProtoReflect.Descriptor instead.
+func (*AccessibilitySnapshotCapturedEvent) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *AccessibilitySnapshotCapturedEvent) GetSnapshot() string {
+	if x != nil {
+		return x.Snapshot
+	}
+	return ""
+}
+
+func (x *AccessibilitySnapshotCapturedEvent) GetFormat() string {
+	if x != nil {
+		return x.Format
+	}
+	return ""
+}
+
 var File_core_v1_context_proto protoreflect.FileDescriptor
 
 const file_core_v1_context_proto_rawDesc = "" +
 	"\n" +
-	"\x15core/v1/context.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x19surfaces/web/v1/web.proto\"\xca\n" +
+	"\x15core/v1/context.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\"\xca\n" +
 	"\n" +
 	"\x15ContextSessionCommand\x12,\n" +
 	"\x12surface_session_id\x18\x01 \x01(\tR\x10surfaceSessionId\x12,\n" +
@@ -2528,7 +2644,15 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\x04note\x18\x03 \x01(\tR\x04note\"H\n" +
 	"\x17ScreenshotCapturedEvent\x12\x19\n" +
 	"\bpng_data\x18\x01 \x01(\fR\apngData\x12\x12\n" +
-	"\x04note\x18\x02 \x01(\tR\x04noteBK\n" +
+	"\x04note\x18\x02 \x01(\tR\x04note\"\xb0\x01\n" +
+	"\x1cAccessibilitySnapshotCommand\x12\x12\n" +
+	"\x04mode\x18\x03 \x01(\tR\x04mode\x12\x16\n" +
+	"\x06format\x18\x01 \x01(\tR\x06format\x12R\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"X\n" +
+	"\"AccessibilitySnapshotCapturedEvent\x12\x1a\n" +
+	"\bsnapshot\x18\x01 \x01(\tR\bsnapshot\x12\x16\n" +
+	"\x06format\x18\x02 \x01(\tR\x06formatBK\n" +
 	"\x17dev.allwright.engine.v1P\x01Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
 
 var (
@@ -2543,7 +2667,7 @@ func file_core_v1_context_proto_rawDescGZIP() []byte {
 	return file_core_v1_context_proto_rawDescData
 }
 
-var file_core_v1_context_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
+var file_core_v1_context_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_core_v1_context_proto_goTypes = []any{
 	(*ContextSessionCommand)(nil),              // 0: allwright.engine.v1.ContextSessionCommand
 	(*ContextSessionPingCommand)(nil),          // 1: allwright.engine.v1.ContextSessionPingCommand
@@ -2628,11 +2752,12 @@ var file_core_v1_context_proto_depIdxs = []int32{
 	35, // 42: allwright.engine.v1.GetInnerTextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
 	35, // 43: allwright.engine.v1.WaitForSelectorCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
 	35, // 44: allwright.engine.v1.ScreenshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	45, // [45:45] is the sub-list for method output_type
-	45, // [45:45] is the sub-list for method input_type
-	45, // [45:45] is the sub-list for extension type_name
-	45, // [45:45] is the sub-list for extension extendee
-	0,  // [0:45] is the sub-list for field type_name
+	35, // 45: allwright.engine.v1.AccessibilitySnapshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	46, // [46:46] is the sub-list for method output_type
+	46, // [46:46] is the sub-list for method input_type
+	46, // [46:46] is the sub-list for extension type_name
+	46, // [46:46] is the sub-list for extension extendee
+	0,  // [0:46] is the sub-list for field type_name
 }
 
 func init() { file_core_v1_context_proto_init() }
@@ -2641,7 +2766,6 @@ func file_core_v1_context_proto_init() {
 		return
 	}
 	file_core_v1_common_proto_init()
-	file_surfaces_web_v1_web_proto_init()
 	file_core_v1_context_proto_msgTypes[0].OneofWrappers = []any{
 		(*ContextSessionCommand_Ping)(nil),
 		(*ContextSessionCommand_Close)(nil),
@@ -2691,13 +2815,14 @@ func file_core_v1_context_proto_init() {
 	file_core_v1_context_proto_msgTypes[17].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[18].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[19].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[33].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_core_v1_context_proto_rawDesc), len(file_core_v1_context_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   33,
+			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

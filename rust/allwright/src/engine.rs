@@ -1413,14 +1413,37 @@ async fn handle_tab_command(
             })
         }
         Some(ContextCommand::AccessibilitySnapshot(command)) => {
-            let (EngineBrowserSessionHandle::Web(surface), EnginePageSessionHandle::Web(page)) =
-                (&surface_session, &page_session)
-            else {
-                return Err(Status::invalid_argument("accessibility snapshot requires a web page"));
-            };
             let snapshot = retry_with_timeout(
                 command_retry_policy(command.retry_options.as_ref()),
-                || async { web_lib::accessibility_snapshot(surface, page, &command.format, &command.mode).await },
+                || async {
+                    match (&surface_session, &page_session) {
+                        (
+                            EngineBrowserSessionHandle::Web(surface),
+                            EnginePageSessionHandle::Web(page),
+                        ) => {
+                            web_lib::accessibility_snapshot(
+                                surface,
+                                page,
+                                &command.format,
+                                &command.mode,
+                            )
+                            .await
+                        }
+                        (
+                            EngineBrowserSessionHandle::Mobile(surface),
+                            EnginePageSessionHandle::Mobile(page),
+                        ) => {
+                            web_lib::accessibility_snapshot_mobile(
+                                surface,
+                                page,
+                                &command.format,
+                                &command.mode,
+                            )
+                            .await
+                        }
+                        _ => Err("inconsistent context backend for accessibility snapshot".into()),
+                    }
+                },
             )
             .await
             .map_err(Status::internal)?;
@@ -1606,8 +1629,20 @@ impl EngineService for EngineGrpcService {
                                 }
                             }
                             Err(status) => {
-                                let _ = tx.send(Err(status)).await;
-                                break;
+                                // Command failures (including stale references) must leave
+                                // the context usable for recovery, such as a fresh snapshot.
+                                if tx
+                                    .send(Ok(tab_event(
+                                        &attach_context_session_id,
+                                        ContextEvent::Error(ContextSessionErrorEvent {
+                                            message: status.message().to_string(),
+                                        }),
+                                    )))
+                                    .await
+                                    .is_err()
+                                {
+                                    break;
+                                }
                             }
                         }
                     }

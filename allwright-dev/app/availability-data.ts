@@ -46,7 +46,7 @@ export const surfaceStatus = [
   },
   {
     label: "Mobile",
-    detail: "Android runs today over adb — tap, fill, read, and screenshot a real app. iOS isn't wired up yet.",
+    detail: "Android runs today over adb — tap, fill, read, screenshot, and capture native accessibility trees. iOS isn't wired up yet.",
     status: "Android available" as const,
   },
   { label: "Desktop", detail: "macOS, Windows, and Linux applications.", status: "Not yet available" as const },

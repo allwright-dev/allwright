@@ -387,6 +387,9 @@ function createLazyAndroidApp(appResource: LazyResource<MobileAndroidApp>): Mobi
     async waitForSelector(selector: string, options?: WaitForSelectorOptions) {
       return (await appResource.get()).waitForSelector(selector, options);
     },
+    async accessibilitySnapshot(options?: Parameters<MobileAndroidApp["accessibilitySnapshot"]>[0]) {
+      return (await appResource.get()).accessibilitySnapshot(options);
+    },
     async screenshot(options?: ScreenshotOptions) {
       return (await appResource.get()).screenshot(options);
     },

@@ -2,6 +2,7 @@ import { createBrowserSessionHandle, createPageHandle, getRuntime } from "./runt
 import { writeFile } from "node:fs/promises";
 import { chainMobileSelectorForTransport, normalizeMobileSelectorForTransport } from "./mobileSelectors.js";
 import type {
+  AccessibilitySnapshotOptions,
   SurfaceSessionEvent,
   SurfaceSessionStream,
   ClickResult,
@@ -241,6 +242,37 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
       if (event.closed) {
         handle.closed = true;
         throw new Error(`android app session ${this.sessionId} closed while waiting for selector`);
+      }
+    }
+  }
+
+  async accessibilitySnapshot(options: AccessibilitySnapshotOptions = {}): Promise<string> {
+    const mode = options.mode ?? "default";
+    if (!["default", "ai", "autoexpect", "codegen"].includes(mode)) {
+      throw new Error("invalid accessibility snapshot mode");
+    }
+    const format = options.format ?? "json";
+    if (format !== "json" && format !== "yaml") {
+      throw new Error("accessibility snapshot format must be 'json' or 'yaml'");
+    }
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.#surfaceSessionId,
+      contextSessionId: this.sessionId,
+      accessibilitySnapshot: {
+        format,
+        mode,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.accessibilitySnapshotCaptured) return event.accessibilitySnapshotCaptured.snapshot ?? "";
+      if (event.error?.message) throw new Error(event.error.message);
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`android app session ${this.sessionId} closed while waiting for accessibility snapshot`);
       }
     }
   }

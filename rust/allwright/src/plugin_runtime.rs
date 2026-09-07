@@ -163,12 +163,42 @@ fn invoke_plugin_library(
 ) -> Result<String, String> {
     let request_cstr = CString::new(request_json)
         .map_err(|error| format!("plugin request contains NUL: {error}"))?;
-    let library = unsafe { Library::new(library_path) }.map_err(|error| {
-        format!(
-            "failed to load plugin `{plugin_id}` from {}: {error}",
-            library_path.display()
-        )
-    })?;
+    static LIBRARIES: std::sync::OnceLock<
+        std::sync::Mutex<
+            std::collections::HashMap<
+                PathBuf,
+                (std::time::SystemTime, u64, std::sync::Arc<Library>),
+            >,
+        >,
+    > = std::sync::OnceLock::new();
+    // Keep plugin-owned session state alive between ABI calls. A changed artifact
+    // requires a new engine process; loading two generations would split that state.
+    let metadata = std::fs::metadata(library_path).map_err(|e| e.to_string())?;
+    let modified = metadata.modified().map_err(|e| e.to_string())?;
+    let library = {
+        let mut libraries = LIBRARIES
+            .get_or_init(Default::default)
+            .lock()
+            .map_err(|_| "plugin library registry lock poisoned")?;
+        if let Some((loaded_modified, loaded_len, library)) = libraries.get(library_path) {
+            if *loaded_modified != modified || *loaded_len != metadata.len() {
+                return Err(format!(
+                    "plugin `{plugin_id}` changed on disk; restart the engine to load the new version"
+                ));
+            }
+            library.clone()
+        } else {
+            let library = std::sync::Arc::new(
+                unsafe { Library::new(library_path) }
+                    .map_err(|e| format!("failed to load plugin `{plugin_id}`: {e}"))?,
+            );
+            libraries.insert(
+                library_path.to_path_buf(),
+                (modified, metadata.len(), library.clone()),
+            );
+            library
+        }
+    };
 
     unsafe {
         let api_version: Symbol<'_, PluginApiVersionFn> = library

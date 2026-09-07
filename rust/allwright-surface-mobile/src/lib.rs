@@ -258,6 +258,12 @@ pub struct MobileScreenshotInfo {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum MobileCommand {
+    AccessibilitySnapshot {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+        format: String,
+        mode: String,
+    },
     Connect(ConnectOptions),
     LaunchApp {
         browser_session: MobileBrowserSessionHandle,
@@ -333,6 +339,7 @@ pub enum MobileCommand {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum MobileCommandResult {
+    AccessibilitySnapshot(allwright_plugin_sdk::AccessibilitySnapshotInfo),
     Connect(MobileConnectInfo),
     LaunchApp(MobilePageInfo),
     OpenPage(MobilePageInfo),

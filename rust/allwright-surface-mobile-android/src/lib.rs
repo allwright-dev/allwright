@@ -1,3 +1,4 @@
+mod accessibility;
 use allwright_plugin_sdk::{
     ALLWRIGHT_PLUGIN_API_VERSION, SurfaceFamily, SurfacePlugin, SurfacePluginDescriptor,
 };
@@ -116,6 +117,7 @@ struct AndroidUiNode {
     focusable: Option<bool>,
     focused: Option<bool>,
     selected: Option<bool>,
+    password: Option<bool>,
     index: Option<usize>,
     bounds: Option<AndroidBounds>,
     parent_index: Option<usize>,
@@ -301,7 +303,7 @@ pub fn connect(options: &ConnectOptions) -> Result<MobileConnectInfo, String> {
             platform: MobilePlatform::Android,
             automation: MobileAutomationSessionInfo {
                 backend: "android-adb".to_string(),
-                session_id: format!("android-adb:{}", selected.serial),
+                session_id: accessibility::unique_id("android-adb"),
                 note: "session established through the Android surface plugin".to_string(),
             },
             device: DeviceTarget {
@@ -313,7 +315,7 @@ pub fn connect(options: &ConnectOptions) -> Result<MobileConnectInfo, String> {
         initial_page: MobilePageInfo {
             note: "attached to the device foreground context".to_string(),
             page_session: MobilePageSessionHandle {
-                page_id: format!("{}:foreground", selected.serial),
+                page_id: accessibility::unique_id("android-page"),
                 package_name: foreground.current_package,
                 activity_name: foreground.current_activity,
                 webview_context: None,
@@ -383,7 +385,7 @@ pub fn launch_app(
             browser_session.device.device_id
         ),
         page_session: MobilePageSessionHandle {
-            page_id: format!("{}:{package_name}", browser_session.device.device_id),
+            page_id: accessibility::unique_id("android-page"),
             package_name: Some(package_name),
             activity_name,
             webview_context: None,
@@ -398,6 +400,7 @@ pub fn click_element(
     timeout_ms: Option<u32>,
 ) -> Result<MobileClickInfo, String> {
     let normalized = normalize_selector_for_transport(selector);
+    accessibility::validate_scope(browser_session, page_session, &normalized)?;
     if normalized.trim().is_empty() {
         return Err("click_element requires a non-empty selector".to_string());
     }
@@ -418,6 +421,7 @@ pub fn fill_element(
     timeout_ms: Option<u32>,
 ) -> Result<MobileFillInfo, String> {
     let normalized = normalize_selector_for_transport(selector);
+    accessibility::validate_scope(browser_session, page_session, &normalized)?;
     if normalized.trim().is_empty() {
         return Err("fill_element requires a non-empty selector".to_string());
     }
@@ -442,6 +446,7 @@ pub fn count_elements(
     timeout_ms: Option<u32>,
 ) -> Result<MobileElementCountInfo, String> {
     let normalized = normalize_selector_for_transport(selector);
+    accessibility::validate_scope(browser_session, page_session, &normalized)?;
     if normalized.trim().is_empty() {
         return Err("count_elements requires a non-empty selector".to_string());
     }
@@ -464,6 +469,7 @@ pub fn focus_element(
     timeout_ms: Option<u32>,
 ) -> Result<MobileElementInfo, String> {
     let normalized = normalize_selector_for_transport(selector);
+    accessibility::validate_scope(browser_session, page_session, &normalized)?;
     if normalized.trim().is_empty() {
         return Err("focus_element requires a non-empty selector".to_string());
     }
@@ -484,6 +490,7 @@ pub fn press_key(
     timeout_ms: Option<u32>,
 ) -> Result<MobilePressInfo, String> {
     let normalized = normalize_selector_for_transport(selector);
+    accessibility::validate_scope(browser_session, page_session, &normalized)?;
     if normalized.trim().is_empty() {
         return Err("press_key requires a non-empty selector".to_string());
     }
@@ -540,6 +547,7 @@ fn get_text_like(
     mode: &str,
 ) -> Result<MobileTextInfo, String> {
     let normalized = normalize_selector_for_transport(selector);
+    accessibility::validate_scope(browser_session, page_session, &normalized)?;
     if normalized.trim().is_empty() {
         return Err(format!("{mode} requires a non-empty selector"));
     }
@@ -563,6 +571,7 @@ pub fn wait_for_selector(
     timeout_ms: Option<u32>,
 ) -> Result<MobileWaitForSelectorInfo, String> {
     let normalized = normalize_selector_for_transport(selector);
+    accessibility::validate_scope(browser_session, page_session, &normalized)?;
     if normalized.trim().is_empty() {
         return Err("wait_for_selector requires a non-empty selector".to_string());
     }
@@ -643,11 +652,11 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             browser_session,
             options,
         } => launch_app(&browser_session, &options).map(MobileCommandResult::LaunchApp),
-        MobileCommand::OpenPage { browser_session } => {
+        MobileCommand::OpenPage { .. } => {
             let info = MobilePageInfo {
                 note: "attached to the Android foreground app context".to_string(),
                 page_session: MobilePageSessionHandle {
-                    page_id: format!("{}:foreground", browser_session.device.device_id),
+                    page_id: accessibility::unique_id("android-page"),
                     package_name: None,
                     activity_name: None,
                     webview_context: None,
@@ -655,7 +664,20 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             };
             Ok(MobileCommandResult::OpenPage(info))
         }
-        MobileCommand::ClosePage { .. } => Ok(MobileCommandResult::ClosePage),
+        MobileCommand::ClosePage {
+            browser_session,
+            page_session,
+        } => {
+            accessibility::clear(&browser_session, &page_session)?;
+            Ok(MobileCommandResult::ClosePage)
+        }
+        MobileCommand::AccessibilitySnapshot {
+            browser_session,
+            page_session,
+            format,
+            mode,
+        } => accessibility::snapshot(&browser_session, &page_session, &format, &mode)
+            .map(MobileCommandResult::AccessibilitySnapshot),
         MobileCommand::ClickElement {
             browser_session,
             page_session,
@@ -1067,7 +1089,8 @@ fn adb_count_elements(
 ) -> Result<u32, String> {
     let source = adb_dump_source(device_id)?;
     let nodes = parse_android_ui_nodes(&source.source)?;
-    let count = matching_nodes_by_selector(&nodes, selector)?.len() as u32;
+    let count =
+        accessibility::matching_source_nodes(device_id, &source, &nodes, selector)?.len() as u32;
     Ok(count)
 }
 
@@ -1351,7 +1374,7 @@ fn resolve_selector_snapshot(
 ) -> Result<ResolvedSelectorSnapshot, String> {
     let source = adb_dump_source(device_id)?;
     let nodes = parse_android_ui_nodes(&source.source)?;
-    let node = matching_nodes_by_selector(&nodes, selector)?
+    let node = accessibility::matching_source_nodes(device_id, &source, &nodes, selector)?
         .into_iter()
         .next()
         .ok_or_else(|| {
@@ -1390,7 +1413,9 @@ fn parse_foreground_app_from_dumpsys(output: &str) -> ForegroundAppInfo {
 fn extract_component_from_line(line: &str) -> Option<(String, String)> {
     for token in line.split_whitespace() {
         let cleaned = token.trim_matches(|ch: char| matches!(ch, '{' | '}' | ',' | ';'));
-        let slash_index = cleaned.find('/')?;
+        let Some(slash_index) = cleaned.find('/') else {
+            continue;
+        };
         let package_name = cleaned[..slash_index].trim();
         let activity_name = cleaned[slash_index + 1..].trim();
         if package_name.is_empty()
@@ -1454,6 +1479,9 @@ fn parse_android_ui_nodes(xml: &str) -> Result<Vec<AndroidUiNode>, String> {
                     .and_then(|value| parse_bool(value)),
                 selected: attributes
                     .get("selected")
+                    .and_then(|value| parse_bool(value)),
+                password: attributes
+                    .get("password")
                     .and_then(|value| parse_bool(value)),
                 index: attributes.get("index").and_then(|value| value.parse().ok()),
                 bounds: attributes
@@ -1558,6 +1586,10 @@ fn matching_nodes_by_selector<'a>(
     selector: &str,
 ) -> Result<Vec<&'a AndroidUiNode>, String> {
     let segments = parse_selector_segments(selector)?;
+    if segments.len() == 1 && segments[0].value.starts_with("/hierarchy/") {
+        return accessibility::resolve_absolute_path(nodes, &segments[0].value)
+            .map(|index| index.map(|i| vec![&nodes[i]]).unwrap_or_default());
+    }
     let criteria = segments
         .iter()
         .map(selector_segment_to_criteria)
@@ -2353,6 +2385,13 @@ mod tests {
         assert_eq!(resolved.path, apk_path);
 
         fs::remove_file(&apk_path).expect("remove local apk fixture");
+    }
+
+    #[test]
+    fn foreground_app_parses_component_after_window_prefix() {
+        let app = parse_foreground_app_from_dumpsys("mCurrentFocus=Window{42 u0 test.app/.Main}");
+        assert_eq!(app.current_package.as_deref(), Some("test.app"));
+        assert_eq!(app.current_activity.as_deref(), Some(".Main"));
     }
 
     #[test]

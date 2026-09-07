@@ -334,122 +334,6 @@ func (x *ChromeLaunchedEvent) GetInitialPageSessionId() string {
 	return ""
 }
 
-// Empty format defaults to JSON. Accepted values are "json" and "yaml".
-type AccessibilitySnapshotCommand struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Empty mode defaults to default. AI injects queryable aria-ref attributes.
-	// Supported: default, ai, autoexpect, codegen.
-	Mode          string               `protobuf:"bytes,3,opt,name=mode,proto3" json:"mode,omitempty"`
-	Format        string               `protobuf:"bytes,1,opt,name=format,proto3" json:"format,omitempty"`
-	RetryOptions  *CommandRetryOptions `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AccessibilitySnapshotCommand) Reset() {
-	*x = AccessibilitySnapshotCommand{}
-	mi := &file_surfaces_web_v1_web_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AccessibilitySnapshotCommand) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AccessibilitySnapshotCommand) ProtoMessage() {}
-
-func (x *AccessibilitySnapshotCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_surfaces_web_v1_web_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AccessibilitySnapshotCommand.ProtoReflect.Descriptor instead.
-func (*AccessibilitySnapshotCommand) Descriptor() ([]byte, []int) {
-	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *AccessibilitySnapshotCommand) GetMode() string {
-	if x != nil {
-		return x.Mode
-	}
-	return ""
-}
-
-func (x *AccessibilitySnapshotCommand) GetFormat() string {
-	if x != nil {
-		return x.Format
-	}
-	return ""
-}
-
-func (x *AccessibilitySnapshotCommand) GetRetryOptions() *CommandRetryOptions {
-	if x != nil {
-		return x.RetryOptions
-	}
-	return nil
-}
-
-// Both formats encode the same versioned, structured document.
-type AccessibilitySnapshotCapturedEvent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Snapshot      string                 `protobuf:"bytes,1,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
-	Format        string                 `protobuf:"bytes,2,opt,name=format,proto3" json:"format,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AccessibilitySnapshotCapturedEvent) Reset() {
-	*x = AccessibilitySnapshotCapturedEvent{}
-	mi := &file_surfaces_web_v1_web_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AccessibilitySnapshotCapturedEvent) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AccessibilitySnapshotCapturedEvent) ProtoMessage() {}
-
-func (x *AccessibilitySnapshotCapturedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_surfaces_web_v1_web_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AccessibilitySnapshotCapturedEvent.ProtoReflect.Descriptor instead.
-func (*AccessibilitySnapshotCapturedEvent) Descriptor() ([]byte, []int) {
-	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *AccessibilitySnapshotCapturedEvent) GetSnapshot() string {
-	if x != nil {
-		return x.Snapshot
-	}
-	return ""
-}
-
-func (x *AccessibilitySnapshotCapturedEvent) GetFormat() string {
-	if x != nil {
-		return x.Format
-	}
-	return ""
-}
-
 var File_surfaces_web_v1_web_proto protoreflect.FileDescriptor
 
 const file_surfaces_web_v1_web_proto_rawDesc = "" +
@@ -477,15 +361,7 @@ const file_surfaces_web_v1_web_proto_rawDesc = "" +
 	"\x04note\x18\x02 \x01(\tR\x04note\x12*\n" +
 	"\x11cdp_websocket_url\x18\x03 \x01(\tR\x0fcdpWebsocketUrl\x12\"\n" +
 	"\ruser_data_dir\x18\x04 \x01(\tR\vuserDataDir\x125\n" +
-	"\x17initial_page_session_id\x18\x05 \x01(\tR\x14initialPageSessionId\"\xb0\x01\n" +
-	"\x1cAccessibilitySnapshotCommand\x12\x12\n" +
-	"\x04mode\x18\x03 \x01(\tR\x04mode\x12\x16\n" +
-	"\x06format\x18\x01 \x01(\tR\x06format\x12R\n" +
-	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
-	"\x0e_retry_options\"X\n" +
-	"\"AccessibilitySnapshotCapturedEvent\x12\x1a\n" +
-	"\bsnapshot\x18\x01 \x01(\tR\bsnapshot\x12\x16\n" +
-	"\x06format\x18\x02 \x01(\tR\x06format*`\n" +
+	"\x17initial_page_session_id\x18\x05 \x01(\tR\x14initialPageSessionId*`\n" +
 	"\vBrowserKind\x12\x1c\n" +
 	"\x18BROWSER_KIND_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15BROWSER_KIND_CHROMIUM\x10\x01\x12\x18\n" +
@@ -505,28 +381,25 @@ func file_surfaces_web_v1_web_proto_rawDescGZIP() []byte {
 }
 
 var file_surfaces_web_v1_web_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_surfaces_web_v1_web_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_surfaces_web_v1_web_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_surfaces_web_v1_web_proto_goTypes = []any{
-	(BrowserKind)(0),                           // 0: allwright.engine.v1.BrowserKind
-	(*LaunchBrowserCommand)(nil),               // 1: allwright.engine.v1.LaunchBrowserCommand
-	(*BrowserLaunchedEvent)(nil),               // 2: allwright.engine.v1.BrowserLaunchedEvent
-	(*LaunchChromeCommand)(nil),                // 3: allwright.engine.v1.LaunchChromeCommand
-	(*ChromeLaunchedEvent)(nil),                // 4: allwright.engine.v1.ChromeLaunchedEvent
-	(*AccessibilitySnapshotCommand)(nil),       // 5: allwright.engine.v1.AccessibilitySnapshotCommand
-	(*AccessibilitySnapshotCapturedEvent)(nil), // 6: allwright.engine.v1.AccessibilitySnapshotCapturedEvent
-	(*CommandRetryOptions)(nil),                // 7: allwright.engine.v1.CommandRetryOptions
+	(BrowserKind)(0),             // 0: allwright.engine.v1.BrowserKind
+	(*LaunchBrowserCommand)(nil), // 1: allwright.engine.v1.LaunchBrowserCommand
+	(*BrowserLaunchedEvent)(nil), // 2: allwright.engine.v1.BrowserLaunchedEvent
+	(*LaunchChromeCommand)(nil),  // 3: allwright.engine.v1.LaunchChromeCommand
+	(*ChromeLaunchedEvent)(nil),  // 4: allwright.engine.v1.ChromeLaunchedEvent
+	(*CommandRetryOptions)(nil),  // 5: allwright.engine.v1.CommandRetryOptions
 }
 var file_surfaces_web_v1_web_proto_depIdxs = []int32{
 	0, // 0: allwright.engine.v1.LaunchBrowserCommand.browser_kind:type_name -> allwright.engine.v1.BrowserKind
-	7, // 1: allwright.engine.v1.LaunchBrowserCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	5, // 1: allwright.engine.v1.LaunchBrowserCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
 	0, // 2: allwright.engine.v1.BrowserLaunchedEvent.browser_kind:type_name -> allwright.engine.v1.BrowserKind
-	7, // 3: allwright.engine.v1.LaunchChromeCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	7, // 4: allwright.engine.v1.AccessibilitySnapshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	5, // 3: allwright.engine.v1.LaunchChromeCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_surfaces_web_v1_web_proto_init() }
@@ -537,14 +410,13 @@ func file_surfaces_web_v1_web_proto_init() {
 	file_core_v1_common_proto_init()
 	file_surfaces_web_v1_web_proto_msgTypes[0].OneofWrappers = []any{}
 	file_surfaces_web_v1_web_proto_msgTypes[2].OneofWrappers = []any{}
-	file_surfaces_web_v1_web_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_surfaces_web_v1_web_proto_rawDesc), len(file_surfaces_web_v1_web_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

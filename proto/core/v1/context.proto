@@ -6,7 +6,6 @@ option java_package = "dev.allwright.engine.v1";
 option java_multiple_files = true;
 
 import "core/v1/common.proto";
-import "surfaces/web/v1/web.proto";
 
 message ContextSessionCommand {
   string surface_session_id = 1;
@@ -217,4 +216,19 @@ message SelectorWaitSatisfiedEvent {
 message ScreenshotCapturedEvent {
   bytes png_data = 1;
   string note = 2;
+}
+
+// Empty format defaults to JSON. Accepted values are "json" and "yaml".
+message AccessibilitySnapshotCommand {
+  // Empty mode defaults to default. AI assigns queryable references; reference storage is surface-owned.
+  // Supported: default, ai, autoexpect, codegen.
+  string mode = 3;
+  string format = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+// Both formats encode the same versioned, structured document.
+message AccessibilitySnapshotCapturedEvent {
+  string snapshot = 1;
+  string format = 2;
 }

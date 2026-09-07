@@ -1,3 +1,4 @@
+pub mod accessibility_yaml;
 use serde::{Deserialize, Serialize};
 
 pub const ALLWRIGHT_PLUGIN_API_VERSION: u32 = 1;

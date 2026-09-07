@@ -180,26 +180,6 @@ pub struct ChromeLaunchedEvent {
     #[prost(string, tag = "5")]
     pub initial_page_session_id: ::prost::alloc::string::String,
 }
-/// Empty format defaults to JSON. Accepted values are "json" and "yaml".
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct AccessibilitySnapshotCommand {
-    /// Empty mode defaults to default. AI injects queryable aria-ref attributes.
-    /// Supported: default, ai, autoexpect, codegen.
-    #[prost(string, tag = "3")]
-    pub mode: ::prost::alloc::string::String,
-    #[prost(string, tag = "1")]
-    pub format: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
-    pub retry_options: ::core::option::Option<CommandRetryOptions>,
-}
-/// Both formats encode the same versioned, structured document.
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct AccessibilitySnapshotCapturedEvent {
-    #[prost(string, tag = "1")]
-    pub snapshot: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub format: ::prost::alloc::string::String,
-}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum BrowserKind {
@@ -650,6 +630,26 @@ pub struct ScreenshotCapturedEvent {
     pub png_data: ::prost::alloc::vec::Vec<u8>,
     #[prost(string, tag = "2")]
     pub note: ::prost::alloc::string::String,
+}
+/// Empty format defaults to JSON. Accepted values are "json" and "yaml".
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AccessibilitySnapshotCommand {
+    /// Empty mode defaults to default. AI assigns queryable references; reference storage is surface-owned.
+    /// Supported: default, ai, autoexpect, codegen.
+    #[prost(string, tag = "3")]
+    pub mode: ::prost::alloc::string::String,
+    #[prost(string, tag = "1")]
+    pub format: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+/// Both formats encode the same versioned, structured document.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AccessibilitySnapshotCapturedEvent {
+    #[prost(string, tag = "1")]
+    pub snapshot: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub format: ::prost::alloc::string::String,
 }
 /// Generated client implementations.
 pub mod engine_service_client {
