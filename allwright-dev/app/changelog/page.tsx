@@ -79,10 +79,10 @@ export default function Changelog() {
           .
         </p>
         <p className="mt-4 text-sm leading-6 text-[var(--muted)]">
-          Next up is <strong className="font-semibold text-[var(--ink)]">v0.1.0</strong>
-          , allwright&apos;s first minor version — coming soon. Read{" "}
-          <Link href="/blog/road-to-v0-1-0" className="font-medium text-[var(--accent-2)] hover:underline">
-            what&apos;s tangible today on the way there
+          Latest is <strong className="font-semibold text-[var(--ink)]">v0.1.4</strong>
+          , four releases past allwright&apos;s first minor version. Read{" "}
+          <Link href="/blog/v0-1-0-is-here" className="font-medium text-[var(--accent-2)] hover:underline">
+            what&apos;s landed since v0.1.0 shipped
           </Link>
           .
         </p>

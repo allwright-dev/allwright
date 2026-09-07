@@ -1,0 +1,121 @@
+---
+title: "v0.1.0 is here — and it hasn't slowed down since"
+description: "allwright v0.1.0 shipped September 4th — the first minor version, and a real milestone. Four releases later, at v0.1.4, it's already grown web accessibility snapshots, semantic locators, locator exclusion, and Android accessibility snapshots."
+date: "2026-09-07"
+author: "The allwright team"
+published: true
+tags: ["release", "milestone", "changelog", "accessibility", "android", "web testing"]
+keywords:
+  [
+    "allwright v0.1.0",
+    "allwright v0.1.4",
+    "allwright release milestone",
+    "accessibility snapshot testing",
+    "semantic web locators",
+    "getByRole testing",
+    "android accessibility testing",
+  ]
+---
+
+Our [last post](/blog/road-to-v0-1-0) said v0.1.0 was coming soon. It's not
+soon anymore — **v0.1.0 shipped on September 4th**, allwright's first minor
+version after more than sixty `0.0.x` releases. And rather than pausing to
+admire the number, we've since cut four more releases in three days. This is
+where things actually stand at **v0.1.4**.
+
+## What v0.1.0 itself was
+
+Worth being honest about this the same way we were in the last post: v0.1.0
+didn't ship a pile of new surfaces the moment the tag was cut. It was the line
+in the sand we said it would be — the point where what had already landed in
+patch releases (web and Android automation, five client languages, one API
+shape, project scaffolding) added up to something worth calling a real
+milestone, instead of another `0.0.x` bump.
+
+The version number finally meaning something is exactly the point. What's
+changed since is everything that's landed *underneath* that number in the
+few days after.
+
+## What's landed since: v0.1.1 – v0.1.4
+
+### v0.1.1 — Web accessibility snapshots
+
+Web pages in all five clients gained `accessibility_snapshot` /
+`AccessibilitySnapshot` / `accessibilitySnapshot`, returning a structured
+document of every node's role, name, states, properties, and children —
+including cross-origin iframes — as JSON (default) or YAML:
+
+```ts
+const tree = JSON.parse(await page.accessibilitySnapshot());
+const yaml = await page.accessibilitySnapshot({ format: "yaml" });
+```
+
+Accessible-name and role computation is Allwright-owned code, informed by the
+W3C accessibility specs and by studying Playwright's behavior as a reference —
+no vendored Playwright code, no `dom-accessibility-api` dependency. See the
+[web plugin's accessibility documentation](https://github.com/allwright-dev/allwright/blob/main/rust/allwright-surface-web/README.md#accessibility-snapshots)
+for the full contract and its limits.
+
+### v0.1.2 — Snapshot modes, including an AI-ready one
+
+A snapshot now has a `mode` alongside its `format`:
+
+| Mode | Behavior |
+| --- | --- |
+| `default` | Accessible content; generic wrappers flattened. |
+| `ai` | Adds an `aria-ref` to every rendered, clickable element, for locating it by reference. |
+| `autoexpect` | Content must be both accessible and rendered. |
+| `codegen` | The default tree, meant for generating assertions from. |
+
+```ts
+const snapshot = JSON.parse(await page.accessibilitySnapshot({ mode: "ai" }));
+// For a node in the snapshot:
+await page.click(`[aria-ref="${node["aria-ref"]}"]`);
+```
+
+References are opaque, stable while the element/role/name stay unchanged, and
+reset on navigation — useful for driving a page from a snapshot instead of a
+hand-written selector.
+
+### v0.1.3 — Semantic web locators, and excluding matches
+
+Pages and locators picked up Playwright-style semantic builders across all
+five clients — `getByRole`, `getByText`, `getByLabel`, `getByPlaceholder`,
+`getByAltText`, `getByTitle`, and `getByTestId` — chainable with CSS/XPath and
+filterable by `has`, `hasNot`, `hasText`, `hasNotText`, and `visible`:
+
+```ts
+await page.getByRole("listitem")
+  .filter({ has: page.getByRole("heading", { name: "Beta", exact: true }) })
+  .getByRole("button", { name: "Buy", disabled: false })
+  .click();
+```
+
+Alongside them, `locator.not(otherLocator)` excludes matching elements (Python
+`not_`, Go `Not`, Rust `not(&other)`), and Vitest assertions gained matching
+negation for both web and Android — `expect(locator).not.toHaveText("Loading")`
+and `expect(locator).not().toBeVisible()`, retrying like every other
+assertion. See the [web locator reference](https://github.com/allwright-dev/allwright/blob/main/rust/allwright-surface-web/SELECTORS.md)
+for the full builder and filter set.
+
+### v0.1.4 — Accessibility snapshots reach Android
+
+The same `accessibility_snapshot` capability web got in v0.1.1 is now
+available on Android, sharing the same versioned document structure and
+JSON/YAML encoding as web — one accessibility model across both surfaces
+instead of two.
+
+```ts
+const tree = JSON.parse(await androidApp.accessibilitySnapshot());
+```
+
+## Where to go next
+
+- Read the [Changelog](/changelog) for the full, continuously updated release
+  history.
+- Check [Availability](/availability) for the current, capability-by-capability
+  picture of web and Android automation.
+- Read [the road to v0.1.0](/blog/road-to-v0-1-0) for where things stood right
+  before this milestone landed.
+- Star or watch [the repo](https://github.com/allwright-dev/allwright) — at
+  this pace, v0.1.5 won't be far behind.

@@ -372,6 +372,51 @@ function RoadmapHero({ variant }: { variant?: HeroVariant }) {
   );
 }
 
+// The sequel to RoadmapHero: the dashed "coming soon" segment is gone,
+// replaced by a fully solid stepper from the v0.1.0 milestone through the
+// four releases that followed it in three days. Every node is shipped, not
+// promised, so nothing here is dashed — only the final node is filled to
+// mark "today."
+function MilestoneHero({ variant }: { variant?: HeroVariant }) {
+  const steps = [
+    { x: 140, version: "v0.1.0", caption: "milestone" },
+    { x: 370, version: "v0.1.1", caption: "a11y snapshots" },
+    { x: 600, version: "v0.1.2", caption: "snapshot modes" },
+    { x: 830, version: "v0.1.3", caption: "locators + not()" },
+  ];
+  const today = { x: 1060, version: "v0.1.4", caption: "you are here" };
+
+  return (
+    <HeroFrame
+      variant={variant}
+      label="A release stepper, fully solid from v0.1.0 through v0.1.4: v0.1.0 marked 'milestone', v0.1.1 marked 'a11y snapshots', v0.1.2 marked 'snapshot modes', v0.1.3 marked 'locators and not()', and v0.1.4 filled in and marked 'you are here' — every step already shipped."
+    >
+      <line x1={140} y1={210} x2={today.x} y2={210} stroke="currentColor" strokeWidth="2" />
+
+      {steps.map((step) => (
+        <g key={step.version}>
+          <circle cx={step.x} cy={210} r={10} fill="var(--card)" stroke="var(--accent)" strokeWidth="1.6" />
+          <text x={step.x} y={172} textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--ink)">
+            {step.version}
+          </text>
+          <text x={step.x} y={252} textAnchor="middle" fontSize="11.5" fill="var(--muted)">
+            {step.caption}
+          </text>
+        </g>
+      ))}
+
+      {/* Today */}
+      <circle cx={today.x} cy={210} r={30} fill="var(--accent-soft)" stroke="var(--accent-2)" strokeWidth="2" />
+      <text x={today.x} y={204} textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--accent-2)">
+        {today.version}
+      </text>
+      <text x={today.x} y={224} textAnchor="middle" fontSize="10.5" fill="var(--accent-2)">
+        {today.caption}
+      </text>
+    </HeroFrame>
+  );
+}
+
 // A terminal running the initializer on the left, fanning out into the
 // scaffolded project it produces on the right — the whole point of the post
 // is "one command in, a working project out," so the diagram shows exactly
@@ -467,6 +512,7 @@ const heroRegistry: Record<string, (props: { variant?: HeroVariant }) => React.R
   "android-testing-playwright-style": AndroidHero,
   "road-to-v0-1-0": RoadmapHero,
   "npm-init-allwright": InitHero,
+  "v0-1-0-is-here": MilestoneHero,
 };
 
 export function HeroImage({ slug, variant }: { slug: string; variant?: HeroVariant }) {

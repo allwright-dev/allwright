@@ -195,6 +195,54 @@ function RoadmapOgDiagram() {
   );
 }
 
+// Same "fully solid stepper" story as MilestoneHero in hero-image.tsx,
+// compressed to fit the thumbnail: version labels only, no feature
+// captions — there isn't room for both at this size.
+function MilestoneOgDiagram() {
+  const { width, height } = DIAGRAM_SIZE;
+  const midY = 132;
+  const steps = [
+    { x: 30, version: "v0.1.0" },
+    { x: 120, version: "v0.1.1" },
+    { x: 210, version: "v0.1.2" },
+    { x: 300, version: "v0.1.3" },
+  ];
+  const today = { x: 390, version: "v0.1.4" };
+
+  return (
+    <div style={{ position: "relative", width, height, display: "flex" }}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ position: "absolute", left: 0, top: 0 }}>
+        <line x1={steps[0].x} y1={midY} x2={today.x} y2={midY} stroke={MUTED} strokeWidth={2} />
+        {steps.map((step, i) => (
+          <circle
+            key={step.version}
+            cx={step.x}
+            cy={midY}
+            r={8}
+            fill="rgba(16,41,45,0.55)"
+            stroke={i === 0 ? MUTED : BRAND_TO}
+            strokeWidth={1.6}
+          />
+        ))}
+        <circle cx={today.x} cy={midY} r={28} fill="rgba(14,159,142,0.16)" stroke={BRAND_TO} strokeWidth={2} />
+      </svg>
+
+      {steps.map((step) => (
+        <div
+          key={step.version}
+          style={{ position: "absolute", left: step.x, top: midY - 34, transform: "translateX(-50%)", display: "flex", fontSize: 12.5, fontWeight: 600, color: INK }}
+        >
+          {step.version}
+        </div>
+      ))}
+      <div style={{ position: "absolute", left: today.x, top: midY - 6, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ display: "flex", fontSize: 16, fontWeight: 700, color: INK_SOFT }}>{today.version}</div>
+        <div style={{ display: "flex", fontSize: 10.5, color: MUTED, marginTop: 2 }}>you are here</div>
+      </div>
+    </div>
+  );
+}
+
 // Same terminal-into-scaffolded-project shape as InitHero in hero-image.tsx,
 // compressed to fit the thumbnail: a terminal card on the left, an arrow,
 // then a short file list standing in for the full project tree.

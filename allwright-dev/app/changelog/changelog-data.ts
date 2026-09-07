@@ -15,6 +15,49 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "v0.1.4",
+    date: "2026-09-07",
+    title: "Accessibility snapshots reach Android",
+    highlights: [
+      "Android gained accessibility_snapshot, sharing the same versioned JSON/YAML document structure web already had — one accessibility model across both surfaces instead of two.",
+    ],
+  },
+  {
+    version: "v0.1.3",
+    date: "2026-09-06",
+    title: "Semantic web locators, and excluding matches",
+    highlights: [
+      "Web pages and locators gained Playwright-style semantic builders across all five clients — getByRole, getByText, getByLabel, getByPlaceholder, getByAltText, getByTitle, and getByTestId — chainable with CSS/XPath and filterable by has, hasNot, hasText, hasNotText, and visible.",
+      "locator.not(otherLocator) excludes matching elements, and Vitest assertions gained matching negation for both web and Android — expect(locator).not.toHaveText(...) and expect(locator).not().toBeVisible() — with the same retrying behavior as every other assertion.",
+    ],
+  },
+  {
+    version: "v0.1.2",
+    date: "2026-09-06",
+    title: "Snapshot modes, including an AI-ready one",
+    highlights: [
+      "Accessibility snapshots gained a mode alongside format: default (accessible content), ai (adds a stable aria-ref to every rendered, clickable element so it can be located by reference), autoexpect, and codegen.",
+    ],
+  },
+  {
+    version: "v0.1.1",
+    date: "2026-09-06",
+    title: "Web accessibility snapshots",
+    highlights: [
+      "Web pages in all five clients gained accessibility_snapshot / AccessibilitySnapshot / accessibilitySnapshot, returning a structured document of every node's role, name, states, properties, and children — including cross-origin iframes — as JSON (default) or YAML.",
+      "Accessible-name and role computation is Allwright-owned code informed by the W3C accessibility specs and by studying Playwright's behavior as a reference — no vendored Playwright code, no dom-accessibility-api dependency.",
+    ],
+  },
+  {
+    version: "v0.1.0",
+    date: "2026-09-04",
+    title: "First minor version: a real milestone",
+    highlights: [
+      "allwright's first minor release after more than sixty 0.0.x patch releases — the point where what had already landed (web and Android automation, five client languages, one API shape, project scaffolding) added up to a real milestone instead of another patch bump.",
+      "No new surfaces shipped in the tag itself; see the entries below for what landed in the days right after.",
+    ],
+  },
+  {
     version: "v0.0.61",
     date: "2026-09-04",
     title: "Web actions hardened onto WebDriver BiDi",
