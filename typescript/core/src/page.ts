@@ -13,6 +13,8 @@ import type {
   FillResult,
   HighlightOptions,
   HighlightResult,
+  Hook,
+  HookType,
   Locator,
   NavigateResult,
   Page,
@@ -32,16 +34,77 @@ import type {
 export class PageImpl extends WebLocatorBuilders implements Page {
   #runtime: RuntimeClient;
   #handlePromise: Promise<PageHandle> | null = null;
+  #createPage: (sessionId: string) => Page;
 
-  constructor(input: PageInfo & { runtime: RuntimeClient }) {
+  constructor(input: PageInfo & { runtime: RuntimeClient; createPage?: (sessionId: string) => Page }) {
     super();
     this.#runtime = input.runtime;
     this.sessionId = input.sessionId;
     this.browserSessionId = input.browserSessionId;
+    this.#createPage = input.createPage ?? ((sessionId) => new PageImpl({
+      runtime: this.#runtime,
+      browserSessionId: this.browserSessionId,
+      sessionId,
+      createPage: this.#createPage,
+    }));
   }
 
   readonly sessionId: string;
   readonly browserSessionId: string;
+
+  async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
+    if (type.name !== "newPage") {
+      throw formatActionError("register hook", `unsupported hook type: ${type.name}`);
+    }
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
+      registerHook: { newPage: {} },
+    });
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.hookRegistered?.hookId) {
+        const hookId = event.hookRegistered.hookId;
+        return {
+          id: hookId,
+          type,
+          wait: (options: CommandOptions = {}) => this.#waitForHook(hookId, type, options),
+        };
+      }
+      if (event.error?.message) {
+        throw formatActionError(`register ${type.name} hook`, event.error.message);
+      }
+    }
+  }
+
+  async #waitForHook<T>(hookId: string, type: HookType<T>, options: CommandOptions): Promise<T> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
+      waitForHook: {
+        hookId,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.hookCompleted?.hookId === hookId) {
+        if (type.name === "newPage" && event.hookCompleted.newPage?.contextSessionId) {
+          return this.#createPage(event.hookCompleted.newPage.contextSessionId) as T;
+        }
+        throw formatActionError(`wait for ${type.name} hook`, "hook returned an invalid result");
+      }
+      if (event.error?.message) {
+        throw formatActionError(`wait for ${type.name} hook`, event.error.message);
+      }
+    }
+  }
 
   locator(selector: string, options?: LocatorFilterOptions): Locator {
     const result = new LocatorImpl({ page: this, selector: normalizeSelectorForTransport(selector) });

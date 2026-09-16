@@ -5,9 +5,9 @@ import java.util.function.BiFunction;
 
 public final class HookType<T> {
     private final String name;
-    private final BiFunction<Browser, HookCompletedEvent, T> decoder;
+    private final BiFunction<Page, HookCompletedEvent, T> decoder;
 
-    HookType(String name, BiFunction<Browser, HookCompletedEvent, T> decoder) {
+    HookType(String name, BiFunction<Page, HookCompletedEvent, T> decoder) {
         this.name = name;
         this.decoder = decoder;
     }
@@ -16,7 +16,7 @@ public final class HookType<T> {
         return name;
     }
 
-    T decode(Browser browser, HookCompletedEvent event) {
-        return decoder.apply(browser, event);
+    T decode(Page page, HookCompletedEvent event) {
+        return decoder.apply(page, event);
     }
 }

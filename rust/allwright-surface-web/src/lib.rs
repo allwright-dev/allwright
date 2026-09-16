@@ -236,7 +236,15 @@ pub async fn open_page(browser_session: &BrowserSessionHandle) -> Result<PageInf
     }
 }
 
-async fn top_level_page_ids(browser_session: &BrowserSessionHandle) -> Result<Vec<String>, String> {
+#[derive(Debug)]
+struct TopLevelPage {
+    id: String,
+    opener_id: Option<String>,
+}
+
+async fn top_level_pages(
+    browser_session: &BrowserSessionHandle,
+) -> Result<Vec<TopLevelPage>, String> {
     match browser_session {
         BrowserSessionHandle::Chromium { cdp_websocket_url } => {
             let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
@@ -257,7 +265,13 @@ async fn top_level_page_ids(browser_session: &BrowserSessionHandle) -> Result<Ve
                     target
                         .get("targetId")
                         .and_then(Value::as_str)
-                        .map(str::to_string)
+                        .map(|id| TopLevelPage {
+                            id: id.to_string(),
+                            opener_id: target
+                                .get("openerId")
+                                .and_then(Value::as_str)
+                                .map(str::to_string),
+                        })
                 })
                 .collect())
         }
@@ -284,7 +298,13 @@ async fn top_level_page_ids(browser_session: &BrowserSessionHandle) -> Result<Ve
                     context
                         .get("context")
                         .and_then(Value::as_str)
-                        .map(str::to_string)
+                        .map(|id| TopLevelPage {
+                            id: id.to_string(),
+                            opener_id: context
+                                .get("originalOpener")
+                                .and_then(Value::as_str)
+                                .map(str::to_string),
+                        })
                 })
                 .collect())
         }
@@ -293,12 +313,26 @@ async fn top_level_page_ids(browser_session: &BrowserSessionHandle) -> Result<Ve
 
 pub async fn register_hook(
     browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
     hook_type: HookType,
 ) -> Result<HookRegistration, String> {
+    let source_page_id = match (browser_session, page_session) {
+        (BrowserSessionHandle::Chromium { .. }, PageSessionHandle::Chromium { target_id, .. }) => {
+            target_id
+        }
+        (
+            BrowserSessionHandle::Firefox { .. },
+            PageSessionHandle::Firefox {
+                browsing_context_id,
+            },
+        ) => browsing_context_id,
+        _ => return Err("page session does not belong to the hook browser backend".to_string()),
+    };
     let state = match hook_type {
         HookType::NewPage => json!({
             "hook_type": "new_page",
-            "existing_page_ids": top_level_page_ids(browser_session).await?,
+            "source_page_id": source_page_id,
+            "existing_page_ids": top_level_pages(browser_session).await?.into_iter().map(|page| page.id).collect::<Vec<_>>(),
         }),
     };
     Ok(HookRegistration {
@@ -319,24 +353,29 @@ pub async fn poll_hook(
         .get("existing_page_ids")
         .and_then(Value::as_array)
         .ok_or_else(|| "new page hook state is missing existing_page_ids".to_string())?;
-    let page_id = top_level_page_ids(browser_session)
+    let source_page_id = state
+        .get("source_page_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "new page hook state is missing source_page_id".to_string())?;
+    let page_id = top_level_pages(browser_session)
         .await?
         .into_iter()
-        .find(|page_id| {
+        .find(|page| {
             !existing_page_ids
                 .iter()
-                .any(|existing| existing.as_str() == Some(page_id))
+                .any(|existing| existing.as_str() == Some(&page.id))
+                && page.opener_id.as_deref() == Some(source_page_id)
         })
         .ok_or_else(|| "new page hook is still waiting for a page".to_string())?;
 
     let page_session = match browser_session {
         BrowserSessionHandle::Chromium { .. } => PageSessionHandle::Chromium {
-            target_id: page_id,
+            target_id: page_id.id,
             browsing_context_id: None,
             mapper_target_id: None,
         },
         BrowserSessionHandle::Firefox { .. } => PageSessionHandle::Firefox {
-            browsing_context_id: page_id,
+            browsing_context_id: page_id.id,
         },
     };
 
@@ -4264,9 +4303,10 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
         }),
         PluginCommand::RegisterHook {
             browser_session,
+            page_session,
             hook_type,
         } => block_on_plugin_future(async move {
-            register_hook(&browser_session, hook_type)
+            register_hook(&browser_session, &page_session, hook_type)
                 .await
                 .map(PluginResult::RegisterHook)
         }),

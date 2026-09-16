@@ -32,8 +32,6 @@ type SurfaceSessionCommand struct {
 	//	*SurfaceSessionCommand_LaunchBrowser
 	//	*SurfaceSessionCommand_ConnectMobile
 	//	*SurfaceSessionCommand_LaunchApp
-	//	*SurfaceSessionCommand_RegisterHook
-	//	*SurfaceSessionCommand_WaitForHook
 	Command       isSurfaceSessionCommand_Command `protobuf_oneof:"command"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -139,24 +137,6 @@ func (x *SurfaceSessionCommand) GetLaunchApp() *LaunchAppCommand {
 	return nil
 }
 
-func (x *SurfaceSessionCommand) GetRegisterHook() *RegisterHookCommand {
-	if x != nil {
-		if x, ok := x.Command.(*SurfaceSessionCommand_RegisterHook); ok {
-			return x.RegisterHook
-		}
-	}
-	return nil
-}
-
-func (x *SurfaceSessionCommand) GetWaitForHook() *WaitForHookCommand {
-	if x != nil {
-		if x, ok := x.Command.(*SurfaceSessionCommand_WaitForHook); ok {
-			return x.WaitForHook
-		}
-	}
-	return nil
-}
-
 type isSurfaceSessionCommand_Command interface {
 	isSurfaceSessionCommand_Command()
 }
@@ -189,14 +169,6 @@ type SurfaceSessionCommand_LaunchApp struct {
 	LaunchApp *LaunchAppCommand `protobuf:"bytes,7,opt,name=launch_app,json=launchApp,proto3,oneof"`
 }
 
-type SurfaceSessionCommand_RegisterHook struct {
-	RegisterHook *RegisterHookCommand `protobuf:"bytes,8,opt,name=register_hook,json=registerHook,proto3,oneof"`
-}
-
-type SurfaceSessionCommand_WaitForHook struct {
-	WaitForHook *WaitForHookCommand `protobuf:"bytes,9,opt,name=wait_for_hook,json=waitForHook,proto3,oneof"`
-}
-
 func (*SurfaceSessionCommand_LaunchChrome) isSurfaceSessionCommand_Command() {}
 
 func (*SurfaceSessionCommand_OpenContext) isSurfaceSessionCommand_Command() {}
@@ -210,10 +182,6 @@ func (*SurfaceSessionCommand_LaunchBrowser) isSurfaceSessionCommand_Command() {}
 func (*SurfaceSessionCommand_ConnectMobile) isSurfaceSessionCommand_Command() {}
 
 func (*SurfaceSessionCommand_LaunchApp) isSurfaceSessionCommand_Command() {}
-
-func (*SurfaceSessionCommand_RegisterHook) isSurfaceSessionCommand_Command() {}
-
-func (*SurfaceSessionCommand_WaitForHook) isSurfaceSessionCommand_Command() {}
 
 type OpenContextCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -339,124 +307,6 @@ func (*CloseSurfaceSessionCommand) Descriptor() ([]byte, []int) {
 	return file_core_v1_surface_proto_rawDescGZIP(), []int{3}
 }
 
-type RegisterHookCommand struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Types that are valid to be assigned to Hook:
-	//
-	//	*RegisterHookCommand_NewPage
-	Hook          isRegisterHookCommand_Hook `protobuf_oneof:"hook"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RegisterHookCommand) Reset() {
-	*x = RegisterHookCommand{}
-	mi := &file_core_v1_surface_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RegisterHookCommand) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RegisterHookCommand) ProtoMessage() {}
-
-func (x *RegisterHookCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_surface_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RegisterHookCommand.ProtoReflect.Descriptor instead.
-func (*RegisterHookCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_surface_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *RegisterHookCommand) GetHook() isRegisterHookCommand_Hook {
-	if x != nil {
-		return x.Hook
-	}
-	return nil
-}
-
-func (x *RegisterHookCommand) GetNewPage() *RegisterNewPageHook {
-	if x != nil {
-		if x, ok := x.Hook.(*RegisterHookCommand_NewPage); ok {
-			return x.NewPage
-		}
-	}
-	return nil
-}
-
-type isRegisterHookCommand_Hook interface {
-	isRegisterHookCommand_Hook()
-}
-
-type RegisterHookCommand_NewPage struct {
-	NewPage *RegisterNewPageHook `protobuf:"bytes,1,opt,name=new_page,json=newPage,proto3,oneof"`
-}
-
-func (*RegisterHookCommand_NewPage) isRegisterHookCommand_Hook() {}
-
-type WaitForHookCommand struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	HookId        string                 `protobuf:"bytes,1,opt,name=hook_id,json=hookId,proto3" json:"hook_id,omitempty"`
-	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WaitForHookCommand) Reset() {
-	*x = WaitForHookCommand{}
-	mi := &file_core_v1_surface_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WaitForHookCommand) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WaitForHookCommand) ProtoMessage() {}
-
-func (x *WaitForHookCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_surface_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WaitForHookCommand.ProtoReflect.Descriptor instead.
-func (*WaitForHookCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_surface_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *WaitForHookCommand) GetHookId() string {
-	if x != nil {
-		return x.HookId
-	}
-	return ""
-}
-
-func (x *WaitForHookCommand) GetRetryOptions() *CommandRetryOptions {
-	if x != nil {
-		return x.RetryOptions
-	}
-	return nil
-}
-
 type SurfaceSessionEvent struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	SessionId string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
@@ -470,8 +320,6 @@ type SurfaceSessionEvent struct {
 	//	*SurfaceSessionEvent_BrowserLaunched
 	//	*SurfaceSessionEvent_MobileConnected
 	//	*SurfaceSessionEvent_AppLaunched
-	//	*SurfaceSessionEvent_HookRegistered
-	//	*SurfaceSessionEvent_HookCompleted
 	Event         isSurfaceSessionEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -479,7 +327,7 @@ type SurfaceSessionEvent struct {
 
 func (x *SurfaceSessionEvent) Reset() {
 	*x = SurfaceSessionEvent{}
-	mi := &file_core_v1_surface_proto_msgTypes[6]
+	mi := &file_core_v1_surface_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -491,7 +339,7 @@ func (x *SurfaceSessionEvent) String() string {
 func (*SurfaceSessionEvent) ProtoMessage() {}
 
 func (x *SurfaceSessionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_surface_proto_msgTypes[6]
+	mi := &file_core_v1_surface_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -504,7 +352,7 @@ func (x *SurfaceSessionEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SurfaceSessionEvent.ProtoReflect.Descriptor instead.
 func (*SurfaceSessionEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_surface_proto_rawDescGZIP(), []int{6}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SurfaceSessionEvent) GetSessionId() string {
@@ -593,24 +441,6 @@ func (x *SurfaceSessionEvent) GetAppLaunched() *AppLaunchedEvent {
 	return nil
 }
 
-func (x *SurfaceSessionEvent) GetHookRegistered() *HookRegisteredEvent {
-	if x != nil {
-		if x, ok := x.Event.(*SurfaceSessionEvent_HookRegistered); ok {
-			return x.HookRegistered
-		}
-	}
-	return nil
-}
-
-func (x *SurfaceSessionEvent) GetHookCompleted() *HookCompletedEvent {
-	if x != nil {
-		if x, ok := x.Event.(*SurfaceSessionEvent_HookCompleted); ok {
-			return x.HookCompleted
-		}
-	}
-	return nil
-}
-
 type isSurfaceSessionEvent_Event interface {
 	isSurfaceSessionEvent_Event()
 }
@@ -647,14 +477,6 @@ type SurfaceSessionEvent_AppLaunched struct {
 	AppLaunched *AppLaunchedEvent `protobuf:"bytes,9,opt,name=app_launched,json=appLaunched,proto3,oneof"`
 }
 
-type SurfaceSessionEvent_HookRegistered struct {
-	HookRegistered *HookRegisteredEvent `protobuf:"bytes,10,opt,name=hook_registered,json=hookRegistered,proto3,oneof"`
-}
-
-type SurfaceSessionEvent_HookCompleted struct {
-	HookCompleted *HookCompletedEvent `protobuf:"bytes,11,opt,name=hook_completed,json=hookCompleted,proto3,oneof"`
-}
-
 func (*SurfaceSessionEvent_ChromeLaunched) isSurfaceSessionEvent_Event() {}
 
 func (*SurfaceSessionEvent_ContextOpened) isSurfaceSessionEvent_Event() {}
@@ -671,10 +493,6 @@ func (*SurfaceSessionEvent_MobileConnected) isSurfaceSessionEvent_Event() {}
 
 func (*SurfaceSessionEvent_AppLaunched) isSurfaceSessionEvent_Event() {}
 
-func (*SurfaceSessionEvent_HookRegistered) isSurfaceSessionEvent_Event() {}
-
-func (*SurfaceSessionEvent_HookCompleted) isSurfaceSessionEvent_Event() {}
-
 type ContextOpenedEvent struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	ContextSessionId string                 `protobuf:"bytes,1,opt,name=context_session_id,json=contextSessionId,proto3" json:"context_session_id,omitempty"`
@@ -685,7 +503,7 @@ type ContextOpenedEvent struct {
 
 func (x *ContextOpenedEvent) Reset() {
 	*x = ContextOpenedEvent{}
-	mi := &file_core_v1_surface_proto_msgTypes[7]
+	mi := &file_core_v1_surface_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -697,7 +515,7 @@ func (x *ContextOpenedEvent) String() string {
 func (*ContextOpenedEvent) ProtoMessage() {}
 
 func (x *ContextOpenedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_surface_proto_msgTypes[7]
+	mi := &file_core_v1_surface_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -710,7 +528,7 @@ func (x *ContextOpenedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContextOpenedEvent.ProtoReflect.Descriptor instead.
 func (*ContextOpenedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_surface_proto_rawDescGZIP(), []int{7}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ContextOpenedEvent) GetContextSessionId() string {
@@ -736,7 +554,7 @@ type SessionPongEvent struct {
 
 func (x *SessionPongEvent) Reset() {
 	*x = SessionPongEvent{}
-	mi := &file_core_v1_surface_proto_msgTypes[8]
+	mi := &file_core_v1_surface_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -748,7 +566,7 @@ func (x *SessionPongEvent) String() string {
 func (*SessionPongEvent) ProtoMessage() {}
 
 func (x *SessionPongEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_surface_proto_msgTypes[8]
+	mi := &file_core_v1_surface_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -761,7 +579,7 @@ func (x *SessionPongEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionPongEvent.ProtoReflect.Descriptor instead.
 func (*SessionPongEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_surface_proto_rawDescGZIP(), []int{8}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SessionPongEvent) GetMessage() string {
@@ -780,7 +598,7 @@ type SurfaceSessionClosedEvent struct {
 
 func (x *SurfaceSessionClosedEvent) Reset() {
 	*x = SurfaceSessionClosedEvent{}
-	mi := &file_core_v1_surface_proto_msgTypes[9]
+	mi := &file_core_v1_surface_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -792,7 +610,7 @@ func (x *SurfaceSessionClosedEvent) String() string {
 func (*SurfaceSessionClosedEvent) ProtoMessage() {}
 
 func (x *SurfaceSessionClosedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_surface_proto_msgTypes[9]
+	mi := &file_core_v1_surface_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -805,7 +623,7 @@ func (x *SurfaceSessionClosedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SurfaceSessionClosedEvent.ProtoReflect.Descriptor instead.
 func (*SurfaceSessionClosedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_surface_proto_rawDescGZIP(), []int{9}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SurfaceSessionClosedEvent) GetReason() string {
@@ -824,7 +642,7 @@ type SurfaceSessionErrorEvent struct {
 
 func (x *SurfaceSessionErrorEvent) Reset() {
 	*x = SurfaceSessionErrorEvent{}
-	mi := &file_core_v1_surface_proto_msgTypes[10]
+	mi := &file_core_v1_surface_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -836,7 +654,7 @@ func (x *SurfaceSessionErrorEvent) String() string {
 func (*SurfaceSessionErrorEvent) ProtoMessage() {}
 
 func (x *SurfaceSessionErrorEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_surface_proto_msgTypes[10]
+	mi := &file_core_v1_surface_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -849,7 +667,7 @@ func (x *SurfaceSessionErrorEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SurfaceSessionErrorEvent.ProtoReflect.Descriptor instead.
 func (*SurfaceSessionErrorEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_surface_proto_rawDescGZIP(), []int{10}
+	return file_core_v1_surface_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SurfaceSessionErrorEvent) GetMessage() string {
@@ -859,129 +677,11 @@ func (x *SurfaceSessionErrorEvent) GetMessage() string {
 	return ""
 }
 
-type HookRegisteredEvent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	HookId        string                 `protobuf:"bytes,1,opt,name=hook_id,json=hookId,proto3" json:"hook_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *HookRegisteredEvent) Reset() {
-	*x = HookRegisteredEvent{}
-	mi := &file_core_v1_surface_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *HookRegisteredEvent) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*HookRegisteredEvent) ProtoMessage() {}
-
-func (x *HookRegisteredEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_surface_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use HookRegisteredEvent.ProtoReflect.Descriptor instead.
-func (*HookRegisteredEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_surface_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *HookRegisteredEvent) GetHookId() string {
-	if x != nil {
-		return x.HookId
-	}
-	return ""
-}
-
-type HookCompletedEvent struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	HookId string                 `protobuf:"bytes,1,opt,name=hook_id,json=hookId,proto3" json:"hook_id,omitempty"`
-	// Types that are valid to be assigned to Result:
-	//
-	//	*HookCompletedEvent_NewPage
-	Result        isHookCompletedEvent_Result `protobuf_oneof:"result"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *HookCompletedEvent) Reset() {
-	*x = HookCompletedEvent{}
-	mi := &file_core_v1_surface_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *HookCompletedEvent) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*HookCompletedEvent) ProtoMessage() {}
-
-func (x *HookCompletedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_surface_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use HookCompletedEvent.ProtoReflect.Descriptor instead.
-func (*HookCompletedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_surface_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *HookCompletedEvent) GetHookId() string {
-	if x != nil {
-		return x.HookId
-	}
-	return ""
-}
-
-func (x *HookCompletedEvent) GetResult() isHookCompletedEvent_Result {
-	if x != nil {
-		return x.Result
-	}
-	return nil
-}
-
-func (x *HookCompletedEvent) GetNewPage() *NewPageHookResult {
-	if x != nil {
-		if x, ok := x.Result.(*HookCompletedEvent_NewPage); ok {
-			return x.NewPage
-		}
-	}
-	return nil
-}
-
-type isHookCompletedEvent_Result interface {
-	isHookCompletedEvent_Result()
-}
-
-type HookCompletedEvent_NewPage struct {
-	NewPage *NewPageHookResult `protobuf:"bytes,2,opt,name=new_page,json=newPage,proto3,oneof"`
-}
-
-func (*HookCompletedEvent_NewPage) isHookCompletedEvent_Result() {}
-
 var File_core_v1_surface_proto protoreflect.FileDescriptor
 
 const file_core_v1_surface_proto_rawDesc = "" +
 	"\n" +
-	"\x15core/v1/surface.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x1fsurfaces/mobile/v1/mobile.proto\x1a\x19surfaces/web/v1/web.proto\"\xd9\x05\n" +
+	"\x15core/v1/surface.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x1fsurfaces/mobile/v1/mobile.proto\x1a\x19surfaces/web/v1/web.proto\"\xb9\x04\n" +
 	"\x15SurfaceSessionCommand\x12O\n" +
 	"\rlaunch_chrome\x18\x01 \x01(\v2(.allwright.engine.v1.LaunchChromeCommandH\x00R\flaunchChrome\x12L\n" +
 	"\fopen_context\x18\x02 \x01(\v2'.allwright.engine.v1.OpenContextCommandH\x00R\vopenContext\x12=\n" +
@@ -990,23 +690,14 @@ const file_core_v1_surface_proto_rawDesc = "" +
 	"\x0elaunch_browser\x18\x05 \x01(\v2).allwright.engine.v1.LaunchBrowserCommandH\x00R\rlaunchBrowser\x12R\n" +
 	"\x0econnect_mobile\x18\x06 \x01(\v2).allwright.engine.v1.ConnectMobileCommandH\x00R\rconnectMobile\x12F\n" +
 	"\n" +
-	"launch_app\x18\a \x01(\v2%.allwright.engine.v1.LaunchAppCommandH\x00R\tlaunchApp\x12O\n" +
-	"\rregister_hook\x18\b \x01(\v2(.allwright.engine.v1.RegisterHookCommandH\x00R\fregisterHook\x12M\n" +
-	"\rwait_for_hook\x18\t \x01(\v2'.allwright.engine.v1.WaitForHookCommandH\x00R\vwaitForHookB\t\n" +
+	"launch_app\x18\a \x01(\v2%.allwright.engine.v1.LaunchAppCommandH\x00R\tlaunchAppB\t\n" +
 	"\acommand\"z\n" +
 	"\x12OpenContextCommand\x12R\n" +
 	"\rretry_options\x18\x01 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
 	"\x0e_retry_options\".\n" +
 	"\x12SessionPingCommand\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"\x1c\n" +
-	"\x1aCloseSurfaceSessionCommand\"d\n" +
-	"\x13RegisterHookCommand\x12E\n" +
-	"\bnew_page\x18\x01 \x01(\v2(.allwright.engine.v1.RegisterNewPageHookH\x00R\anewPageB\x06\n" +
-	"\x04hook\"\x93\x01\n" +
-	"\x12WaitForHookCommand\x12\x17\n" +
-	"\ahook_id\x18\x01 \x01(\tR\x06hookId\x12R\n" +
-	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
-	"\x0e_retry_options\"\xd5\x06\n" +
+	"\x1aCloseSurfaceSessionCommand\"\xae\x05\n" +
 	"\x13SurfaceSessionEvent\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12S\n" +
@@ -1017,10 +708,7 @@ const file_core_v1_surface_proto_rawDesc = "" +
 	"\x05error\x18\x06 \x01(\v2-.allwright.engine.v1.SurfaceSessionErrorEventH\x00R\x05error\x12V\n" +
 	"\x10browser_launched\x18\a \x01(\v2).allwright.engine.v1.BrowserLaunchedEventH\x00R\x0fbrowserLaunched\x12V\n" +
 	"\x10mobile_connected\x18\b \x01(\v2).allwright.engine.v1.MobileConnectedEventH\x00R\x0fmobileConnected\x12J\n" +
-	"\fapp_launched\x18\t \x01(\v2%.allwright.engine.v1.AppLaunchedEventH\x00R\vappLaunched\x12S\n" +
-	"\x0fhook_registered\x18\n" +
-	" \x01(\v2(.allwright.engine.v1.HookRegisteredEventH\x00R\x0ehookRegistered\x12P\n" +
-	"\x0ehook_completed\x18\v \x01(\v2'.allwright.engine.v1.HookCompletedEventH\x00R\rhookCompletedB\a\n" +
+	"\fapp_launched\x18\t \x01(\v2%.allwright.engine.v1.AppLaunchedEventH\x00R\vappLaunchedB\a\n" +
 	"\x05event\"V\n" +
 	"\x12ContextOpenedEvent\x12,\n" +
 	"\x12context_session_id\x18\x01 \x01(\tR\x10contextSessionId\x12\x12\n" +
@@ -1030,13 +718,7 @@ const file_core_v1_surface_proto_rawDesc = "" +
 	"\x19SurfaceSessionClosedEvent\x12\x16\n" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\"4\n" +
 	"\x18SurfaceSessionErrorEvent\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\".\n" +
-	"\x13HookRegisteredEvent\x12\x17\n" +
-	"\ahook_id\x18\x01 \x01(\tR\x06hookId\"|\n" +
-	"\x12HookCompletedEvent\x12\x17\n" +
-	"\ahook_id\x18\x01 \x01(\tR\x06hookId\x12C\n" +
-	"\bnew_page\x18\x02 \x01(\v2&.allwright.engine.v1.NewPageHookResultH\x00R\anewPageB\b\n" +
-	"\x06resultBK\n" +
+	"\amessage\x18\x01 \x01(\tR\amessageBK\n" +
 	"\x17dev.allwright.engine.v1P\x01Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
 
 var (
@@ -1051,62 +733,49 @@ func file_core_v1_surface_proto_rawDescGZIP() []byte {
 	return file_core_v1_surface_proto_rawDescData
 }
 
-var file_core_v1_surface_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_core_v1_surface_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_core_v1_surface_proto_goTypes = []any{
 	(*SurfaceSessionCommand)(nil),      // 0: allwright.engine.v1.SurfaceSessionCommand
 	(*OpenContextCommand)(nil),         // 1: allwright.engine.v1.OpenContextCommand
 	(*SessionPingCommand)(nil),         // 2: allwright.engine.v1.SessionPingCommand
 	(*CloseSurfaceSessionCommand)(nil), // 3: allwright.engine.v1.CloseSurfaceSessionCommand
-	(*RegisterHookCommand)(nil),        // 4: allwright.engine.v1.RegisterHookCommand
-	(*WaitForHookCommand)(nil),         // 5: allwright.engine.v1.WaitForHookCommand
-	(*SurfaceSessionEvent)(nil),        // 6: allwright.engine.v1.SurfaceSessionEvent
-	(*ContextOpenedEvent)(nil),         // 7: allwright.engine.v1.ContextOpenedEvent
-	(*SessionPongEvent)(nil),           // 8: allwright.engine.v1.SessionPongEvent
-	(*SurfaceSessionClosedEvent)(nil),  // 9: allwright.engine.v1.SurfaceSessionClosedEvent
-	(*SurfaceSessionErrorEvent)(nil),   // 10: allwright.engine.v1.SurfaceSessionErrorEvent
-	(*HookRegisteredEvent)(nil),        // 11: allwright.engine.v1.HookRegisteredEvent
-	(*HookCompletedEvent)(nil),         // 12: allwright.engine.v1.HookCompletedEvent
-	(*LaunchChromeCommand)(nil),        // 13: allwright.engine.v1.LaunchChromeCommand
-	(*LaunchBrowserCommand)(nil),       // 14: allwright.engine.v1.LaunchBrowserCommand
-	(*ConnectMobileCommand)(nil),       // 15: allwright.engine.v1.ConnectMobileCommand
-	(*LaunchAppCommand)(nil),           // 16: allwright.engine.v1.LaunchAppCommand
-	(*CommandRetryOptions)(nil),        // 17: allwright.engine.v1.CommandRetryOptions
-	(*RegisterNewPageHook)(nil),        // 18: allwright.engine.v1.RegisterNewPageHook
-	(*ChromeLaunchedEvent)(nil),        // 19: allwright.engine.v1.ChromeLaunchedEvent
-	(*BrowserLaunchedEvent)(nil),       // 20: allwright.engine.v1.BrowserLaunchedEvent
-	(*MobileConnectedEvent)(nil),       // 21: allwright.engine.v1.MobileConnectedEvent
-	(*AppLaunchedEvent)(nil),           // 22: allwright.engine.v1.AppLaunchedEvent
-	(*NewPageHookResult)(nil),          // 23: allwright.engine.v1.NewPageHookResult
+	(*SurfaceSessionEvent)(nil),        // 4: allwright.engine.v1.SurfaceSessionEvent
+	(*ContextOpenedEvent)(nil),         // 5: allwright.engine.v1.ContextOpenedEvent
+	(*SessionPongEvent)(nil),           // 6: allwright.engine.v1.SessionPongEvent
+	(*SurfaceSessionClosedEvent)(nil),  // 7: allwright.engine.v1.SurfaceSessionClosedEvent
+	(*SurfaceSessionErrorEvent)(nil),   // 8: allwright.engine.v1.SurfaceSessionErrorEvent
+	(*LaunchChromeCommand)(nil),        // 9: allwright.engine.v1.LaunchChromeCommand
+	(*LaunchBrowserCommand)(nil),       // 10: allwright.engine.v1.LaunchBrowserCommand
+	(*ConnectMobileCommand)(nil),       // 11: allwright.engine.v1.ConnectMobileCommand
+	(*LaunchAppCommand)(nil),           // 12: allwright.engine.v1.LaunchAppCommand
+	(*CommandRetryOptions)(nil),        // 13: allwright.engine.v1.CommandRetryOptions
+	(*ChromeLaunchedEvent)(nil),        // 14: allwright.engine.v1.ChromeLaunchedEvent
+	(*BrowserLaunchedEvent)(nil),       // 15: allwright.engine.v1.BrowserLaunchedEvent
+	(*MobileConnectedEvent)(nil),       // 16: allwright.engine.v1.MobileConnectedEvent
+	(*AppLaunchedEvent)(nil),           // 17: allwright.engine.v1.AppLaunchedEvent
 }
 var file_core_v1_surface_proto_depIdxs = []int32{
-	13, // 0: allwright.engine.v1.SurfaceSessionCommand.launch_chrome:type_name -> allwright.engine.v1.LaunchChromeCommand
+	9,  // 0: allwright.engine.v1.SurfaceSessionCommand.launch_chrome:type_name -> allwright.engine.v1.LaunchChromeCommand
 	1,  // 1: allwright.engine.v1.SurfaceSessionCommand.open_context:type_name -> allwright.engine.v1.OpenContextCommand
 	2,  // 2: allwright.engine.v1.SurfaceSessionCommand.ping:type_name -> allwright.engine.v1.SessionPingCommand
 	3,  // 3: allwright.engine.v1.SurfaceSessionCommand.close:type_name -> allwright.engine.v1.CloseSurfaceSessionCommand
-	14, // 4: allwright.engine.v1.SurfaceSessionCommand.launch_browser:type_name -> allwright.engine.v1.LaunchBrowserCommand
-	15, // 5: allwright.engine.v1.SurfaceSessionCommand.connect_mobile:type_name -> allwright.engine.v1.ConnectMobileCommand
-	16, // 6: allwright.engine.v1.SurfaceSessionCommand.launch_app:type_name -> allwright.engine.v1.LaunchAppCommand
-	4,  // 7: allwright.engine.v1.SurfaceSessionCommand.register_hook:type_name -> allwright.engine.v1.RegisterHookCommand
-	5,  // 8: allwright.engine.v1.SurfaceSessionCommand.wait_for_hook:type_name -> allwright.engine.v1.WaitForHookCommand
-	17, // 9: allwright.engine.v1.OpenContextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	18, // 10: allwright.engine.v1.RegisterHookCommand.new_page:type_name -> allwright.engine.v1.RegisterNewPageHook
-	17, // 11: allwright.engine.v1.WaitForHookCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	19, // 12: allwright.engine.v1.SurfaceSessionEvent.chrome_launched:type_name -> allwright.engine.v1.ChromeLaunchedEvent
-	7,  // 13: allwright.engine.v1.SurfaceSessionEvent.context_opened:type_name -> allwright.engine.v1.ContextOpenedEvent
-	8,  // 14: allwright.engine.v1.SurfaceSessionEvent.pong:type_name -> allwright.engine.v1.SessionPongEvent
-	9,  // 15: allwright.engine.v1.SurfaceSessionEvent.closed:type_name -> allwright.engine.v1.SurfaceSessionClosedEvent
-	10, // 16: allwright.engine.v1.SurfaceSessionEvent.error:type_name -> allwright.engine.v1.SurfaceSessionErrorEvent
-	20, // 17: allwright.engine.v1.SurfaceSessionEvent.browser_launched:type_name -> allwright.engine.v1.BrowserLaunchedEvent
-	21, // 18: allwright.engine.v1.SurfaceSessionEvent.mobile_connected:type_name -> allwright.engine.v1.MobileConnectedEvent
-	22, // 19: allwright.engine.v1.SurfaceSessionEvent.app_launched:type_name -> allwright.engine.v1.AppLaunchedEvent
-	11, // 20: allwright.engine.v1.SurfaceSessionEvent.hook_registered:type_name -> allwright.engine.v1.HookRegisteredEvent
-	12, // 21: allwright.engine.v1.SurfaceSessionEvent.hook_completed:type_name -> allwright.engine.v1.HookCompletedEvent
-	23, // 22: allwright.engine.v1.HookCompletedEvent.new_page:type_name -> allwright.engine.v1.NewPageHookResult
-	23, // [23:23] is the sub-list for method output_type
-	23, // [23:23] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	10, // 4: allwright.engine.v1.SurfaceSessionCommand.launch_browser:type_name -> allwright.engine.v1.LaunchBrowserCommand
+	11, // 5: allwright.engine.v1.SurfaceSessionCommand.connect_mobile:type_name -> allwright.engine.v1.ConnectMobileCommand
+	12, // 6: allwright.engine.v1.SurfaceSessionCommand.launch_app:type_name -> allwright.engine.v1.LaunchAppCommand
+	13, // 7: allwright.engine.v1.OpenContextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	14, // 8: allwright.engine.v1.SurfaceSessionEvent.chrome_launched:type_name -> allwright.engine.v1.ChromeLaunchedEvent
+	5,  // 9: allwright.engine.v1.SurfaceSessionEvent.context_opened:type_name -> allwright.engine.v1.ContextOpenedEvent
+	6,  // 10: allwright.engine.v1.SurfaceSessionEvent.pong:type_name -> allwright.engine.v1.SessionPongEvent
+	7,  // 11: allwright.engine.v1.SurfaceSessionEvent.closed:type_name -> allwright.engine.v1.SurfaceSessionClosedEvent
+	8,  // 12: allwright.engine.v1.SurfaceSessionEvent.error:type_name -> allwright.engine.v1.SurfaceSessionErrorEvent
+	15, // 13: allwright.engine.v1.SurfaceSessionEvent.browser_launched:type_name -> allwright.engine.v1.BrowserLaunchedEvent
+	16, // 14: allwright.engine.v1.SurfaceSessionEvent.mobile_connected:type_name -> allwright.engine.v1.MobileConnectedEvent
+	17, // 15: allwright.engine.v1.SurfaceSessionEvent.app_launched:type_name -> allwright.engine.v1.AppLaunchedEvent
+	16, // [16:16] is the sub-list for method output_type
+	16, // [16:16] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_core_v1_surface_proto_init() }
@@ -1125,15 +794,9 @@ func file_core_v1_surface_proto_init() {
 		(*SurfaceSessionCommand_LaunchBrowser)(nil),
 		(*SurfaceSessionCommand_ConnectMobile)(nil),
 		(*SurfaceSessionCommand_LaunchApp)(nil),
-		(*SurfaceSessionCommand_RegisterHook)(nil),
-		(*SurfaceSessionCommand_WaitForHook)(nil),
 	}
 	file_core_v1_surface_proto_msgTypes[1].OneofWrappers = []any{}
 	file_core_v1_surface_proto_msgTypes[4].OneofWrappers = []any{
-		(*RegisterHookCommand_NewPage)(nil),
-	}
-	file_core_v1_surface_proto_msgTypes[5].OneofWrappers = []any{}
-	file_core_v1_surface_proto_msgTypes[6].OneofWrappers = []any{
 		(*SurfaceSessionEvent_ChromeLaunched)(nil),
 		(*SurfaceSessionEvent_ContextOpened)(nil),
 		(*SurfaceSessionEvent_Pong)(nil),
@@ -1142,11 +805,6 @@ func file_core_v1_surface_proto_init() {
 		(*SurfaceSessionEvent_BrowserLaunched)(nil),
 		(*SurfaceSessionEvent_MobileConnected)(nil),
 		(*SurfaceSessionEvent_AppLaunched)(nil),
-		(*SurfaceSessionEvent_HookRegistered)(nil),
-		(*SurfaceSessionEvent_HookCompleted)(nil),
-	}
-	file_core_v1_surface_proto_msgTypes[12].OneofWrappers = []any{
-		(*HookCompletedEvent_NewPage)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1154,7 +812,7 @@ func file_core_v1_surface_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_core_v1_surface_proto_rawDesc), len(file_core_v1_surface_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -19,6 +19,11 @@ import dev.allwright.engine.v1.ContextSessionEvent;
 import dev.allwright.engine.v1.ContextSessionPingCommand;
 import dev.allwright.engine.v1.ScreenshotCommand;
 import dev.allwright.engine.v1.WaitForSelectorCommand;
+import dev.allwright.engine.v1.HookCompletedEvent;
+import dev.allwright.engine.v1.RegisterHookCommand;
+import dev.allwright.engine.v1.RegisterNewPageHook;
+import dev.allwright.engine.v1.WaitForHookCommand;
+import java.util.function.Function;
 
 public final class Page implements AutoCloseable, WebLocators {
     private final RuntimeSupport.RuntimeClient runtime;
@@ -26,6 +31,7 @@ public final class Page implements AutoCloseable, WebLocators {
     private final String sessionId;
     private RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> stream;
     private boolean closed;
+    private Function<String, Page> pageFactory;
 
     Page(RuntimeSupport.RuntimeClient runtime, String browserSessionId, String sessionId) {
         this.runtime = runtime;
@@ -43,6 +49,73 @@ public final class Page implements AutoCloseable, WebLocators {
 
     public Locator locator(String selector) {
         return new Locator(this, SelectorSupport.normalizeSelectorForTransport(selector));
+    }
+
+    void setPageFactory(Function<String, Page> pageFactory) {
+        this.pageFactory = pageFactory;
+    }
+
+    Page pageFromHook(String sessionId) {
+        if (pageFactory != null) {
+            return pageFactory.apply(sessionId);
+        }
+        Page page = new Page(runtime, browserSessionId, sessionId);
+        page.setPageFactory(this::pageFromHook);
+        return page;
+    }
+
+    public synchronized <T> Hook<T> registerHook(HookType<T> type) {
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
+        ensureOpen();
+        if (type == null || !"new_page".equals(type.name())) {
+            throw new AllwrightException("unsupported hook type");
+        }
+        handle.send(ContextSessionCommand.newBuilder()
+                .setSurfaceSessionId(browserSessionId)
+                .setContextSessionId(sessionId)
+                .setRegisterHook(RegisterHookCommand.newBuilder()
+                        .setNewPage(RegisterNewPageHook.newBuilder().build()).build())
+                .build());
+        while (true) {
+            ContextSessionEvent event = handle.recv("receive page session event while registering hook");
+            switch (event.getEventCase()) {
+                case HOOK_REGISTERED -> {
+                    return new Hook<>(this, event.getHookRegistered().getHookId(), type);
+                }
+                case ERROR -> throw new AllwrightException(
+                        "page session error while registering hook: " + event.getError().getMessage());
+                default -> { }
+            }
+        }
+    }
+
+    synchronized <T> T waitForHook(String hookId, HookType<T> type, CommandOptions options) {
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
+        ensureOpen();
+        CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+        WaitForHookCommand.Builder wait = WaitForHookCommand.newBuilder().setHookId(hookId);
+        if (CommandSupport.hasTimeout(resolvedOptions.timeoutMs())) {
+            wait.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
+        }
+        handle.send(ContextSessionCommand.newBuilder()
+                .setSurfaceSessionId(browserSessionId)
+                .setContextSessionId(sessionId)
+                .setWaitForHook(wait.build())
+                .build());
+        while (true) {
+            ContextSessionEvent event = handle.recv("receive page session event while waiting for hook");
+            switch (event.getEventCase()) {
+                case HOOK_COMPLETED -> {
+                    HookCompletedEvent completed = event.getHookCompleted();
+                    if (hookId.equals(completed.getHookId())) {
+                        return type.decode(this, completed);
+                    }
+                }
+                case ERROR -> throw new AllwrightException(
+                        "page session error while waiting for hook: " + event.getError().getMessage());
+                default -> { }
+            }
+        }
     }
 
     public synchronized NavigateResult goTo(String url) {

@@ -1,13 +1,9 @@
 from __future__ import annotations
 
 import threading
-from typing import TypeVar
 
 from ._proto import engine_pb2
 from ._types import AllwrightError, CommandOptions, LaunchOptions
-from ._hooks import Hook, HookType
-
-T = TypeVar("T")
 
 
 class BrowserType:
@@ -43,6 +39,7 @@ class Browser:
         self.cdp_websocket_url = cdp_websocket_url
         self.user_data_dir = user_data_dir
         self._initial_page = initial_page
+        initial_page._page_factory = self._create_page
 
     def page(self) -> Page:
         return self._initial_page
@@ -75,13 +72,7 @@ class Browser:
                 event = self._stream.recv("receive browser session event while opening page")
                 match event.WhichOneof("event"):
                     case "context_opened":
-                        page = Page(
-                            runtime=self._runtime,
-                            surface_session_id=self.session_id,
-                            session_id=event.context_opened.context_session_id,
-                        )
-                        self._pages[page.session_id] = page
-                        return page
+                        return self._create_page(event.context_opened.context_session_id)
                     case "error":
                         raise AllwrightError(
                             f"browser session error while opening page: {event.error.message}"
@@ -90,68 +81,18 @@ class Browser:
     def new_tab(self, options: CommandOptions | None = None) -> Page:
         return self.new_page(options)
 
-    def register_hook(self, hook_type: HookType[T]) -> Hook[T]:
-        with self._lock:
-            self._ensure_open()
-            if hook_type.name != "new_page":
-                raise AllwrightError(f"unsupported hook type: {hook_type.name}")
-            self._stream.send(
-                engine_pb2.SurfaceSessionCommand(
-                    register_hook=engine_pb2.RegisterHookCommand(
-                        new_page=engine_pb2.RegisterNewPageHook()
-                    )
-                )
-            )
-            while True:
-                event = self._stream.recv("receive browser session event while registering hook")
-                match event.WhichOneof("event"):
-                    case "hook_registered":
-                        return Hook(self, event.hook_registered.hook_id, hook_type)
-                    case "error":
-                        raise AllwrightError(
-                            f"browser session error while registering hook: {event.error.message}"
-                        )
-
-    def _wait_for_hook(
-        self,
-        hook_id: str,
-        hook_type: HookType[T],
-        options: CommandOptions | None = None,
-    ) -> T:
-        from ._page import Page
-        from ._runtime import retry_options
-
-        with self._lock:
-            self._ensure_open()
-            command_options = options or CommandOptions()
-            self._stream.send(
-                engine_pb2.SurfaceSessionCommand(
-                    wait_for_hook=engine_pb2.WaitForHookCommand(
-                        hook_id=hook_id,
-                        retry_options=retry_options(command_options.timeout_ms),
-                    )
-                )
-            )
-            while True:
-                event = self._stream.recv("receive browser session event while waiting for hook")
-                match event.WhichOneof("event"):
-                    case "hook_completed":
-                        completed = event.hook_completed
-                        if completed.hook_id != hook_id:
-                            continue
-                        if hook_type.name == "new_page" and completed.WhichOneof("result") == "new_page":
-                            page = Page(
-                                runtime=self._runtime,
-                                surface_session_id=self.session_id,
-                                session_id=completed.new_page.context_session_id,
-                            )
-                            self._pages[page.session_id] = page
-                            return page  # type: ignore[return-value]
-                        raise AllwrightError("hook completed with an invalid result")
-                    case "error":
-                        raise AllwrightError(
-                            f"browser session error while waiting for hook: {event.error.message}"
-                        )
+    def _create_page(self, session_id: str) -> Page:
+        existing = self._pages.get(session_id)
+        if existing is not None:
+            return existing
+        page = Page(
+            runtime=self._runtime,
+            surface_session_id=self.session_id,
+            session_id=session_id,
+            page_factory=self._create_page,
+        )
+        self._pages[session_id] = page
+        return page
 
     def ping(self, message: str = "ping") -> str:
         with self._lock:

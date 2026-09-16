@@ -195,13 +195,13 @@ in Allwright-owned JavaScript using specifications and Playwright as references.
 [accessibility snapshot contract and limitations](rust/allwright-surface-web/README.md#accessibility-snapshots).
 
 Actions that create a new tab can be coordinated with a typed hook. Registering
-the hook captures the browser state before the action, so the tab is not missed
+the hook captures the source page state before the action, so the tab is not missed
 if it opens before the test starts waiting:
 
 ```ts
 import { hooks } from "@allwright.dev/core";
 
-const newPageHook = await browser.registerHook(hooks.newPage);
+const newPageHook = await page.registerHook(hooks.newPage);
 await page.click("a[target=_blank]");
 const newPage = await newPageHook.wait();
 ```

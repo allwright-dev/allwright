@@ -27,7 +27,7 @@ Typed hooks use one generic registration/wait lifecycle. For example, register
 the web-owned new-page hook before the action that opens a tab:
 
 ```rust,no_run
-let hook = browser.register_hook(allwright::NEW_PAGE).await?;
+let hook = page.register_hook(allwright::NEW_PAGE).await?;
 page.click("a[target=_blank]").await?;
 let new_page = hook.wait().await?;
 ```

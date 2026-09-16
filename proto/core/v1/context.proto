@@ -6,6 +6,7 @@ option java_package = "dev.allwright.engine.v1";
 option java_multiple_files = true;
 
 import "core/v1/common.proto";
+import "surfaces/web/v1/web.proto";
 
 message ContextSessionCommand {
   string surface_session_id = 1;
@@ -27,6 +28,8 @@ message ContextSessionCommand {
     WaitForSelectorCommand wait_for_selector = 15;
     ScreenshotCommand screenshot = 16;
     AccessibilitySnapshotCommand accessibility_snapshot = 17;
+    RegisterHookCommand register_hook = 18;
+    WaitForHookCommand wait_for_hook = 19;
   }
 }
 
@@ -58,6 +61,8 @@ message ContextSessionEvent {
     SelectorWaitSatisfiedEvent selector_wait_satisfied = 17;
     ScreenshotCapturedEvent screenshot_captured = 18;
     AccessibilitySnapshotCapturedEvent accessibility_snapshot_captured = 19;
+    HookRegisteredEvent hook_registered = 20;
+    HookCompletedEvent hook_completed = 21;
   }
 }
 
@@ -75,6 +80,29 @@ message ContextSessionClosedEvent {
 
 message ContextSessionErrorEvent {
   string message = 1;
+}
+
+message RegisterHookCommand {
+  oneof hook {
+    RegisterNewPageHook new_page = 1;
+  }
+}
+
+message WaitForHookCommand {
+  string hook_id = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message HookRegisteredEvent {
+  string hook_id = 1;
+}
+
+message HookCompletedEvent {
+  string hook_id = 1;
+
+  oneof result {
+    NewPageHookResult new_page = 2;
+  }
 }
 
 message NavigatePageCommand {

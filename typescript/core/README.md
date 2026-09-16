@@ -28,7 +28,7 @@ import { firefox, hooks } from "@allwright.dev/core";
 
 const browser = await firefox.launch();
 const page = browser.page();
-const hook = await browser.registerHook(hooks.newPage);
+const hook = await page.registerHook(hooks.newPage);
 await page.click("a[target=_blank]");
 const newPage = await hook.wait();
 ```

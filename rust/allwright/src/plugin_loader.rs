@@ -394,12 +394,14 @@ pub async fn open_page(surface_session: &BrowserSessionHandle) -> Result<PageInf
 
 pub async fn register_hook(
     surface_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
     hook_type: allwright_plugin_sdk::HookType,
 ) -> Result<allwright_plugin_sdk::HookRegistration, String> {
     match invoke_web_expected(
         "RegisterHookCommand",
         PluginCommand::RegisterHook {
             browser_session: surface_session.clone(),
+            page_session: page_session.clone(),
             hook_type,
         },
     )

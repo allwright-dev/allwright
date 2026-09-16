@@ -7,10 +7,6 @@ import dev.allwright.engine.v1.CloseSurfaceSessionCommand;
 import dev.allwright.engine.v1.OpenContextCommand;
 import dev.allwright.engine.v1.SessionPingCommand;
 import dev.allwright.engine.v1.ContextOpenedEvent;
-import dev.allwright.engine.v1.HookCompletedEvent;
-import dev.allwright.engine.v1.RegisterHookCommand;
-import dev.allwright.engine.v1.RegisterNewPageHook;
-import dev.allwright.engine.v1.WaitForHookCommand;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,6 +43,7 @@ public final class Browser implements AutoCloseable {
         this.cdpWebSocketURL = cdpWebSocketURL;
         this.userDataDir = userDataDir;
         this.initialPage = initialPage;
+        this.initialPage.setPageFactory(this::pageFromHook);
         this.pages.put(initialPage.sessionId(), initialPage);
     }
 
@@ -108,9 +105,7 @@ public final class Browser implements AutoCloseable {
             switch (event.getEventCase()) {
                 case CONTEXT_OPENED -> {
                     ContextOpenedEvent opened = event.getContextOpened();
-                    Page page = new Page(runtime, sessionId, opened.getContextSessionId());
-                    pages.put(page.sessionId(), page);
-                    return page;
+                    return pageFromHook(opened.getContextSessionId());
                 }
                 case ERROR -> throw new AllwrightException(
                         "browser session error while opening page: " + event.getError().getMessage()
@@ -129,67 +124,13 @@ public final class Browser implements AutoCloseable {
         return newPage(options);
     }
 
-    public synchronized <T> Hook<T> registerHook(HookType<T> type) {
-        ensureOpen();
-        if (type == null || !"new_page".equals(type.name())) {
-            throw new AllwrightException("unsupported hook type");
-        }
-        stream.send(
-                SurfaceSessionCommand.newBuilder()
-                        .setRegisterHook(
-                                RegisterHookCommand.newBuilder()
-                                        .setNewPage(RegisterNewPageHook.newBuilder().build())
-                                        .build()
-                        )
-                        .build()
-        );
-        while (true) {
-            SurfaceSessionEvent event = stream.recv("receive browser session event while registering hook");
-            switch (event.getEventCase()) {
-                case HOOK_REGISTERED -> {
-                    return new Hook<>(this, event.getHookRegistered().getHookId(), type);
-                }
-                case ERROR -> throw new AllwrightException(
-                        "browser session error while registering hook: " + event.getError().getMessage()
-                );
-                default -> {
-                }
-            }
-        }
-    }
-
-    synchronized <T> T waitForHook(String hookId, HookType<T> type, CommandOptions options) {
-        ensureOpen();
-        CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
-        WaitForHookCommand.Builder wait = WaitForHookCommand.newBuilder().setHookId(hookId);
-        if (CommandSupport.hasTimeout(resolvedOptions.timeoutMs())) {
-            wait.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
-        }
-        stream.send(SurfaceSessionCommand.newBuilder().setWaitForHook(wait.build()).build());
-        while (true) {
-            SurfaceSessionEvent event = stream.recv("receive browser session event while waiting for hook");
-            switch (event.getEventCase()) {
-                case HOOK_COMPLETED -> {
-                    HookCompletedEvent completed = event.getHookCompleted();
-                    if (hookId.equals(completed.getHookId())) {
-                        return type.decode(this, completed);
-                    }
-                }
-                case ERROR -> throw new AllwrightException(
-                        "browser session error while waiting for hook: " + event.getError().getMessage()
-                );
-                default -> {
-                }
-            }
-        }
-    }
-
     synchronized Page pageFromHook(String sessionId) {
         Page existing = pages.get(sessionId);
         if (existing != null) {
             return existing;
         }
         Page page = new Page(runtime, this.sessionId, sessionId);
+        page.setPageFactory(this::pageFromHook);
         pages.put(sessionId, page);
         return page;
     }

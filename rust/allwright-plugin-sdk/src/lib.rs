@@ -114,7 +114,7 @@ pub struct HookRegistration {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "hook_type", content = "result", rename_all = "snake_case")]
+#[serde(tag = "hook_type", content = "value", rename_all = "snake_case")]
 pub enum HookResult {
     NewPage(PageInfo),
 }
@@ -213,6 +213,7 @@ pub enum PluginCommand {
     },
     RegisterHook {
         browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
         hook_type: HookType,
     },
     PollHook {
@@ -436,4 +437,31 @@ pub struct PluginEnvelope {
     pub ok: bool,
     pub result: Option<PluginResult>,
     pub error: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn poll_hook_envelope_round_trips_without_duplicate_result_fields() {
+        let envelope = PluginEnvelope {
+            ok: true,
+            result: Some(PluginResult::PollHook(HookResult::NewPage(PageInfo {
+                note: "opened".to_string(),
+                page_session: PageSessionHandle::Chromium {
+                    target_id: "target-2".to_string(),
+                    browsing_context_id: None,
+                    mapper_target_id: None,
+                },
+            }))),
+            error: None,
+        };
+
+        let json = serde_json::to_string(&envelope).unwrap();
+        assert_eq!(
+            serde_json::from_str::<PluginEnvelope>(&json).unwrap(),
+            envelope
+        );
+    }
 }

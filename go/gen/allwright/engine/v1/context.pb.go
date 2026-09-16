@@ -42,6 +42,8 @@ type ContextSessionCommand struct {
 	//	*ContextSessionCommand_WaitForSelector
 	//	*ContextSessionCommand_Screenshot
 	//	*ContextSessionCommand_AccessibilitySnapshot
+	//	*ContextSessionCommand_RegisterHook
+	//	*ContextSessionCommand_WaitForHook
 	Command       isContextSessionCommand_Command `protobuf_oneof:"command"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -233,6 +235,24 @@ func (x *ContextSessionCommand) GetAccessibilitySnapshot() *AccessibilitySnapsho
 	return nil
 }
 
+func (x *ContextSessionCommand) GetRegisterHook() *RegisterHookCommand {
+	if x != nil {
+		if x, ok := x.Command.(*ContextSessionCommand_RegisterHook); ok {
+			return x.RegisterHook
+		}
+	}
+	return nil
+}
+
+func (x *ContextSessionCommand) GetWaitForHook() *WaitForHookCommand {
+	if x != nil {
+		if x, ok := x.Command.(*ContextSessionCommand_WaitForHook); ok {
+			return x.WaitForHook
+		}
+	}
+	return nil
+}
+
 type isContextSessionCommand_Command interface {
 	isContextSessionCommand_Command()
 }
@@ -297,6 +317,14 @@ type ContextSessionCommand_AccessibilitySnapshot struct {
 	AccessibilitySnapshot *AccessibilitySnapshotCommand `protobuf:"bytes,17,opt,name=accessibility_snapshot,json=accessibilitySnapshot,proto3,oneof"`
 }
 
+type ContextSessionCommand_RegisterHook struct {
+	RegisterHook *RegisterHookCommand `protobuf:"bytes,18,opt,name=register_hook,json=registerHook,proto3,oneof"`
+}
+
+type ContextSessionCommand_WaitForHook struct {
+	WaitForHook *WaitForHookCommand `protobuf:"bytes,19,opt,name=wait_for_hook,json=waitForHook,proto3,oneof"`
+}
+
 func (*ContextSessionCommand_Ping) isContextSessionCommand_Command() {}
 
 func (*ContextSessionCommand_Close) isContextSessionCommand_Command() {}
@@ -326,6 +354,10 @@ func (*ContextSessionCommand_WaitForSelector) isContextSessionCommand_Command() 
 func (*ContextSessionCommand_Screenshot) isContextSessionCommand_Command() {}
 
 func (*ContextSessionCommand_AccessibilitySnapshot) isContextSessionCommand_Command() {}
+
+func (*ContextSessionCommand_RegisterHook) isContextSessionCommand_Command() {}
+
+func (*ContextSessionCommand_WaitForHook) isContextSessionCommand_Command() {}
 
 type ContextSessionPingCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -430,6 +462,8 @@ type ContextSessionEvent struct {
 	//	*ContextSessionEvent_SelectorWaitSatisfied
 	//	*ContextSessionEvent_ScreenshotCaptured
 	//	*ContextSessionEvent_AccessibilitySnapshotCaptured
+	//	*ContextSessionEvent_HookRegistered
+	//	*ContextSessionEvent_HookCompleted
 	Event         isContextSessionEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -641,6 +675,24 @@ func (x *ContextSessionEvent) GetAccessibilitySnapshotCaptured() *AccessibilityS
 	return nil
 }
 
+func (x *ContextSessionEvent) GetHookRegistered() *HookRegisteredEvent {
+	if x != nil {
+		if x, ok := x.Event.(*ContextSessionEvent_HookRegistered); ok {
+			return x.HookRegistered
+		}
+	}
+	return nil
+}
+
+func (x *ContextSessionEvent) GetHookCompleted() *HookCompletedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*ContextSessionEvent_HookCompleted); ok {
+			return x.HookCompleted
+		}
+	}
+	return nil
+}
+
 type isContextSessionEvent_Event interface {
 	isContextSessionEvent_Event()
 }
@@ -717,6 +769,14 @@ type ContextSessionEvent_AccessibilitySnapshotCaptured struct {
 	AccessibilitySnapshotCaptured *AccessibilitySnapshotCapturedEvent `protobuf:"bytes,19,opt,name=accessibility_snapshot_captured,json=accessibilitySnapshotCaptured,proto3,oneof"`
 }
 
+type ContextSessionEvent_HookRegistered struct {
+	HookRegistered *HookRegisteredEvent `protobuf:"bytes,20,opt,name=hook_registered,json=hookRegistered,proto3,oneof"`
+}
+
+type ContextSessionEvent_HookCompleted struct {
+	HookCompleted *HookCompletedEvent `protobuf:"bytes,21,opt,name=hook_completed,json=hookCompleted,proto3,oneof"`
+}
+
 func (*ContextSessionEvent_Attached) isContextSessionEvent_Event() {}
 
 func (*ContextSessionEvent_Pong) isContextSessionEvent_Event() {}
@@ -752,6 +812,10 @@ func (*ContextSessionEvent_SelectorWaitSatisfied) isContextSessionEvent_Event() 
 func (*ContextSessionEvent_ScreenshotCaptured) isContextSessionEvent_Event() {}
 
 func (*ContextSessionEvent_AccessibilitySnapshotCaptured) isContextSessionEvent_Event() {}
+
+func (*ContextSessionEvent_HookRegistered) isContextSessionEvent_Event() {}
+
+func (*ContextSessionEvent_HookCompleted) isContextSessionEvent_Event() {}
 
 type ContextSessionAttachedEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -929,6 +993,242 @@ func (x *ContextSessionErrorEvent) GetMessage() string {
 	return ""
 }
 
+type RegisterHookCommand struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Hook:
+	//
+	//	*RegisterHookCommand_NewPage
+	Hook          isRegisterHookCommand_Hook `protobuf_oneof:"hook"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterHookCommand) Reset() {
+	*x = RegisterHookCommand{}
+	mi := &file_core_v1_context_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterHookCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterHookCommand) ProtoMessage() {}
+
+func (x *RegisterHookCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterHookCommand.ProtoReflect.Descriptor instead.
+func (*RegisterHookCommand) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RegisterHookCommand) GetHook() isRegisterHookCommand_Hook {
+	if x != nil {
+		return x.Hook
+	}
+	return nil
+}
+
+func (x *RegisterHookCommand) GetNewPage() *RegisterNewPageHook {
+	if x != nil {
+		if x, ok := x.Hook.(*RegisterHookCommand_NewPage); ok {
+			return x.NewPage
+		}
+	}
+	return nil
+}
+
+type isRegisterHookCommand_Hook interface {
+	isRegisterHookCommand_Hook()
+}
+
+type RegisterHookCommand_NewPage struct {
+	NewPage *RegisterNewPageHook `protobuf:"bytes,1,opt,name=new_page,json=newPage,proto3,oneof"`
+}
+
+func (*RegisterHookCommand_NewPage) isRegisterHookCommand_Hook() {}
+
+type WaitForHookCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HookId        string                 `protobuf:"bytes,1,opt,name=hook_id,json=hookId,proto3" json:"hook_id,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WaitForHookCommand) Reset() {
+	*x = WaitForHookCommand{}
+	mi := &file_core_v1_context_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WaitForHookCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WaitForHookCommand) ProtoMessage() {}
+
+func (x *WaitForHookCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WaitForHookCommand.ProtoReflect.Descriptor instead.
+func (*WaitForHookCommand) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *WaitForHookCommand) GetHookId() string {
+	if x != nil {
+		return x.HookId
+	}
+	return ""
+}
+
+func (x *WaitForHookCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type HookRegisteredEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HookId        string                 `protobuf:"bytes,1,opt,name=hook_id,json=hookId,proto3" json:"hook_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HookRegisteredEvent) Reset() {
+	*x = HookRegisteredEvent{}
+	mi := &file_core_v1_context_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HookRegisteredEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HookRegisteredEvent) ProtoMessage() {}
+
+func (x *HookRegisteredEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HookRegisteredEvent.ProtoReflect.Descriptor instead.
+func (*HookRegisteredEvent) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *HookRegisteredEvent) GetHookId() string {
+	if x != nil {
+		return x.HookId
+	}
+	return ""
+}
+
+type HookCompletedEvent struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	HookId string                 `protobuf:"bytes,1,opt,name=hook_id,json=hookId,proto3" json:"hook_id,omitempty"`
+	// Types that are valid to be assigned to Result:
+	//
+	//	*HookCompletedEvent_NewPage
+	Result        isHookCompletedEvent_Result `protobuf_oneof:"result"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HookCompletedEvent) Reset() {
+	*x = HookCompletedEvent{}
+	mi := &file_core_v1_context_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HookCompletedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HookCompletedEvent) ProtoMessage() {}
+
+func (x *HookCompletedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HookCompletedEvent.ProtoReflect.Descriptor instead.
+func (*HookCompletedEvent) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *HookCompletedEvent) GetHookId() string {
+	if x != nil {
+		return x.HookId
+	}
+	return ""
+}
+
+func (x *HookCompletedEvent) GetResult() isHookCompletedEvent_Result {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+func (x *HookCompletedEvent) GetNewPage() *NewPageHookResult {
+	if x != nil {
+		if x, ok := x.Result.(*HookCompletedEvent_NewPage); ok {
+			return x.NewPage
+		}
+	}
+	return nil
+}
+
+type isHookCompletedEvent_Result interface {
+	isHookCompletedEvent_Result()
+}
+
+type HookCompletedEvent_NewPage struct {
+	NewPage *NewPageHookResult `protobuf:"bytes,2,opt,name=new_page,json=newPage,proto3,oneof"`
+}
+
+func (*HookCompletedEvent_NewPage) isHookCompletedEvent_Result() {}
+
 type NavigatePageCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
@@ -939,7 +1239,7 @@ type NavigatePageCommand struct {
 
 func (x *NavigatePageCommand) Reset() {
 	*x = NavigatePageCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[8]
+	mi := &file_core_v1_context_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -951,7 +1251,7 @@ func (x *NavigatePageCommand) String() string {
 func (*NavigatePageCommand) ProtoMessage() {}
 
 func (x *NavigatePageCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[8]
+	mi := &file_core_v1_context_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -964,7 +1264,7 @@ func (x *NavigatePageCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NavigatePageCommand.ProtoReflect.Descriptor instead.
 func (*NavigatePageCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{8}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *NavigatePageCommand) GetUrl() string {
@@ -991,7 +1291,7 @@ type ClickElementCommand struct {
 
 func (x *ClickElementCommand) Reset() {
 	*x = ClickElementCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[9]
+	mi := &file_core_v1_context_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1003,7 +1303,7 @@ func (x *ClickElementCommand) String() string {
 func (*ClickElementCommand) ProtoMessage() {}
 
 func (x *ClickElementCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[9]
+	mi := &file_core_v1_context_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1016,7 +1316,7 @@ func (x *ClickElementCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClickElementCommand.ProtoReflect.Descriptor instead.
 func (*ClickElementCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{9}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ClickElementCommand) GetCssSelector() string {
@@ -1043,7 +1343,7 @@ type CountElementsCommand struct {
 
 func (x *CountElementsCommand) Reset() {
 	*x = CountElementsCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[10]
+	mi := &file_core_v1_context_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1055,7 +1355,7 @@ func (x *CountElementsCommand) String() string {
 func (*CountElementsCommand) ProtoMessage() {}
 
 func (x *CountElementsCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[10]
+	mi := &file_core_v1_context_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1068,7 +1368,7 @@ func (x *CountElementsCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CountElementsCommand.ProtoReflect.Descriptor instead.
 func (*CountElementsCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{10}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CountElementsCommand) GetCssSelector() string {
@@ -1096,7 +1396,7 @@ type HighlightElementsCommand struct {
 
 func (x *HighlightElementsCommand) Reset() {
 	*x = HighlightElementsCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[11]
+	mi := &file_core_v1_context_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1108,7 +1408,7 @@ func (x *HighlightElementsCommand) String() string {
 func (*HighlightElementsCommand) ProtoMessage() {}
 
 func (x *HighlightElementsCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[11]
+	mi := &file_core_v1_context_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1121,7 +1421,7 @@ func (x *HighlightElementsCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HighlightElementsCommand.ProtoReflect.Descriptor instead.
 func (*HighlightElementsCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{11}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *HighlightElementsCommand) GetCssSelector() string {
@@ -1155,7 +1455,7 @@ type FocusElementCommand struct {
 
 func (x *FocusElementCommand) Reset() {
 	*x = FocusElementCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[12]
+	mi := &file_core_v1_context_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1167,7 +1467,7 @@ func (x *FocusElementCommand) String() string {
 func (*FocusElementCommand) ProtoMessage() {}
 
 func (x *FocusElementCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[12]
+	mi := &file_core_v1_context_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1180,7 +1480,7 @@ func (x *FocusElementCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FocusElementCommand.ProtoReflect.Descriptor instead.
 func (*FocusElementCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{12}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *FocusElementCommand) GetCssSelector() string {
@@ -1208,7 +1508,7 @@ type FillElementCommand struct {
 
 func (x *FillElementCommand) Reset() {
 	*x = FillElementCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[13]
+	mi := &file_core_v1_context_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1220,7 +1520,7 @@ func (x *FillElementCommand) String() string {
 func (*FillElementCommand) ProtoMessage() {}
 
 func (x *FillElementCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[13]
+	mi := &file_core_v1_context_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1233,7 +1533,7 @@ func (x *FillElementCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FillElementCommand.ProtoReflect.Descriptor instead.
 func (*FillElementCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{13}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *FillElementCommand) GetCssSelector() string {
@@ -1267,7 +1567,7 @@ type HoverElementCommand struct {
 
 func (x *HoverElementCommand) Reset() {
 	*x = HoverElementCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[14]
+	mi := &file_core_v1_context_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1279,7 +1579,7 @@ func (x *HoverElementCommand) String() string {
 func (*HoverElementCommand) ProtoMessage() {}
 
 func (x *HoverElementCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[14]
+	mi := &file_core_v1_context_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1292,7 +1592,7 @@ func (x *HoverElementCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HoverElementCommand.ProtoReflect.Descriptor instead.
 func (*HoverElementCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{14}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *HoverElementCommand) GetCssSelector() string {
@@ -1321,7 +1621,7 @@ type PressKeyCommand struct {
 
 func (x *PressKeyCommand) Reset() {
 	*x = PressKeyCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[15]
+	mi := &file_core_v1_context_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1333,7 +1633,7 @@ func (x *PressKeyCommand) String() string {
 func (*PressKeyCommand) ProtoMessage() {}
 
 func (x *PressKeyCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[15]
+	mi := &file_core_v1_context_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1346,7 +1646,7 @@ func (x *PressKeyCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PressKeyCommand.ProtoReflect.Descriptor instead.
 func (*PressKeyCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{15}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PressKeyCommand) GetCssSelector() string {
@@ -1387,7 +1687,7 @@ type GetTextContentCommand struct {
 
 func (x *GetTextContentCommand) Reset() {
 	*x = GetTextContentCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[16]
+	mi := &file_core_v1_context_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1399,7 +1699,7 @@ func (x *GetTextContentCommand) String() string {
 func (*GetTextContentCommand) ProtoMessage() {}
 
 func (x *GetTextContentCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[16]
+	mi := &file_core_v1_context_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1412,7 +1712,7 @@ func (x *GetTextContentCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTextContentCommand.ProtoReflect.Descriptor instead.
 func (*GetTextContentCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{16}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetTextContentCommand) GetCssSelector() string {
@@ -1439,7 +1739,7 @@ type GetInnerTextCommand struct {
 
 func (x *GetInnerTextCommand) Reset() {
 	*x = GetInnerTextCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[17]
+	mi := &file_core_v1_context_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1451,7 +1751,7 @@ func (x *GetInnerTextCommand) String() string {
 func (*GetInnerTextCommand) ProtoMessage() {}
 
 func (x *GetInnerTextCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[17]
+	mi := &file_core_v1_context_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1464,7 +1764,7 @@ func (x *GetInnerTextCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInnerTextCommand.ProtoReflect.Descriptor instead.
 func (*GetInnerTextCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{17}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetInnerTextCommand) GetCssSelector() string {
@@ -1492,7 +1792,7 @@ type WaitForSelectorCommand struct {
 
 func (x *WaitForSelectorCommand) Reset() {
 	*x = WaitForSelectorCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[18]
+	mi := &file_core_v1_context_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1504,7 +1804,7 @@ func (x *WaitForSelectorCommand) String() string {
 func (*WaitForSelectorCommand) ProtoMessage() {}
 
 func (x *WaitForSelectorCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[18]
+	mi := &file_core_v1_context_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1517,7 +1817,7 @@ func (x *WaitForSelectorCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WaitForSelectorCommand.ProtoReflect.Descriptor instead.
 func (*WaitForSelectorCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{18}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *WaitForSelectorCommand) GetCssSelector() string {
@@ -1551,7 +1851,7 @@ type ScreenshotCommand struct {
 
 func (x *ScreenshotCommand) Reset() {
 	*x = ScreenshotCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[19]
+	mi := &file_core_v1_context_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1563,7 +1863,7 @@ func (x *ScreenshotCommand) String() string {
 func (*ScreenshotCommand) ProtoMessage() {}
 
 func (x *ScreenshotCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[19]
+	mi := &file_core_v1_context_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1576,7 +1876,7 @@ func (x *ScreenshotCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreenshotCommand.ProtoReflect.Descriptor instead.
 func (*ScreenshotCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{19}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ScreenshotCommand) GetRetryOptions() *CommandRetryOptions {
@@ -1603,7 +1903,7 @@ type PageNavigatedEvent struct {
 
 func (x *PageNavigatedEvent) Reset() {
 	*x = PageNavigatedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[20]
+	mi := &file_core_v1_context_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1615,7 +1915,7 @@ func (x *PageNavigatedEvent) String() string {
 func (*PageNavigatedEvent) ProtoMessage() {}
 
 func (x *PageNavigatedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[20]
+	mi := &file_core_v1_context_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1628,7 +1928,7 @@ func (x *PageNavigatedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageNavigatedEvent.ProtoReflect.Descriptor instead.
 func (*PageNavigatedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{20}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *PageNavigatedEvent) GetUrl() string {
@@ -1658,7 +1958,7 @@ type ChromiumBidiInjectionEvent struct {
 
 func (x *ChromiumBidiInjectionEvent) Reset() {
 	*x = ChromiumBidiInjectionEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[21]
+	mi := &file_core_v1_context_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1670,7 +1970,7 @@ func (x *ChromiumBidiInjectionEvent) String() string {
 func (*ChromiumBidiInjectionEvent) ProtoMessage() {}
 
 func (x *ChromiumBidiInjectionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[21]
+	mi := &file_core_v1_context_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1683,7 +1983,7 @@ func (x *ChromiumBidiInjectionEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChromiumBidiInjectionEvent.ProtoReflect.Descriptor instead.
 func (*ChromiumBidiInjectionEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{21}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ChromiumBidiInjectionEvent) GetNote() string {
@@ -1732,7 +2032,7 @@ type ElementClickedEvent struct {
 
 func (x *ElementClickedEvent) Reset() {
 	*x = ElementClickedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[22]
+	mi := &file_core_v1_context_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1744,7 +2044,7 @@ func (x *ElementClickedEvent) String() string {
 func (*ElementClickedEvent) ProtoMessage() {}
 
 func (x *ElementClickedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[22]
+	mi := &file_core_v1_context_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1757,7 +2057,7 @@ func (x *ElementClickedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementClickedEvent.ProtoReflect.Descriptor instead.
 func (*ElementClickedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{22}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ElementClickedEvent) GetCssSelector() string {
@@ -1792,7 +2092,7 @@ type ElementCountedEvent struct {
 
 func (x *ElementCountedEvent) Reset() {
 	*x = ElementCountedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[23]
+	mi := &file_core_v1_context_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1804,7 +2104,7 @@ func (x *ElementCountedEvent) String() string {
 func (*ElementCountedEvent) ProtoMessage() {}
 
 func (x *ElementCountedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[23]
+	mi := &file_core_v1_context_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1817,7 +2117,7 @@ func (x *ElementCountedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementCountedEvent.ProtoReflect.Descriptor instead.
 func (*ElementCountedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{23}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ElementCountedEvent) GetCssSelector() string {
@@ -1852,7 +2152,7 @@ type ElementsHighlightedEvent struct {
 
 func (x *ElementsHighlightedEvent) Reset() {
 	*x = ElementsHighlightedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[24]
+	mi := &file_core_v1_context_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1864,7 +2164,7 @@ func (x *ElementsHighlightedEvent) String() string {
 func (*ElementsHighlightedEvent) ProtoMessage() {}
 
 func (x *ElementsHighlightedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[24]
+	mi := &file_core_v1_context_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1877,7 +2177,7 @@ func (x *ElementsHighlightedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementsHighlightedEvent.ProtoReflect.Descriptor instead.
 func (*ElementsHighlightedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{24}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ElementsHighlightedEvent) GetCssSelector() string {
@@ -1911,7 +2211,7 @@ type ElementFocusedEvent struct {
 
 func (x *ElementFocusedEvent) Reset() {
 	*x = ElementFocusedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[25]
+	mi := &file_core_v1_context_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1923,7 +2223,7 @@ func (x *ElementFocusedEvent) String() string {
 func (*ElementFocusedEvent) ProtoMessage() {}
 
 func (x *ElementFocusedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[25]
+	mi := &file_core_v1_context_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1936,7 +2236,7 @@ func (x *ElementFocusedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementFocusedEvent.ProtoReflect.Descriptor instead.
 func (*ElementFocusedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{25}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ElementFocusedEvent) GetCssSelector() string {
@@ -1964,7 +2264,7 @@ type ElementFilledEvent struct {
 
 func (x *ElementFilledEvent) Reset() {
 	*x = ElementFilledEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[26]
+	mi := &file_core_v1_context_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1976,7 +2276,7 @@ func (x *ElementFilledEvent) String() string {
 func (*ElementFilledEvent) ProtoMessage() {}
 
 func (x *ElementFilledEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[26]
+	mi := &file_core_v1_context_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1989,7 +2289,7 @@ func (x *ElementFilledEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementFilledEvent.ProtoReflect.Descriptor instead.
 func (*ElementFilledEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{26}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ElementFilledEvent) GetCssSelector() string {
@@ -2023,7 +2323,7 @@ type ElementHoveredEvent struct {
 
 func (x *ElementHoveredEvent) Reset() {
 	*x = ElementHoveredEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[27]
+	mi := &file_core_v1_context_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2035,7 +2335,7 @@ func (x *ElementHoveredEvent) String() string {
 func (*ElementHoveredEvent) ProtoMessage() {}
 
 func (x *ElementHoveredEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[27]
+	mi := &file_core_v1_context_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2048,7 +2348,7 @@ func (x *ElementHoveredEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementHoveredEvent.ProtoReflect.Descriptor instead.
 func (*ElementHoveredEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{27}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ElementHoveredEvent) GetCssSelector() string {
@@ -2076,7 +2376,7 @@ type KeyPressedEvent struct {
 
 func (x *KeyPressedEvent) Reset() {
 	*x = KeyPressedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[28]
+	mi := &file_core_v1_context_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2088,7 +2388,7 @@ func (x *KeyPressedEvent) String() string {
 func (*KeyPressedEvent) ProtoMessage() {}
 
 func (x *KeyPressedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[28]
+	mi := &file_core_v1_context_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2101,7 +2401,7 @@ func (x *KeyPressedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyPressedEvent.ProtoReflect.Descriptor instead.
 func (*KeyPressedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{28}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *KeyPressedEvent) GetCssSelector() string {
@@ -2136,7 +2436,7 @@ type TextContentResolvedEvent struct {
 
 func (x *TextContentResolvedEvent) Reset() {
 	*x = TextContentResolvedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[29]
+	mi := &file_core_v1_context_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2148,7 +2448,7 @@ func (x *TextContentResolvedEvent) String() string {
 func (*TextContentResolvedEvent) ProtoMessage() {}
 
 func (x *TextContentResolvedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[29]
+	mi := &file_core_v1_context_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2161,7 +2461,7 @@ func (x *TextContentResolvedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextContentResolvedEvent.ProtoReflect.Descriptor instead.
 func (*TextContentResolvedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{29}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *TextContentResolvedEvent) GetCssSelector() string {
@@ -2196,7 +2496,7 @@ type InnerTextResolvedEvent struct {
 
 func (x *InnerTextResolvedEvent) Reset() {
 	*x = InnerTextResolvedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[30]
+	mi := &file_core_v1_context_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2208,7 +2508,7 @@ func (x *InnerTextResolvedEvent) String() string {
 func (*InnerTextResolvedEvent) ProtoMessage() {}
 
 func (x *InnerTextResolvedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[30]
+	mi := &file_core_v1_context_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2221,7 +2521,7 @@ func (x *InnerTextResolvedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InnerTextResolvedEvent.ProtoReflect.Descriptor instead.
 func (*InnerTextResolvedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{30}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *InnerTextResolvedEvent) GetCssSelector() string {
@@ -2256,7 +2556,7 @@ type SelectorWaitSatisfiedEvent struct {
 
 func (x *SelectorWaitSatisfiedEvent) Reset() {
 	*x = SelectorWaitSatisfiedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[31]
+	mi := &file_core_v1_context_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2268,7 +2568,7 @@ func (x *SelectorWaitSatisfiedEvent) String() string {
 func (*SelectorWaitSatisfiedEvent) ProtoMessage() {}
 
 func (x *SelectorWaitSatisfiedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[31]
+	mi := &file_core_v1_context_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2281,7 +2581,7 @@ func (x *SelectorWaitSatisfiedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectorWaitSatisfiedEvent.ProtoReflect.Descriptor instead.
 func (*SelectorWaitSatisfiedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{31}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *SelectorWaitSatisfiedEvent) GetCssSelector() string {
@@ -2315,7 +2615,7 @@ type ScreenshotCapturedEvent struct {
 
 func (x *ScreenshotCapturedEvent) Reset() {
 	*x = ScreenshotCapturedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[32]
+	mi := &file_core_v1_context_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2327,7 +2627,7 @@ func (x *ScreenshotCapturedEvent) String() string {
 func (*ScreenshotCapturedEvent) ProtoMessage() {}
 
 func (x *ScreenshotCapturedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[32]
+	mi := &file_core_v1_context_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2340,7 +2640,7 @@ func (x *ScreenshotCapturedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreenshotCapturedEvent.ProtoReflect.Descriptor instead.
 func (*ScreenshotCapturedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{32}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ScreenshotCapturedEvent) GetPngData() []byte {
@@ -2371,7 +2671,7 @@ type AccessibilitySnapshotCommand struct {
 
 func (x *AccessibilitySnapshotCommand) Reset() {
 	*x = AccessibilitySnapshotCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[33]
+	mi := &file_core_v1_context_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2383,7 +2683,7 @@ func (x *AccessibilitySnapshotCommand) String() string {
 func (*AccessibilitySnapshotCommand) ProtoMessage() {}
 
 func (x *AccessibilitySnapshotCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[33]
+	mi := &file_core_v1_context_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2396,7 +2696,7 @@ func (x *AccessibilitySnapshotCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccessibilitySnapshotCommand.ProtoReflect.Descriptor instead.
 func (*AccessibilitySnapshotCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{33}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *AccessibilitySnapshotCommand) GetMode() string {
@@ -2431,7 +2731,7 @@ type AccessibilitySnapshotCapturedEvent struct {
 
 func (x *AccessibilitySnapshotCapturedEvent) Reset() {
 	*x = AccessibilitySnapshotCapturedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[34]
+	mi := &file_core_v1_context_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2443,7 +2743,7 @@ func (x *AccessibilitySnapshotCapturedEvent) String() string {
 func (*AccessibilitySnapshotCapturedEvent) ProtoMessage() {}
 
 func (x *AccessibilitySnapshotCapturedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[34]
+	mi := &file_core_v1_context_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2456,7 +2756,7 @@ func (x *AccessibilitySnapshotCapturedEvent) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use AccessibilitySnapshotCapturedEvent.ProtoReflect.Descriptor instead.
 func (*AccessibilitySnapshotCapturedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{34}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *AccessibilitySnapshotCapturedEvent) GetSnapshot() string {
@@ -2477,8 +2777,7 @@ var File_core_v1_context_proto protoreflect.FileDescriptor
 
 const file_core_v1_context_proto_rawDesc = "" +
 	"\n" +
-	"\x15core/v1/context.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\"\xca\n" +
-	"\n" +
+	"\x15core/v1/context.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x19surfaces/web/v1/web.proto\"\xea\v\n" +
 	"\x15ContextSessionCommand\x12,\n" +
 	"\x12surface_session_id\x18\x01 \x01(\tR\x10surfaceSessionId\x12,\n" +
 	"\x12context_session_id\x18\x02 \x01(\tR\x10contextSessionId\x12D\n" +
@@ -2499,11 +2798,13 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\n" +
 	"screenshot\x18\x10 \x01(\v2&.allwright.engine.v1.ScreenshotCommandH\x00R\n" +
 	"screenshot\x12j\n" +
-	"\x16accessibility_snapshot\x18\x11 \x01(\v21.allwright.engine.v1.AccessibilitySnapshotCommandH\x00R\x15accessibilitySnapshotB\t\n" +
+	"\x16accessibility_snapshot\x18\x11 \x01(\v21.allwright.engine.v1.AccessibilitySnapshotCommandH\x00R\x15accessibilitySnapshot\x12O\n" +
+	"\rregister_hook\x18\x12 \x01(\v2(.allwright.engine.v1.RegisterHookCommandH\x00R\fregisterHook\x12M\n" +
+	"\rwait_for_hook\x18\x13 \x01(\v2'.allwright.engine.v1.WaitForHookCommandH\x00R\vwaitForHookB\t\n" +
 	"\acommand\"5\n" +
 	"\x19ContextSessionPingCommand\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"\x1c\n" +
-	"\x1aCloseContextSessionCommand\"\x8c\r\n" +
+	"\x1aCloseContextSessionCommand\"\xb3\x0e\n" +
 	"\x13ContextSessionEvent\x12,\n" +
 	"\x12context_session_id\x18\x01 \x01(\tR\x10contextSessionId\x12N\n" +
 	"\battached\x18\x02 \x01(\v20.allwright.engine.v1.ContextSessionAttachedEventH\x00R\battached\x12B\n" +
@@ -2525,7 +2826,9 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\x13inner_text_resolved\x18\x10 \x01(\v2+.allwright.engine.v1.InnerTextResolvedEventH\x00R\x11innerTextResolved\x12i\n" +
 	"\x17selector_wait_satisfied\x18\x11 \x01(\v2/.allwright.engine.v1.SelectorWaitSatisfiedEventH\x00R\x15selectorWaitSatisfied\x12_\n" +
 	"\x13screenshot_captured\x18\x12 \x01(\v2,.allwright.engine.v1.ScreenshotCapturedEventH\x00R\x12screenshotCaptured\x12\x81\x01\n" +
-	"\x1faccessibility_snapshot_captured\x18\x13 \x01(\v27.allwright.engine.v1.AccessibilitySnapshotCapturedEventH\x00R\x1daccessibilitySnapshotCapturedB\a\n" +
+	"\x1faccessibility_snapshot_captured\x18\x13 \x01(\v27.allwright.engine.v1.AccessibilitySnapshotCapturedEventH\x00R\x1daccessibilitySnapshotCaptured\x12S\n" +
+	"\x0fhook_registered\x18\x14 \x01(\v2(.allwright.engine.v1.HookRegisteredEventH\x00R\x0ehookRegistered\x12P\n" +
+	"\x0ehook_completed\x18\x15 \x01(\v2'.allwright.engine.v1.HookCompletedEventH\x00R\rhookCompletedB\a\n" +
 	"\x05event\"1\n" +
 	"\x1bContextSessionAttachedEvent\x12\x12\n" +
 	"\x04note\x18\x01 \x01(\tR\x04note\"3\n" +
@@ -2534,7 +2837,20 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\x19ContextSessionClosedEvent\x12\x16\n" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\"4\n" +
 	"\x18ContextSessionErrorEvent\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\"\x8d\x01\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"d\n" +
+	"\x13RegisterHookCommand\x12E\n" +
+	"\bnew_page\x18\x01 \x01(\v2(.allwright.engine.v1.RegisterNewPageHookH\x00R\anewPageB\x06\n" +
+	"\x04hook\"\x93\x01\n" +
+	"\x12WaitForHookCommand\x12\x17\n" +
+	"\ahook_id\x18\x01 \x01(\tR\x06hookId\x12R\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\".\n" +
+	"\x13HookRegisteredEvent\x12\x17\n" +
+	"\ahook_id\x18\x01 \x01(\tR\x06hookId\"|\n" +
+	"\x12HookCompletedEvent\x12\x17\n" +
+	"\ahook_id\x18\x01 \x01(\tR\x06hookId\x12C\n" +
+	"\bnew_page\x18\x02 \x01(\v2&.allwright.engine.v1.NewPageHookResultH\x00R\anewPageB\b\n" +
+	"\x06result\"\x8d\x01\n" +
 	"\x13NavigatePageCommand\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12R\n" +
 	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
@@ -2667,7 +2983,7 @@ func file_core_v1_context_proto_rawDescGZIP() []byte {
 	return file_core_v1_context_proto_rawDescData
 }
 
-var file_core_v1_context_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
+var file_core_v1_context_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
 var file_core_v1_context_proto_goTypes = []any{
 	(*ContextSessionCommand)(nil),              // 0: allwright.engine.v1.ContextSessionCommand
 	(*ContextSessionPingCommand)(nil),          // 1: allwright.engine.v1.ContextSessionPingCommand
@@ -2677,87 +2993,100 @@ var file_core_v1_context_proto_goTypes = []any{
 	(*ContextSessionPongEvent)(nil),            // 5: allwright.engine.v1.ContextSessionPongEvent
 	(*ContextSessionClosedEvent)(nil),          // 6: allwright.engine.v1.ContextSessionClosedEvent
 	(*ContextSessionErrorEvent)(nil),           // 7: allwright.engine.v1.ContextSessionErrorEvent
-	(*NavigatePageCommand)(nil),                // 8: allwright.engine.v1.NavigatePageCommand
-	(*ClickElementCommand)(nil),                // 9: allwright.engine.v1.ClickElementCommand
-	(*CountElementsCommand)(nil),               // 10: allwright.engine.v1.CountElementsCommand
-	(*HighlightElementsCommand)(nil),           // 11: allwright.engine.v1.HighlightElementsCommand
-	(*FocusElementCommand)(nil),                // 12: allwright.engine.v1.FocusElementCommand
-	(*FillElementCommand)(nil),                 // 13: allwright.engine.v1.FillElementCommand
-	(*HoverElementCommand)(nil),                // 14: allwright.engine.v1.HoverElementCommand
-	(*PressKeyCommand)(nil),                    // 15: allwright.engine.v1.PressKeyCommand
-	(*GetTextContentCommand)(nil),              // 16: allwright.engine.v1.GetTextContentCommand
-	(*GetInnerTextCommand)(nil),                // 17: allwright.engine.v1.GetInnerTextCommand
-	(*WaitForSelectorCommand)(nil),             // 18: allwright.engine.v1.WaitForSelectorCommand
-	(*ScreenshotCommand)(nil),                  // 19: allwright.engine.v1.ScreenshotCommand
-	(*PageNavigatedEvent)(nil),                 // 20: allwright.engine.v1.PageNavigatedEvent
-	(*ChromiumBidiInjectionEvent)(nil),         // 21: allwright.engine.v1.ChromiumBidiInjectionEvent
-	(*ElementClickedEvent)(nil),                // 22: allwright.engine.v1.ElementClickedEvent
-	(*ElementCountedEvent)(nil),                // 23: allwright.engine.v1.ElementCountedEvent
-	(*ElementsHighlightedEvent)(nil),           // 24: allwright.engine.v1.ElementsHighlightedEvent
-	(*ElementFocusedEvent)(nil),                // 25: allwright.engine.v1.ElementFocusedEvent
-	(*ElementFilledEvent)(nil),                 // 26: allwright.engine.v1.ElementFilledEvent
-	(*ElementHoveredEvent)(nil),                // 27: allwright.engine.v1.ElementHoveredEvent
-	(*KeyPressedEvent)(nil),                    // 28: allwright.engine.v1.KeyPressedEvent
-	(*TextContentResolvedEvent)(nil),           // 29: allwright.engine.v1.TextContentResolvedEvent
-	(*InnerTextResolvedEvent)(nil),             // 30: allwright.engine.v1.InnerTextResolvedEvent
-	(*SelectorWaitSatisfiedEvent)(nil),         // 31: allwright.engine.v1.SelectorWaitSatisfiedEvent
-	(*ScreenshotCapturedEvent)(nil),            // 32: allwright.engine.v1.ScreenshotCapturedEvent
-	(*AccessibilitySnapshotCommand)(nil),       // 33: allwright.engine.v1.AccessibilitySnapshotCommand
-	(*AccessibilitySnapshotCapturedEvent)(nil), // 34: allwright.engine.v1.AccessibilitySnapshotCapturedEvent
-	(*CommandRetryOptions)(nil),                // 35: allwright.engine.v1.CommandRetryOptions
+	(*RegisterHookCommand)(nil),                // 8: allwright.engine.v1.RegisterHookCommand
+	(*WaitForHookCommand)(nil),                 // 9: allwright.engine.v1.WaitForHookCommand
+	(*HookRegisteredEvent)(nil),                // 10: allwright.engine.v1.HookRegisteredEvent
+	(*HookCompletedEvent)(nil),                 // 11: allwright.engine.v1.HookCompletedEvent
+	(*NavigatePageCommand)(nil),                // 12: allwright.engine.v1.NavigatePageCommand
+	(*ClickElementCommand)(nil),                // 13: allwright.engine.v1.ClickElementCommand
+	(*CountElementsCommand)(nil),               // 14: allwright.engine.v1.CountElementsCommand
+	(*HighlightElementsCommand)(nil),           // 15: allwright.engine.v1.HighlightElementsCommand
+	(*FocusElementCommand)(nil),                // 16: allwright.engine.v1.FocusElementCommand
+	(*FillElementCommand)(nil),                 // 17: allwright.engine.v1.FillElementCommand
+	(*HoverElementCommand)(nil),                // 18: allwright.engine.v1.HoverElementCommand
+	(*PressKeyCommand)(nil),                    // 19: allwright.engine.v1.PressKeyCommand
+	(*GetTextContentCommand)(nil),              // 20: allwright.engine.v1.GetTextContentCommand
+	(*GetInnerTextCommand)(nil),                // 21: allwright.engine.v1.GetInnerTextCommand
+	(*WaitForSelectorCommand)(nil),             // 22: allwright.engine.v1.WaitForSelectorCommand
+	(*ScreenshotCommand)(nil),                  // 23: allwright.engine.v1.ScreenshotCommand
+	(*PageNavigatedEvent)(nil),                 // 24: allwright.engine.v1.PageNavigatedEvent
+	(*ChromiumBidiInjectionEvent)(nil),         // 25: allwright.engine.v1.ChromiumBidiInjectionEvent
+	(*ElementClickedEvent)(nil),                // 26: allwright.engine.v1.ElementClickedEvent
+	(*ElementCountedEvent)(nil),                // 27: allwright.engine.v1.ElementCountedEvent
+	(*ElementsHighlightedEvent)(nil),           // 28: allwright.engine.v1.ElementsHighlightedEvent
+	(*ElementFocusedEvent)(nil),                // 29: allwright.engine.v1.ElementFocusedEvent
+	(*ElementFilledEvent)(nil),                 // 30: allwright.engine.v1.ElementFilledEvent
+	(*ElementHoveredEvent)(nil),                // 31: allwright.engine.v1.ElementHoveredEvent
+	(*KeyPressedEvent)(nil),                    // 32: allwright.engine.v1.KeyPressedEvent
+	(*TextContentResolvedEvent)(nil),           // 33: allwright.engine.v1.TextContentResolvedEvent
+	(*InnerTextResolvedEvent)(nil),             // 34: allwright.engine.v1.InnerTextResolvedEvent
+	(*SelectorWaitSatisfiedEvent)(nil),         // 35: allwright.engine.v1.SelectorWaitSatisfiedEvent
+	(*ScreenshotCapturedEvent)(nil),            // 36: allwright.engine.v1.ScreenshotCapturedEvent
+	(*AccessibilitySnapshotCommand)(nil),       // 37: allwright.engine.v1.AccessibilitySnapshotCommand
+	(*AccessibilitySnapshotCapturedEvent)(nil), // 38: allwright.engine.v1.AccessibilitySnapshotCapturedEvent
+	(*RegisterNewPageHook)(nil),                // 39: allwright.engine.v1.RegisterNewPageHook
+	(*CommandRetryOptions)(nil),                // 40: allwright.engine.v1.CommandRetryOptions
+	(*NewPageHookResult)(nil),                  // 41: allwright.engine.v1.NewPageHookResult
 }
 var file_core_v1_context_proto_depIdxs = []int32{
 	1,  // 0: allwright.engine.v1.ContextSessionCommand.ping:type_name -> allwright.engine.v1.ContextSessionPingCommand
 	2,  // 1: allwright.engine.v1.ContextSessionCommand.close:type_name -> allwright.engine.v1.CloseContextSessionCommand
-	8,  // 2: allwright.engine.v1.ContextSessionCommand.navigate:type_name -> allwright.engine.v1.NavigatePageCommand
-	9,  // 3: allwright.engine.v1.ContextSessionCommand.click_element:type_name -> allwright.engine.v1.ClickElementCommand
-	10, // 4: allwright.engine.v1.ContextSessionCommand.count_elements:type_name -> allwright.engine.v1.CountElementsCommand
-	11, // 5: allwright.engine.v1.ContextSessionCommand.highlight_elements:type_name -> allwright.engine.v1.HighlightElementsCommand
-	12, // 6: allwright.engine.v1.ContextSessionCommand.focus_element:type_name -> allwright.engine.v1.FocusElementCommand
-	13, // 7: allwright.engine.v1.ContextSessionCommand.fill_element:type_name -> allwright.engine.v1.FillElementCommand
-	14, // 8: allwright.engine.v1.ContextSessionCommand.hover_element:type_name -> allwright.engine.v1.HoverElementCommand
-	15, // 9: allwright.engine.v1.ContextSessionCommand.press_key:type_name -> allwright.engine.v1.PressKeyCommand
-	16, // 10: allwright.engine.v1.ContextSessionCommand.get_text_content:type_name -> allwright.engine.v1.GetTextContentCommand
-	17, // 11: allwright.engine.v1.ContextSessionCommand.get_inner_text:type_name -> allwright.engine.v1.GetInnerTextCommand
-	18, // 12: allwright.engine.v1.ContextSessionCommand.wait_for_selector:type_name -> allwright.engine.v1.WaitForSelectorCommand
-	19, // 13: allwright.engine.v1.ContextSessionCommand.screenshot:type_name -> allwright.engine.v1.ScreenshotCommand
-	33, // 14: allwright.engine.v1.ContextSessionCommand.accessibility_snapshot:type_name -> allwright.engine.v1.AccessibilitySnapshotCommand
-	4,  // 15: allwright.engine.v1.ContextSessionEvent.attached:type_name -> allwright.engine.v1.ContextSessionAttachedEvent
-	5,  // 16: allwright.engine.v1.ContextSessionEvent.pong:type_name -> allwright.engine.v1.ContextSessionPongEvent
-	6,  // 17: allwright.engine.v1.ContextSessionEvent.closed:type_name -> allwright.engine.v1.ContextSessionClosedEvent
-	7,  // 18: allwright.engine.v1.ContextSessionEvent.error:type_name -> allwright.engine.v1.ContextSessionErrorEvent
-	20, // 19: allwright.engine.v1.ContextSessionEvent.navigated:type_name -> allwright.engine.v1.PageNavigatedEvent
-	21, // 20: allwright.engine.v1.ContextSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
-	22, // 21: allwright.engine.v1.ContextSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
-	23, // 22: allwright.engine.v1.ContextSessionEvent.element_counted:type_name -> allwright.engine.v1.ElementCountedEvent
-	24, // 23: allwright.engine.v1.ContextSessionEvent.elements_highlighted:type_name -> allwright.engine.v1.ElementsHighlightedEvent
-	25, // 24: allwright.engine.v1.ContextSessionEvent.element_focused:type_name -> allwright.engine.v1.ElementFocusedEvent
-	26, // 25: allwright.engine.v1.ContextSessionEvent.element_filled:type_name -> allwright.engine.v1.ElementFilledEvent
-	27, // 26: allwright.engine.v1.ContextSessionEvent.element_hovered:type_name -> allwright.engine.v1.ElementHoveredEvent
-	28, // 27: allwright.engine.v1.ContextSessionEvent.key_pressed:type_name -> allwright.engine.v1.KeyPressedEvent
-	29, // 28: allwright.engine.v1.ContextSessionEvent.text_content_resolved:type_name -> allwright.engine.v1.TextContentResolvedEvent
-	30, // 29: allwright.engine.v1.ContextSessionEvent.inner_text_resolved:type_name -> allwright.engine.v1.InnerTextResolvedEvent
-	31, // 30: allwright.engine.v1.ContextSessionEvent.selector_wait_satisfied:type_name -> allwright.engine.v1.SelectorWaitSatisfiedEvent
-	32, // 31: allwright.engine.v1.ContextSessionEvent.screenshot_captured:type_name -> allwright.engine.v1.ScreenshotCapturedEvent
-	34, // 32: allwright.engine.v1.ContextSessionEvent.accessibility_snapshot_captured:type_name -> allwright.engine.v1.AccessibilitySnapshotCapturedEvent
-	35, // 33: allwright.engine.v1.NavigatePageCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	35, // 34: allwright.engine.v1.ClickElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	35, // 35: allwright.engine.v1.CountElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	35, // 36: allwright.engine.v1.HighlightElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	35, // 37: allwright.engine.v1.FocusElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	35, // 38: allwright.engine.v1.FillElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	35, // 39: allwright.engine.v1.HoverElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	35, // 40: allwright.engine.v1.PressKeyCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	35, // 41: allwright.engine.v1.GetTextContentCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	35, // 42: allwright.engine.v1.GetInnerTextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	35, // 43: allwright.engine.v1.WaitForSelectorCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	35, // 44: allwright.engine.v1.ScreenshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	35, // 45: allwright.engine.v1.AccessibilitySnapshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	46, // [46:46] is the sub-list for method output_type
-	46, // [46:46] is the sub-list for method input_type
-	46, // [46:46] is the sub-list for extension type_name
-	46, // [46:46] is the sub-list for extension extendee
-	0,  // [0:46] is the sub-list for field type_name
+	12, // 2: allwright.engine.v1.ContextSessionCommand.navigate:type_name -> allwright.engine.v1.NavigatePageCommand
+	13, // 3: allwright.engine.v1.ContextSessionCommand.click_element:type_name -> allwright.engine.v1.ClickElementCommand
+	14, // 4: allwright.engine.v1.ContextSessionCommand.count_elements:type_name -> allwright.engine.v1.CountElementsCommand
+	15, // 5: allwright.engine.v1.ContextSessionCommand.highlight_elements:type_name -> allwright.engine.v1.HighlightElementsCommand
+	16, // 6: allwright.engine.v1.ContextSessionCommand.focus_element:type_name -> allwright.engine.v1.FocusElementCommand
+	17, // 7: allwright.engine.v1.ContextSessionCommand.fill_element:type_name -> allwright.engine.v1.FillElementCommand
+	18, // 8: allwright.engine.v1.ContextSessionCommand.hover_element:type_name -> allwright.engine.v1.HoverElementCommand
+	19, // 9: allwright.engine.v1.ContextSessionCommand.press_key:type_name -> allwright.engine.v1.PressKeyCommand
+	20, // 10: allwright.engine.v1.ContextSessionCommand.get_text_content:type_name -> allwright.engine.v1.GetTextContentCommand
+	21, // 11: allwright.engine.v1.ContextSessionCommand.get_inner_text:type_name -> allwright.engine.v1.GetInnerTextCommand
+	22, // 12: allwright.engine.v1.ContextSessionCommand.wait_for_selector:type_name -> allwright.engine.v1.WaitForSelectorCommand
+	23, // 13: allwright.engine.v1.ContextSessionCommand.screenshot:type_name -> allwright.engine.v1.ScreenshotCommand
+	37, // 14: allwright.engine.v1.ContextSessionCommand.accessibility_snapshot:type_name -> allwright.engine.v1.AccessibilitySnapshotCommand
+	8,  // 15: allwright.engine.v1.ContextSessionCommand.register_hook:type_name -> allwright.engine.v1.RegisterHookCommand
+	9,  // 16: allwright.engine.v1.ContextSessionCommand.wait_for_hook:type_name -> allwright.engine.v1.WaitForHookCommand
+	4,  // 17: allwright.engine.v1.ContextSessionEvent.attached:type_name -> allwright.engine.v1.ContextSessionAttachedEvent
+	5,  // 18: allwright.engine.v1.ContextSessionEvent.pong:type_name -> allwright.engine.v1.ContextSessionPongEvent
+	6,  // 19: allwright.engine.v1.ContextSessionEvent.closed:type_name -> allwright.engine.v1.ContextSessionClosedEvent
+	7,  // 20: allwright.engine.v1.ContextSessionEvent.error:type_name -> allwright.engine.v1.ContextSessionErrorEvent
+	24, // 21: allwright.engine.v1.ContextSessionEvent.navigated:type_name -> allwright.engine.v1.PageNavigatedEvent
+	25, // 22: allwright.engine.v1.ContextSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
+	26, // 23: allwright.engine.v1.ContextSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
+	27, // 24: allwright.engine.v1.ContextSessionEvent.element_counted:type_name -> allwright.engine.v1.ElementCountedEvent
+	28, // 25: allwright.engine.v1.ContextSessionEvent.elements_highlighted:type_name -> allwright.engine.v1.ElementsHighlightedEvent
+	29, // 26: allwright.engine.v1.ContextSessionEvent.element_focused:type_name -> allwright.engine.v1.ElementFocusedEvent
+	30, // 27: allwright.engine.v1.ContextSessionEvent.element_filled:type_name -> allwright.engine.v1.ElementFilledEvent
+	31, // 28: allwright.engine.v1.ContextSessionEvent.element_hovered:type_name -> allwright.engine.v1.ElementHoveredEvent
+	32, // 29: allwright.engine.v1.ContextSessionEvent.key_pressed:type_name -> allwright.engine.v1.KeyPressedEvent
+	33, // 30: allwright.engine.v1.ContextSessionEvent.text_content_resolved:type_name -> allwright.engine.v1.TextContentResolvedEvent
+	34, // 31: allwright.engine.v1.ContextSessionEvent.inner_text_resolved:type_name -> allwright.engine.v1.InnerTextResolvedEvent
+	35, // 32: allwright.engine.v1.ContextSessionEvent.selector_wait_satisfied:type_name -> allwright.engine.v1.SelectorWaitSatisfiedEvent
+	36, // 33: allwright.engine.v1.ContextSessionEvent.screenshot_captured:type_name -> allwright.engine.v1.ScreenshotCapturedEvent
+	38, // 34: allwright.engine.v1.ContextSessionEvent.accessibility_snapshot_captured:type_name -> allwright.engine.v1.AccessibilitySnapshotCapturedEvent
+	10, // 35: allwright.engine.v1.ContextSessionEvent.hook_registered:type_name -> allwright.engine.v1.HookRegisteredEvent
+	11, // 36: allwright.engine.v1.ContextSessionEvent.hook_completed:type_name -> allwright.engine.v1.HookCompletedEvent
+	39, // 37: allwright.engine.v1.RegisterHookCommand.new_page:type_name -> allwright.engine.v1.RegisterNewPageHook
+	40, // 38: allwright.engine.v1.WaitForHookCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	41, // 39: allwright.engine.v1.HookCompletedEvent.new_page:type_name -> allwright.engine.v1.NewPageHookResult
+	40, // 40: allwright.engine.v1.NavigatePageCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	40, // 41: allwright.engine.v1.ClickElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	40, // 42: allwright.engine.v1.CountElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	40, // 43: allwright.engine.v1.HighlightElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	40, // 44: allwright.engine.v1.FocusElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	40, // 45: allwright.engine.v1.FillElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	40, // 46: allwright.engine.v1.HoverElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	40, // 47: allwright.engine.v1.PressKeyCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	40, // 48: allwright.engine.v1.GetTextContentCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	40, // 49: allwright.engine.v1.GetInnerTextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	40, // 50: allwright.engine.v1.WaitForSelectorCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	40, // 51: allwright.engine.v1.ScreenshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	40, // 52: allwright.engine.v1.AccessibilitySnapshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	53, // [53:53] is the sub-list for method output_type
+	53, // [53:53] is the sub-list for method input_type
+	53, // [53:53] is the sub-list for extension type_name
+	53, // [53:53] is the sub-list for extension extendee
+	0,  // [0:53] is the sub-list for field type_name
 }
 
 func init() { file_core_v1_context_proto_init() }
@@ -2766,6 +3095,7 @@ func file_core_v1_context_proto_init() {
 		return
 	}
 	file_core_v1_common_proto_init()
+	file_surfaces_web_v1_web_proto_init()
 	file_core_v1_context_proto_msgTypes[0].OneofWrappers = []any{
 		(*ContextSessionCommand_Ping)(nil),
 		(*ContextSessionCommand_Close)(nil),
@@ -2782,6 +3112,8 @@ func file_core_v1_context_proto_init() {
 		(*ContextSessionCommand_WaitForSelector)(nil),
 		(*ContextSessionCommand_Screenshot)(nil),
 		(*ContextSessionCommand_AccessibilitySnapshot)(nil),
+		(*ContextSessionCommand_RegisterHook)(nil),
+		(*ContextSessionCommand_WaitForHook)(nil),
 	}
 	file_core_v1_context_proto_msgTypes[3].OneofWrappers = []any{
 		(*ContextSessionEvent_Attached)(nil),
@@ -2802,11 +3134,16 @@ func file_core_v1_context_proto_init() {
 		(*ContextSessionEvent_SelectorWaitSatisfied)(nil),
 		(*ContextSessionEvent_ScreenshotCaptured)(nil),
 		(*ContextSessionEvent_AccessibilitySnapshotCaptured)(nil),
+		(*ContextSessionEvent_HookRegistered)(nil),
+		(*ContextSessionEvent_HookCompleted)(nil),
 	}
-	file_core_v1_context_proto_msgTypes[8].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[8].OneofWrappers = []any{
+		(*RegisterHookCommand_NewPage)(nil),
+	}
 	file_core_v1_context_proto_msgTypes[9].OneofWrappers = []any{}
-	file_core_v1_context_proto_msgTypes[10].OneofWrappers = []any{}
-	file_core_v1_context_proto_msgTypes[11].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[11].OneofWrappers = []any{
+		(*HookCompletedEvent_NewPage)(nil),
+	}
 	file_core_v1_context_proto_msgTypes[12].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[13].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[14].OneofWrappers = []any{}
@@ -2815,14 +3152,18 @@ func file_core_v1_context_proto_init() {
 	file_core_v1_context_proto_msgTypes[17].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[18].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[19].OneofWrappers = []any{}
-	file_core_v1_context_proto_msgTypes[33].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[20].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[21].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[22].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[23].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[37].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_core_v1_context_proto_rawDesc), len(file_core_v1_context_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   35,
+			NumMessages:   39,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

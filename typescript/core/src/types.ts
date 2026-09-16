@@ -142,13 +142,13 @@ export interface Browser extends BrowserInfo {
   pages(): Page[];
   newPage(options?: CommandOptions): Promise<Page>;
   newTab(options?: CommandOptions): Promise<Page>;
-  registerHook<T>(type: HookType<T>): Promise<Hook<T>>;
   close(): Promise<void>;
   ping(message?: string): Promise<string>;
   browserInfo(): BrowserInfo;
 }
 
 export interface Page extends PageInfo, WebLocators {
+  registerHook<T>(type: HookType<T>): Promise<Hook<T>>;
   accessibilitySnapshot(options?: AccessibilitySnapshotOptions): Promise<string>;
   locator(selector: string, options?: LocatorFilterOptions): Locator;
   goto(url: string, options?: CommandOptions): Promise<NavigateResult>;
@@ -402,18 +402,6 @@ export interface SurfaceSessionEvent {
     contextSessionId?: string;
     note?: string;
   };
-  hookRegistered?: {
-    hookId?: string;
-    hookType?: number;
-  };
-  hookCompleted?: {
-    hookId?: string;
-    hookType?: number;
-    newPage?: {
-      contextSessionId?: string;
-      note?: string;
-    };
-  };
   pong?: {
     message?: string;
   };
@@ -440,6 +428,16 @@ export interface ContextSessionEvent {
   };
   error?: {
     message?: string;
+  };
+  hookRegistered?: {
+    hookId?: string;
+  };
+  hookCompleted?: {
+    hookId?: string;
+    newPage?: {
+      contextSessionId?: string;
+      note?: string;
+    };
   };
   navigated?: {
     url?: string;
@@ -534,12 +532,16 @@ export interface OpenContextRequest {
 }
 
 export interface RegisterHookRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
   registerHook: {
     newPage?: Record<string, never>;
   };
 }
 
 export interface WaitForHookRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
   waitForHook: {
     hookId: string;
     retryOptions?: {
@@ -743,8 +745,6 @@ export type SurfaceSessionRequest =
   | LaunchBrowserRequest
   | LaunchChromeRequest
   | OpenContextRequest
-  | RegisterHookRequest
-  | WaitForHookRequest
   | ConnectMobileRequest
   | LaunchAppRequest
   | SurfacePingRequest
@@ -752,6 +752,8 @@ export type SurfaceSessionRequest =
 
 export type ContextSessionRequest =
   | ContextPingRequest
+  | RegisterHookRequest
+  | WaitForHookRequest
   | NavigateRequest
   | ClickRequest
   | CountRequest

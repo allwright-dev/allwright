@@ -37,7 +37,7 @@ For an action that opens a tab, register the generic typed hook first:
 ```python
 from allwright import hooks
 
-hook = browser.register_hook(hooks.new_page)
+hook = page.register_hook(hooks.new_page)
 page.click("a[target=_blank]")
 new_page = hook.wait()
 ```

@@ -252,6 +252,9 @@ function createLazyPage(pageResource: LazyResource<Page>): Page {
     async screenshot(options?: ScreenshotOptions) {
       return (await pageResource.get()).screenshot(options);
     },
+    async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
+      return (await pageResource.get()).registerHook(type);
+    },
     async close() {
       await (await pageResource.get()).close();
     },
@@ -332,9 +335,6 @@ function createLazyBrowser(browserResource: LazyResource<Browser>): Browser {
     },
     async newTab(options?: CommandOptions) {
       return (await browserResource.get()).newTab(options);
-    },
-    async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
-      return (await browserResource.get()).registerHook(type);
     },
     async close() {
       await (await browserResource.get()).close();

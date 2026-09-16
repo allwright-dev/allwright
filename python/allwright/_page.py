@@ -4,9 +4,10 @@ from ._web_locators import WebLocators, TextMatcher, semantic_selector
 
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, TypeVar
 
 from ._locator import Locator
+from ._hooks import Hook, HookType
 from ._proto import engine_pb2
 from ._selectors import normalize_selector_for_transport
 from ._transport import RuntimeClient, StreamHandle
@@ -31,14 +32,24 @@ from ._types import (
 )
 
 
+T = TypeVar("T")
+
+
 class Page(WebLocators):
-    def __init__(self, runtime: RuntimeClient, surface_session_id: str, session_id: str) -> None:
+    def __init__(
+        self,
+        runtime: RuntimeClient,
+        surface_session_id: str,
+        session_id: str,
+        page_factory: Callable[[str], Page] | None = None,
+    ) -> None:
         self._runtime = runtime
         self._surface_session_id = surface_session_id
         self._session_id = session_id
         self._lock = threading.Lock()
         self._handle: StreamHandle | None = None
         self._closed = False
+        self._page_factory = page_factory
 
     @property
     def session_id(self) -> str:
@@ -50,6 +61,74 @@ class Page(WebLocators):
 
     def locator(self, selector: str) -> Locator:
         return Locator(page=self, selector=normalize_selector_for_transport(selector))
+
+    def register_hook(self, hook_type: HookType[T]) -> Hook[T]:
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            if hook_type.name != "new_page":
+                raise AllwrightError(f"unsupported hook type: {hook_type.name}")
+            handle.send(
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
+                    register_hook=engine_pb2.RegisterHookCommand(
+                        new_page=engine_pb2.RegisterNewPageHook()
+                    ),
+                )
+            )
+            while True:
+                event = handle.recv("receive page session event while registering hook")
+                match event.WhichOneof("event"):
+                    case "hook_registered":
+                        return Hook(self, event.hook_registered.hook_id, hook_type)
+                    case "error":
+                        raise AllwrightError(
+                            f"page session error while registering hook: {event.error.message}"
+                        )
+
+    def _wait_for_hook(
+        self,
+        hook_id: str,
+        hook_type: HookType[T],
+        options: CommandOptions | None = None,
+    ) -> T:
+        from ._runtime import retry_options
+
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            command_options = options or CommandOptions()
+            handle.send(
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
+                    wait_for_hook=engine_pb2.WaitForHookCommand(
+                        hook_id=hook_id,
+                        retry_options=retry_options(command_options.timeout_ms),
+                    ),
+                )
+            )
+            while True:
+                event = handle.recv("receive page session event while waiting for hook")
+                match event.WhichOneof("event"):
+                    case "hook_completed":
+                        completed = event.hook_completed
+                        if completed.hook_id != hook_id:
+                            continue
+                        if hook_type.name == "new_page" and completed.WhichOneof("result") == "new_page":
+                            session_id = completed.new_page.context_session_id
+                            page = (
+                                self._page_factory(session_id)
+                                if self._page_factory is not None
+                                else Page(self._runtime, self.surface_session_id, session_id)
+                            )
+                            return page  # type: ignore[return-value]
+                        raise AllwrightError("hook completed with an invalid result")
+                    case "error":
+                        raise AllwrightError(
+                            f"page session error while waiting for hook: {event.error.message}"
+                        )
 
     def goto(self, url: str, options: CommandOptions | None = None) -> NavigateResult:
         from ._runtime import retry_options

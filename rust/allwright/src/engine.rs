@@ -76,6 +76,7 @@ struct TabSessionState {
 #[derive(Debug, Clone)]
 struct HookState {
     surface_session_id: String,
+    context_session_id: String,
     registration: HookRegistration,
 }
 
@@ -615,148 +616,6 @@ async fn handle_browser_command(
                 should_close: false,
             })
         }
-        Some(SurfaceCommand::RegisterHook(RegisterHookCommand { hook })) => {
-            let plugin_hook_type = match hook {
-                Some(RegisterHook::NewPage(_)) => PluginHookType::NewPage,
-                None => {
-                    return Ok(CommandOutcome {
-                        event: browser_event(
-                            session_id,
-                            SurfaceEvent::Error(SurfaceSessionErrorEvent {
-                                message: "register_hook requires a typed hook payload".to_string(),
-                            }),
-                        ),
-                        should_close: false,
-                    });
-                }
-            };
-            let surface_session = {
-                let state = state.lock().await;
-                state
-                    .browser_sessions
-                    .get(session_id)
-                    .filter(|session| session.launched)
-                    .and_then(|session| session.surface_session.clone())
-            };
-            let Some(EngineBrowserSessionHandle::Web(surface_session)) = surface_session else {
-                return Ok(CommandOutcome {
-                    event: browser_event(
-                        session_id,
-                        SurfaceEvent::Error(SurfaceSessionErrorEvent {
-                            message: "this hook type requires a launched web browser session"
-                                .to_string(),
-                        }),
-                    ),
-                    should_close: false,
-                });
-            };
-
-            match web_lib::register_hook(&surface_session, plugin_hook_type).await {
-                Ok(registration) => {
-                    let hook_id = next_hook_id();
-                    state.lock().await.hooks.insert(
-                        hook_id.clone(),
-                        HookState {
-                            surface_session_id: session_id.to_string(),
-                            registration,
-                        },
-                    );
-                    Ok(CommandOutcome {
-                        event: browser_event(
-                            session_id,
-                            SurfaceEvent::HookRegistered(HookRegisteredEvent { hook_id }),
-                        ),
-                        should_close: false,
-                    })
-                }
-                Err(message) => Ok(CommandOutcome {
-                    event: browser_event(
-                        session_id,
-                        SurfaceEvent::Error(SurfaceSessionErrorEvent { message }),
-                    ),
-                    should_close: false,
-                }),
-            }
-        }
-        Some(SurfaceCommand::WaitForHook(WaitForHookCommand {
-            hook_id,
-            retry_options,
-        })) => {
-            let (surface_session, hook) = {
-                let state = state.lock().await;
-                (
-                    state
-                        .browser_sessions
-                        .get(session_id)
-                        .and_then(|session| session.surface_session.clone()),
-                    state.hooks.get(&hook_id).cloned(),
-                )
-            };
-            let Some(hook) = hook.filter(|hook| hook.surface_session_id == session_id) else {
-                return Ok(CommandOutcome {
-                    event: browser_event(
-                        session_id,
-                        SurfaceEvent::Error(SurfaceSessionErrorEvent {
-                            message: format!("hook {hook_id} is not registered"),
-                        }),
-                    ),
-                    should_close: false,
-                });
-            };
-            let Some(EngineBrowserSessionHandle::Web(surface_session)) = surface_session else {
-                return Ok(CommandOutcome {
-                    event: browser_event(
-                        session_id,
-                        SurfaceEvent::Error(SurfaceSessionErrorEvent {
-                            message: "hook browser session is not available".to_string(),
-                        }),
-                    ),
-                    should_close: false,
-                });
-            };
-
-            let retry_policy = command_retry_policy(retry_options.as_ref());
-            match retry_with_timeout(retry_policy, || async {
-                web_lib::poll_hook(&surface_session, &hook.registration).await
-            })
-            .await
-            {
-                Ok(HookResult::NewPage(page)) => {
-                    let context_session_id = next_context_session_id();
-                    let note = page.note;
-                    let mut state = state.lock().await;
-                    state.hooks.remove(&hook_id);
-                    state.tab_sessions.insert(
-                        context_session_id.clone(),
-                        TabSessionState {
-                            surface_session_id: session_id.to_string(),
-                            page_session: EnginePageSessionHandle::Web(page.page_session),
-                            current_url: None,
-                        },
-                    );
-                    Ok(CommandOutcome {
-                        event: browser_event(
-                            session_id,
-                            SurfaceEvent::HookCompleted(HookCompletedEvent {
-                                hook_id,
-                                result: Some(HookCompletionResult::NewPage(NewPageHookResult {
-                                    context_session_id,
-                                    note,
-                                })),
-                            }),
-                        ),
-                        should_close: false,
-                    })
-                }
-                Err(message) => Ok(CommandOutcome {
-                    event: browser_event(
-                        session_id,
-                        SurfaceEvent::Error(SurfaceSessionErrorEvent { message }),
-                    ),
-                    should_close: false,
-                }),
-            }
-        }
         Some(SurfaceCommand::Ping(SessionPingCommand { message })) => Ok(CommandOutcome {
             event: browser_event(
                 session_id,
@@ -899,6 +758,140 @@ async fn handle_tab_command(
     };
 
     match command.command {
+        Some(ContextCommand::RegisterHook(RegisterHookCommand { hook })) => {
+            let plugin_hook_type = match hook {
+                Some(RegisterHook::NewPage(_)) => PluginHookType::NewPage,
+                None => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "register_hook requires a typed hook payload".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            };
+            let (surface_session, page_session) = match (&surface_session, &page_session) {
+                (
+                    EngineBrowserSessionHandle::Web(surface_session),
+                    EnginePageSessionHandle::Web(page_session),
+                ) => (surface_session, page_session),
+                _ => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "this hook type requires a web page session".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            };
+
+            match web_lib::register_hook(surface_session, page_session, plugin_hook_type).await {
+                Ok(registration) => {
+                    let hook_id = next_hook_id();
+                    state.lock().await.hooks.insert(
+                        hook_id.clone(),
+                        HookState {
+                            surface_session_id: surface_session_id.clone(),
+                            context_session_id: context_session_id.clone(),
+                            registration,
+                        },
+                    );
+                    Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::HookRegistered(HookRegisteredEvent { hook_id }),
+                        )],
+                        should_close: false,
+                    })
+                }
+                Err(message) => Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent { message }),
+                    )],
+                    should_close: false,
+                }),
+            }
+        }
+        Some(ContextCommand::WaitForHook(WaitForHookCommand {
+            hook_id,
+            retry_options,
+        })) => {
+            let hook = state.lock().await.hooks.get(&hook_id).cloned();
+            let Some(hook) = hook.filter(|hook| {
+                hook.surface_session_id == surface_session_id
+                    && hook.context_session_id == context_session_id
+            }) else {
+                return Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: format!("hook {hook_id} is not registered on this page"),
+                        }),
+                    )],
+                    should_close: false,
+                });
+            };
+            let EngineBrowserSessionHandle::Web(surface_session) = &surface_session else {
+                return Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: "hook browser session is not available".to_string(),
+                        }),
+                    )],
+                    should_close: false,
+                });
+            };
+
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            match retry_with_timeout(retry_policy, || async {
+                web_lib::poll_hook(surface_session, &hook.registration).await
+            })
+            .await
+            {
+                Ok(HookResult::NewPage(page)) => {
+                    let new_context_session_id = next_context_session_id();
+                    let note = page.note;
+                    let mut state = state.lock().await;
+                    state.hooks.remove(&hook_id);
+                    state.tab_sessions.insert(
+                        new_context_session_id.clone(),
+                        TabSessionState {
+                            surface_session_id: surface_session_id.clone(),
+                            page_session: EnginePageSessionHandle::Web(page.page_session),
+                            current_url: None,
+                        },
+                    );
+                    Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::HookCompleted(HookCompletedEvent {
+                                hook_id,
+                                result: Some(HookCompletionResult::NewPage(NewPageHookResult {
+                                    context_session_id: new_context_session_id,
+                                    note,
+                                })),
+                            }),
+                        )],
+                        should_close: false,
+                    })
+                }
+                Err(message) => Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent { message }),
+                    )],
+                    should_close: false,
+                }),
+            }
+        }
         Some(ContextCommand::Ping(ContextSessionPingCommand { message })) => {
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
@@ -944,7 +937,11 @@ async fn handle_tab_command(
                     });
                 }
             }
-            state.lock().await.tab_sessions.remove(&context_session_id);
+            let mut state = state.lock().await;
+            state.tab_sessions.remove(&context_session_id);
+            state
+                .hooks
+                .retain(|_, hook| hook.context_session_id != context_session_id);
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
                     &context_session_id,

@@ -1,17 +1,18 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+use crate::proto::context_session_command::Command as ContextCommand;
+use crate::proto::context_session_event::Event as ContextEvent;
 use crate::proto::hook_completed_event::Result as HookCompletionResult;
 use crate::proto::register_hook_command::Hook as RegisterHook;
-use crate::proto::surface_session_command::Command as SurfaceCommand;
-use crate::proto::surface_session_event::Event as SurfaceEvent;
 use crate::proto::{
-    RegisterHookCommand, RegisterNewPageHook, SurfaceSessionCommand, WaitForHookCommand,
+    ContextSessionCommand, RegisterHookCommand, RegisterNewPageHook, WaitForHookCommand,
 };
 use tokio::sync::Mutex as AsyncMutex;
 
 use super::command::command_retry_options;
-use super::types::{Browser, CommandOptions, Error, Result, Tab, TabInner, TabState};
+use super::tab::ensure_tab_open;
+use super::types::{CommandOptions, Error, Result, Tab, TabInner, TabState};
 
 pub trait HookType: private::Sealed + Clone + Send + Sync + 'static {
     type Output;
@@ -22,10 +23,7 @@ mod private {
 
     pub trait Sealed {
         fn name() -> &'static str;
-        fn decode(
-            browser: &Browser,
-            result: HookCompletionResult,
-        ) -> Result<<Self as HookType>::Output>
+        fn decode(page: &Tab, result: HookCompletionResult) -> Result<<Self as HookType>::Output>
         where
             Self: HookType;
     }
@@ -45,16 +43,13 @@ impl private::Sealed for NewPage {
         "new_page"
     }
 
-    fn decode(
-        browser: &Browser,
-        result: HookCompletionResult,
-    ) -> Result<<Self as HookType>::Output> {
-        let HookCompletionResult::NewPage(page) = result;
+    fn decode(page: &Tab, result: HookCompletionResult) -> Result<<Self as HookType>::Output> {
+        let HookCompletionResult::NewPage(new_page) = result;
         Ok(Tab {
             inner: Arc::new(TabInner {
-                runtime: Arc::clone(&browser.inner.runtime),
-                surface_session_id: browser.inner.session_id.clone(),
-                session_id: page.context_session_id,
+                runtime: Arc::clone(&page.inner.runtime),
+                surface_session_id: page.inner.surface_session_id.clone(),
+                session_id: new_page.context_session_id,
                 state: AsyncMutex::new(TabState::default()),
             }),
         })
@@ -62,7 +57,7 @@ impl private::Sealed for NewPage {
 }
 
 pub struct Hook<T: HookType> {
-    browser: Browser,
+    page: Tab,
     id: String,
     _type: PhantomData<T>,
 }
@@ -77,17 +72,15 @@ impl<T: HookType> Hook<T> {
     }
 
     pub async fn wait_with_options(&self, options: CommandOptions) -> Result<T::Output> {
-        let mut state = self.browser.inner.state.lock().await;
-        if state.closed {
-            return Err(Error::new(format!(
-                "browser session {} is closed",
-                self.browser.inner.session_id
-            )));
-        }
-        state
+        let mut state = self.page.inner.state.lock().await;
+        let handle = self.page.ensure_handle(&mut state).await?;
+        ensure_tab_open(handle, &self.page.inner.session_id)?;
+        handle
             .command_tx
-            .send(SurfaceSessionCommand {
-                command: Some(SurfaceCommand::WaitForHook(WaitForHookCommand {
+            .send(ContextSessionCommand {
+                surface_session_id: self.page.inner.surface_session_id.clone(),
+                context_session_id: self.page.inner.session_id.clone(),
+                command: Some(ContextCommand::WaitForHook(WaitForHookCommand {
                     hook_id: self.id.clone(),
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
@@ -96,21 +89,21 @@ impl<T: HookType> Hook<T> {
             .map_err(|_| Error::new("failed to send WaitForHookCommand"))?;
 
         loop {
-            let event = state
+            let event = handle
                 .events
                 .message()
                 .await?
-                .ok_or_else(|| Error::new("browser session closed while waiting for hook"))?;
+                .ok_or_else(|| Error::new("page session closed while waiting for hook"))?;
             match event.event {
-                Some(SurfaceEvent::HookCompleted(completed)) if completed.hook_id == self.id => {
+                Some(ContextEvent::HookCompleted(completed)) if completed.hook_id == self.id => {
                     let result = completed
                         .result
                         .ok_or_else(|| Error::new("hook completed without a result"))?;
-                    return T::decode(&self.browser, result);
+                    return T::decode(&self.page, result);
                 }
-                Some(SurfaceEvent::Error(error)) => {
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
-                        "browser session error while waiting for hook: {}",
+                        "page session error while waiting for hook: {}",
                         error.message
                     )));
                 }
@@ -120,19 +113,17 @@ impl<T: HookType> Hook<T> {
     }
 }
 
-impl Browser {
+impl Tab {
     pub async fn register_hook<T: HookType>(&self, _hook_type: T) -> Result<Hook<T>> {
         let mut state = self.inner.state.lock().await;
-        if state.closed {
-            return Err(Error::new(format!(
-                "browser session {} is closed",
-                self.inner.session_id
-            )));
-        }
-        state
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_tab_open(handle, &self.inner.session_id)?;
+        handle
             .command_tx
-            .send(SurfaceSessionCommand {
-                command: Some(SurfaceCommand::RegisterHook(RegisterHookCommand {
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::RegisterHook(RegisterHookCommand {
                     hook: match T::name() {
                         "new_page" => Some(RegisterHook::NewPage(RegisterNewPageHook {})),
                         _ => return Err(Error::new("unsupported hook type")),
@@ -143,22 +134,22 @@ impl Browser {
             .map_err(|_| Error::new("failed to send RegisterHookCommand"))?;
 
         loop {
-            let event = state
+            let event = handle
                 .events
                 .message()
                 .await?
-                .ok_or_else(|| Error::new("browser session closed while registering hook"))?;
+                .ok_or_else(|| Error::new("page session closed while registering hook"))?;
             match event.event {
-                Some(SurfaceEvent::HookRegistered(registered)) => {
+                Some(ContextEvent::HookRegistered(registered)) => {
                     return Ok(Hook {
-                        browser: self.clone(),
+                        page: self.clone(),
                         id: registered.hook_id,
                         _type: PhantomData,
                     });
                 }
-                Some(SurfaceEvent::Error(error)) => {
+                Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
-                        "browser session error while registering hook: {}",
+                        "page session error while registering hook: {}",
                         error.message
                     )));
                 }

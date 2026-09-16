@@ -83,9 +83,13 @@ async fn new_page_hook_captures_page_opened_before_wait() {
         .unwrap();
     let _process = BrowserProcess(browser.process_id);
     let fixture = Fixture::new();
-    let hook = register_hook(&browser.browser_session, HookType::NewPage)
-        .await
-        .unwrap();
+    let hook = register_hook(
+        &browser.browser_session,
+        &browser.initial_page.page_session,
+        HookType::NewPage,
+    )
+    .await
+    .unwrap();
     let navigation = navigate_page(
         &browser.browser_session,
         &browser.initial_page.page_session,
