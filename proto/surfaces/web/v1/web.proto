@@ -39,3 +39,10 @@ message ChromeLaunchedEvent {
   string user_data_dir = 4;
   string initial_page_session_id = 5;
 }
+
+message RegisterNewPageHook {}
+
+message NewPageHookResult {
+  string context_session_id = 1;
+  string note = 2;
+}

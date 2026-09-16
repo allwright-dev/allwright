@@ -334,6 +334,94 @@ func (x *ChromeLaunchedEvent) GetInitialPageSessionId() string {
 	return ""
 }
 
+type RegisterNewPageHook struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterNewPageHook) Reset() {
+	*x = RegisterNewPageHook{}
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterNewPageHook) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterNewPageHook) ProtoMessage() {}
+
+func (x *RegisterNewPageHook) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterNewPageHook.ProtoReflect.Descriptor instead.
+func (*RegisterNewPageHook) Descriptor() ([]byte, []int) {
+	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{4}
+}
+
+type NewPageHookResult struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ContextSessionId string                 `protobuf:"bytes,1,opt,name=context_session_id,json=contextSessionId,proto3" json:"context_session_id,omitempty"`
+	Note             string                 `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *NewPageHookResult) Reset() {
+	*x = NewPageHookResult{}
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NewPageHookResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NewPageHookResult) ProtoMessage() {}
+
+func (x *NewPageHookResult) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NewPageHookResult.ProtoReflect.Descriptor instead.
+func (*NewPageHookResult) Descriptor() ([]byte, []int) {
+	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *NewPageHookResult) GetContextSessionId() string {
+	if x != nil {
+		return x.ContextSessionId
+	}
+	return ""
+}
+
+func (x *NewPageHookResult) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
 var File_surfaces_web_v1_web_proto protoreflect.FileDescriptor
 
 const file_surfaces_web_v1_web_proto_rawDesc = "" +
@@ -361,7 +449,11 @@ const file_surfaces_web_v1_web_proto_rawDesc = "" +
 	"\x04note\x18\x02 \x01(\tR\x04note\x12*\n" +
 	"\x11cdp_websocket_url\x18\x03 \x01(\tR\x0fcdpWebsocketUrl\x12\"\n" +
 	"\ruser_data_dir\x18\x04 \x01(\tR\vuserDataDir\x125\n" +
-	"\x17initial_page_session_id\x18\x05 \x01(\tR\x14initialPageSessionId*`\n" +
+	"\x17initial_page_session_id\x18\x05 \x01(\tR\x14initialPageSessionId\"\x15\n" +
+	"\x13RegisterNewPageHook\"U\n" +
+	"\x11NewPageHookResult\x12,\n" +
+	"\x12context_session_id\x18\x01 \x01(\tR\x10contextSessionId\x12\x12\n" +
+	"\x04note\x18\x02 \x01(\tR\x04note*`\n" +
 	"\vBrowserKind\x12\x1c\n" +
 	"\x18BROWSER_KIND_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15BROWSER_KIND_CHROMIUM\x10\x01\x12\x18\n" +
@@ -381,20 +473,22 @@ func file_surfaces_web_v1_web_proto_rawDescGZIP() []byte {
 }
 
 var file_surfaces_web_v1_web_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_surfaces_web_v1_web_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_surfaces_web_v1_web_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_surfaces_web_v1_web_proto_goTypes = []any{
 	(BrowserKind)(0),             // 0: allwright.engine.v1.BrowserKind
 	(*LaunchBrowserCommand)(nil), // 1: allwright.engine.v1.LaunchBrowserCommand
 	(*BrowserLaunchedEvent)(nil), // 2: allwright.engine.v1.BrowserLaunchedEvent
 	(*LaunchChromeCommand)(nil),  // 3: allwright.engine.v1.LaunchChromeCommand
 	(*ChromeLaunchedEvent)(nil),  // 4: allwright.engine.v1.ChromeLaunchedEvent
-	(*CommandRetryOptions)(nil),  // 5: allwright.engine.v1.CommandRetryOptions
+	(*RegisterNewPageHook)(nil),  // 5: allwright.engine.v1.RegisterNewPageHook
+	(*NewPageHookResult)(nil),    // 6: allwright.engine.v1.NewPageHookResult
+	(*CommandRetryOptions)(nil),  // 7: allwright.engine.v1.CommandRetryOptions
 }
 var file_surfaces_web_v1_web_proto_depIdxs = []int32{
 	0, // 0: allwright.engine.v1.LaunchBrowserCommand.browser_kind:type_name -> allwright.engine.v1.BrowserKind
-	5, // 1: allwright.engine.v1.LaunchBrowserCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	7, // 1: allwright.engine.v1.LaunchBrowserCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
 	0, // 2: allwright.engine.v1.BrowserLaunchedEvent.browser_kind:type_name -> allwright.engine.v1.BrowserKind
-	5, // 3: allwright.engine.v1.LaunchChromeCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	7, // 3: allwright.engine.v1.LaunchChromeCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
 	4, // [4:4] is the sub-list for method output_type
 	4, // [4:4] is the sub-list for method input_type
 	4, // [4:4] is the sub-list for extension type_name
@@ -416,7 +510,7 @@ func file_surfaces_web_v1_web_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_surfaces_web_v1_web_proto_rawDesc), len(file_surfaces_web_v1_web_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

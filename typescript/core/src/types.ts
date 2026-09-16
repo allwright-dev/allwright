@@ -122,6 +122,19 @@ export interface BrowserType {
   launch(options?: LaunchOptions): Promise<Browser>;
 }
 
+declare const hookOutput: unique symbol;
+
+export interface HookType<T> {
+  readonly name: string;
+  readonly [hookOutput]: T;
+}
+
+export interface Hook<T> {
+  readonly id: string;
+  readonly type: HookType<T>;
+  wait(options?: CommandOptions): Promise<T>;
+}
+
 export interface Browser extends BrowserInfo {
   page(): Page;
   initialPage(): Page;
@@ -129,6 +142,7 @@ export interface Browser extends BrowserInfo {
   pages(): Page[];
   newPage(options?: CommandOptions): Promise<Page>;
   newTab(options?: CommandOptions): Promise<Page>;
+  registerHook<T>(type: HookType<T>): Promise<Hook<T>>;
   close(): Promise<void>;
   ping(message?: string): Promise<string>;
   browserInfo(): BrowserInfo;
@@ -388,6 +402,18 @@ export interface SurfaceSessionEvent {
     contextSessionId?: string;
     note?: string;
   };
+  hookRegistered?: {
+    hookId?: string;
+    hookType?: number;
+  };
+  hookCompleted?: {
+    hookId?: string;
+    hookType?: number;
+    newPage?: {
+      contextSessionId?: string;
+      note?: string;
+    };
+  };
   pong?: {
     message?: string;
   };
@@ -501,6 +527,21 @@ export interface LaunchBrowserRequest {
 
 export interface OpenContextRequest {
   openContext: {
+    retryOptions?: {
+      timeoutMs?: number;
+    };
+  };
+}
+
+export interface RegisterHookRequest {
+  registerHook: {
+    newPage?: Record<string, never>;
+  };
+}
+
+export interface WaitForHookRequest {
+  waitForHook: {
+    hookId: string;
     retryOptions?: {
       timeoutMs?: number;
     };
@@ -702,6 +743,8 @@ export type SurfaceSessionRequest =
   | LaunchBrowserRequest
   | LaunchChromeRequest
   | OpenContextRequest
+  | RegisterHookRequest
+  | WaitForHookRequest
   | ConnectMobileRequest
   | LaunchAppRequest
   | SurfacePingRequest

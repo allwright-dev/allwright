@@ -24,6 +24,17 @@ dependencies {
 }
 ```
 
+For an action that opens a tab, register the generic typed hook first:
+
+```java
+import dev.allwright.client.Hook;
+import dev.allwright.client.Hooks;
+
+Hook<Page> hook = browser.registerHook(Hooks.NEW_PAGE);
+page.click("a[target=_blank]");
+Page newPage = hook.waitFor();
+```
+
 Maven:
 
 ```xml

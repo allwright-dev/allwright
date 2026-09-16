@@ -194,6 +194,22 @@ all five clients and the Vitest page fixture. Accessibility computation is imple
 in Allwright-owned JavaScript using specifications and Playwright as references. See the
 [accessibility snapshot contract and limitations](rust/allwright-surface-web/README.md#accessibility-snapshots).
 
+Actions that create a new tab can be coordinated with a typed hook. Registering
+the hook captures the browser state before the action, so the tab is not missed
+if it opens before the test starts waiting:
+
+```ts
+import { hooks } from "@allwright.dev/core";
+
+const newPageHook = await browser.registerHook(hooks.newPage);
+await page.click("a[target=_blank]");
+const newPage = await newPageHook.wait();
+```
+
+Hook registration and waiting are generic engine operations. The new-page hook
+type and result remain owned by the web surface; future download, dialog, and
+file-chooser hooks can use the same lifecycle without adding per-event methods.
+
 ## Client Experience
 
 allwright is designed around high-level browser objects rather than asking application code to manage raw gRPC connections.

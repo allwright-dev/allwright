@@ -19,6 +19,7 @@ import type {
   LaunchOptions,
   MobileSurfaceNamespace,
   Page,
+  HookType,
   ResolveConfigOptions,
   ResolvedAllwrightConfig,
   ScreenshotResult,
@@ -33,6 +34,8 @@ export type {
   BrowserInfo,
   BrowserKind,
   BrowserType,
+  Hook,
+  HookType,
   ClickResult,
   CommandOptions,
   CountResult,
@@ -66,6 +69,9 @@ export type {
 
 export const chromium: BrowserType = new BrowserTypeImpl("chromium");
 export const firefox: BrowserType = new BrowserTypeImpl("firefox");
+export const hooks = {
+  newPage: Object.freeze({ name: "newPage" }) as HookType<Page>,
+};
 export { mobile };
 
 export type Tab = Page;

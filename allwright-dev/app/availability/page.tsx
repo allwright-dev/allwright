@@ -30,6 +30,7 @@ export const metadata: Metadata = {
 const webAvailable = [
   "Launch a real Chromium or Firefox browser — no separate driver to install or version-match",
   "Open and close tabs within a browser session",
+  "Register a typed hook before an action and wait for the new tab that action opens",
   "Navigate to a URL",
   "Click an element",
   "Type into a field",

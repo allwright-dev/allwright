@@ -9,6 +9,8 @@ import type {
   SurfaceSessionStream,
   BrowserType,
   CommandOptions,
+  Hook,
+  HookType,
   LaunchOptions,
   Page,
   RuntimeClient,
@@ -90,6 +92,56 @@ export class BrowserImpl implements Browser {
       }
       if (event.error?.message) {
         throw formatActionError("open page", event.error.message);
+      }
+    }
+  }
+
+  async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
+    this.#ensureOpen();
+    if (type.name !== "newPage") {
+      throw formatActionError("register hook", `unsupported hook type: ${type.name}`);
+    }
+    this.#stream.write({ registerHook: { newPage: {} } });
+
+    while (true) {
+      const event = await this.#queue.next();
+      if (event.hookRegistered?.hookId) {
+        const hookId = event.hookRegistered.hookId;
+        return {
+          id: hookId,
+          type,
+          wait: (options: CommandOptions = {}) => this.#waitForHook(hookId, type, options),
+        };
+      }
+      if (event.error?.message) {
+        throw formatActionError(`register ${type.name} hook`, event.error.message);
+      }
+    }
+  }
+
+  async #waitForHook<T>(
+    hookId: string,
+    type: HookType<T>,
+    options: CommandOptions,
+  ): Promise<T> {
+    this.#ensureOpen();
+    this.#stream.write({
+      waitForHook: {
+        hookId,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+
+    while (true) {
+      const event = await this.#queue.next();
+      if (event.hookCompleted?.hookId === hookId) {
+        if (type.name === "newPage" && event.hookCompleted.newPage?.contextSessionId) {
+          return this.#createPage(event.hookCompleted.newPage.contextSessionId) as T;
+        }
+        throw formatActionError(`wait for ${type.name} hook`, "hook returned an invalid result");
+      }
+      if (event.error?.message) {
+        throw formatActionError(`wait for ${type.name} hook`, event.error.message);
       }
     }
   }

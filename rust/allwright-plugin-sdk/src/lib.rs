@@ -104,6 +104,22 @@ pub struct PageInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum HookType {
+    NewPage,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HookRegistration {
+    pub opaque_state: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "hook_type", content = "result", rename_all = "snake_case")]
+pub enum HookResult {
+    NewPage(PageInfo),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AutomationSessionInfo {
     pub bidi_session_id: String,
     pub note: String,
@@ -194,6 +210,14 @@ pub enum PluginCommand {
     },
     OpenPage {
         browser_session: BrowserSessionHandle,
+    },
+    RegisterHook {
+        browser_session: BrowserSessionHandle,
+        hook_type: HookType,
+    },
+    PollHook {
+        browser_session: BrowserSessionHandle,
+        registration: HookRegistration,
     },
     ClosePage {
         browser_session: BrowserSessionHandle,
@@ -367,6 +391,8 @@ pub enum PluginCommand {
 pub enum PluginResult {
     LaunchBrowser(BrowserLaunchInfo),
     OpenPage(PageInfo),
+    RegisterHook(HookRegistration),
+    PollHook(HookResult),
     ClosePage,
     NavigatePage(TabNavigationInfo),
     ClickElement(ClickInfo),

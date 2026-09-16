@@ -6,6 +6,8 @@ mod browser;
 mod command;
 #[path = "client_config.rs"]
 mod config;
+#[path = "client_hook.rs"]
+mod hook;
 #[path = "client_launch.rs"]
 mod launch;
 #[path = "client_locator.rs"]
@@ -30,6 +32,7 @@ mod types;
 mod web_locators;
 
 pub use config::{find_config_file, launch_configured_browser, load_config_file, resolve_config};
+pub use hook::{Hook, HookType, NEW_PAGE, NewPage};
 pub use launch::{chromium, firefox, launch_browser, launch_chrome, launch_firefox};
 pub use runtime::{ping, set_server_addr, shutdown};
 pub use types::*;

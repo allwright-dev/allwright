@@ -20,6 +20,19 @@ await page.click(
 await browser.close();
 ```
 
+Register a typed hook before an action that opens a tab, then wait for its
+typed result afterward:
+
+```ts
+import { firefox, hooks } from "@allwright.dev/core";
+
+const browser = await firefox.launch();
+const page = browser.page();
+const hook = await browser.registerHook(hooks.newPage);
+await page.click("a[target=_blank]");
+const newPage = await hook.wait();
+```
+
 Runnable examples live in [examples/web-basic.ts](./examples/web-basic.ts) and [examples/android-basic.ts](./examples/android-basic.ts).
 
 Shared config files are stack-agnostic and can live in `allwright.config.yaml` or `allwright.config.json`.

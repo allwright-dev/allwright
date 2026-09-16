@@ -180,6 +180,15 @@ pub struct ChromeLaunchedEvent {
     #[prost(string, tag = "5")]
     pub initial_page_session_id: ::prost::alloc::string::String,
 }
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct RegisterNewPageHook {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NewPageHookResult {
+    #[prost(string, tag = "1")]
+    pub context_session_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub note: ::prost::alloc::string::String,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum BrowserKind {
@@ -211,7 +220,10 @@ impl BrowserKind {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SurfaceSessionCommand {
-    #[prost(oneof = "surface_session_command::Command", tags = "1, 2, 3, 4, 5, 6, 7")]
+    #[prost(
+        oneof = "surface_session_command::Command",
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9"
+    )]
     pub command: ::core::option::Option<surface_session_command::Command>,
 }
 /// Nested message and enum types in `SurfaceSessionCommand`.
@@ -232,6 +244,10 @@ pub mod surface_session_command {
         ConnectMobile(super::ConnectMobileCommand),
         #[prost(message, tag = "7")]
         LaunchApp(super::LaunchAppCommand),
+        #[prost(message, tag = "8")]
+        RegisterHook(super::RegisterHookCommand),
+        #[prost(message, tag = "9")]
+        WaitForHook(super::WaitForHookCommand),
     }
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
@@ -246,11 +262,34 @@ pub struct SessionPingCommand {
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct CloseSurfaceSessionCommand {}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct RegisterHookCommand {
+    #[prost(oneof = "register_hook_command::Hook", tags = "1")]
+    pub hook: ::core::option::Option<register_hook_command::Hook>,
+}
+/// Nested message and enum types in `RegisterHookCommand`.
+pub mod register_hook_command {
+    #[derive(Clone, Copy, PartialEq, ::prost::Oneof)]
+    pub enum Hook {
+        #[prost(message, tag = "1")]
+        NewPage(super::RegisterNewPageHook),
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct WaitForHookCommand {
+    #[prost(string, tag = "1")]
+    pub hook_id: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SurfaceSessionEvent {
     #[prost(string, tag = "1")]
     pub session_id: ::prost::alloc::string::String,
-    #[prost(oneof = "surface_session_event::Event", tags = "2, 3, 4, 5, 6, 7, 8, 9")]
+    #[prost(
+        oneof = "surface_session_event::Event",
+        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11"
+    )]
     pub event: ::core::option::Option<surface_session_event::Event>,
 }
 /// Nested message and enum types in `SurfaceSessionEvent`.
@@ -273,6 +312,10 @@ pub mod surface_session_event {
         MobileConnected(super::MobileConnectedEvent),
         #[prost(message, tag = "9")]
         AppLaunched(super::AppLaunchedEvent),
+        #[prost(message, tag = "10")]
+        HookRegistered(super::HookRegisteredEvent),
+        #[prost(message, tag = "11")]
+        HookCompleted(super::HookCompletedEvent),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -296,6 +339,26 @@ pub struct SurfaceSessionClosedEvent {
 pub struct SurfaceSessionErrorEvent {
     #[prost(string, tag = "1")]
     pub message: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct HookRegisteredEvent {
+    #[prost(string, tag = "1")]
+    pub hook_id: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct HookCompletedEvent {
+    #[prost(string, tag = "1")]
+    pub hook_id: ::prost::alloc::string::String,
+    #[prost(oneof = "hook_completed_event::Result", tags = "2")]
+    pub result: ::core::option::Option<hook_completed_event::Result>,
+}
+/// Nested message and enum types in `HookCompletedEvent`.
+pub mod hook_completed_event {
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Result {
+        #[prost(message, tag = "2")]
+        NewPage(super::NewPageHookResult),
+    }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ContextSessionCommand {

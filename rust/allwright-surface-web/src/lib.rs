@@ -5,10 +5,10 @@ pub use accessibility::{accessibility_snapshot, accessibility_snapshot_with_mode
 use allwright_plugin_sdk::{
     ALLWRIGHT_PLUGIN_API_VERSION, AutomationSessionInfo, BrowserKind, BrowserLaunchInfo,
     BrowserSessionHandle, ChromeLaunchInfo, ChromeTabInfo, ChromiumBidiMapperInfo, ClickInfo,
-    ElementCountInfo, FillInfo, FocusInfo, HighlightElementsInfo, HoverInfo, PageInfo,
-    PageSessionHandle, PluginCommand, PluginEnvelope, PluginResult, PressKeyInfo, ScreenshotInfo,
-    SurfaceFamily, SurfacePlugin, SurfacePluginDescriptor, TabNavigationInfo, TextInfo,
-    WaitForSelectorInfo,
+    ElementCountInfo, FillInfo, FocusInfo, HighlightElementsInfo, HookRegistration, HookResult,
+    HookType, HoverInfo, PageInfo, PageSessionHandle, PluginCommand, PluginEnvelope, PluginResult,
+    PressKeyInfo, ScreenshotInfo, SurfaceFamily, SurfacePlugin, SurfacePluginDescriptor,
+    TabNavigationInfo, TextInfo, WaitForSelectorInfo,
 };
 use base64::Engine as _;
 use std::borrow::Cow;
@@ -234,6 +234,116 @@ pub async fn open_page(browser_session: &BrowserSessionHandle) -> Result<PageInf
             })
         }
     }
+}
+
+async fn top_level_page_ids(browser_session: &BrowserSessionHandle) -> Result<Vec<String>, String> {
+    match browser_session {
+        BrowserSessionHandle::Chromium { cdp_websocket_url } => {
+            let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+            let targets = cdp
+                .send_command("Target.getTargets", json!({}), None)
+                .await?;
+            Ok(targets
+                .get("targetInfos")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter(|target| {
+                    target.get("type").and_then(Value::as_str) == Some("page")
+                        && target.get("url").and_then(Value::as_str)
+                            != Some("about:blank#MAPPER_TARGET")
+                })
+                .filter_map(|target| {
+                    target
+                        .get("targetId")
+                        .and_then(Value::as_str)
+                        .map(str::to_string)
+                })
+                .collect())
+        }
+        BrowserSessionHandle::Firefox { connection_id, .. } => {
+            let mut sessions = firefox_session_guard(connection_id).await?;
+            let bidi = &mut sessions
+                .get_mut(connection_id)
+                .expect("Firefox session guard validated connection id")
+                .connection;
+            let tree = bidi
+                .send_command(
+                    "browsingContext.getTree",
+                    json!({
+                        "maxDepth": 0,
+                    }),
+                )
+                .await?;
+            Ok(tree
+                .pointer("/result/contexts")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|context| {
+                    context
+                        .get("context")
+                        .and_then(Value::as_str)
+                        .map(str::to_string)
+                })
+                .collect())
+        }
+    }
+}
+
+pub async fn register_hook(
+    browser_session: &BrowserSessionHandle,
+    hook_type: HookType,
+) -> Result<HookRegistration, String> {
+    let state = match hook_type {
+        HookType::NewPage => json!({
+            "hook_type": "new_page",
+            "existing_page_ids": top_level_page_ids(browser_session).await?,
+        }),
+    };
+    Ok(HookRegistration {
+        opaque_state: state.to_string(),
+    })
+}
+
+pub async fn poll_hook(
+    browser_session: &BrowserSessionHandle,
+    registration: &HookRegistration,
+) -> Result<HookResult, String> {
+    let state: Value = serde_json::from_str(&registration.opaque_state)
+        .map_err(|error| format!("failed to decode web hook state: {error}"))?;
+    if state.get("hook_type").and_then(Value::as_str) != Some("new_page") {
+        return Err("web hook state has an unsupported hook type".to_string());
+    }
+    let existing_page_ids = state
+        .get("existing_page_ids")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "new page hook state is missing existing_page_ids".to_string())?;
+    let page_id = top_level_page_ids(browser_session)
+        .await?
+        .into_iter()
+        .find(|page_id| {
+            !existing_page_ids
+                .iter()
+                .any(|existing| existing.as_str() == Some(page_id))
+        })
+        .ok_or_else(|| "new page hook is still waiting for a page".to_string())?;
+
+    let page_session = match browser_session {
+        BrowserSessionHandle::Chromium { .. } => PageSessionHandle::Chromium {
+            target_id: page_id,
+            browsing_context_id: None,
+            mapper_target_id: None,
+        },
+        BrowserSessionHandle::Firefox { .. } => PageSessionHandle::Firefox {
+            browsing_context_id: page_id,
+        },
+    };
+
+    Ok(HookResult::NewPage(PageInfo {
+        note: "new page hook completed".to_string(),
+        page_session,
+    }))
 }
 
 pub async fn close_page(
@@ -4151,6 +4261,22 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             open_page(&browser_session)
                 .await
                 .map(PluginResult::OpenPage)
+        }),
+        PluginCommand::RegisterHook {
+            browser_session,
+            hook_type,
+        } => block_on_plugin_future(async move {
+            register_hook(&browser_session, hook_type)
+                .await
+                .map(PluginResult::RegisterHook)
+        }),
+        PluginCommand::PollHook {
+            browser_session,
+            registration,
+        } => block_on_plugin_future(async move {
+            poll_hook(&browser_session, &registration)
+                .await
+                .map(PluginResult::PollHook)
         }),
         PluginCommand::ClosePage {
             browser_session,

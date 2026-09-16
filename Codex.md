@@ -341,3 +341,10 @@ xtask/
 - `cargo test -p allwright-surface-mobile-android -p allwright-plugin-sdk --offline` covers native semantics, absolute paths, cache isolation/invalidation and YAML types. Build the CLI and Android plugin, then run `ALLWRIGHT_TEST_MOBILE_SNAPSHOT=1 bun test typescript/core/tests/mobile-snapshot.integration.test.ts` for an opt-in gRPC/dynamic-plugin test using simulated ADB. This fixture does not replace device validation. iOS remains unimplemented.
 
 - Context command execution errors are relayed as `ContextSessionErrorEvent` without terminating the gRPC stream, allowing a client to capture again after a stale-reference failure. Transport failures still terminate the stream.
+
+## Hooks
+
+- Hooks use one typed, two-phase lifecycle across clients: register a `HookType<T>` before the triggering actions, then wait on the returned `Hook<T>` afterward. Do not add event-specific registration or wait methods as new hook types arrive.
+- Core owns only the generic `RegisterHookCommand`, `WaitForHookCommand`, `HookRegisteredEvent`, `HookCompletedEvent`, opaque hook ids/plugin state, retry timing, and lifecycle cleanup. Surface-specific registration/result payloads belong to their surface proto; `RegisterNewPageHook` and `NewPageHookResult` live in `proto/surfaces/web/v1/web.proto`.
+- The first hook type is the web new-page hook. The web plugin snapshots top-level page ids at registration, then resolves the first page absent from that baseline for both Chromium and Firefox. Core converts the returned opaque web page handle into a normal managed context session.
+- Public APIs are `browser.registerHook(hooks.newPage)` in TypeScript, `browser.register_hook(hooks.new_page)` in Python, `browser.registerHook(Hooks.NEW_PAGE)` in Java, `browser.register_hook(NEW_PAGE)` in Rust, and generic `RegisterHook(ctx, browser, Hooks.NewPage)` in Go (which does not support generic methods). Waiting returns a page/tab with the language's normal `Hook<T>` API.

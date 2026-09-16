@@ -5,6 +5,7 @@ from typing import overload
 from ._browser import Browser, BrowserType
 from ._config import find_config_file, load_config_file, resolve_config
 from ._locator import Locator
+from ._hooks import Hook, HookType, hooks
 from ._mobile import (
     AndroidLocator,
     AndroidDevice,

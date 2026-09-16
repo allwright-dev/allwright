@@ -392,6 +392,42 @@ pub async fn open_page(surface_session: &BrowserSessionHandle) -> Result<PageInf
     }
 }
 
+pub async fn register_hook(
+    surface_session: &BrowserSessionHandle,
+    hook_type: allwright_plugin_sdk::HookType,
+) -> Result<allwright_plugin_sdk::HookRegistration, String> {
+    match invoke_web_expected(
+        "RegisterHookCommand",
+        PluginCommand::RegisterHook {
+            browser_session: surface_session.clone(),
+            hook_type,
+        },
+    )
+    .await?
+    {
+        PluginResult::RegisterHook(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for RegisterHook".to_string()),
+    }
+}
+
+pub async fn poll_hook(
+    surface_session: &BrowserSessionHandle,
+    registration: &allwright_plugin_sdk::HookRegistration,
+) -> Result<allwright_plugin_sdk::HookResult, String> {
+    match invoke_web_expected(
+        "WaitForHookCommand",
+        PluginCommand::PollHook {
+            browser_session: surface_session.clone(),
+            registration: registration.clone(),
+        },
+    )
+    .await?
+    {
+        PluginResult::PollHook(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for PollHook".to_string()),
+    }
+}
+
 pub async fn close_page(
     surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,

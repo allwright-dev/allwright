@@ -22,3 +22,12 @@ The surrounding Rust workspace now also publishes:
 - `allwright-surface-desktop-linux`
 
 Installing the `allwright` package is intended to provide the CLI plus this lightweight core together, while surface crates are added separately as plugins.
+
+Typed hooks use one generic registration/wait lifecycle. For example, register
+the web-owned new-page hook before the action that opens a tab:
+
+```rust,no_run
+let hook = browser.register_hook(allwright::NEW_PAGE).await?;
+page.click("a[target=_blank]").await?;
+let new_page = hook.wait().await?;
+```

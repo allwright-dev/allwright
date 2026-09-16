@@ -18,6 +18,8 @@ message SurfaceSessionCommand {
     LaunchBrowserCommand launch_browser = 5;
     ConnectMobileCommand connect_mobile = 6;
     LaunchAppCommand launch_app = 7;
+    RegisterHookCommand register_hook = 8;
+    WaitForHookCommand wait_for_hook = 9;
   }
 }
 
@@ -31,6 +33,17 @@ message SessionPingCommand {
 
 message CloseSurfaceSessionCommand {}
 
+message RegisterHookCommand {
+  oneof hook {
+    RegisterNewPageHook new_page = 1;
+  }
+}
+
+message WaitForHookCommand {
+  string hook_id = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
 message SurfaceSessionEvent {
   string session_id = 1;
 
@@ -43,6 +56,8 @@ message SurfaceSessionEvent {
     BrowserLaunchedEvent browser_launched = 7;
     MobileConnectedEvent mobile_connected = 8;
     AppLaunchedEvent app_launched = 9;
+    HookRegisteredEvent hook_registered = 10;
+    HookCompletedEvent hook_completed = 11;
   }
 }
 
@@ -61,4 +76,16 @@ message SurfaceSessionClosedEvent {
 
 message SurfaceSessionErrorEvent {
   string message = 1;
+}
+
+message HookRegisteredEvent {
+  string hook_id = 1;
+}
+
+message HookCompletedEvent {
+  string hook_id = 1;
+
+  oneof result {
+    NewPageHookResult new_page = 2;
+  }
 }

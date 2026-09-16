@@ -11,6 +11,8 @@ from .client import (
     FillResult,
     HighlightOptions,
     HighlightResult,
+    Hook,
+    HookType,
     LaunchOptions,
     Locator,
     AllwrightConfig,
@@ -40,6 +42,7 @@ from .client import (
     set_server_addr,
     shutdown,
     mobile,
+    hooks,
 )
 
 __all__ = [
@@ -55,6 +58,8 @@ __all__ = [
     "FillResult",
     "HighlightOptions",
     "HighlightResult",
+    "Hook",
+    "HookType",
     "LaunchOptions",
     "Locator",
     "AllwrightConfig",
@@ -84,4 +89,5 @@ __all__ = [
     "set_server_addr",
     "shutdown",
     "mobile",
+    "hooks",
 ]

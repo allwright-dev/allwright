@@ -6,7 +6,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::plugin_loader as web_lib;
 use crate::proto;
-use allwright_plugin_sdk::{BrowserSessionHandle, PageSessionHandle};
+use allwright_plugin_sdk::{
+    BrowserSessionHandle, HookRegistration, HookResult, HookType as PluginHookType,
+    PageSessionHandle,
+};
 use allwright_surface_mobile::{
     ConnectOptions as MobileConnectOptions, DeviceConnectionKind as MobileDeviceConnectionKind,
     LaunchOptions as MobileLaunchOptions, MobileBrowserSessionHandle, MobilePageSessionHandle,
@@ -27,21 +30,25 @@ use proto::{
     ContextSessionPongEvent, CountElementsCommand, DeviceConnectionKind, ElementClickedEvent,
     ElementCountedEvent, ElementFilledEvent, ElementFocusedEvent, ElementHoveredEvent,
     ElementsHighlightedEvent, FillElementCommand, FocusElementCommand, GetInnerTextCommand,
-    GetTextContentCommand, HighlightElementsCommand, HoverElementCommand, InnerTextResolvedEvent,
-    KeyPressedEvent, LaunchAppCommand, LaunchBrowserCommand, LaunchChromeCommand,
-    MobileConnectedEvent, MobilePlatform as ProtoMobilePlatform, NavigatePageCommand,
+    GetTextContentCommand, HighlightElementsCommand, HookCompletedEvent, HookRegisteredEvent,
+    HoverElementCommand, InnerTextResolvedEvent, KeyPressedEvent, LaunchAppCommand,
+    LaunchBrowserCommand, LaunchChromeCommand, MobileConnectedEvent,
+    MobilePlatform as ProtoMobilePlatform, NavigatePageCommand, NewPageHookResult,
     OpenContextCommand, PageNavigatedEvent, PingRequest, PingResponse, PressKeyCommand,
-    ScreenshotCapturedEvent, ScreenshotCommand, SelectorWaitSatisfiedEvent, SessionPingCommand,
-    SessionPongEvent, SurfaceSessionClosedEvent, SurfaceSessionCommand, SurfaceSessionErrorEvent,
-    SurfaceSessionEvent, TextContentResolvedEvent, WaitForSelectorCommand,
-    context_session_command::Command as ContextCommand,
+    RegisterHookCommand, ScreenshotCapturedEvent, ScreenshotCommand, SelectorWaitSatisfiedEvent,
+    SessionPingCommand, SessionPongEvent, SurfaceSessionClosedEvent, SurfaceSessionCommand,
+    SurfaceSessionErrorEvent, SurfaceSessionEvent, TextContentResolvedEvent, WaitForHookCommand,
+    WaitForSelectorCommand, context_session_command::Command as ContextCommand,
     context_session_event::Event as ContextEvent,
+    hook_completed_event::Result as HookCompletionResult,
+    register_hook_command::Hook as RegisterHook,
     surface_session_command::Command as SurfaceCommand,
     surface_session_event::Event as SurfaceEvent,
 };
 
 static BROWSER_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 static TAB_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
+static HOOK_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Clone)]
 struct BrowserAutomationState {
@@ -64,6 +71,12 @@ struct TabSessionState {
     surface_session_id: String,
     page_session: EnginePageSessionHandle,
     current_url: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct HookState {
+    surface_session_id: String,
+    registration: HookRegistration,
 }
 
 #[derive(Debug, Clone)]
@@ -128,6 +141,7 @@ fn proto_device_connection_kind(value: MobileDeviceConnectionKind) -> DeviceConn
 struct EngineState {
     browser_sessions: HashMap<String, BrowserSessionState>,
     tab_sessions: HashMap<String, TabSessionState>,
+    hooks: HashMap<String, HookState>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -215,6 +229,10 @@ fn next_context_session_id() -> String {
         "tab-session-{}",
         TAB_SESSION_COUNTER.fetch_add(1, Ordering::Relaxed)
     )
+}
+
+fn next_hook_id() -> String {
+    format!("hook-{}", HOOK_COUNTER.fetch_add(1, Ordering::Relaxed))
 }
 
 fn browser_event(session_id: &str, event: SurfaceEvent) -> SurfaceSessionEvent {
@@ -596,6 +614,148 @@ async fn handle_browser_command(
                 ),
                 should_close: false,
             })
+        }
+        Some(SurfaceCommand::RegisterHook(RegisterHookCommand { hook })) => {
+            let plugin_hook_type = match hook {
+                Some(RegisterHook::NewPage(_)) => PluginHookType::NewPage,
+                None => {
+                    return Ok(CommandOutcome {
+                        event: browser_event(
+                            session_id,
+                            SurfaceEvent::Error(SurfaceSessionErrorEvent {
+                                message: "register_hook requires a typed hook payload".to_string(),
+                            }),
+                        ),
+                        should_close: false,
+                    });
+                }
+            };
+            let surface_session = {
+                let state = state.lock().await;
+                state
+                    .browser_sessions
+                    .get(session_id)
+                    .filter(|session| session.launched)
+                    .and_then(|session| session.surface_session.clone())
+            };
+            let Some(EngineBrowserSessionHandle::Web(surface_session)) = surface_session else {
+                return Ok(CommandOutcome {
+                    event: browser_event(
+                        session_id,
+                        SurfaceEvent::Error(SurfaceSessionErrorEvent {
+                            message: "this hook type requires a launched web browser session"
+                                .to_string(),
+                        }),
+                    ),
+                    should_close: false,
+                });
+            };
+
+            match web_lib::register_hook(&surface_session, plugin_hook_type).await {
+                Ok(registration) => {
+                    let hook_id = next_hook_id();
+                    state.lock().await.hooks.insert(
+                        hook_id.clone(),
+                        HookState {
+                            surface_session_id: session_id.to_string(),
+                            registration,
+                        },
+                    );
+                    Ok(CommandOutcome {
+                        event: browser_event(
+                            session_id,
+                            SurfaceEvent::HookRegistered(HookRegisteredEvent { hook_id }),
+                        ),
+                        should_close: false,
+                    })
+                }
+                Err(message) => Ok(CommandOutcome {
+                    event: browser_event(
+                        session_id,
+                        SurfaceEvent::Error(SurfaceSessionErrorEvent { message }),
+                    ),
+                    should_close: false,
+                }),
+            }
+        }
+        Some(SurfaceCommand::WaitForHook(WaitForHookCommand {
+            hook_id,
+            retry_options,
+        })) => {
+            let (surface_session, hook) = {
+                let state = state.lock().await;
+                (
+                    state
+                        .browser_sessions
+                        .get(session_id)
+                        .and_then(|session| session.surface_session.clone()),
+                    state.hooks.get(&hook_id).cloned(),
+                )
+            };
+            let Some(hook) = hook.filter(|hook| hook.surface_session_id == session_id) else {
+                return Ok(CommandOutcome {
+                    event: browser_event(
+                        session_id,
+                        SurfaceEvent::Error(SurfaceSessionErrorEvent {
+                            message: format!("hook {hook_id} is not registered"),
+                        }),
+                    ),
+                    should_close: false,
+                });
+            };
+            let Some(EngineBrowserSessionHandle::Web(surface_session)) = surface_session else {
+                return Ok(CommandOutcome {
+                    event: browser_event(
+                        session_id,
+                        SurfaceEvent::Error(SurfaceSessionErrorEvent {
+                            message: "hook browser session is not available".to_string(),
+                        }),
+                    ),
+                    should_close: false,
+                });
+            };
+
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            match retry_with_timeout(retry_policy, || async {
+                web_lib::poll_hook(&surface_session, &hook.registration).await
+            })
+            .await
+            {
+                Ok(HookResult::NewPage(page)) => {
+                    let context_session_id = next_context_session_id();
+                    let note = page.note;
+                    let mut state = state.lock().await;
+                    state.hooks.remove(&hook_id);
+                    state.tab_sessions.insert(
+                        context_session_id.clone(),
+                        TabSessionState {
+                            surface_session_id: session_id.to_string(),
+                            page_session: EnginePageSessionHandle::Web(page.page_session),
+                            current_url: None,
+                        },
+                    );
+                    Ok(CommandOutcome {
+                        event: browser_event(
+                            session_id,
+                            SurfaceEvent::HookCompleted(HookCompletedEvent {
+                                hook_id,
+                                result: Some(HookCompletionResult::NewPage(NewPageHookResult {
+                                    context_session_id,
+                                    note,
+                                })),
+                            }),
+                        ),
+                        should_close: false,
+                    })
+                }
+                Err(message) => Ok(CommandOutcome {
+                    event: browser_event(
+                        session_id,
+                        SurfaceEvent::Error(SurfaceSessionErrorEvent { message }),
+                    ),
+                    should_close: false,
+                }),
+            }
         }
         Some(SurfaceCommand::Ping(SessionPingCommand { message })) => Ok(CommandOutcome {
             event: browser_event(
@@ -1579,6 +1739,9 @@ impl EngineService for EngineGrpcService {
             state
                 .tab_sessions
                 .retain(|_, context_session| context_session.surface_session_id != session_id);
+            state
+                .hooks
+                .retain(|_, hook| hook.surface_session_id != session_id);
         });
 
         Ok(Response::new(Box::pin(ReceiverStream::new(rx))))
