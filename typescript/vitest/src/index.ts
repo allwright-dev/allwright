@@ -13,6 +13,8 @@ import {
   type Browser,
   type BrowserKind,
   type CommandOptions,
+  type Hook,
+  type HookType,
   type LaunchOptions,
   type Locator,
   type MobileAndroidLocator,
@@ -330,6 +332,9 @@ function createLazyBrowser(browserResource: LazyResource<Browser>): Browser {
     },
     async newTab(options?: CommandOptions) {
       return (await browserResource.get()).newTab(options);
+    },
+    async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
+      return (await browserResource.get()).registerHook(type);
     },
     async close() {
       await (await browserResource.get()).close();
