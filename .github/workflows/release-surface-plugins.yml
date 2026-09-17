@@ -232,8 +232,42 @@ jobs:
         shell: bash
         run: ./scripts/publish-crates.sh publish mobile-android
 
+  ensure-github-release:
+    name: Ensure GitHub release exists
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Create release when absent
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              exit 0
+            fi
+            if gh release create "$TAG_NAME" --verify-tag --title "$TAG_NAME" --notes "" --repo "$GITHUB_REPOSITORY"; then
+              exit 0
+            fi
+            if [[ "$attempt" -lt 5 ]]; then
+              sleep_seconds=$((attempt * 10))
+              echo "GitHub release lookup/create attempt ${attempt}/5 failed; retrying in ${sleep_seconds}s"
+              sleep "$sleep_seconds"
+            fi
+          done
+          echo "failed to find or create GitHub release $TAG_NAME" >&2
+          exit 1
+
   release-allwright-cli:
     name: Release allwright CLI (${{ matrix.target }})
+    needs: ensure-github-release
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -299,12 +333,16 @@ jobs:
           echo "asset_path=${asset_path}" >> "$GITHUB_OUTPUT"
 
       - name: Upload release asset
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ steps.package.outputs.asset_path }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+          ASSET_PATH: ${{ steps.package.outputs.asset_path }}
+        run: bash ./scripts/upload-release-asset.sh "$TAG_NAME" "$ASSET_PATH"
 
   release-web-plugin:
     name: Release web plugin (${{ matrix.target }})
+    needs: ensure-github-release
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -370,12 +408,16 @@ jobs:
           echo "asset_path=${asset_path}" >> "$GITHUB_OUTPUT"
 
       - name: Upload release asset
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ steps.package.outputs.asset_path }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+          ASSET_PATH: ${{ steps.package.outputs.asset_path }}
+        run: bash ./scripts/upload-release-asset.sh "$TAG_NAME" "$ASSET_PATH"
 
   release-mobile-android-plugin:
     name: Release mobile-android plugin (${{ matrix.target }})
+    needs: ensure-github-release
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -441,6 +483,9 @@ jobs:
           echo "asset_path=${asset_path}" >> "$GITHUB_OUTPUT"
 
       - name: Upload release asset
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ steps.package.outputs.asset_path }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+          ASSET_PATH: ${{ steps.package.outputs.asset_path }}
+        run: bash ./scripts/upload-release-asset.sh "$TAG_NAME" "$ASSET_PATH"
