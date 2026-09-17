@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: "/how-it-works", label: "How it works" },
   { href: "/quickstart", label: "Quickstart" },
   { href: "/availability", label: "Availability" },
+  { href: "/reference", label: "Reference" },
   { href: "/changelog", label: "Changelog" },
   { href: "/blog", label: "Blog" },
 ];
@@ -30,7 +31,7 @@ export function SiteHeader() {
 
       <nav
         aria-label="Primary"
-        className="flex items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--card)] p-1 backdrop-blur-xl sm:justify-self-center"
+        className="flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-[var(--line)] bg-[var(--card)] p-1 backdrop-blur-xl sm:justify-self-center"
       >
         {NAV_LINKS.map((link) => {
           const active = pathname === link.href;
@@ -39,7 +40,7 @@ export function SiteHeader() {
               key={link.href}
               href={link.href}
               aria-current={active ? "page" : undefined}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+              className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition ${
                 active
                   ? "bg-[var(--accent-soft)] text-[var(--accent-2)]"
                   : "text-[var(--muted)] hover:text-[var(--ink)]"

@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 
 import { getAllPosts } from "./blog/blog-data";
 import { SITE_URL } from "./brand";
+import { getLanguageIds, getReference } from "./reference/data";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const posts = getAllPosts();
@@ -31,6 +32,26 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 0.8,
     },
+    {
+      url: `${SITE_URL}/reference`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    ...getLanguageIds().flatMap((language) => [
+      {
+        url: `${SITE_URL}/reference/${language}`,
+        lastModified: new Date(),
+        changeFrequency: "weekly" as const,
+        priority: 0.7,
+      },
+      ...(getReference(language)?.modules ?? []).map((module) => ({
+        url: `${SITE_URL}/reference/${language}/${module.slug}`,
+        lastModified: new Date(),
+        changeFrequency: "weekly" as const,
+        priority: 0.6,
+      })),
+    ]),
     {
       url: `${SITE_URL}/changelog`,
       lastModified: new Date(),
