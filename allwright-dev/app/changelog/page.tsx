@@ -79,10 +79,10 @@ export default function Changelog() {
           .
         </p>
         <p className="mt-4 text-sm leading-6 text-[var(--muted)]">
-          Latest is <strong className="font-semibold text-[var(--ink)]">v0.1.4</strong>
-          , four releases past allwright&apos;s first minor version. Read{" "}
-          <Link href="/blog/v0-1-0-is-here" className="font-medium text-[var(--accent-2)] hover:underline">
-            what&apos;s landed since v0.1.0 shipped
+          Latest is <strong className="font-semibold text-[var(--ink)]">v0.1.7</strong>
+          , which rounds out typed hooks with file choosers and downloads. Read{" "}
+          <Link href="/blog/hooks-popups-uploads-downloads" className="font-medium text-[var(--accent-2)] hover:underline">
+            how hooks catch popups, uploads, and downloads
           </Link>
           .
         </p>

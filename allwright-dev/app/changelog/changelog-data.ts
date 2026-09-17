@@ -15,6 +15,34 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "v0.1.7",
+    date: "2026-09-17",
+    title: "File chooser and download hooks",
+    highlights: [
+      "Two new typed hooks join newPage on the same register-then-wait lifecycle: fileChooser intercepts the native file picker (no OS dialog ever renders) and resolves to a typed chooser whose setFiles/set_files/SetFiles hands it one or more paths.",
+      "download resolves as soon as a download starts, exposing url and suggestedFilename immediately; its saveAs/save_as/SaveAs waits for the download to finish and copies it to the given path.",
+      "Shipped across all five clients at once, reusing the same generic RegisterHookCommand/WaitForHookCommand engine primitives newPage already used.",
+    ],
+  },
+  {
+    version: "v0.1.6",
+    date: "2026-09-16",
+    title: "New-page hook made page-scoped, and correctly attributed",
+    highlights: [
+      "Fixed a real correctness bug: registering the new-page hook on the browser and resolving to \"the first new page since registration\" could hand back an unrelated tab if more than one could plausibly open around the same time.",
+      "Hooks now register on the page that triggers the event, not the browser, and resolve to the new page whose opener is specifically that page — page.registerHook(...) replaces browser.registerHook(...) across all five clients.",
+    ],
+  },
+  {
+    version: "v0.1.5",
+    date: "2026-09-16",
+    title: "Hooks arrive: coordinating browser-native events",
+    highlights: [
+      "Introduced typed hooks — a generic register-then-wait lifecycle for browser-native events that fire asynchronously outside any direct call, so a test can start listening before the triggering action instead of racing it.",
+      "The first hook type: newPage, for tabs opened by a click — hook.wait() resolves to a normal Page, with the same actions and retrying assertions as any other.",
+    ],
+  },
+  {
     version: "v0.1.4",
     date: "2026-09-07",
     title: "Accessibility snapshots reach Android",

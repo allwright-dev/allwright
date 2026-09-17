@@ -1,0 +1,196 @@
+---
+title: "Hooks: catching popups, uploads, and downloads without racing your test"
+description: "allwright v0.1.5–v0.1.7 shipped typed hooks — a register-then-wait lifecycle across all five clients for new tabs, native file pickers, and downloads, so you never race a browser-native event again."
+date: "2026-09-17"
+author: "The allwright team"
+published: true
+tags: ["hooks", "release", "changelog", "web testing", "file upload", "download", "popup"]
+keywords:
+  [
+    "handle new tab automation",
+    "playwright popup window alternative",
+    "file upload testing automation",
+    "file download testing automation",
+    "native file chooser testing",
+    "typed hooks browser testing",
+    "allwright hooks api",
+  ]
+---
+
+Three kinds of browser behavior never happen on your test's schedule: a link
+opens a new tab, a button pops the OS-native file picker, an anchor kicks off
+a download. All three start asynchronously, outside anything your test called
+directly, and all three are gone — the tab closed, the picker dismissed, the
+download finished — if you start looking for them a beat too late. **v0.1.5
+through v0.1.7** shipped the fix: typed hooks, one register-then-wait
+lifecycle, reused for all three, across every client language.
+
+## The shape of the problem
+
+You can't `click()` your way to a new tab's `Page` object, a file chooser, or
+a `Download` handle — those only exist once the browser-native event actually
+fires, which is *after* the action that triggers it. Wait for the event first
+and you might miss the click. Click first and look afterward and you might
+miss the event. The only correct order is: start listening, take the action,
+then wait for what you started listening for.
+
+That's exactly the two-phase shape allwright's hooks give you:
+
+```ts
+const hook = await page.registerHook(hooks.newPage); // 1. start listening
+await page.click("a[target=_blank]");                // 2. take the action
+const newPage = await hook.wait();                    // 3. wait for it
+```
+
+Registering captures the page's state *before* the triggering action runs, so
+the event can't sneak in and get missed between steps 2 and 3. Under the
+hood, `RegisterHookCommand` and `WaitForHookCommand` are the only engine
+primitives involved — generic, typed, and identical regardless of which of
+the three event kinds you're waiting for.
+
+## The three hooks, today
+
+### New tabs — `hooks.newPage`
+
+```ts
+import { expect, test } from "@allwright.dev/vitest";
+import { hooks } from "@allwright.dev/core";
+
+const WEB_URL = "https://themoderninternet.vercel.app";
+const ENTRY_SELECTOR =
+  "xpath=//div[contains(@class,'card')][.//h2[normalize-space()='Multiple Windows']]//button[normalize-space()='Visit page']";
+const HEADING_SELECTOR = 'xpath=//h1[text()="Multiple Windows"]';
+
+test("opens the Multiple Windows page", { timeout: 30_000 }, async ({ page }) => {
+  await page.goto(WEB_URL);
+  await page.click(ENTRY_SELECTOR);
+  await expect(page.locator(HEADING_SELECTOR)).toHaveText("Multiple Windows");
+
+  const hook = await page.registerHook(hooks.newPage);
+  await page.click('[data-testid="open-link"]');
+  const np = await hook.wait();
+  await expect(np.getByText("Marketing announcement")).toBeVisible();
+});
+```
+
+`hook.wait()` resolves to a normal `Page` — same `click`, `getByText`, same
+retrying `expect` as the page that opened it. Nothing app-specific to learn
+for a second window.
+
+### File uploads — `hooks.fileChooser`
+
+```ts
+import { expect, test } from "@allwright.dev/vitest";
+import { hooks } from "@allwright.dev/core";
+
+const Page = "File Upload";
+const WEB_URL = "https://themoderninternet.vercel.app";
+const ENTRY_SELECTOR =
+  `xpath=//div[contains(@class,'card')][.//h2[normalize-space()='${Page}']]//button[normalize-space()='Visit page']`;
+const HEADING_SELECTOR = `xpath=//h1[text()="${Page}"]`;
+
+test(`opens the ${Page} page`, { timeout: 30_000 }, async ({ page }) => {
+  await page.goto(WEB_URL);
+  await page.click(ENTRY_SELECTOR);
+  const hook = await page.registerHook(hooks.fileChooser);
+  await page.click("#file-upload-input");
+  const chooser = await hook.wait();
+  await chooser.setFiles("README.md");
+  await page.click('[data-testid="upload-button"]');
+});
+```
+
+No OS dialog ever actually opens — allwright intercepts the file chooser at
+the browser level, so `setFiles` hands it a path (or an array of paths, for a
+multi-select input) and the native picker never has to render at all.
+
+### Downloads — `hooks.download`
+
+```ts
+import { expect, test } from "@allwright.dev/vitest";
+import { hooks } from "@allwright.dev/core";
+
+const Page = "File Download";
+const WEB_URL = "https://themoderninternet.vercel.app";
+const ENTRY_SELECTOR =
+  `xpath=//div[contains(@class,'card')][.//h2[normalize-space()='${Page}']]//button[normalize-space()='Visit page']`;
+const HEADING_SELECTOR = `xpath=//h1[text()="${Page}"]`;
+
+test(`opens the ${Page} page`, { timeout: 30_000 }, async ({ page }) => {
+  await page.goto(WEB_URL);
+  await page.click(ENTRY_SELECTOR);
+  const hook = await page.registerHook(hooks.download);
+  await page.click(`[download="README.md"]`);
+  const download = await hook.wait();
+  await download.saveAs("README1.md");
+});
+```
+
+`hook.wait()` resolves as soon as the download *starts* — it hands back the
+download's `url` and `suggestedFilename` immediately, so you can branch on
+metadata without stalling on a large file. `saveAs()` is the part that
+actually waits for the bytes to land, then copies the finished file to the
+path you gave it.
+
+## The same lifecycle, every language
+
+`register` / `wait` is the whole API. Only the spelling changes:
+
+| Language | Register | Wait |
+| --- | --- | --- |
+| TypeScript | `page.registerHook(hooks.newPage)` | `hook.wait()` |
+| Python | `page.register_hook(hooks.new_page)` | `hook.wait()` |
+| Java | `page.registerHook(Hooks.NEW_PAGE)` | `hook.waitFor()` |
+| Rust | `page.register_hook(allwright::NEW_PAGE).await?` | `hook.wait().await?` |
+| Go | `allwright.RegisterHook(ctx, page, allwright.Hooks.NewPage)` | `hook.Wait(ctx)` |
+
+Go spells it as a free function rather than a method because Go doesn't
+support generic methods — `RegisterHook[T]` has to live at package scope to
+stay typed. Every other client hangs it directly off `Page`.
+
+## What changed across v0.1.5–v0.1.7
+
+Hooks didn't ship complete on day one — three releases in three days, each
+correcting course on the last:
+
+- **v0.1.5** — the first hook type: `newPage`, registered on the *browser*.
+  It snapshotted every open page at registration time, then resolved to
+  whichever page turned up afterward that wasn't in that snapshot.
+- **v0.1.6** — a real bug fix, not just an API tweak. Registering on the
+  browser and picking "the first new page since registration" breaks the
+  moment two tabs can plausibly open around the same time — you could get
+  back a tab that had nothing to do with the click you were coordinating.
+  The fix moved registration to the *page* that triggers the event and
+  changed resolution to match the new page whose opener is specifically that
+  page — `browser.registerHook(...)` became `page.registerHook(...)`, and the
+  hook now can't be misattributed to an unrelated tab.
+- **v0.1.7** — `fileChooser` and `download` landed on the same corrected,
+  page-scoped lifecycle, across all five clients at once, plus `Download`
+  and `FileChooser` result types with `saveAs` / `setFiles`.
+
+The full tag-by-tag history — including everything else that shipped
+alongside these — is on the [Changelog](/changelog).
+
+## Why one lifecycle, not three APIs
+
+The engine only knows about two commands, `RegisterHookCommand` and
+`WaitForHookCommand`, plus two events, `HookRegisteredEvent` and
+`HookCompletedEvent` — opaque hook ids, retry timing, and lifecycle cleanup,
+nothing event-specific. `RegisterNewPageHook`, `RegisterFileChooserHook`,
+`RegisterDownloadHook`, and their typed results live in the web surface's own
+proto, not in core. That split is deliberate: it means the *next* hook —
+`beforeunload`/native `dialog` handling is the obvious next candidate — is a
+new surface-owned registration and result type reusing the exact same
+register/wait plumbing, not a fourth bespoke API to design, implement five
+times, and document.
+
+## Where to go next
+
+- Read the [Changelog](/changelog) for the full v0.1.5–v0.1.7 history, and
+  everything shipped since.
+- Read the [hooks section of the README](https://github.com/allwright-dev/allwright#readme)
+  for the complete, current API across all five clients.
+- Check [Availability](/availability) for the current, capability-by-capability
+  picture of what's real today.
+- Star or watch [the repo](https://github.com/allwright-dev/allwright) — the
+  next hook type is already the obvious next step.

@@ -289,12 +289,83 @@ function InitOgDiagram() {
   );
 }
 
+// Same "register, then wait, into three typed results" story as HooksHero
+// in hero-image.tsx, compressed to fit the thumbnail: one page node feeding
+// a short fan of three outcome chips instead of a full before/after compare.
+function HooksOgDiagram() {
+  const { width, height } = DIAGRAM_SIZE;
+  const coreX = 210;
+  const outcomes = [
+    { label: "New tab", y: 30 },
+    { label: "File chooser", y: 116 },
+    { label: "Download", y: 202 },
+  ];
+
+  return (
+    <div style={{ position: "relative", width, height, display: "flex" }}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ position: "absolute", left: 0, top: 0 }}>
+        <rect x={0} y={92} width={140} height={76} rx={14} fill="rgba(16,41,45,0.55)" stroke={LINE} strokeWidth={2} />
+        {outcomes.map((outcome) => (
+          <line
+            key={`line-${outcome.label}`}
+            x1={146}
+            y1={130}
+            x2={coreX + 60}
+            y2={outcome.y + 20}
+            stroke={BRAND_TO}
+            strokeWidth={2}
+          />
+        ))}
+        {outcomes.map((outcome) => (
+          <rect
+            key={`box-${outcome.label}`}
+            x={coreX + 60}
+            y={outcome.y}
+            width={150}
+            height={40}
+            rx={10}
+            fill="none"
+            stroke={BRAND_TO}
+            strokeWidth={2}
+          />
+        ))}
+      </svg>
+
+      <div style={{ position: "absolute", left: 22, top: 118, display: "flex", fontSize: 13, fontFamily: "monospace", color: BRAND_TO }}>
+        registerHook()
+      </div>
+      <div style={{ position: "absolute", left: 22, top: 142, display: "flex", fontSize: 14, fontWeight: 700, color: INK_SOFT }}>
+        page
+      </div>
+      {outcomes.map((outcome) => (
+        <div
+          key={`label-${outcome.label}`}
+          style={{
+            position: "absolute",
+            left: coreX + 60 + 75,
+            top: outcome.y + 12,
+            transform: "translateX(-50%)",
+            display: "flex",
+            fontSize: 13,
+            fontWeight: 600,
+            color: INK,
+          }}
+        >
+          {outcome.label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const ogHeroRegistry: Record<string, () => React.ReactElement> = {
   "get-started-with-typescript": TypeScriptOgDiagram,
   "why-allwright-if-playwright-exists": EngineOgDiagram,
   "android-testing-playwright-style": AndroidOgDiagram,
   "road-to-v0-1-0": RoadmapOgDiagram,
   "npm-init-allwright": InitOgDiagram,
+  "v0-1-0-is-here": MilestoneOgDiagram,
+  "hooks-popups-uploads-downloads": HooksOgDiagram,
 };
 
 /** Returns the post's diagram element for its social-preview card, or null for posts without one (their card falls back to a text-only layout). */

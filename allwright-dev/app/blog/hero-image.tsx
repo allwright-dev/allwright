@@ -485,6 +485,88 @@ function InitHero({ variant }: { variant?: HeroVariant }) {
   );
 }
 
+// Two-panel comparison, same shape as EngineHero: left shows the race you
+// get without a hook (a click and a browser-native event fired at each
+// other, dashed, with no coordination — hence "missed"), right shows the
+// three-phase register → act → wait lifecycle resolving cleanly into the
+// three typed results that ship today, all solid because all three are real.
+function HooksHero({ variant }: { variant?: HeroVariant }) {
+  const outcomes = [
+    { label: "New tab", y: 96 },
+    { label: "File chooser", y: 230 },
+    { label: "Download", y: 364 },
+  ];
+
+  return (
+    <HeroFrame
+      variant={variant}
+      label="Left: a click and a browser event fired at each other with no coordination, dashed, colliding and missed. Right: a page registers a hook first, then the click runs, then wait resolves cleanly into one of three typed results — new tab, file chooser, or download."
+    >
+      <defs>
+        <ArrowMarker id="hero-hooks-arrow" />
+      </defs>
+
+      <text x={230} y={54} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--muted)">
+        Without a hook
+      </text>
+      <line x1={110} y1={210} x2={330} y2={250} stroke="currentColor" strokeWidth="1.4" strokeDasharray="4 3" opacity="0.7" />
+      <line x1={110} y1={250} x2={330} y2={210} stroke="currentColor" strokeWidth="1.4" strokeDasharray="4 3" opacity="0.7" />
+      <text x={130} y={196} fontSize="13" fontFamily="var(--font-mono)" fill="var(--muted)">
+        click()
+      </text>
+      <text x={260} y={278} fontSize="13" fontFamily="var(--font-mono)" fill="var(--muted)">
+        new tab fires
+      </text>
+      <circle cx={220} cy={230} r={20} fill="none" stroke="var(--muted)" strokeWidth="1.6" />
+      <line x1={207} y1={217} x2={233} y2={243} stroke="var(--muted)" strokeWidth="1.6" />
+      <line x1={233} y1={217} x2={207} y2={243} stroke="var(--muted)" strokeWidth="1.6" />
+      <text x={220} y={278} textAnchor="middle" fontSize="12" fill="var(--muted)">
+        missed
+      </text>
+
+      <line x1={600} y1={40} x2={600} y2={420} stroke="currentColor" strokeWidth="1" opacity="0.3" strokeDasharray="2 6" />
+
+      <text x={890} y={54} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--muted)">
+        Register, then wait
+      </text>
+
+      {/* Page node */}
+      <rect x={660} y={195} width={130} height={70} rx={14} fill="var(--card)" stroke="currentColor" strokeWidth="1" />
+      <text x={725} y={235} textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--ink)">
+        page
+      </text>
+      <text x={725} y={180} textAnchor="middle" fontSize="11.5" fontFamily="var(--font-mono)" fill="var(--muted)">
+        registerHook()
+      </text>
+
+      {outcomes.map((outcome) => (
+        <line
+          key={`line-${outcome.label}`}
+          x1={790}
+          y1={225}
+          x2={1000}
+          y2={outcome.y + 32}
+          stroke="currentColor"
+          strokeWidth="1.4"
+          markerEnd="url(#hero-hooks-arrow)"
+        />
+      ))}
+
+      {outcomes.map((outcome) => (
+        <g key={`node-${outcome.label}`}>
+          <rect x={1000} y={outcome.y} width={170} height={64} rx={14} fill="var(--card)" stroke="var(--accent)" strokeWidth="1.4" />
+          <text x={1085} y={outcome.y + 30} textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--ink)">
+            {outcome.label}
+          </text>
+          <text x={1085} y={outcome.y + 49} textAnchor="middle" fontSize="10.5" fill="var(--accent)">
+            ● caught
+          </text>
+        </g>
+      ))}
+    </HeroFrame>
+  );
+}
+
 function DefaultHero({ variant }: { variant?: HeroVariant }) {
   return (
     <HeroFrame variant={variant} label="The allwright logo mark on a gradient card">
@@ -513,6 +595,7 @@ const heroRegistry: Record<string, (props: { variant?: HeroVariant }) => React.R
   "road-to-v0-1-0": RoadmapHero,
   "npm-init-allwright": InitHero,
   "v0-1-0-is-here": MilestoneHero,
+  "hooks-popups-uploads-downloads": HooksHero,
 };
 
 export function HeroImage({ slug, variant }: { slug: string; variant?: HeroVariant }) {
