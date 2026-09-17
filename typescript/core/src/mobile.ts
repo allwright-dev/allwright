@@ -1,5 +1,7 @@
 import { createBrowserSessionHandle, createPageHandle, getRuntime } from "./runtime.js";
-import { writeFile } from "node:fs/promises";
+import { open, rename, unlink, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { basename } from "node:path";
 import { chainMobileSelectorForTransport, normalizeMobileSelectorForTransport } from "./mobileSelectors.js";
 import type {
   AccessibilitySnapshotOptions,
@@ -11,6 +13,10 @@ import type {
   ElementResult,
   EventQueue,
   FillResult,
+  FileChooser,
+  Download,
+  Hook,
+  HookType,
   MobileAndroidConnectOptions,
   MobileAndroidDevice,
   MobileAndroidLaunchOptions,
@@ -44,6 +50,174 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
 
   locator(selector: string): MobileAndroidLocator {
     return new MobileAndroidLocatorImpl(this, normalizeMobileSelectorForTransport(selector));
+  }
+
+  async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
+    if (type.name !== "fileChooser" && type.name !== "download") {
+      throw new Error(`hook type ${type.name} is not supported by Android apps`);
+    }
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.#surfaceSessionId,
+      contextSessionId: this.sessionId,
+      registerHook: type.name === "fileChooser"
+        ? { mobileFileChooser: {} }
+        : { mobileDownload: {} },
+    });
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.hookRegistered?.hookId) {
+        const hookId = event.hookRegistered.hookId;
+        return {
+          id: hookId,
+          type,
+          wait: (options: CommandOptions = {}) => this.#waitForHook(hookId, type, options),
+        };
+      }
+      if (event.error?.message) throw new Error(event.error.message);
+    }
+  }
+
+  async #waitForHook<T>(hookId: string, type: HookType<T>, options: CommandOptions): Promise<T> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.#surfaceSessionId,
+      contextSessionId: this.sessionId,
+      waitForHook: { hookId, retryOptions: retryOptions(options.timeoutMs) },
+    });
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.hookCompleted?.hookId === hookId) {
+        if (type.name === "fileChooser" && event.hookCompleted.mobileFileChooser?.fileChooserId) {
+          return new MobileFileChooserImpl(
+            this,
+            event.hookCompleted.mobileFileChooser.fileChooserId,
+            event.hookCompleted.mobileFileChooser.isMultiple ?? false,
+          ) as T;
+        }
+        if (type.name === "download" && event.hookCompleted.mobileDownload?.downloadId) {
+          return new MobileDownloadImpl(
+            this,
+            event.hookCompleted.mobileDownload.downloadId,
+            event.hookCompleted.mobileDownload.suggestedFilename ?? "download",
+          ) as T;
+        }
+        throw new Error(`Android ${type.name} hook returned an invalid result`);
+      }
+      if (event.error?.message) throw new Error(event.error.message);
+    }
+  }
+
+  async setChooserFiles(
+    fileChooserId: string,
+    files: string[],
+    options: CommandOptions,
+  ): Promise<void> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    const fileIds = [];
+    for (const file of files) fileIds.push(await this.#uploadLocalFile(handle, file));
+    handle.stream.write({
+      surfaceSessionId: this.#surfaceSessionId,
+      contextSessionId: this.sessionId,
+      setMobileFileChooserFiles: {
+        fileChooserId,
+        fileIds,
+        retryOptions: retryOptions(options.timeoutMs),
+      },
+    });
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.mobileFileChooserFilesSet?.fileChooserId === fileChooserId) return;
+      if (event.error?.message) throw new Error(event.error.message);
+    }
+  }
+
+  async saveMobileDownload(
+    downloadId: string,
+    path: string,
+    options: CommandOptions,
+  ): Promise<void> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.#surfaceSessionId,
+      contextSessionId: this.sessionId,
+      saveMobileDownload: { downloadId, retryOptions: retryOptions(options.timeoutMs) },
+    });
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.mobileDownloadSaved?.downloadId === downloadId && event.mobileDownloadSaved.fileId) {
+        await this.#downloadToLocalFile(handle, event.mobileDownloadSaved.fileId, path);
+        return;
+      }
+      if (event.error?.message) throw new Error(event.error.message);
+    }
+  }
+
+  async #uploadLocalFile(handle: PageHandle, path: string): Promise<string> {
+    const source = await open(path, "r");
+    const transferId = randomUUID();
+    let offset = 0;
+    try {
+      const size = (await source.stat()).size;
+      do {
+        const buffer = Buffer.alloc(Math.min(256 * 1024, Math.max(0, size - offset)) || 1);
+        const { bytesRead } = await source.read(buffer, 0, buffer.length, offset);
+        const last = offset + bytesRead >= size;
+        handle.stream.write({
+          surfaceSessionId: this.#surfaceSessionId,
+          contextSessionId: this.sessionId,
+          uploadFileChunk: {
+            transferId,
+            name: basename(path),
+            offset: String(offset),
+            data: buffer.subarray(0, bytesRead),
+            last,
+          },
+        });
+        offset += bytesRead;
+      } while (offset < size);
+    } finally {
+      await source.close();
+    }
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.fileUploaded?.transferId === transferId && event.fileUploaded.fileId) {
+        return event.fileUploaded.fileId;
+      }
+      if (event.error?.message) throw new Error(event.error.message);
+    }
+  }
+
+  async #downloadToLocalFile(handle: PageHandle, fileId: string, path: string): Promise<void> {
+    const temporaryPath = `${path}.allwright-${randomUUID()}.tmp`;
+    const destination = await open(temporaryPath, "wx");
+    let offset = 0;
+    try {
+      while (true) {
+        handle.stream.write({
+          surfaceSessionId: this.#surfaceSessionId,
+          contextSessionId: this.sessionId,
+          readFileChunk: { fileId, offset: String(offset), maxBytes: 256 * 1024 },
+        });
+        const event = await handle.queue.next();
+        if (event.error?.message) throw new Error(event.error.message);
+        if (event.fileChunk?.fileId !== fileId || Number(event.fileChunk.offset ?? -1) !== offset) continue;
+        const data = event.fileChunk.data ?? new Uint8Array();
+        await destination.write(data, 0, data.length, offset);
+        offset += data.length;
+        if (event.fileChunk.last) break;
+      }
+      await destination.close();
+      await rename(temporaryPath, path);
+    } catch (error) {
+      await destination.close().catch(() => undefined);
+      await unlink(temporaryPath).catch(() => undefined);
+      throw error;
+    }
   }
 
   async click(selector: string, options: CommandOptions = {}): Promise<ClickResult> {
@@ -376,6 +550,40 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
         throw new Error(`android app session ${this.sessionId} closed while reading text`);
       }
     }
+  }
+}
+
+class MobileFileChooserImpl implements FileChooser {
+  constructor(
+    readonly page: MobileAndroidAppImpl,
+    readonly id: string,
+    private readonly multiple: boolean,
+  ) {}
+
+  isMultiple(): boolean {
+    return this.multiple;
+  }
+
+  async setFiles(files: string | string[], options: CommandOptions = {}): Promise<void> {
+    const paths = typeof files === "string" ? [files] : files;
+    if (!this.multiple && paths.length > 1) {
+      throw new Error("Android file chooser does not accept multiple files");
+    }
+    await this.page.setChooserFiles(this.id, paths, options);
+  }
+}
+
+class MobileDownloadImpl implements Download {
+  readonly url = "";
+
+  constructor(
+    readonly page: MobileAndroidAppImpl,
+    readonly id: string,
+    readonly suggestedFilename: string,
+  ) {}
+
+  async saveAs(path: string, options: CommandOptions = {}): Promise<void> {
+    await this.page.saveMobileDownload(this.id, path, options);
   }
 }
 

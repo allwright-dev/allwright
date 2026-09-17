@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import threading
+import os
+import uuid
 from pathlib import Path
+from typing import TypeVar
 
 from ._proto import engine_pb2
 from ._transport import RuntimeClient, StreamHandle
+from ._hooks import Download, FileChooser, Hook, HookType
 from ._types import (
     AccessibilitySnapshotOptions,
     AllwrightError,
@@ -21,6 +25,8 @@ from ._types import (
     WaitForSelectorOptions,
     WaitForSelectorResult,
 )
+
+T = TypeVar("T")
 
 
 class MobileAndroidConnectOptions:
@@ -71,6 +77,166 @@ class AndroidApp:
             page=self,
             selector=normalize_mobile_selector_for_transport(selector),
         )
+
+    def register_hook(self, hook_type: HookType[T]) -> Hook[T]:
+        if hook_type.name not in {"file_chooser", "download"}:
+            raise AllwrightError(f"hook type {hook_type.name} is not supported by Android apps")
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            register = (
+                engine_pb2.RegisterHookCommand(
+                    mobile_file_chooser=engine_pb2.RegisterMobileFileChooserHook()
+                )
+                if hook_type.name == "file_chooser"
+                else engine_pb2.RegisterHookCommand(
+                    mobile_download=engine_pb2.RegisterMobileDownloadHook()
+                )
+            )
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self._surface_session_id,
+                context_session_id=self._session_id,
+                register_hook=register,
+            ))
+            while True:
+                event = handle.recv("receive Android hook registration")
+                if event.WhichOneof("event") == "hook_registered":
+                    return Hook(self, event.hook_registered.hook_id, hook_type)
+                if event.WhichOneof("event") == "error":
+                    raise AllwrightError(event.error.message)
+
+    def _wait_for_hook(
+        self, hook_id: str, hook_type: HookType[T], options: CommandOptions | None
+    ) -> T:
+        from ._runtime import retry_options
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self._surface_session_id,
+                context_session_id=self._session_id,
+                wait_for_hook=engine_pb2.WaitForHookCommand(
+                    hook_id=hook_id,
+                    retry_options=retry_options((options or CommandOptions()).timeout_ms),
+                ),
+            ))
+            while True:
+                event = handle.recv("wait for Android hook")
+                if event.WhichOneof("event") == "hook_completed" and event.hook_completed.hook_id == hook_id:
+                    result = event.hook_completed.WhichOneof("result")
+                    if hook_type.name == "file_chooser" and result == "mobile_file_chooser":
+                        chooser = event.hook_completed.mobile_file_chooser
+                        return FileChooser(self, chooser.file_chooser_id, chooser.is_multiple)
+                    if hook_type.name == "download" and result == "mobile_download":
+                        download = event.hook_completed.mobile_download
+                        return Download(self, download.download_id, "", download.suggested_filename)
+                    raise AllwrightError("Android hook returned an invalid result")
+                if event.WhichOneof("event") == "error":
+                    raise AllwrightError(event.error.message)
+
+    def _set_file_chooser_files(
+        self, file_chooser_id: str, files: list[str], options: CommandOptions | None
+    ) -> None:
+        from ._runtime import retry_options
+        with self._lock:
+            handle = self._ensure_handle()
+            file_ids = [self._upload_local_file(handle, path) for path in files]
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self._surface_session_id,
+                context_session_id=self._session_id,
+                set_mobile_file_chooser_files=engine_pb2.SetMobileFileChooserFilesCommand(
+                    file_chooser_id=file_chooser_id,
+                    file_ids=file_ids,
+                    retry_options=retry_options((options or CommandOptions()).timeout_ms),
+                ),
+            ))
+            while True:
+                event = handle.recv("set Android file chooser files")
+                if event.WhichOneof("event") == "mobile_file_chooser_files_set" and event.mobile_file_chooser_files_set.file_chooser_id == file_chooser_id:
+                    return
+                if event.WhichOneof("event") == "error":
+                    raise AllwrightError(event.error.message)
+
+    def _save_download(
+        self, download_id: str, path: str, options: CommandOptions | None
+    ) -> None:
+        from ._runtime import retry_options
+        with self._lock:
+            handle = self._ensure_handle()
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self._surface_session_id,
+                context_session_id=self._session_id,
+                save_mobile_download=engine_pb2.SaveMobileDownloadCommand(
+                    download_id=download_id,
+                    retry_options=retry_options((options or CommandOptions()).timeout_ms),
+                ),
+            ))
+            while True:
+                event = handle.recv("save Android download")
+                if event.WhichOneof("event") == "mobile_download_saved" and event.mobile_download_saved.download_id == download_id:
+                    self._download_to_local_file(handle, event.mobile_download_saved.file_id, path)
+                    return
+                if event.WhichOneof("event") == "error":
+                    raise AllwrightError(event.error.message)
+
+    def _upload_local_file(self, handle: StreamHandle, path: str) -> str:
+        transfer_id = str(uuid.uuid4())
+        size = os.path.getsize(path)
+        offset = 0
+        with open(path, "rb") as source:
+            while True:
+                data = source.read(256 * 1024)
+                last = offset + len(data) >= size
+                handle.send(engine_pb2.ContextSessionCommand(
+                    surface_session_id=self._surface_session_id,
+                    context_session_id=self._session_id,
+                    upload_file_chunk=engine_pb2.UploadFileChunkCommand(
+                        transfer_id=transfer_id,
+                        name=os.path.basename(path),
+                        offset=offset,
+                        data=data,
+                        last=last,
+                    ),
+                ))
+                offset += len(data)
+                if last:
+                    break
+        while True:
+            event = handle.recv("upload Android chooser file")
+            if event.WhichOneof("event") == "file_uploaded" and event.file_uploaded.transfer_id == transfer_id:
+                return event.file_uploaded.file_id
+            if event.WhichOneof("event") == "error":
+                raise AllwrightError(event.error.message)
+
+    def _download_to_local_file(self, handle: StreamHandle, file_id: str, path: str) -> None:
+        temporary = f"{path}.allwright-{uuid.uuid4()}.tmp"
+        offset = 0
+        try:
+            with open(temporary, "xb") as destination:
+                while True:
+                    handle.send(engine_pb2.ContextSessionCommand(
+                        surface_session_id=self._surface_session_id,
+                        context_session_id=self._session_id,
+                        read_file_chunk=engine_pb2.ReadFileChunkCommand(
+                            file_id=file_id, offset=offset, max_bytes=256 * 1024
+                        ),
+                    ))
+                    event = handle.recv("download Android file")
+                    if event.WhichOneof("event") == "error":
+                        raise AllwrightError(event.error.message)
+                    if event.WhichOneof("event") != "file_chunk" or event.file_chunk.file_id != file_id or event.file_chunk.offset != offset:
+                        continue
+                    destination.write(event.file_chunk.data)
+                    offset += len(event.file_chunk.data)
+                    if event.file_chunk.last:
+                        break
+            os.replace(temporary, path)
+        except Exception:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+            raise
 
     def click(self, selector: str, options: CommandOptions | None = None) -> ClickResult:
         from ._runtime import retry_options

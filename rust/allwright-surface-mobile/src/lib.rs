@@ -255,9 +255,78 @@ pub struct MobileScreenshotInfo {
     pub note: String,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum MobileHookType {
+    FileChooser,
+    Download,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MobileHookRegistration {
+    pub opaque_state: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "hook_type", content = "value", rename_all = "snake_case")]
+pub enum MobileHookResult {
+    FileChooser(MobileFileChooserInfo),
+    Download(MobileDownloadInfo),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MobileFileChooserInfo {
+    pub file_chooser_id: String,
+    pub is_multiple: bool,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MobileFileChooserFilesSetInfo {
+    pub file_chooser_id: String,
+    pub files: Vec<String>,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MobileDownloadInfo {
+    pub download_id: String,
+    pub suggested_filename: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MobileDownloadSavedInfo {
+    pub download_id: String,
+    pub path: String,
+    pub suggested_filename: String,
+    pub size: u64,
+    pub note: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum MobileCommand {
+    RegisterHook {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+        hook_type: MobileHookType,
+    },
+    PollHook {
+        browser_session: MobileBrowserSessionHandle,
+        registration: MobileHookRegistration,
+    },
+    SetFileChooserFiles {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+        file_chooser_id: String,
+        files: Vec<String>,
+    },
+    SaveDownload {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+        download_id: String,
+        path: String,
+    },
     AccessibilitySnapshot {
         browser_session: MobileBrowserSessionHandle,
         page_session: MobilePageSessionHandle,
@@ -339,6 +408,10 @@ pub enum MobileCommand {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum MobileCommandResult {
+    RegisterHook(MobileHookRegistration),
+    PollHook(MobileHookResult),
+    SetFileChooserFiles(MobileFileChooserFilesSetInfo),
+    SaveDownload(MobileDownloadSavedInfo),
     AccessibilitySnapshot(allwright_plugin_sdk::AccessibilitySnapshotInfo),
     Connect(MobileConnectInfo),
     LaunchApp(MobilePageInfo),

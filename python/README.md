@@ -55,3 +55,7 @@ page.click("a.download-report")
 download = hook.wait()
 download.save_as(f"artifacts/{download.suggested_filename}")
 ```
+
+These paths are local to the Python test process and are streamed through a
+remote Allwright server when necessary. Android app contexts support
+`hooks.file_chooser` and `hooks.download` with the same lifecycle.

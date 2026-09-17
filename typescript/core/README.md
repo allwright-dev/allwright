@@ -47,6 +47,10 @@ const download = await hook.wait();
 await download.saveAs(`artifacts/${download.suggestedFilename}`);
 ```
 
+Paths passed to `setFiles` and `saveAs` belong to the test process, even when
+the Allwright server is remote. Android apps support the same `fileChooser` and
+`download` hook shape; Android `newPage` hooks are not applicable.
+
 Runnable examples live in [examples/web-basic.ts](./examples/web-basic.ts) and [examples/android-basic.ts](./examples/android-basic.ts).
 
 Shared config files are stack-agnostic and can live in `allwright.config.yaml` or `allwright.config.json`.

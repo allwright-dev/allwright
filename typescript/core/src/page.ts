@@ -1,6 +1,8 @@
 import { WebLocatorBuilders, type LocatorFilterOptions } from "./web-locators.js";
 import { LocatorImpl } from "./locator.js";
-import { writeFile } from "node:fs/promises";
+import { open, rename, unlink, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { basename } from "node:path";
 import { formatActionError } from "./errors.js";
 import { normalizeSelectorForTransport } from "./selectors.js";
 import { createPageHandle } from "./runtime.js";
@@ -134,12 +136,16 @@ export class PageImpl extends WebLocatorBuilders implements Page {
   ): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
+    const fileIds = [];
+    for (const file of files) {
+      fileIds.push(await this.#uploadLocalFile(handle, file));
+    }
     handle.stream.write({
       surfaceSessionId: this.browserSessionId,
       contextSessionId: this.sessionId,
       setFileChooserFiles: {
         fileChooserId,
-        files,
+        fileIds,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });
@@ -166,18 +172,88 @@ export class PageImpl extends WebLocatorBuilders implements Page {
       contextSessionId: this.sessionId,
       saveDownload: {
         downloadId,
-        path,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });
     while (true) {
       const event = await handle.queue.next();
-      if (event.downloadSaved?.downloadId === downloadId) {
+      if (event.downloadSaved?.downloadId === downloadId && event.downloadSaved.fileId) {
+        await this.#downloadToLocalFile(handle, event.downloadSaved.fileId, path);
         return;
       }
       if (event.error?.message) {
         throw formatActionError("save download", event.error.message);
       }
+    }
+  }
+
+  async #uploadLocalFile(handle: PageHandle, path: string): Promise<string> {
+    const source = await open(path, "r");
+    const transferId = randomUUID();
+    const name = basename(path);
+    let offset = 0;
+    try {
+      const size = (await source.stat()).size;
+      do {
+        const buffer = Buffer.alloc(Math.min(256 * 1024, Math.max(0, size - offset)) || 1);
+        const { bytesRead } = await source.read(buffer, 0, buffer.length, offset);
+        const last = offset + bytesRead >= size;
+        handle.stream.write({
+          surfaceSessionId: this.browserSessionId,
+          contextSessionId: this.sessionId,
+          uploadFileChunk: {
+            transferId,
+            name,
+            offset: String(offset),
+            data: buffer.subarray(0, bytesRead),
+            last,
+          },
+        });
+        offset += bytesRead;
+      } while (offset < size);
+    } finally {
+      await source.close();
+    }
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.fileUploaded?.transferId === transferId && event.fileUploaded.fileId) {
+        return event.fileUploaded.fileId;
+      }
+      if (event.error?.message) {
+        throw formatActionError("upload file", event.error.message);
+      }
+    }
+  }
+
+  async #downloadToLocalFile(handle: PageHandle, fileId: string, path: string): Promise<void> {
+    const temporaryPath = `${path}.allwright-${randomUUID()}.tmp`;
+    const destination = await open(temporaryPath, "wx");
+    let offset = 0;
+    try {
+      while (true) {
+        handle.stream.write({
+          surfaceSessionId: this.browserSessionId,
+          contextSessionId: this.sessionId,
+          readFileChunk: { fileId, offset: String(offset), maxBytes: 256 * 1024 },
+        });
+        const event = await handle.queue.next();
+        if (event.error?.message) {
+          throw formatActionError("download file", event.error.message);
+        }
+        if (event.fileChunk?.fileId !== fileId || Number(event.fileChunk.offset ?? -1) !== offset) {
+          continue;
+        }
+        const data = event.fileChunk.data ?? new Uint8Array();
+        await destination.write(data, 0, data.length, offset);
+        offset += data.length;
+        if (event.fileChunk.last) break;
+      }
+      await destination.close();
+      await rename(temporaryPath, path);
+    } catch (error) {
+      await destination.close().catch(() => undefined);
+      await unlink(temporaryPath).catch(() => undefined);
+      throw error;
     }
   }
 

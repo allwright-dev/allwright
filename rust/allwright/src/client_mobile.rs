@@ -1,16 +1,109 @@
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::{
+    fs,
+    io::{Read, Write},
+    marker::PhantomData,
+    path::Path,
+};
 
 use crate::proto::context_session_command::Command as ContextCommand;
 use crate::proto::context_session_event::Event as ContextEvent;
+use crate::proto::hook_completed_event::Result as HookCompletionResult;
+use crate::proto::register_hook_command::Hook as RegisterHook;
 use crate::proto::surface_session_command::Command as SurfaceCommand;
 use crate::proto::surface_session_event::Event as SurfaceEvent;
 use crate::proto::{
     AccessibilitySnapshotCommand, AppLaunchedEvent, ClickElementCommand, ConnectMobileCommand,
     ContextSessionCommand, CountElementsCommand, FillElementCommand, FocusElementCommand,
     GetInnerTextCommand, GetTextContentCommand, LaunchAppCommand, MobileConnectedEvent,
-    MobilePlatform as ProtoMobilePlatform, PressKeyCommand, ScreenshotCommand,
-    SurfaceSessionCommand, WaitForSelectorCommand,
+    MobilePlatform as ProtoMobilePlatform, PressKeyCommand, ReadFileChunkCommand,
+    RegisterHookCommand, RegisterMobileDownloadHook, RegisterMobileFileChooserHook,
+    SaveMobileDownloadCommand, ScreenshotCommand, SetMobileFileChooserFilesCommand,
+    SurfaceSessionCommand, UploadFileChunkCommand, WaitForHookCommand, WaitForSelectorCommand,
 };
+
+use super::hook::{DownloadHook, FileChooserHook};
+
+static MOBILE_TRANSFER_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+pub trait AndroidHookType: private::Sealed + Clone + Send + Sync + 'static {
+    type Output;
+}
+
+mod private {
+    use super::*;
+    pub trait Sealed {
+        fn name() -> &'static str;
+        fn decode(
+            app: &AndroidApp,
+            result: HookCompletionResult,
+        ) -> Result<<Self as AndroidHookType>::Output>
+        where
+            Self: AndroidHookType;
+    }
+}
+
+impl AndroidHookType for FileChooserHook {
+    type Output = AndroidFileChooser;
+}
+impl private::Sealed for FileChooserHook {
+    fn name() -> &'static str {
+        "file_chooser"
+    }
+    fn decode(app: &AndroidApp, result: HookCompletionResult) -> Result<AndroidFileChooser> {
+        let HookCompletionResult::MobileFileChooser(result) = result else {
+            return Err(Error::new(
+                "Android file chooser hook returned an invalid result",
+            ));
+        };
+        Ok(AndroidFileChooser {
+            app: app.clone(),
+            id: result.file_chooser_id,
+            is_multiple: result.is_multiple,
+        })
+    }
+}
+impl AndroidHookType for DownloadHook {
+    type Output = AndroidDownload;
+}
+impl private::Sealed for DownloadHook {
+    fn name() -> &'static str {
+        "download"
+    }
+    fn decode(app: &AndroidApp, result: HookCompletionResult) -> Result<AndroidDownload> {
+        let HookCompletionResult::MobileDownload(result) = result else {
+            return Err(Error::new(
+                "Android download hook returned an invalid result",
+            ));
+        };
+        Ok(AndroidDownload {
+            app: app.clone(),
+            id: result.download_id,
+            suggested_filename: result.suggested_filename,
+        })
+    }
+}
+
+pub struct AndroidHook<T: AndroidHookType> {
+    app: AndroidApp,
+    id: String,
+    _type: PhantomData<T>,
+}
+
+#[derive(Clone)]
+pub struct AndroidFileChooser {
+    app: AndroidApp,
+    id: String,
+    is_multiple: bool,
+}
+
+#[derive(Clone)]
+pub struct AndroidDownload {
+    app: AndroidApp,
+    id: String,
+    suggested_filename: String,
+}
 use tokio::sync::{Mutex as AsyncMutex, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -239,6 +332,45 @@ impl AndroidDevice {
 impl AndroidApp {
     pub fn session_id(&self) -> &str {
         &self.inner.session_id
+    }
+
+    pub async fn register_hook<T: AndroidHookType>(&self, _hook_type: T) -> Result<AndroidHook<T>> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.inner.session_id)?;
+        let hook = match T::name() {
+            "file_chooser" => Some(RegisterHook::MobileFileChooser(
+                RegisterMobileFileChooserHook {},
+            )),
+            "download" => Some(RegisterHook::MobileDownload(RegisterMobileDownloadHook {})),
+            _ => return Err(Error::new("hook type is not supported by Android apps")),
+        };
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::RegisterHook(RegisterHookCommand { hook })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send Android RegisterHookCommand"))?;
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("Android app session closed while registering hook")
+                })?;
+            match event.event {
+                Some(ContextEvent::HookRegistered(event)) => {
+                    return Ok(AndroidHook {
+                        app: self.clone(),
+                        id: event.hook_id,
+                        _type: PhantomData,
+                    });
+                }
+                Some(ContextEvent::Error(error)) => return Err(Error::new(error.message)),
+                _ => {}
+            }
+        }
     }
 
     pub fn locator(&self, selector: impl Into<String>) -> AndroidLocator {
@@ -744,6 +876,290 @@ impl AndroidApp {
                 }
                 _ => {}
             }
+        }
+    }
+}
+
+impl<T: AndroidHookType> AndroidHook<T> {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub async fn wait(&self) -> Result<T::Output> {
+        self.wait_with_options(CommandOptions::default()).await
+    }
+
+    pub async fn wait_with_options(&self, options: CommandOptions) -> Result<T::Output> {
+        let mut state = self.app.inner.state.lock().await;
+        let handle = self.app.ensure_handle(&mut state).await?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.app.inner.surface_session_id.clone(),
+                context_session_id: self.app.inner.session_id.clone(),
+                command: Some(ContextCommand::WaitForHook(WaitForHookCommand {
+                    hook_id: self.id.clone(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send Android WaitForHookCommand"))?;
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("Android app session closed while waiting for hook")
+                })?;
+            match event.event {
+                Some(ContextEvent::HookCompleted(event)) if event.hook_id == self.id => {
+                    return T::decode(
+                        &self.app,
+                        event
+                            .result
+                            .ok_or_else(|| Error::new("Android hook completed without a result"))?,
+                    );
+                }
+                Some(ContextEvent::Error(error)) => return Err(Error::new(error.message)),
+                _ => {}
+            }
+        }
+    }
+}
+
+impl AndroidFileChooser {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+    pub fn app(&self) -> &AndroidApp {
+        &self.app
+    }
+    pub fn is_multiple(&self) -> bool {
+        self.is_multiple
+    }
+    pub async fn set_file(&self, path: impl AsRef<Path>) -> Result<()> {
+        self.set_files([path]).await
+    }
+    pub async fn set_files<I, P>(&self, paths: I) -> Result<()>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let paths = paths
+            .into_iter()
+            .map(|path| path.as_ref().to_path_buf())
+            .collect::<Vec<_>>();
+        if !self.is_multiple && paths.len() > 1 {
+            return Err(Error::new(
+                "Android file chooser does not accept multiple files",
+            ));
+        }
+        let mut state = self.app.inner.state.lock().await;
+        let handle = self.app.ensure_handle(&mut state).await?;
+        let mut file_ids = Vec::with_capacity(paths.len());
+        for path in paths {
+            file_ids.push(upload_android_client_file(&self.app, handle, &path).await?);
+        }
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.app.inner.surface_session_id.clone(),
+                context_session_id: self.app.inner.session_id.clone(),
+                command: Some(ContextCommand::SetMobileFileChooserFiles(
+                    SetMobileFileChooserFilesCommand {
+                        file_chooser_id: self.id.clone(),
+                        file_ids,
+                        retry_options: None,
+                    },
+                )),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send SetMobileFileChooserFilesCommand"))?;
+        loop {
+            let event = handle.events.message().await?.ok_or_else(|| {
+                Error::new("Android app session closed while setting chooser files")
+            })?;
+            match event.event {
+                Some(ContextEvent::MobileFileChooserFilesSet(result))
+                    if result.file_chooser_id == self.id =>
+                {
+                    return Ok(());
+                }
+                Some(ContextEvent::Error(error)) => return Err(Error::new(error.message)),
+                _ => {}
+            }
+        }
+    }
+}
+
+impl AndroidDownload {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+    pub fn app(&self) -> &AndroidApp {
+        &self.app
+    }
+    pub fn suggested_filename(&self) -> &str {
+        &self.suggested_filename
+    }
+    pub async fn save_as(&self, path: impl AsRef<Path>) -> Result<()> {
+        let mut state = self.app.inner.state.lock().await;
+        let handle = self.app.ensure_handle(&mut state).await?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.app.inner.surface_session_id.clone(),
+                context_session_id: self.app.inner.session_id.clone(),
+                command: Some(ContextCommand::SaveMobileDownload(
+                    SaveMobileDownloadCommand {
+                        download_id: self.id.clone(),
+                        retry_options: None,
+                    },
+                )),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send SaveMobileDownloadCommand"))?;
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("Android app session closed while saving download")
+                })?;
+            match event.event {
+                Some(ContextEvent::MobileDownloadSaved(result))
+                    if result.download_id == self.id =>
+                {
+                    return download_android_client_file(
+                        &self.app,
+                        handle,
+                        &result.file_id,
+                        path.as_ref(),
+                    )
+                    .await;
+                }
+                Some(ContextEvent::Error(error)) => return Err(Error::new(error.message)),
+                _ => {}
+            }
+        }
+    }
+}
+
+async fn upload_android_client_file(
+    app: &AndroidApp,
+    handle: &mut AndroidTabHandle,
+    path: &Path,
+) -> Result<String> {
+    let mut source = fs::File::open(path)
+        .map_err(|error| Error::new(format!("open upload {}: {error}", path.display())))?;
+    let size = source
+        .metadata()
+        .map_err(|error| Error::new(error.to_string()))?
+        .len();
+    let transfer_id = format!(
+        "rust-mobile-upload-{}-{}",
+        std::process::id(),
+        MOBILE_TRANSFER_COUNTER.fetch_add(1, Ordering::Relaxed)
+    );
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| Error::new("upload requires a valid file name"))?
+        .to_string();
+    let mut offset = 0_u64;
+    loop {
+        let mut data = vec![0; 256 * 1024];
+        let count = source
+            .read(&mut data)
+            .map_err(|error| Error::new(error.to_string()))?;
+        data.truncate(count);
+        let last = offset + count as u64 >= size;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: app.inner.surface_session_id.clone(),
+                context_session_id: app.inner.session_id.clone(),
+                command: Some(ContextCommand::UploadFileChunk(UploadFileChunkCommand {
+                    transfer_id: transfer_id.clone(),
+                    name: name.clone(),
+                    offset,
+                    data,
+                    last,
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send UploadFileChunkCommand"))?;
+        offset += count as u64;
+        if last {
+            break;
+        }
+    }
+    loop {
+        let event = handle
+            .events
+            .message()
+            .await?
+            .ok_or_else(|| Error::new("Android app session closed while uploading file"))?;
+        match event.event {
+            Some(ContextEvent::FileUploaded(result)) if result.transfer_id == transfer_id => {
+                return Ok(result.file_id);
+            }
+            Some(ContextEvent::Error(error)) => return Err(Error::new(error.message)),
+            _ => {}
+        }
+    }
+}
+
+async fn download_android_client_file(
+    app: &AndroidApp,
+    handle: &mut AndroidTabHandle,
+    file_id: &str,
+    path: &Path,
+) -> Result<()> {
+    let temporary = path.with_extension(format!(
+        "allwright-{}.tmp",
+        MOBILE_TRANSFER_COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    let mut output = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+        .map_err(|error| Error::new(error.to_string()))?;
+    let mut offset = 0_u64;
+    loop {
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: app.inner.surface_session_id.clone(),
+                context_session_id: app.inner.session_id.clone(),
+                command: Some(ContextCommand::ReadFileChunk(ReadFileChunkCommand {
+                    file_id: file_id.to_string(),
+                    offset,
+                    max_bytes: 256 * 1024,
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send ReadFileChunkCommand"))?;
+        let event = handle
+            .events
+            .message()
+            .await?
+            .ok_or_else(|| Error::new("Android app session closed while downloading file"))?;
+        match event.event {
+            Some(ContextEvent::FileChunk(chunk))
+                if chunk.file_id == file_id && chunk.offset == offset =>
+            {
+                output
+                    .write_all(&chunk.data)
+                    .map_err(|error| Error::new(error.to_string()))?;
+                offset += chunk.data.len() as u64;
+                if chunk.last {
+                    drop(output);
+                    fs::rename(&temporary, path).map_err(|error| Error::new(error.to_string()))?;
+                    return Ok(());
+                }
+            }
+            Some(ContextEvent::Error(error)) => {
+                let _ = fs::remove_file(&temporary);
+                return Err(Error::new(error.message));
+            }
+            _ => {}
         }
     }
 }

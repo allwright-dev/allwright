@@ -1,12 +1,12 @@
 package dev.allwright.client;
 
 public final class Hook<T> {
-    private final Page page;
+    private final HookContext context;
     private final String id;
     private final HookType<T> type;
 
-    Hook(Page page, String id, HookType<T> type) {
-        this.page = page;
+    Hook(HookContext context, String id, HookType<T> type) {
+        this.context = context;
         this.id = id;
         this.type = type;
     }
@@ -20,6 +20,6 @@ public final class Hook<T> {
     }
 
     public T waitFor(CommandOptions options) {
-        return page.waitForHook(id, type, options);
+        return context.waitForHook(id, type, options);
     }
 }

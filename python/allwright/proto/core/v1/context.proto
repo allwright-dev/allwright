@@ -6,6 +6,7 @@ option java_package = "dev.allwright.engine.v1";
 option java_multiple_files = true;
 
 import "core/v1/common.proto";
+import "surfaces/mobile/v1/mobile.proto";
 import "surfaces/web/v1/web.proto";
 
 message ContextSessionCommand {
@@ -32,6 +33,10 @@ message ContextSessionCommand {
     WaitForHookCommand wait_for_hook = 19;
     SetFileChooserFilesCommand set_file_chooser_files = 20;
     SaveDownloadCommand save_download = 21;
+    UploadFileChunkCommand upload_file_chunk = 22;
+    ReadFileChunkCommand read_file_chunk = 23;
+    SetMobileFileChooserFilesCommand set_mobile_file_chooser_files = 24;
+    SaveMobileDownloadCommand save_mobile_download = 25;
   }
 }
 
@@ -67,6 +72,10 @@ message ContextSessionEvent {
     HookCompletedEvent hook_completed = 21;
     FileChooserFilesSetEvent file_chooser_files_set = 22;
     DownloadSavedEvent download_saved = 23;
+    FileUploadedEvent file_uploaded = 24;
+    FileChunkEvent file_chunk = 25;
+    MobileFileChooserFilesSetEvent mobile_file_chooser_files_set = 26;
+    MobileDownloadSavedEvent mobile_download_saved = 27;
   }
 }
 
@@ -91,6 +100,8 @@ message RegisterHookCommand {
     RegisterNewPageHook new_page = 1;
     RegisterFileChooserHook file_chooser = 2;
     RegisterDownloadHook download = 3;
+    RegisterMobileFileChooserHook mobile_file_chooser = 4;
+    RegisterMobileDownloadHook mobile_download = 5;
   }
 }
 
@@ -110,7 +121,37 @@ message HookCompletedEvent {
     NewPageHookResult new_page = 2;
     FileChooserHookResult file_chooser = 3;
     DownloadHookResult download = 4;
+    MobileFileChooserHookResult mobile_file_chooser = 5;
+    MobileDownloadHookResult mobile_download = 6;
   }
+}
+
+message UploadFileChunkCommand {
+  string transfer_id = 1;
+  string name = 2;
+  uint64 offset = 3;
+  bytes data = 4;
+  bool last = 5;
+}
+
+message FileUploadedEvent {
+  string transfer_id = 1;
+  string file_id = 2;
+  string name = 3;
+  uint64 size = 4;
+}
+
+message ReadFileChunkCommand {
+  string file_id = 1;
+  uint64 offset = 2;
+  uint32 max_bytes = 3;
+}
+
+message FileChunkEvent {
+  string file_id = 1;
+  uint64 offset = 2;
+  bytes data = 3;
+  bool last = 4;
 }
 
 message NavigatePageCommand {

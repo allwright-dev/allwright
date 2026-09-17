@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
 import { EventEmitter } from "node:events";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { BrowserImpl } from "../src/browser.js";
 import { PageImpl } from "../src/page.js";
@@ -85,9 +88,16 @@ test("file-chooser hook resolves to a typed chooser that sets files", async () =
             fileChooser: { fileChooserId: "chooser-1", isMultiple: true },
           },
         }));
+      } else if ("uploadFileChunk" in command && command.uploadFileChunk.last) {
+        queueMicrotask(() => contextStream.emit("data", {
+          fileUploaded: {
+            transferId: command.uploadFileChunk.transferId,
+            fileId: `file-${commands.filter((item) => "uploadFileChunk" in item).length}`,
+          },
+        }));
       } else if ("setFileChooserFiles" in command) {
         queueMicrotask(() => contextStream.emit("data", {
-          fileChooserFilesSet: { fileChooserId: "chooser-1", files: command.setFileChooserFiles.files },
+          fileChooserFilesSet: { fileChooserId: "chooser-1", fileIds: command.setFileChooserFiles.fileIds },
         }));
       }
       return true;
@@ -103,25 +113,23 @@ test("file-chooser hook resolves to a typed chooser that sets files", async () =
   } as unknown as RuntimeClient;
   const page = new PageImpl({ runtime, browserSessionId: "browser-1", sessionId: "page-1" });
 
+  const directory = await mkdtemp(join(tmpdir(), "allwright-hook-test-"));
+  const one = join(directory, "one.txt");
+  const two = join(directory, "two.txt");
+  await writeFile(one, "one");
+  await writeFile(two, "two");
   const hook = await page.registerHook(hooks.fileChooser);
   const chooser = await hook.wait();
-  await chooser.setFiles(["one.txt", "two.txt"]);
+  await chooser.setFiles([one, two]);
 
   expect(chooser.isMultiple()).toBe(true);
   expect(chooser.page).toBe(page);
-  expect(commands).toEqual([
-    { surfaceSessionId: "browser-1", contextSessionId: "page-1", registerHook: { fileChooser: {} } },
-    { surfaceSessionId: "browser-1", contextSessionId: "page-1", waitForHook: { hookId: "hook-2", retryOptions: undefined } },
-    {
-      surfaceSessionId: "browser-1",
-      contextSessionId: "page-1",
-      setFileChooserFiles: {
-        fileChooserId: "chooser-1",
-        files: ["one.txt", "two.txt"],
-        retryOptions: undefined,
-      },
-    },
-  ]);
+  const setCommand = commands.find((command) => "setFileChooserFiles" in command);
+  expect(setCommand && "setFileChooserFiles" in setCommand
+    ? setCommand.setFileChooserFiles.fileIds
+    : []).toEqual(["file-1", "file-2"]);
+  expect(commands.filter((command) => "uploadFileChunk" in command)).toHaveLength(2);
+  await rm(directory, { recursive: true });
 });
 
 test("download hook resolves when the download starts and saves it", async () => {
@@ -144,7 +152,16 @@ test("download hook resolves when the download starts and saves it", async () =>
         }));
       } else if ("saveDownload" in command) {
         queueMicrotask(() => contextStream.emit("data", {
-          downloadSaved: { downloadId: "download-1", path: command.saveDownload.path },
+          downloadSaved: { downloadId: "download-1", fileId: "file-download-1" },
+        }));
+      } else if ("readFileChunk" in command) {
+        queueMicrotask(() => contextStream.emit("data", {
+          fileChunk: {
+            fileId: "file-download-1",
+            offset: command.readFileChunk.offset,
+            data: Buffer.from("report contents"),
+            last: true,
+          },
         }));
       }
       return true;
@@ -160,24 +177,19 @@ test("download hook resolves when the download starts and saves it", async () =>
   } as unknown as RuntimeClient;
   const page = new PageImpl({ runtime, browserSessionId: "browser-1", sessionId: "page-1" });
 
+  const directory = await mkdtemp(join(tmpdir(), "allwright-hook-test-"));
+  const destination = join(directory, "report.csv");
   const hook = await page.registerHook(hooks.download);
   const download = await hook.wait();
-  await download.saveAs("artifacts/report.csv");
+  await download.saveAs(destination);
 
   expect(download.page).toBe(page);
   expect(download.url).toBe("https://example.test/report.csv");
   expect(download.suggestedFilename).toBe("report.csv");
-  expect(commands).toEqual([
-    { surfaceSessionId: "browser-1", contextSessionId: "page-1", registerHook: { download: {} } },
-    { surfaceSessionId: "browser-1", contextSessionId: "page-1", waitForHook: { hookId: "hook-3", retryOptions: undefined } },
-    {
-      surfaceSessionId: "browser-1",
-      contextSessionId: "page-1",
-      saveDownload: {
-        downloadId: "download-1",
-        path: "artifacts/report.csv",
-        retryOptions: undefined,
-      },
-    },
-  ]);
+  expect(await readFile(destination, "utf8")).toBe("report contents");
+  const saveCommand = commands.find((command) => "saveDownload" in command);
+  expect(saveCommand && "saveDownload" in saveCommand ? saveCommand.saveDownload : null)
+    .toEqual({ downloadId: "download-1", retryOptions: undefined });
+  expect(commands.some((command) => "readFileChunk" in command)).toBe(true);
+  await rm(directory, { recursive: true });
 });

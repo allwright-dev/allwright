@@ -1,13 +1,19 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+    fs,
+    io::{Read, Write},
+};
 
 use crate::proto::context_session_command::Command as ContextCommand;
 use crate::proto::context_session_event::Event as ContextEvent;
 use crate::proto::hook_completed_event::Result as HookCompletionResult;
 use crate::proto::register_hook_command::Hook as RegisterHook;
 use crate::proto::{
-    ContextSessionCommand, RegisterDownloadHook, RegisterFileChooserHook, RegisterHookCommand,
-    RegisterNewPageHook, SaveDownloadCommand, SetFileChooserFilesCommand, WaitForHookCommand,
+    ContextSessionCommand, ReadFileChunkCommand, RegisterDownloadHook, RegisterFileChooserHook,
+    RegisterHookCommand, RegisterNewPageHook, SaveDownloadCommand, SetFileChooserFilesCommand,
+    UploadFileChunkCommand, WaitForHookCommand,
 };
 use std::path::Path;
 use tokio::sync::Mutex as AsyncMutex;
@@ -15,6 +21,8 @@ use tokio::sync::Mutex as AsyncMutex;
 use super::command::command_retry_options;
 use super::tab::ensure_tab_open;
 use super::types::{CommandOptions, Error, Result, Tab, TabInner, TabState};
+
+static TRANSFER_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 pub trait HookType: private::Sealed + Clone + Send + Sync + 'static {
     type Output;
@@ -119,11 +127,78 @@ impl FileChooser {
     {
         let files = files
             .into_iter()
-            .map(|file| file.as_ref().to_string_lossy().to_string())
+            .map(|file| file.as_ref().to_path_buf())
             .collect::<Vec<_>>();
         let mut state = self.page.inner.state.lock().await;
         let handle = self.page.ensure_handle(&mut state).await?;
         ensure_tab_open(handle, &self.page.inner.session_id)?;
+        let mut file_ids = Vec::with_capacity(files.len());
+        for path in files {
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(|| Error::new("upload path requires a valid file name"))?
+                .to_string();
+            let transfer_id = format!(
+                "rust-upload-{}-{}",
+                std::process::id(),
+                TRANSFER_COUNTER.fetch_add(1, Ordering::Relaxed)
+            );
+            let mut source = fs::File::open(&path)
+                .map_err(|error| Error::new(format!("open upload {}: {error}", path.display())))?;
+            let size = source
+                .metadata()
+                .map_err(|error| Error::new(format!("inspect upload {}: {error}", path.display())))?
+                .len();
+            let mut offset = 0_u64;
+            loop {
+                let mut data = vec![0; 256 * 1024];
+                let count = source.read(&mut data).map_err(|error| {
+                    Error::new(format!("read upload {}: {error}", path.display()))
+                })?;
+                data.truncate(count);
+                let last = offset + count as u64 >= size;
+                handle
+                    .command_tx
+                    .send(ContextSessionCommand {
+                        surface_session_id: self.page.inner.surface_session_id.clone(),
+                        context_session_id: self.page.inner.session_id.clone(),
+                        command: Some(ContextCommand::UploadFileChunk(UploadFileChunkCommand {
+                            transfer_id: transfer_id.clone(),
+                            name: name.clone(),
+                            offset,
+                            data,
+                            last,
+                        })),
+                    })
+                    .await
+                    .map_err(|_| Error::new("failed to send UploadFileChunkCommand"))?;
+                offset += count as u64;
+                if last {
+                    break;
+                }
+            }
+            loop {
+                let event = handle.events.message().await?.ok_or_else(|| {
+                    Error::new("page session closed while uploading chooser file")
+                })?;
+                match event.event {
+                    Some(ContextEvent::FileUploaded(result))
+                        if result.transfer_id == transfer_id =>
+                    {
+                        file_ids.push(result.file_id);
+                        break;
+                    }
+                    Some(ContextEvent::Error(error)) => {
+                        return Err(Error::new(format!(
+                            "page session error while uploading chooser file: {}",
+                            error.message
+                        )));
+                    }
+                    _ => {}
+                }
+            }
+        }
         handle
             .command_tx
             .send(ContextSessionCommand {
@@ -132,7 +207,7 @@ impl FileChooser {
                 command: Some(ContextCommand::SetFileChooserFiles(
                     SetFileChooserFilesCommand {
                         file_chooser_id: self.id.clone(),
-                        files,
+                        file_ids,
                         retry_options: None,
                     },
                 )),
@@ -235,7 +310,6 @@ impl Download {
                 context_session_id: self.page.inner.session_id.clone(),
                 command: Some(ContextCommand::SaveDownload(SaveDownloadCommand {
                     download_id: self.id.clone(),
-                    path: path.as_ref().to_string_lossy().to_string(),
                     retry_options: command_retry_options(options.timeout_ms),
                 })),
             })
@@ -249,7 +323,62 @@ impl Download {
                 .ok_or_else(|| Error::new("page session closed while saving download"))?;
             match event.event {
                 Some(ContextEvent::DownloadSaved(result)) if result.download_id == self.id => {
-                    return Ok(());
+                    let destination = path.as_ref();
+                    let temporary = destination.with_extension(format!(
+                        "allwright-{}.tmp",
+                        TRANSFER_COUNTER.fetch_add(1, Ordering::Relaxed)
+                    ));
+                    let mut output = fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(&temporary)
+                        .map_err(|error| Error::new(format!("create download file: {error}")))?;
+                    let mut offset = 0_u64;
+                    loop {
+                        handle
+                            .command_tx
+                            .send(ContextSessionCommand {
+                                surface_session_id: self.page.inner.surface_session_id.clone(),
+                                context_session_id: self.page.inner.session_id.clone(),
+                                command: Some(ContextCommand::ReadFileChunk(
+                                    ReadFileChunkCommand {
+                                        file_id: result.file_id.clone(),
+                                        offset,
+                                        max_bytes: 256 * 1024,
+                                    },
+                                )),
+                            })
+                            .await
+                            .map_err(|_| Error::new("failed to send ReadFileChunkCommand"))?;
+                        let chunk = handle.events.message().await?.ok_or_else(|| {
+                            Error::new("page session closed while downloading file")
+                        })?;
+                        match chunk.event {
+                            Some(ContextEvent::FileChunk(chunk))
+                                if chunk.file_id == result.file_id && chunk.offset == offset =>
+                            {
+                                output.write_all(&chunk.data).map_err(|error| {
+                                    Error::new(format!("write download file: {error}"))
+                                })?;
+                                offset += chunk.data.len() as u64;
+                                if chunk.last {
+                                    drop(output);
+                                    fs::rename(&temporary, destination).map_err(|error| {
+                                        Error::new(format!("finish download file: {error}"))
+                                    })?;
+                                    return Ok(());
+                                }
+                            }
+                            Some(ContextEvent::Error(error)) => {
+                                let _ = fs::remove_file(&temporary);
+                                return Err(Error::new(format!(
+                                    "page session error while downloading file: {}",
+                                    error.message
+                                )));
+                            }
+                            _ => {}
+                        }
+                    }
                 }
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(

@@ -1004,11 +1004,16 @@ pub async fn save_download(
     })?;
     let saved_path = fs::canonicalize(&destination)
         .map_err(|error| format!("resolve saved download {}: {error}", destination.display()))?;
+    let size = fs::metadata(&saved_path)
+        .map_err(|error| format!("read saved download metadata: {error}"))?
+        .len();
     downloads.remove(download_id);
     let _ = fs::remove_dir_all(&download_dir);
     Ok(DownloadSavedInfo {
         download_id: download_id.to_string(),
         path: saved_path.to_string_lossy().to_string(),
+        suggested_filename,
+        size,
         note: "saved completed download".to_string(),
     })
 }

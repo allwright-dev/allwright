@@ -57,13 +57,13 @@ message FileChooserHookResult {
 
 message SetFileChooserFilesCommand {
   string file_chooser_id = 1;
-  repeated string files = 2;
+  repeated string file_ids = 2;
   optional CommandRetryOptions retry_options = 3;
 }
 
 message FileChooserFilesSetEvent {
   string file_chooser_id = 1;
-  repeated string files = 2;
+  repeated string file_ids = 2;
   string note = 3;
 }
 
@@ -78,12 +78,13 @@ message DownloadHookResult {
 
 message SaveDownloadCommand {
   string download_id = 1;
-  string path = 2;
-  optional CommandRetryOptions retry_options = 3;
+  optional CommandRetryOptions retry_options = 2;
 }
 
 message DownloadSavedEvent {
   string download_id = 1;
-  string path = 2;
-  string note = 3;
+  string file_id = 2;
+  string suggested_filename = 3;
+  uint64 size = 4;
+  string note = 5;
 }

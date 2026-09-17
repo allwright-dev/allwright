@@ -1,7 +1,15 @@
 package dev.allwright.client;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.UUID;
+
+import com.google.protobuf.ByteString;
 
 import dev.allwright.engine.v1.ClickElementCommand;
 import dev.allwright.engine.v1.CloseContextSessionCommand;
@@ -25,11 +33,13 @@ import dev.allwright.engine.v1.RegisterNewPageHook;
 import dev.allwright.engine.v1.RegisterFileChooserHook;
 import dev.allwright.engine.v1.RegisterDownloadHook;
 import dev.allwright.engine.v1.SaveDownloadCommand;
+import dev.allwright.engine.v1.ReadFileChunkCommand;
 import dev.allwright.engine.v1.SetFileChooserFilesCommand;
+import dev.allwright.engine.v1.UploadFileChunkCommand;
 import dev.allwright.engine.v1.WaitForHookCommand;
 import java.util.function.Function;
 
-public final class Page implements AutoCloseable, WebLocators {
+public final class Page implements AutoCloseable, WebLocators, HookContext {
     private final RuntimeSupport.RuntimeClient runtime;
     private final String browserSessionId;
     private final String sessionId;
@@ -102,7 +112,8 @@ public final class Page implements AutoCloseable, WebLocators {
         }
     }
 
-    synchronized <T> T waitForHook(String hookId, HookType<T> type, CommandOptions options) {
+    @Override
+    public synchronized <T> T waitForHook(String hookId, HookType<T> type, CommandOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
@@ -139,9 +150,13 @@ public final class Page implements AutoCloseable, WebLocators {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+        java.util.List<String> fileIds = new ArrayList<>();
+        for (String file : files) {
+            fileIds.add(uploadLocalFile(handle, Path.of(file)));
+        }
         SetFileChooserFilesCommand.Builder setFiles = SetFileChooserFilesCommand.newBuilder()
                 .setFileChooserId(fileChooserId)
-                .addAllFiles(files);
+                .addAllFileIds(fileIds);
         if (CommandSupport.hasTimeout(resolvedOptions.timeoutMs())) {
             setFiles.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
         }
@@ -165,13 +180,22 @@ public final class Page implements AutoCloseable, WebLocators {
         }
     }
 
+    @Override
+    public void setHookFileChooserFiles(String chooserId, java.util.List<String> files, CommandOptions options) {
+        setFileChooserFiles(chooserId, files, options);
+    }
+
+    @Override
+    public void saveHookDownload(String downloadId, String path, CommandOptions options) {
+        saveDownload(downloadId, path, options);
+    }
+
     synchronized void saveDownload(String downloadId, String path, CommandOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
         SaveDownloadCommand.Builder save = SaveDownloadCommand.newBuilder()
-                .setDownloadId(downloadId)
-                .setPath(path);
+                .setDownloadId(downloadId);
         if (CommandSupport.hasTimeout(resolvedOptions.timeoutMs())) {
             save.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
         }
@@ -185,6 +209,7 @@ public final class Page implements AutoCloseable, WebLocators {
             switch (event.getEventCase()) {
                 case DOWNLOAD_SAVED -> {
                     if (downloadId.equals(event.getDownloadSaved().getDownloadId())) {
+                        downloadToLocalFile(handle, event.getDownloadSaved().getFileId(), Path.of(path));
                         return;
                     }
                 }
@@ -192,6 +217,93 @@ public final class Page implements AutoCloseable, WebLocators {
                         "page session error while saving download: " + event.getError().getMessage());
                 default -> { }
             }
+        }
+    }
+
+    private String uploadLocalFile(
+            RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle,
+            Path path
+    ) {
+        String transferId = UUID.randomUUID().toString();
+        try (InputStream source = Files.newInputStream(path)) {
+            long size = Files.size(path);
+            long offset = 0;
+            while (true) {
+                byte[] buffer = source.readNBytes(256 * 1024);
+                boolean last = offset + buffer.length >= size;
+                handle.send(ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
+                        .setUploadFileChunk(UploadFileChunkCommand.newBuilder()
+                                .setTransferId(transferId)
+                                .setName(path.getFileName().toString())
+                                .setOffset(offset)
+                                .setData(ByteString.copyFrom(buffer))
+                                .setLast(last)
+                                .build())
+                        .build());
+                offset += buffer.length;
+                if (last) break;
+            }
+        } catch (IOException error) {
+            throw new AllwrightException("failed to read upload " + path + ": " + error.getMessage());
+        }
+        while (true) {
+            ContextSessionEvent event = handle.recv("receive page session event while uploading file");
+            switch (event.getEventCase()) {
+                case FILE_UPLOADED -> {
+                    if (transferId.equals(event.getFileUploaded().getTransferId())) {
+                        return event.getFileUploaded().getFileId();
+                    }
+                }
+                case ERROR -> throw new AllwrightException(
+                        "page session error while uploading file: " + event.getError().getMessage());
+                default -> { }
+            }
+        }
+    }
+
+    private void downloadToLocalFile(
+            RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle,
+            String fileId,
+            Path path
+    ) {
+        Path temporary = path.resolveSibling(path.getFileName() + ".allwright-" + UUID.randomUUID() + ".tmp");
+        try (OutputStream destination = Files.newOutputStream(temporary)) {
+            long offset = 0;
+            while (true) {
+                handle.send(ContextSessionCommand.newBuilder()
+                        .setSurfaceSessionId(browserSessionId)
+                        .setContextSessionId(sessionId)
+                        .setReadFileChunk(ReadFileChunkCommand.newBuilder()
+                                .setFileId(fileId)
+                                .setOffset(offset)
+                                .setMaxBytes(256 * 1024)
+                                .build())
+                        .build());
+                ContextSessionEvent event = handle.recv("receive page session event while downloading file");
+                if (event.getEventCase() == ContextSessionEvent.EventCase.ERROR) {
+                    throw new AllwrightException(
+                            "page session error while downloading file: " + event.getError().getMessage());
+                }
+                if (event.getEventCase() != ContextSessionEvent.EventCase.FILE_CHUNK
+                        || !fileId.equals(event.getFileChunk().getFileId())
+                        || event.getFileChunk().getOffset() != offset) {
+                    continue;
+                }
+                byte[] data = event.getFileChunk().getData().toByteArray();
+                destination.write(data);
+                offset += data.length;
+                if (event.getFileChunk().getLast()) break;
+            }
+        } catch (IOException error) {
+            try { Files.deleteIfExists(temporary); } catch (IOException ignored) { }
+            throw new AllwrightException("failed to save download " + path + ": " + error.getMessage());
+        }
+        try {
+            Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException error) {
+            throw new AllwrightException("failed to finish download " + path + ": " + error.getMessage());
         }
     }
 

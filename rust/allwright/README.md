@@ -47,3 +47,8 @@ download
     .save_as(format!("artifacts/{}", download.suggested_filename()))
     .await?;
 ```
+
+These paths are local to the Rust test process and are streamed through a
+remote Allwright server when necessary. Android app contexts expose the same
+`register_hook(FILE_CHOOSER)` / `register_hook(DOWNLOAD)` lifecycle and return
+mobile chooser/download handles.

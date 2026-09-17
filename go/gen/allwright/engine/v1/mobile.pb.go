@@ -466,6 +466,446 @@ func (x *AppLaunchedEvent) GetWebviewContext() string {
 	return ""
 }
 
+type RegisterMobileFileChooserHook struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterMobileFileChooserHook) Reset() {
+	*x = RegisterMobileFileChooserHook{}
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterMobileFileChooserHook) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterMobileFileChooserHook) ProtoMessage() {}
+
+func (x *RegisterMobileFileChooserHook) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterMobileFileChooserHook.ProtoReflect.Descriptor instead.
+func (*RegisterMobileFileChooserHook) Descriptor() ([]byte, []int) {
+	return file_surfaces_mobile_v1_mobile_proto_rawDescGZIP(), []int{4}
+}
+
+type MobileFileChooserHookResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileChooserId string                 `protobuf:"bytes,1,opt,name=file_chooser_id,json=fileChooserId,proto3" json:"file_chooser_id,omitempty"`
+	IsMultiple    bool                   `protobuf:"varint,2,opt,name=is_multiple,json=isMultiple,proto3" json:"is_multiple,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MobileFileChooserHookResult) Reset() {
+	*x = MobileFileChooserHookResult{}
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MobileFileChooserHookResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MobileFileChooserHookResult) ProtoMessage() {}
+
+func (x *MobileFileChooserHookResult) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MobileFileChooserHookResult.ProtoReflect.Descriptor instead.
+func (*MobileFileChooserHookResult) Descriptor() ([]byte, []int) {
+	return file_surfaces_mobile_v1_mobile_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *MobileFileChooserHookResult) GetFileChooserId() string {
+	if x != nil {
+		return x.FileChooserId
+	}
+	return ""
+}
+
+func (x *MobileFileChooserHookResult) GetIsMultiple() bool {
+	if x != nil {
+		return x.IsMultiple
+	}
+	return false
+}
+
+func (x *MobileFileChooserHookResult) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type SetMobileFileChooserFilesCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileChooserId string                 `protobuf:"bytes,1,opt,name=file_chooser_id,json=fileChooserId,proto3" json:"file_chooser_id,omitempty"`
+	FileIds       []string               `protobuf:"bytes,2,rep,name=file_ids,json=fileIds,proto3" json:"file_ids,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,3,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetMobileFileChooserFilesCommand) Reset() {
+	*x = SetMobileFileChooserFilesCommand{}
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetMobileFileChooserFilesCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetMobileFileChooserFilesCommand) ProtoMessage() {}
+
+func (x *SetMobileFileChooserFilesCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetMobileFileChooserFilesCommand.ProtoReflect.Descriptor instead.
+func (*SetMobileFileChooserFilesCommand) Descriptor() ([]byte, []int) {
+	return file_surfaces_mobile_v1_mobile_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SetMobileFileChooserFilesCommand) GetFileChooserId() string {
+	if x != nil {
+		return x.FileChooserId
+	}
+	return ""
+}
+
+func (x *SetMobileFileChooserFilesCommand) GetFileIds() []string {
+	if x != nil {
+		return x.FileIds
+	}
+	return nil
+}
+
+func (x *SetMobileFileChooserFilesCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type MobileFileChooserFilesSetEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileChooserId string                 `protobuf:"bytes,1,opt,name=file_chooser_id,json=fileChooserId,proto3" json:"file_chooser_id,omitempty"`
+	FileIds       []string               `protobuf:"bytes,2,rep,name=file_ids,json=fileIds,proto3" json:"file_ids,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MobileFileChooserFilesSetEvent) Reset() {
+	*x = MobileFileChooserFilesSetEvent{}
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MobileFileChooserFilesSetEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MobileFileChooserFilesSetEvent) ProtoMessage() {}
+
+func (x *MobileFileChooserFilesSetEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MobileFileChooserFilesSetEvent.ProtoReflect.Descriptor instead.
+func (*MobileFileChooserFilesSetEvent) Descriptor() ([]byte, []int) {
+	return file_surfaces_mobile_v1_mobile_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *MobileFileChooserFilesSetEvent) GetFileChooserId() string {
+	if x != nil {
+		return x.FileChooserId
+	}
+	return ""
+}
+
+func (x *MobileFileChooserFilesSetEvent) GetFileIds() []string {
+	if x != nil {
+		return x.FileIds
+	}
+	return nil
+}
+
+func (x *MobileFileChooserFilesSetEvent) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type RegisterMobileDownloadHook struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterMobileDownloadHook) Reset() {
+	*x = RegisterMobileDownloadHook{}
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterMobileDownloadHook) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterMobileDownloadHook) ProtoMessage() {}
+
+func (x *RegisterMobileDownloadHook) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterMobileDownloadHook.ProtoReflect.Descriptor instead.
+func (*RegisterMobileDownloadHook) Descriptor() ([]byte, []int) {
+	return file_surfaces_mobile_v1_mobile_proto_rawDescGZIP(), []int{8}
+}
+
+type MobileDownloadHookResult struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	DownloadId        string                 `protobuf:"bytes,1,opt,name=download_id,json=downloadId,proto3" json:"download_id,omitempty"`
+	SuggestedFilename string                 `protobuf:"bytes,2,opt,name=suggested_filename,json=suggestedFilename,proto3" json:"suggested_filename,omitempty"`
+	Note              string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *MobileDownloadHookResult) Reset() {
+	*x = MobileDownloadHookResult{}
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MobileDownloadHookResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MobileDownloadHookResult) ProtoMessage() {}
+
+func (x *MobileDownloadHookResult) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MobileDownloadHookResult.ProtoReflect.Descriptor instead.
+func (*MobileDownloadHookResult) Descriptor() ([]byte, []int) {
+	return file_surfaces_mobile_v1_mobile_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *MobileDownloadHookResult) GetDownloadId() string {
+	if x != nil {
+		return x.DownloadId
+	}
+	return ""
+}
+
+func (x *MobileDownloadHookResult) GetSuggestedFilename() string {
+	if x != nil {
+		return x.SuggestedFilename
+	}
+	return ""
+}
+
+func (x *MobileDownloadHookResult) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type SaveMobileDownloadCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DownloadId    string                 `protobuf:"bytes,1,opt,name=download_id,json=downloadId,proto3" json:"download_id,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SaveMobileDownloadCommand) Reset() {
+	*x = SaveMobileDownloadCommand{}
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SaveMobileDownloadCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SaveMobileDownloadCommand) ProtoMessage() {}
+
+func (x *SaveMobileDownloadCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SaveMobileDownloadCommand.ProtoReflect.Descriptor instead.
+func (*SaveMobileDownloadCommand) Descriptor() ([]byte, []int) {
+	return file_surfaces_mobile_v1_mobile_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *SaveMobileDownloadCommand) GetDownloadId() string {
+	if x != nil {
+		return x.DownloadId
+	}
+	return ""
+}
+
+func (x *SaveMobileDownloadCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type MobileDownloadSavedEvent struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	DownloadId        string                 `protobuf:"bytes,1,opt,name=download_id,json=downloadId,proto3" json:"download_id,omitempty"`
+	FileId            string                 `protobuf:"bytes,2,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
+	SuggestedFilename string                 `protobuf:"bytes,3,opt,name=suggested_filename,json=suggestedFilename,proto3" json:"suggested_filename,omitempty"`
+	Size              uint64                 `protobuf:"varint,4,opt,name=size,proto3" json:"size,omitempty"`
+	Note              string                 `protobuf:"bytes,5,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *MobileDownloadSavedEvent) Reset() {
+	*x = MobileDownloadSavedEvent{}
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MobileDownloadSavedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MobileDownloadSavedEvent) ProtoMessage() {}
+
+func (x *MobileDownloadSavedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_mobile_v1_mobile_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MobileDownloadSavedEvent.ProtoReflect.Descriptor instead.
+func (*MobileDownloadSavedEvent) Descriptor() ([]byte, []int) {
+	return file_surfaces_mobile_v1_mobile_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *MobileDownloadSavedEvent) GetDownloadId() string {
+	if x != nil {
+		return x.DownloadId
+	}
+	return ""
+}
+
+func (x *MobileDownloadSavedEvent) GetFileId() string {
+	if x != nil {
+		return x.FileId
+	}
+	return ""
+}
+
+func (x *MobileDownloadSavedEvent) GetSuggestedFilename() string {
+	if x != nil {
+		return x.SuggestedFilename
+	}
+	return ""
+}
+
+func (x *MobileDownloadSavedEvent) GetSize() uint64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *MobileDownloadSavedEvent) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
 var File_surfaces_mobile_v1_mobile_proto protoreflect.FileDescriptor
 
 const file_surfaces_mobile_v1_mobile_proto_rawDesc = "" +
@@ -513,7 +953,40 @@ const file_surfaces_mobile_v1_mobile_proto_rawDesc = "" +
 	"\x0fwebview_context\x18\x05 \x01(\tH\x02R\x0ewebviewContext\x88\x01\x01B\x0f\n" +
 	"\r_package_nameB\x10\n" +
 	"\x0e_activity_nameB\x12\n" +
-	"\x10_webview_context*g\n" +
+	"\x10_webview_context\"\x1f\n" +
+	"\x1dRegisterMobileFileChooserHook\"z\n" +
+	"\x1bMobileFileChooserHookResult\x12&\n" +
+	"\x0ffile_chooser_id\x18\x01 \x01(\tR\rfileChooserId\x12\x1f\n" +
+	"\vis_multiple\x18\x02 \x01(\bR\n" +
+	"isMultiple\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"\xcb\x01\n" +
+	" SetMobileFileChooserFilesCommand\x12&\n" +
+	"\x0ffile_chooser_id\x18\x01 \x01(\tR\rfileChooserId\x12\x19\n" +
+	"\bfile_ids\x18\x02 \x03(\tR\afileIds\x12R\n" +
+	"\rretry_options\x18\x03 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"w\n" +
+	"\x1eMobileFileChooserFilesSetEvent\x12&\n" +
+	"\x0ffile_chooser_id\x18\x01 \x01(\tR\rfileChooserId\x12\x19\n" +
+	"\bfile_ids\x18\x02 \x03(\tR\afileIds\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"\x1c\n" +
+	"\x1aRegisterMobileDownloadHook\"~\n" +
+	"\x18MobileDownloadHookResult\x12\x1f\n" +
+	"\vdownload_id\x18\x01 \x01(\tR\n" +
+	"downloadId\x12-\n" +
+	"\x12suggested_filename\x18\x02 \x01(\tR\x11suggestedFilename\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"\xa2\x01\n" +
+	"\x19SaveMobileDownloadCommand\x12\x1f\n" +
+	"\vdownload_id\x18\x01 \x01(\tR\n" +
+	"downloadId\x12R\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"\xab\x01\n" +
+	"\x18MobileDownloadSavedEvent\x12\x1f\n" +
+	"\vdownload_id\x18\x01 \x01(\tR\n" +
+	"downloadId\x12\x17\n" +
+	"\afile_id\x18\x02 \x01(\tR\x06fileId\x12-\n" +
+	"\x12suggested_filename\x18\x03 \x01(\tR\x11suggestedFilename\x12\x12\n" +
+	"\x04size\x18\x04 \x01(\x04R\x04size\x12\x12\n" +
+	"\x04note\x18\x05 \x01(\tR\x04note*g\n" +
 	"\x0eMobilePlatform\x12\x1f\n" +
 	"\x1bMOBILE_PLATFORM_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17MOBILE_PLATFORM_ANDROID\x10\x01\x12\x17\n" +
@@ -538,27 +1011,37 @@ func file_surfaces_mobile_v1_mobile_proto_rawDescGZIP() []byte {
 }
 
 var file_surfaces_mobile_v1_mobile_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_surfaces_mobile_v1_mobile_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_surfaces_mobile_v1_mobile_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_surfaces_mobile_v1_mobile_proto_goTypes = []any{
-	(MobilePlatform)(0),          // 0: allwright.engine.v1.MobilePlatform
-	(DeviceConnectionKind)(0),    // 1: allwright.engine.v1.DeviceConnectionKind
-	(*ConnectMobileCommand)(nil), // 2: allwright.engine.v1.ConnectMobileCommand
-	(*MobileConnectedEvent)(nil), // 3: allwright.engine.v1.MobileConnectedEvent
-	(*LaunchAppCommand)(nil),     // 4: allwright.engine.v1.LaunchAppCommand
-	(*AppLaunchedEvent)(nil),     // 5: allwright.engine.v1.AppLaunchedEvent
-	(*CommandRetryOptions)(nil),  // 6: allwright.engine.v1.CommandRetryOptions
+	(MobilePlatform)(0),                      // 0: allwright.engine.v1.MobilePlatform
+	(DeviceConnectionKind)(0),                // 1: allwright.engine.v1.DeviceConnectionKind
+	(*ConnectMobileCommand)(nil),             // 2: allwright.engine.v1.ConnectMobileCommand
+	(*MobileConnectedEvent)(nil),             // 3: allwright.engine.v1.MobileConnectedEvent
+	(*LaunchAppCommand)(nil),                 // 4: allwright.engine.v1.LaunchAppCommand
+	(*AppLaunchedEvent)(nil),                 // 5: allwright.engine.v1.AppLaunchedEvent
+	(*RegisterMobileFileChooserHook)(nil),    // 6: allwright.engine.v1.RegisterMobileFileChooserHook
+	(*MobileFileChooserHookResult)(nil),      // 7: allwright.engine.v1.MobileFileChooserHookResult
+	(*SetMobileFileChooserFilesCommand)(nil), // 8: allwright.engine.v1.SetMobileFileChooserFilesCommand
+	(*MobileFileChooserFilesSetEvent)(nil),   // 9: allwright.engine.v1.MobileFileChooserFilesSetEvent
+	(*RegisterMobileDownloadHook)(nil),       // 10: allwright.engine.v1.RegisterMobileDownloadHook
+	(*MobileDownloadHookResult)(nil),         // 11: allwright.engine.v1.MobileDownloadHookResult
+	(*SaveMobileDownloadCommand)(nil),        // 12: allwright.engine.v1.SaveMobileDownloadCommand
+	(*MobileDownloadSavedEvent)(nil),         // 13: allwright.engine.v1.MobileDownloadSavedEvent
+	(*CommandRetryOptions)(nil),              // 14: allwright.engine.v1.CommandRetryOptions
 }
 var file_surfaces_mobile_v1_mobile_proto_depIdxs = []int32{
-	0, // 0: allwright.engine.v1.ConnectMobileCommand.platform:type_name -> allwright.engine.v1.MobilePlatform
-	6, // 1: allwright.engine.v1.ConnectMobileCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	0, // 2: allwright.engine.v1.MobileConnectedEvent.platform:type_name -> allwright.engine.v1.MobilePlatform
-	1, // 3: allwright.engine.v1.MobileConnectedEvent.connection_kind:type_name -> allwright.engine.v1.DeviceConnectionKind
-	6, // 4: allwright.engine.v1.LaunchAppCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	0,  // 0: allwright.engine.v1.ConnectMobileCommand.platform:type_name -> allwright.engine.v1.MobilePlatform
+	14, // 1: allwright.engine.v1.ConnectMobileCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	0,  // 2: allwright.engine.v1.MobileConnectedEvent.platform:type_name -> allwright.engine.v1.MobilePlatform
+	1,  // 3: allwright.engine.v1.MobileConnectedEvent.connection_kind:type_name -> allwright.engine.v1.DeviceConnectionKind
+	14, // 4: allwright.engine.v1.LaunchAppCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	14, // 5: allwright.engine.v1.SetMobileFileChooserFilesCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	14, // 6: allwright.engine.v1.SaveMobileDownloadCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	7,  // [7:7] is the sub-list for method output_type
+	7,  // [7:7] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_surfaces_mobile_v1_mobile_proto_init() }
@@ -571,13 +1054,15 @@ func file_surfaces_mobile_v1_mobile_proto_init() {
 	file_surfaces_mobile_v1_mobile_proto_msgTypes[1].OneofWrappers = []any{}
 	file_surfaces_mobile_v1_mobile_proto_msgTypes[2].OneofWrappers = []any{}
 	file_surfaces_mobile_v1_mobile_proto_msgTypes[3].OneofWrappers = []any{}
+	file_surfaces_mobile_v1_mobile_proto_msgTypes[6].OneofWrappers = []any{}
+	file_surfaces_mobile_v1_mobile_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_surfaces_mobile_v1_mobile_proto_rawDesc), len(file_surfaces_mobile_v1_mobile_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   4,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -1,5 +1,8 @@
 use std::collections::HashMap;
+use std::fs::{self, OpenOptions};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -12,8 +15,8 @@ use allwright_plugin_sdk::{
 };
 use allwright_surface_mobile::{
     ConnectOptions as MobileConnectOptions, DeviceConnectionKind as MobileDeviceConnectionKind,
-    LaunchOptions as MobileLaunchOptions, MobileBrowserSessionHandle, MobilePageSessionHandle,
-    MobilePlatform,
+    LaunchOptions as MobileLaunchOptions, MobileBrowserSessionHandle, MobileHookRegistration,
+    MobileHookResult, MobileHookType, MobilePageSessionHandle, MobilePlatform,
 };
 use tokio::sync::{Mutex, mpsc};
 use tokio::time::{Duration, Instant, sleep};
@@ -30,17 +33,20 @@ use proto::{
     ContextSessionPongEvent, CountElementsCommand, DeviceConnectionKind, DownloadHookResult,
     DownloadSavedEvent, ElementClickedEvent, ElementCountedEvent, ElementFilledEvent,
     ElementFocusedEvent, ElementHoveredEvent, ElementsHighlightedEvent, FileChooserFilesSetEvent,
-    FileChooserHookResult, FillElementCommand, FocusElementCommand, GetInnerTextCommand,
-    GetTextContentCommand, HighlightElementsCommand, HookCompletedEvent, HookRegisteredEvent,
-    HoverElementCommand, InnerTextResolvedEvent, KeyPressedEvent, LaunchAppCommand,
-    LaunchBrowserCommand, LaunchChromeCommand, MobileConnectedEvent,
+    FileChooserHookResult, FileChunkEvent, FileUploadedEvent, FillElementCommand,
+    FocusElementCommand, GetInnerTextCommand, GetTextContentCommand, HighlightElementsCommand,
+    HookCompletedEvent, HookRegisteredEvent, HoverElementCommand, InnerTextResolvedEvent,
+    KeyPressedEvent, LaunchAppCommand, LaunchBrowserCommand, LaunchChromeCommand,
+    MobileConnectedEvent, MobileDownloadHookResult, MobileDownloadSavedEvent,
+    MobileFileChooserFilesSetEvent, MobileFileChooserHookResult,
     MobilePlatform as ProtoMobilePlatform, NavigatePageCommand, NewPageHookResult,
     OpenContextCommand, PageNavigatedEvent, PingRequest, PingResponse, PressKeyCommand,
-    RegisterHookCommand, SaveDownloadCommand, ScreenshotCapturedEvent, ScreenshotCommand,
-    SelectorWaitSatisfiedEvent, SessionPingCommand, SessionPongEvent, SetFileChooserFilesCommand,
+    ReadFileChunkCommand, RegisterHookCommand, SaveDownloadCommand, SaveMobileDownloadCommand,
+    ScreenshotCapturedEvent, ScreenshotCommand, SelectorWaitSatisfiedEvent, SessionPingCommand,
+    SessionPongEvent, SetFileChooserFilesCommand, SetMobileFileChooserFilesCommand,
     SurfaceSessionClosedEvent, SurfaceSessionCommand, SurfaceSessionErrorEvent,
-    SurfaceSessionEvent, TextContentResolvedEvent, WaitForHookCommand, WaitForSelectorCommand,
-    context_session_command::Command as ContextCommand,
+    SurfaceSessionEvent, TextContentResolvedEvent, UploadFileChunkCommand, WaitForHookCommand,
+    WaitForSelectorCommand, context_session_command::Command as ContextCommand,
     context_session_event::Event as ContextEvent,
     hook_completed_event::Result as HookCompletionResult,
     register_hook_command::Hook as RegisterHook,
@@ -51,6 +57,7 @@ use proto::{
 static BROWSER_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 static TAB_SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 static HOOK_COUNTER: AtomicU64 = AtomicU64::new(1);
+static FILE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Clone)]
 struct BrowserAutomationState {
@@ -79,7 +86,28 @@ struct TabSessionState {
 struct HookState {
     surface_session_id: String,
     context_session_id: String,
-    registration: HookRegistration,
+    registration: EngineHookRegistration,
+}
+
+#[derive(Debug, Clone)]
+enum EngineHookRegistration {
+    Web(HookRegistration),
+    Mobile(MobileHookRegistration),
+}
+
+#[derive(Debug)]
+struct FileUploadState {
+    context_session_id: String,
+    name: String,
+    path: PathBuf,
+    size: u64,
+}
+
+#[derive(Debug, Clone)]
+struct StagedFile {
+    context_session_id: String,
+    path: PathBuf,
+    size: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -145,6 +173,8 @@ struct EngineState {
     browser_sessions: HashMap<String, BrowserSessionState>,
     tab_sessions: HashMap<String, TabSessionState>,
     hooks: HashMap<String, HookState>,
+    file_uploads: HashMap<String, FileUploadState>,
+    staged_files: HashMap<String, StagedFile>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -236,6 +266,33 @@ fn next_context_session_id() -> String {
 
 fn next_hook_id() -> String {
     format!("hook-{}", HOOK_COUNTER.fetch_add(1, Ordering::Relaxed))
+}
+
+fn next_file_id(prefix: &str) -> String {
+    format!("{prefix}-{}", FILE_COUNTER.fetch_add(1, Ordering::Relaxed))
+}
+
+fn safe_transfer_name(name: &str) -> Result<String, String> {
+    let name = Path::new(name)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty() && *name != "." && *name != "..")
+        .ok_or_else(|| "uploaded file requires a valid file name".to_string())?;
+    Ok(name.to_string())
+}
+
+fn transfer_path(id: &str, name: &str) -> PathBuf {
+    std::env::temp_dir()
+        .join(format!("allwright-transfer-{}", std::process::id()))
+        .join(id)
+        .join(name)
+}
+
+fn remove_staged_file(file: &StagedFile) {
+    let _ = fs::remove_file(&file.path);
+    if let Some(parent) = file.path.parent() {
+        let _ = fs::remove_dir(parent);
+    }
 }
 
 fn browser_event(session_id: &str, event: SurfaceEvent) -> SurfaceSessionEvent {
@@ -760,42 +817,251 @@ async fn handle_tab_command(
     };
 
     match command.command {
-        Some(ContextCommand::RegisterHook(RegisterHookCommand { hook })) => {
-            let plugin_hook_type = match hook {
-                Some(RegisterHook::NewPage(_)) => PluginHookType::NewPage,
-                Some(RegisterHook::FileChooser(_)) => PluginHookType::FileChooser,
-                Some(RegisterHook::Download(_)) => PluginHookType::Download,
-                None => {
+        Some(ContextCommand::UploadFileChunk(UploadFileChunkCommand {
+            transfer_id,
+            name,
+            offset,
+            data,
+            last,
+        })) => {
+            if transfer_id.trim().is_empty() {
+                return Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: "upload_file_chunk requires transfer_id".to_string(),
+                        }),
+                    )],
+                    should_close: false,
+                });
+            }
+            if data.len() > 1024 * 1024 {
+                return Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: "upload file chunks must not exceed 1 MiB".to_string(),
+                        }),
+                    )],
+                    should_close: false,
+                });
+            }
+
+            let mut engine = state.lock().await;
+            if !engine.file_uploads.contains_key(&transfer_id) {
+                if offset != 0 {
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "register_hook requires a typed hook payload".to_string(),
+                                message: "first upload chunk must start at offset 0".to_string(),
                             }),
                         )],
                         should_close: false,
                     });
                 }
+                let name = match safe_transfer_name(&name) {
+                    Ok(name) => name,
+                    Err(message) => {
+                        return Ok(TabCommandOutcome {
+                            events: vec![tab_event(
+                                &context_session_id,
+                                ContextEvent::Error(ContextSessionErrorEvent { message }),
+                            )],
+                            should_close: false,
+                        });
+                    }
+                };
+                let path = transfer_path(&next_file_id("upload"), &name);
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent)
+                        .map_err(|error| Status::internal(error.to_string()))?;
+                }
+                engine.file_uploads.insert(
+                    transfer_id.clone(),
+                    FileUploadState {
+                        context_session_id: context_session_id.clone(),
+                        name,
+                        path,
+                        size: 0,
+                    },
+                );
+            }
+
+            let upload = engine
+                .file_uploads
+                .get_mut(&transfer_id)
+                .expect("upload inserted");
+            if upload.context_session_id != context_session_id {
+                return Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: "file upload belongs to a different context session"
+                                .to_string(),
+                        }),
+                    )],
+                    should_close: false,
+                });
+            }
+            if offset != upload.size {
+                return Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: format!(
+                                "upload chunk offset {offset} does not match expected offset {}",
+                                upload.size
+                            ),
+                        }),
+                    )],
+                    should_close: false,
+                });
+            }
+            let mut file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&upload.path)
+                .map_err(|error| Status::internal(error.to_string()))?;
+            file.write_all(&data)
+                .map_err(|error| Status::internal(error.to_string()))?;
+            upload.size += data.len() as u64;
+
+            if !last {
+                return Ok(TabCommandOutcome {
+                    events: Vec::new(),
+                    should_close: false,
+                });
+            }
+
+            let upload = engine
+                .file_uploads
+                .remove(&transfer_id)
+                .expect("upload exists");
+            let file_id = next_file_id("file");
+            let event = FileUploadedEvent {
+                transfer_id,
+                file_id: file_id.clone(),
+                name: upload.name.clone(),
+                size: upload.size,
             };
-            let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (
-                    EngineBrowserSessionHandle::Web(surface_session),
-                    EnginePageSessionHandle::Web(page_session),
-                ) => (surface_session, page_session),
-                _ => {
-                    return Ok(TabCommandOutcome {
-                        events: vec![tab_event(
-                            &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "this hook type requires a web page session".to_string(),
-                            }),
-                        )],
-                        should_close: false,
-                    });
+            engine.staged_files.insert(
+                file_id,
+                StagedFile {
+                    context_session_id: context_session_id.clone(),
+                    path: upload.path,
+                    size: upload.size,
+                },
+            );
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &context_session_id,
+                    ContextEvent::FileUploaded(event),
+                )],
+                should_close: false,
+            })
+        }
+        Some(ContextCommand::ReadFileChunk(ReadFileChunkCommand {
+            file_id,
+            offset,
+            max_bytes,
+        })) => {
+            let file = state.lock().await.staged_files.get(&file_id).cloned();
+            let Some(file) = file.filter(|file| file.context_session_id == context_session_id)
+            else {
+                return Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: format!("unknown staged file {file_id}"),
+                        }),
+                    )],
+                    should_close: false,
+                });
+            };
+            if offset > file.size {
+                return Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: format!("file offset {offset} exceeds size {}", file.size),
+                        }),
+                    )],
+                    should_close: false,
+                });
+            }
+            let read_size = usize::try_from(max_bytes.clamp(1, 1024 * 1024)).unwrap_or(1024 * 1024);
+            let mut source =
+                fs::File::open(&file.path).map_err(|error| Status::internal(error.to_string()))?;
+            source
+                .seek(SeekFrom::Start(offset))
+                .map_err(|error| Status::internal(error.to_string()))?;
+            let mut data = vec![0; read_size];
+            let count = source
+                .read(&mut data)
+                .map_err(|error| Status::internal(error.to_string()))?;
+            data.truncate(count);
+            let last = offset + count as u64 >= file.size;
+            if last {
+                if let Some(file) = state.lock().await.staged_files.remove(&file_id) {
+                    remove_staged_file(&file);
                 }
+            }
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &context_session_id,
+                    ContextEvent::FileChunk(FileChunkEvent {
+                        file_id,
+                        offset,
+                        data,
+                        last,
+                    }),
+                )],
+                should_close: false,
+            })
+        }
+        Some(ContextCommand::RegisterHook(RegisterHookCommand { hook })) => {
+            let registration = match (hook, &surface_session, &page_session) {
+                (
+                    Some(RegisterHook::NewPage(_)),
+                    EngineBrowserSessionHandle::Web(browser),
+                    EnginePageSessionHandle::Web(page),
+                ) => web_lib::register_hook(browser, page, PluginHookType::NewPage)
+                    .await
+                    .map(EngineHookRegistration::Web),
+                (
+                    Some(RegisterHook::FileChooser(_)),
+                    EngineBrowserSessionHandle::Web(browser),
+                    EnginePageSessionHandle::Web(page),
+                ) => web_lib::register_hook(browser, page, PluginHookType::FileChooser)
+                    .await
+                    .map(EngineHookRegistration::Web),
+                (
+                    Some(RegisterHook::Download(_)),
+                    EngineBrowserSessionHandle::Web(browser),
+                    EnginePageSessionHandle::Web(page),
+                ) => web_lib::register_hook(browser, page, PluginHookType::Download)
+                    .await
+                    .map(EngineHookRegistration::Web),
+                (
+                    Some(RegisterHook::MobileFileChooser(_)),
+                    EngineBrowserSessionHandle::Mobile(browser),
+                    EnginePageSessionHandle::Mobile(page),
+                ) => web_lib::register_mobile_hook(browser, page, MobileHookType::FileChooser)
+                    .await
+                    .map(EngineHookRegistration::Mobile),
+                (
+                    Some(RegisterHook::MobileDownload(_)),
+                    EngineBrowserSessionHandle::Mobile(browser),
+                    EnginePageSessionHandle::Mobile(page),
+                ) => web_lib::register_mobile_hook(browser, page, MobileHookType::Download)
+                    .await
+                    .map(EngineHookRegistration::Mobile),
+                (None, _, _) => Err("register_hook requires a typed hook payload".to_string()),
+                _ => Err("hook type is not supported by this context surface".to_string()),
             };
 
-            match web_lib::register_hook(surface_session, page_session, plugin_hook_type).await {
+            match registration {
                 Ok(registration) => {
                     let hook_id = next_hook_id();
                     state.lock().await.hooks.insert(
@@ -842,6 +1108,74 @@ async fn handle_tab_command(
                     should_close: false,
                 });
             };
+            if let EngineHookRegistration::Mobile(registration) = &hook.registration {
+                let EngineBrowserSessionHandle::Mobile(mobile_session) = &surface_session else {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "mobile hook session is not available".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                };
+                let result =
+                    retry_with_timeout(command_retry_policy(retry_options.as_ref()), || async {
+                        web_lib::poll_mobile_hook(mobile_session, registration).await
+                    })
+                    .await;
+                return match result {
+                    Ok(MobileHookResult::FileChooser(chooser)) => {
+                        state.lock().await.hooks.remove(&hook_id);
+                        Ok(TabCommandOutcome {
+                            events: vec![tab_event(
+                                &context_session_id,
+                                ContextEvent::HookCompleted(HookCompletedEvent {
+                                    hook_id,
+                                    result: Some(HookCompletionResult::MobileFileChooser(
+                                        MobileFileChooserHookResult {
+                                            file_chooser_id: chooser.file_chooser_id,
+                                            is_multiple: chooser.is_multiple,
+                                            note: chooser.note,
+                                        },
+                                    )),
+                                }),
+                            )],
+                            should_close: false,
+                        })
+                    }
+                    Ok(MobileHookResult::Download(download)) => {
+                        state.lock().await.hooks.remove(&hook_id);
+                        Ok(TabCommandOutcome {
+                            events: vec![tab_event(
+                                &context_session_id,
+                                ContextEvent::HookCompleted(HookCompletedEvent {
+                                    hook_id,
+                                    result: Some(HookCompletionResult::MobileDownload(
+                                        MobileDownloadHookResult {
+                                            download_id: download.download_id,
+                                            suggested_filename: download.suggested_filename,
+                                            note: download.note,
+                                        },
+                                    )),
+                                }),
+                            )],
+                            should_close: false,
+                        })
+                    }
+                    Err(message) => Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent { message }),
+                        )],
+                        should_close: false,
+                    }),
+                };
+            }
+            let EngineHookRegistration::Web(registration) = &hook.registration else {
+                unreachable!("mobile hook returned above")
+            };
             let EngineBrowserSessionHandle::Web(surface_session) = &surface_session else {
                 return Ok(TabCommandOutcome {
                     events: vec![tab_event(
@@ -856,7 +1190,7 @@ async fn handle_tab_command(
 
             let retry_policy = command_retry_policy(retry_options.as_ref());
             match retry_with_timeout(retry_policy, || async {
-                web_lib::poll_hook(surface_session, &hook.registration).await
+                web_lib::poll_hook(surface_session, registration).await
             })
             .await
             {
@@ -935,7 +1269,7 @@ async fn handle_tab_command(
         }
         Some(ContextCommand::SetFileChooserFiles(SetFileChooserFilesCommand {
             file_chooser_id,
-            files,
+            file_ids,
             retry_options,
         })) => {
             let (surface_session, page_session) = match (&surface_session, &page_session) {
@@ -955,6 +1289,29 @@ async fn handle_tab_command(
                     });
                 }
             };
+            let files = {
+                let engine = state.lock().await;
+                let mut files = Vec::with_capacity(file_ids.len());
+                for file_id in &file_ids {
+                    let Some(file) = engine
+                        .staged_files
+                        .get(file_id)
+                        .filter(|file| file.context_session_id == context_session_id)
+                    else {
+                        return Ok(TabCommandOutcome {
+                            events: vec![tab_event(
+                                &context_session_id,
+                                ContextEvent::Error(ContextSessionErrorEvent {
+                                    message: format!("unknown staged file {file_id}"),
+                                }),
+                            )],
+                            should_close: false,
+                        });
+                    };
+                    files.push(file.path.to_string_lossy().to_string());
+                }
+                files
+            };
             let result =
                 retry_with_timeout(command_retry_policy(retry_options.as_ref()), || async {
                     web_lib::set_file_chooser_files(
@@ -972,7 +1329,7 @@ async fn handle_tab_command(
                         &context_session_id,
                         ContextEvent::FileChooserFilesSet(FileChooserFilesSetEvent {
                             file_chooser_id: result.file_chooser_id,
-                            files: result.files,
+                            file_ids,
                             note: result.note,
                         }),
                     )],
@@ -989,7 +1346,6 @@ async fn handle_tab_command(
         }
         Some(ContextCommand::SaveDownload(SaveDownloadCommand {
             download_id,
-            path,
             retry_options,
         })) => {
             let (surface_session, page_session) = match (&surface_session, &page_session) {
@@ -1009,23 +1365,200 @@ async fn handle_tab_command(
                     });
                 }
             };
+            let server_file_id = next_file_id("download-file");
+            let destination = transfer_path(&server_file_id, "download");
+            if let Some(parent) = destination.parent() {
+                fs::create_dir_all(parent).map_err(|error| Status::internal(error.to_string()))?;
+            }
+            let destination_string = destination.to_string_lossy().to_string();
             let result =
                 retry_with_timeout(command_retry_policy(retry_options.as_ref()), || async {
-                    web_lib::save_download(surface_session, page_session, &download_id, &path).await
+                    web_lib::save_download(
+                        surface_session,
+                        page_session,
+                        &download_id,
+                        &destination_string,
+                    )
+                    .await
                 })
                 .await;
+            match result {
+                Ok(result) => {
+                    state.lock().await.staged_files.insert(
+                        server_file_id.clone(),
+                        StagedFile {
+                            context_session_id: context_session_id.clone(),
+                            path: PathBuf::from(&result.path),
+                            size: result.size,
+                        },
+                    );
+                    Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::DownloadSaved(DownloadSavedEvent {
+                                download_id: result.download_id,
+                                file_id: server_file_id,
+                                suggested_filename: result.suggested_filename,
+                                size: result.size,
+                                note: result.note,
+                            }),
+                        )],
+                        should_close: false,
+                    })
+                }
+                Err(message) => Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent { message }),
+                    )],
+                    should_close: false,
+                }),
+            }
+        }
+        Some(ContextCommand::SetMobileFileChooserFiles(SetMobileFileChooserFilesCommand {
+            file_chooser_id,
+            file_ids,
+            retry_options,
+        })) => {
+            let (
+                EngineBrowserSessionHandle::Mobile(mobile_session),
+                EnginePageSessionHandle::Mobile(mobile_page),
+            ) = (&surface_session, &page_session)
+            else {
+                return Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: "mobile file chooser requires a mobile app context"
+                                .to_string(),
+                        }),
+                    )],
+                    should_close: false,
+                });
+            };
+            let files = {
+                let engine = state.lock().await;
+                let mut files = Vec::with_capacity(file_ids.len());
+                for file_id in &file_ids {
+                    let Some(file) = engine
+                        .staged_files
+                        .get(file_id)
+                        .filter(|file| file.context_session_id == context_session_id)
+                    else {
+                        return Ok(TabCommandOutcome {
+                            events: vec![tab_event(
+                                &context_session_id,
+                                ContextEvent::Error(ContextSessionErrorEvent {
+                                    message: format!("unknown staged file {file_id}"),
+                                }),
+                            )],
+                            should_close: false,
+                        });
+                    };
+                    files.push(file.path.to_string_lossy().to_string());
+                }
+                files
+            };
+            let result =
+                retry_with_timeout(command_retry_policy(retry_options.as_ref()), || async {
+                    web_lib::set_mobile_file_chooser_files(
+                        mobile_session,
+                        mobile_page,
+                        &file_chooser_id,
+                        &files,
+                    )
+                    .await
+                })
+                .await;
+            {
+                let mut engine = state.lock().await;
+                for file_id in &file_ids {
+                    if let Some(file) = engine.staged_files.remove(file_id) {
+                        remove_staged_file(&file);
+                    }
+                }
+            }
             match result {
                 Ok(result) => Ok(TabCommandOutcome {
                     events: vec![tab_event(
                         &context_session_id,
-                        ContextEvent::DownloadSaved(DownloadSavedEvent {
-                            download_id: result.download_id,
-                            path: result.path,
+                        ContextEvent::MobileFileChooserFilesSet(MobileFileChooserFilesSetEvent {
+                            file_chooser_id: result.file_chooser_id,
+                            file_ids,
                             note: result.note,
                         }),
                     )],
                     should_close: false,
                 }),
+                Err(message) => Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent { message }),
+                    )],
+                    should_close: false,
+                }),
+            }
+        }
+        Some(ContextCommand::SaveMobileDownload(SaveMobileDownloadCommand {
+            download_id,
+            retry_options,
+        })) => {
+            let (
+                EngineBrowserSessionHandle::Mobile(mobile_session),
+                EnginePageSessionHandle::Mobile(mobile_page),
+            ) = (&surface_session, &page_session)
+            else {
+                return Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: "mobile download requires a mobile app context".to_string(),
+                        }),
+                    )],
+                    should_close: false,
+                });
+            };
+            let server_file_id = next_file_id("mobile-download-file");
+            let destination = transfer_path(&server_file_id, "download");
+            if let Some(parent) = destination.parent() {
+                fs::create_dir_all(parent).map_err(|error| Status::internal(error.to_string()))?;
+            }
+            let destination_string = destination.to_string_lossy().to_string();
+            let result =
+                retry_with_timeout(command_retry_policy(retry_options.as_ref()), || async {
+                    web_lib::save_mobile_download(
+                        mobile_session,
+                        mobile_page,
+                        &download_id,
+                        &destination_string,
+                    )
+                    .await
+                })
+                .await;
+            match result {
+                Ok(result) => {
+                    state.lock().await.staged_files.insert(
+                        server_file_id.clone(),
+                        StagedFile {
+                            context_session_id: context_session_id.clone(),
+                            path: PathBuf::from(&result.path),
+                            size: result.size,
+                        },
+                    );
+                    Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::MobileDownloadSaved(MobileDownloadSavedEvent {
+                                download_id: result.download_id,
+                                file_id: server_file_id,
+                                suggested_filename: result.suggested_filename,
+                                size: result.size,
+                                note: result.note,
+                            }),
+                        )],
+                        should_close: false,
+                    })
+                }
                 Err(message) => Ok(TabCommandOutcome {
                     events: vec![tab_event(
                         &context_session_id,
@@ -1085,6 +1618,28 @@ async fn handle_tab_command(
             state
                 .hooks
                 .retain(|_, hook| hook.context_session_id != context_session_id);
+            let upload_ids = state
+                .file_uploads
+                .iter()
+                .filter(|(_, upload)| upload.context_session_id == context_session_id)
+                .map(|(id, _)| id.clone())
+                .collect::<Vec<_>>();
+            for id in upload_ids {
+                if let Some(upload) = state.file_uploads.remove(&id) {
+                    let _ = fs::remove_file(upload.path);
+                }
+            }
+            let file_ids = state
+                .staged_files
+                .iter()
+                .filter(|(_, file)| file.context_session_id == context_session_id)
+                .map(|(id, _)| id.clone())
+                .collect::<Vec<_>>();
+            for id in file_ids {
+                if let Some(file) = state.staged_files.remove(&id) {
+                    remove_staged_file(&file);
+                }
+            }
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
                     &context_session_id,
@@ -1967,4 +2522,85 @@ pub async fn serve(addr: SocketAddr) -> Result<(), tonic::transport::Error> {
         .add_service(EngineServiceServer::new(EngineGrpcService::default()))
         .serve(addr)
         .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn transfer_test_state() -> Arc<Mutex<EngineState>> {
+        let mut state = EngineState::default();
+        state.browser_sessions.insert(
+            "surface-1".to_string(),
+            BrowserSessionState {
+                launched: true,
+                surface_session: Some(EngineBrowserSessionHandle::Web(
+                    BrowserSessionHandle::Chromium {
+                        cdp_websocket_url: "ws://unused".to_string(),
+                    },
+                )),
+                process_id: None,
+                automation: None,
+            },
+        );
+        state.tab_sessions.insert(
+            "context-1".to_string(),
+            TabSessionState {
+                surface_session_id: "surface-1".to_string(),
+                page_session: EnginePageSessionHandle::Web(PageSessionHandle::Chromium {
+                    target_id: "unused".to_string(),
+                    browsing_context_id: None,
+                    mapper_target_id: None,
+                }),
+                current_url: None,
+            },
+        );
+        Arc::new(Mutex::new(state))
+    }
+
+    #[tokio::test]
+    async fn staged_files_round_trip_in_chunks_without_server_paths_in_the_contract() {
+        let state = transfer_test_state();
+        let upload = handle_tab_command(
+            Arc::clone(&state),
+            ContextSessionCommand {
+                surface_session_id: "surface-1".to_string(),
+                context_session_id: "context-1".to_string(),
+                command: Some(ContextCommand::UploadFileChunk(UploadFileChunkCommand {
+                    transfer_id: "transfer-1".to_string(),
+                    name: "fixture.txt".to_string(),
+                    offset: 0,
+                    data: b"client bytes".to_vec(),
+                    last: true,
+                })),
+            },
+        )
+        .await
+        .unwrap();
+        let Some(ContextEvent::FileUploaded(uploaded)) = &upload.events[0].event else {
+            panic!("expected file uploaded event")
+        };
+        let file_id = uploaded.file_id.clone();
+        assert_ne!(file_id, "fixture.txt");
+
+        let read = handle_tab_command(
+            state,
+            ContextSessionCommand {
+                surface_session_id: "surface-1".to_string(),
+                context_session_id: "context-1".to_string(),
+                command: Some(ContextCommand::ReadFileChunk(ReadFileChunkCommand {
+                    file_id,
+                    offset: 0,
+                    max_bytes: 64,
+                })),
+            },
+        )
+        .await
+        .unwrap();
+        let Some(ContextEvent::FileChunk(chunk)) = &read.events[0].event else {
+            panic!("expected file chunk event")
+        };
+        assert_eq!(chunk.data, b"client bytes");
+        assert!(chunk.last);
+    }
 }

@@ -7,9 +7,11 @@ use allwright_plugin_sdk::{
 };
 use allwright_surface_mobile::{
     ConnectOptions as MobileConnectOptions, MobileBrowserSessionHandle, MobileClickInfo,
-    MobileCommand, MobileCommandResult, MobileConnectInfo, MobileElementCountInfo,
-    MobileElementInfo, MobileFillInfo, MobilePageInfo, MobilePageSessionHandle, MobilePlatform,
-    MobilePressInfo, MobileScreenshotInfo, MobileTextInfo, MobileWaitForSelectorInfo,
+    MobileCommand, MobileCommandResult, MobileConnectInfo, MobileDownloadSavedInfo,
+    MobileElementCountInfo, MobileElementInfo, MobileFileChooserFilesSetInfo, MobileFillInfo,
+    MobileHookRegistration, MobileHookResult, MobileHookType, MobilePageInfo,
+    MobilePageSessionHandle, MobilePlatform, MobilePressInfo, MobileScreenshotInfo, MobileTextInfo,
+    MobileWaitForSelectorInfo,
 };
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -72,6 +74,18 @@ fn mobile_plugin_id_for_command(command: &MobileCommand) -> Result<&'static str,
         MobileCommand::LaunchApp {
             browser_session, ..
         }
+        | MobileCommand::RegisterHook {
+            browser_session, ..
+        }
+        | MobileCommand::PollHook {
+            browser_session, ..
+        }
+        | MobileCommand::SetFileChooserFiles {
+            browser_session, ..
+        }
+        | MobileCommand::SaveDownload {
+            browser_session, ..
+        }
         | MobileCommand::OpenPage { browser_session }
         | MobileCommand::ClosePage {
             browser_session, ..
@@ -108,6 +122,76 @@ fn mobile_plugin_id_for_command(command: &MobileCommand) -> Result<&'static str,
         } => browser_session.platform,
     };
     mobile_plugin_id(platform)
+}
+
+pub async fn register_mobile_hook(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    hook_type: MobileHookType,
+) -> Result<MobileHookRegistration, String> {
+    match invoke_mobile_expected(MobileCommand::RegisterHook {
+        browser_session: browser_session.clone(),
+        page_session: page_session.clone(),
+        hook_type,
+    })
+    .await?
+    {
+        MobileCommandResult::RegisterHook(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected hook registration".to_string()),
+    }
+}
+
+pub async fn poll_mobile_hook(
+    browser_session: &MobileBrowserSessionHandle,
+    registration: &MobileHookRegistration,
+) -> Result<MobileHookResult, String> {
+    match invoke_mobile_expected(MobileCommand::PollHook {
+        browser_session: browser_session.clone(),
+        registration: registration.clone(),
+    })
+    .await?
+    {
+        MobileCommandResult::PollHook(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected hook result".to_string()),
+    }
+}
+
+pub async fn set_mobile_file_chooser_files(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    file_chooser_id: &str,
+    files: &[String],
+) -> Result<MobileFileChooserFilesSetInfo, String> {
+    match invoke_mobile_expected(MobileCommand::SetFileChooserFiles {
+        browser_session: browser_session.clone(),
+        page_session: page_session.clone(),
+        file_chooser_id: file_chooser_id.to_string(),
+        files: files.to_vec(),
+    })
+    .await?
+    {
+        MobileCommandResult::SetFileChooserFiles(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected file chooser result".to_string()),
+    }
+}
+
+pub async fn save_mobile_download(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    download_id: &str,
+    path: &str,
+) -> Result<MobileDownloadSavedInfo, String> {
+    match invoke_mobile_expected(MobileCommand::SaveDownload {
+        browser_session: browser_session.clone(),
+        page_session: page_session.clone(),
+        download_id: download_id.to_string(),
+        path: path.to_string(),
+    })
+    .await?
+    {
+        MobileCommandResult::SaveDownload(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected download result".to_string()),
+    }
 }
 
 fn mobile_plugin_id(platform: MobilePlatform) -> Result<&'static str, String> {

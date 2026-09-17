@@ -521,7 +521,7 @@ func (x *FileChooserHookResult) GetNote() string {
 type SetFileChooserFilesCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	FileChooserId string                 `protobuf:"bytes,1,opt,name=file_chooser_id,json=fileChooserId,proto3" json:"file_chooser_id,omitempty"`
-	Files         []string               `protobuf:"bytes,2,rep,name=files,proto3" json:"files,omitempty"`
+	FileIds       []string               `protobuf:"bytes,2,rep,name=file_ids,json=fileIds,proto3" json:"file_ids,omitempty"`
 	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,3,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -564,9 +564,9 @@ func (x *SetFileChooserFilesCommand) GetFileChooserId() string {
 	return ""
 }
 
-func (x *SetFileChooserFilesCommand) GetFiles() []string {
+func (x *SetFileChooserFilesCommand) GetFileIds() []string {
 	if x != nil {
-		return x.Files
+		return x.FileIds
 	}
 	return nil
 }
@@ -581,7 +581,7 @@ func (x *SetFileChooserFilesCommand) GetRetryOptions() *CommandRetryOptions {
 type FileChooserFilesSetEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	FileChooserId string                 `protobuf:"bytes,1,opt,name=file_chooser_id,json=fileChooserId,proto3" json:"file_chooser_id,omitempty"`
-	Files         []string               `protobuf:"bytes,2,rep,name=files,proto3" json:"files,omitempty"`
+	FileIds       []string               `protobuf:"bytes,2,rep,name=file_ids,json=fileIds,proto3" json:"file_ids,omitempty"`
 	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -624,9 +624,9 @@ func (x *FileChooserFilesSetEvent) GetFileChooserId() string {
 	return ""
 }
 
-func (x *FileChooserFilesSetEvent) GetFiles() []string {
+func (x *FileChooserFilesSetEvent) GetFileIds() []string {
 	if x != nil {
-		return x.Files
+		return x.FileIds
 	}
 	return nil
 }
@@ -745,8 +745,7 @@ func (x *DownloadHookResult) GetNote() string {
 type SaveDownloadCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DownloadId    string                 `protobuf:"bytes,1,opt,name=download_id,json=downloadId,proto3" json:"download_id,omitempty"`
-	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,3,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -788,13 +787,6 @@ func (x *SaveDownloadCommand) GetDownloadId() string {
 	return ""
 }
 
-func (x *SaveDownloadCommand) GetPath() string {
-	if x != nil {
-		return x.Path
-	}
-	return ""
-}
-
 func (x *SaveDownloadCommand) GetRetryOptions() *CommandRetryOptions {
 	if x != nil {
 		return x.RetryOptions
@@ -803,12 +795,14 @@ func (x *SaveDownloadCommand) GetRetryOptions() *CommandRetryOptions {
 }
 
 type DownloadSavedEvent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DownloadId    string                 `protobuf:"bytes,1,opt,name=download_id,json=downloadId,proto3" json:"download_id,omitempty"`
-	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	DownloadId        string                 `protobuf:"bytes,1,opt,name=download_id,json=downloadId,proto3" json:"download_id,omitempty"`
+	FileId            string                 `protobuf:"bytes,2,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
+	SuggestedFilename string                 `protobuf:"bytes,3,opt,name=suggested_filename,json=suggestedFilename,proto3" json:"suggested_filename,omitempty"`
+	Size              uint64                 `protobuf:"varint,4,opt,name=size,proto3" json:"size,omitempty"`
+	Note              string                 `protobuf:"bytes,5,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *DownloadSavedEvent) Reset() {
@@ -848,11 +842,25 @@ func (x *DownloadSavedEvent) GetDownloadId() string {
 	return ""
 }
 
-func (x *DownloadSavedEvent) GetPath() string {
+func (x *DownloadSavedEvent) GetFileId() string {
 	if x != nil {
-		return x.Path
+		return x.FileId
 	}
 	return ""
+}
+
+func (x *DownloadSavedEvent) GetSuggestedFilename() string {
+	if x != nil {
+		return x.SuggestedFilename
+	}
+	return ""
+}
+
+func (x *DownloadSavedEvent) GetSize() uint64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
 }
 
 func (x *DownloadSavedEvent) GetNote() string {
@@ -899,15 +907,15 @@ const file_surfaces_web_v1_web_proto_rawDesc = "" +
 	"\x0ffile_chooser_id\x18\x01 \x01(\tR\rfileChooserId\x12\x1f\n" +
 	"\vis_multiple\x18\x02 \x01(\bR\n" +
 	"isMultiple\x12\x12\n" +
-	"\x04note\x18\x03 \x01(\tR\x04note\"\xc0\x01\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"\xc5\x01\n" +
 	"\x1aSetFileChooserFilesCommand\x12&\n" +
-	"\x0ffile_chooser_id\x18\x01 \x01(\tR\rfileChooserId\x12\x14\n" +
-	"\x05files\x18\x02 \x03(\tR\x05files\x12R\n" +
+	"\x0ffile_chooser_id\x18\x01 \x01(\tR\rfileChooserId\x12\x19\n" +
+	"\bfile_ids\x18\x02 \x03(\tR\afileIds\x12R\n" +
 	"\rretry_options\x18\x03 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
-	"\x0e_retry_options\"l\n" +
+	"\x0e_retry_options\"q\n" +
 	"\x18FileChooserFilesSetEvent\x12&\n" +
-	"\x0ffile_chooser_id\x18\x01 \x01(\tR\rfileChooserId\x12\x14\n" +
-	"\x05files\x18\x02 \x03(\tR\x05files\x12\x12\n" +
+	"\x0ffile_chooser_id\x18\x01 \x01(\tR\rfileChooserId\x12\x19\n" +
+	"\bfile_ids\x18\x02 \x03(\tR\afileIds\x12\x12\n" +
 	"\x04note\x18\x03 \x01(\tR\x04note\"\x16\n" +
 	"\x14RegisterDownloadHook\"\x8a\x01\n" +
 	"\x12DownloadHookResult\x12\x1f\n" +
@@ -915,18 +923,19 @@ const file_surfaces_web_v1_web_proto_rawDesc = "" +
 	"downloadId\x12\x10\n" +
 	"\x03url\x18\x02 \x01(\tR\x03url\x12-\n" +
 	"\x12suggested_filename\x18\x03 \x01(\tR\x11suggestedFilename\x12\x12\n" +
-	"\x04note\x18\x04 \x01(\tR\x04note\"\xb0\x01\n" +
+	"\x04note\x18\x04 \x01(\tR\x04note\"\x9c\x01\n" +
 	"\x13SaveDownloadCommand\x12\x1f\n" +
 	"\vdownload_id\x18\x01 \x01(\tR\n" +
-	"downloadId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\x12R\n" +
-	"\rretry_options\x18\x03 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
-	"\x0e_retry_options\"]\n" +
+	"downloadId\x12R\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"\xa5\x01\n" +
 	"\x12DownloadSavedEvent\x12\x1f\n" +
 	"\vdownload_id\x18\x01 \x01(\tR\n" +
-	"downloadId\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\x12\x12\n" +
-	"\x04note\x18\x03 \x01(\tR\x04note*`\n" +
+	"downloadId\x12\x17\n" +
+	"\afile_id\x18\x02 \x01(\tR\x06fileId\x12-\n" +
+	"\x12suggested_filename\x18\x03 \x01(\tR\x11suggestedFilename\x12\x12\n" +
+	"\x04size\x18\x04 \x01(\x04R\x04size\x12\x12\n" +
+	"\x04note\x18\x05 \x01(\tR\x04note*`\n" +
 	"\vBrowserKind\x12\x1c\n" +
 	"\x18BROWSER_KIND_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15BROWSER_KIND_CHROMIUM\x10\x01\x12\x18\n" +

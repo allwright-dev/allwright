@@ -73,6 +73,7 @@ const androidAvailable = [
   "Count matching elements",
   "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
   "Capture screenshots, including a full-page scroll-and-stitch capture",
+  "Register typed file-chooser and public-download hooks with files streamed to and from the test machine",
   "Text, partial-text, resource id, class name, XPath, and state-based (e.g. clickable) selectors",
 ];
 

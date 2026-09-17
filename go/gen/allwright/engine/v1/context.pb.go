@@ -46,6 +46,10 @@ type ContextSessionCommand struct {
 	//	*ContextSessionCommand_WaitForHook
 	//	*ContextSessionCommand_SetFileChooserFiles
 	//	*ContextSessionCommand_SaveDownload
+	//	*ContextSessionCommand_UploadFileChunk
+	//	*ContextSessionCommand_ReadFileChunk
+	//	*ContextSessionCommand_SetMobileFileChooserFiles
+	//	*ContextSessionCommand_SaveMobileDownload
 	Command       isContextSessionCommand_Command `protobuf_oneof:"command"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -273,6 +277,42 @@ func (x *ContextSessionCommand) GetSaveDownload() *SaveDownloadCommand {
 	return nil
 }
 
+func (x *ContextSessionCommand) GetUploadFileChunk() *UploadFileChunkCommand {
+	if x != nil {
+		if x, ok := x.Command.(*ContextSessionCommand_UploadFileChunk); ok {
+			return x.UploadFileChunk
+		}
+	}
+	return nil
+}
+
+func (x *ContextSessionCommand) GetReadFileChunk() *ReadFileChunkCommand {
+	if x != nil {
+		if x, ok := x.Command.(*ContextSessionCommand_ReadFileChunk); ok {
+			return x.ReadFileChunk
+		}
+	}
+	return nil
+}
+
+func (x *ContextSessionCommand) GetSetMobileFileChooserFiles() *SetMobileFileChooserFilesCommand {
+	if x != nil {
+		if x, ok := x.Command.(*ContextSessionCommand_SetMobileFileChooserFiles); ok {
+			return x.SetMobileFileChooserFiles
+		}
+	}
+	return nil
+}
+
+func (x *ContextSessionCommand) GetSaveMobileDownload() *SaveMobileDownloadCommand {
+	if x != nil {
+		if x, ok := x.Command.(*ContextSessionCommand_SaveMobileDownload); ok {
+			return x.SaveMobileDownload
+		}
+	}
+	return nil
+}
+
 type isContextSessionCommand_Command interface {
 	isContextSessionCommand_Command()
 }
@@ -353,6 +393,22 @@ type ContextSessionCommand_SaveDownload struct {
 	SaveDownload *SaveDownloadCommand `protobuf:"bytes,21,opt,name=save_download,json=saveDownload,proto3,oneof"`
 }
 
+type ContextSessionCommand_UploadFileChunk struct {
+	UploadFileChunk *UploadFileChunkCommand `protobuf:"bytes,22,opt,name=upload_file_chunk,json=uploadFileChunk,proto3,oneof"`
+}
+
+type ContextSessionCommand_ReadFileChunk struct {
+	ReadFileChunk *ReadFileChunkCommand `protobuf:"bytes,23,opt,name=read_file_chunk,json=readFileChunk,proto3,oneof"`
+}
+
+type ContextSessionCommand_SetMobileFileChooserFiles struct {
+	SetMobileFileChooserFiles *SetMobileFileChooserFilesCommand `protobuf:"bytes,24,opt,name=set_mobile_file_chooser_files,json=setMobileFileChooserFiles,proto3,oneof"`
+}
+
+type ContextSessionCommand_SaveMobileDownload struct {
+	SaveMobileDownload *SaveMobileDownloadCommand `protobuf:"bytes,25,opt,name=save_mobile_download,json=saveMobileDownload,proto3,oneof"`
+}
+
 func (*ContextSessionCommand_Ping) isContextSessionCommand_Command() {}
 
 func (*ContextSessionCommand_Close) isContextSessionCommand_Command() {}
@@ -390,6 +446,14 @@ func (*ContextSessionCommand_WaitForHook) isContextSessionCommand_Command() {}
 func (*ContextSessionCommand_SetFileChooserFiles) isContextSessionCommand_Command() {}
 
 func (*ContextSessionCommand_SaveDownload) isContextSessionCommand_Command() {}
+
+func (*ContextSessionCommand_UploadFileChunk) isContextSessionCommand_Command() {}
+
+func (*ContextSessionCommand_ReadFileChunk) isContextSessionCommand_Command() {}
+
+func (*ContextSessionCommand_SetMobileFileChooserFiles) isContextSessionCommand_Command() {}
+
+func (*ContextSessionCommand_SaveMobileDownload) isContextSessionCommand_Command() {}
 
 type ContextSessionPingCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -498,6 +562,10 @@ type ContextSessionEvent struct {
 	//	*ContextSessionEvent_HookCompleted
 	//	*ContextSessionEvent_FileChooserFilesSet
 	//	*ContextSessionEvent_DownloadSaved
+	//	*ContextSessionEvent_FileUploaded
+	//	*ContextSessionEvent_FileChunk
+	//	*ContextSessionEvent_MobileFileChooserFilesSet
+	//	*ContextSessionEvent_MobileDownloadSaved
 	Event         isContextSessionEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -745,6 +813,42 @@ func (x *ContextSessionEvent) GetDownloadSaved() *DownloadSavedEvent {
 	return nil
 }
 
+func (x *ContextSessionEvent) GetFileUploaded() *FileUploadedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*ContextSessionEvent_FileUploaded); ok {
+			return x.FileUploaded
+		}
+	}
+	return nil
+}
+
+func (x *ContextSessionEvent) GetFileChunk() *FileChunkEvent {
+	if x != nil {
+		if x, ok := x.Event.(*ContextSessionEvent_FileChunk); ok {
+			return x.FileChunk
+		}
+	}
+	return nil
+}
+
+func (x *ContextSessionEvent) GetMobileFileChooserFilesSet() *MobileFileChooserFilesSetEvent {
+	if x != nil {
+		if x, ok := x.Event.(*ContextSessionEvent_MobileFileChooserFilesSet); ok {
+			return x.MobileFileChooserFilesSet
+		}
+	}
+	return nil
+}
+
+func (x *ContextSessionEvent) GetMobileDownloadSaved() *MobileDownloadSavedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*ContextSessionEvent_MobileDownloadSaved); ok {
+			return x.MobileDownloadSaved
+		}
+	}
+	return nil
+}
+
 type isContextSessionEvent_Event interface {
 	isContextSessionEvent_Event()
 }
@@ -837,6 +941,22 @@ type ContextSessionEvent_DownloadSaved struct {
 	DownloadSaved *DownloadSavedEvent `protobuf:"bytes,23,opt,name=download_saved,json=downloadSaved,proto3,oneof"`
 }
 
+type ContextSessionEvent_FileUploaded struct {
+	FileUploaded *FileUploadedEvent `protobuf:"bytes,24,opt,name=file_uploaded,json=fileUploaded,proto3,oneof"`
+}
+
+type ContextSessionEvent_FileChunk struct {
+	FileChunk *FileChunkEvent `protobuf:"bytes,25,opt,name=file_chunk,json=fileChunk,proto3,oneof"`
+}
+
+type ContextSessionEvent_MobileFileChooserFilesSet struct {
+	MobileFileChooserFilesSet *MobileFileChooserFilesSetEvent `protobuf:"bytes,26,opt,name=mobile_file_chooser_files_set,json=mobileFileChooserFilesSet,proto3,oneof"`
+}
+
+type ContextSessionEvent_MobileDownloadSaved struct {
+	MobileDownloadSaved *MobileDownloadSavedEvent `protobuf:"bytes,27,opt,name=mobile_download_saved,json=mobileDownloadSaved,proto3,oneof"`
+}
+
 func (*ContextSessionEvent_Attached) isContextSessionEvent_Event() {}
 
 func (*ContextSessionEvent_Pong) isContextSessionEvent_Event() {}
@@ -880,6 +1000,14 @@ func (*ContextSessionEvent_HookCompleted) isContextSessionEvent_Event() {}
 func (*ContextSessionEvent_FileChooserFilesSet) isContextSessionEvent_Event() {}
 
 func (*ContextSessionEvent_DownloadSaved) isContextSessionEvent_Event() {}
+
+func (*ContextSessionEvent_FileUploaded) isContextSessionEvent_Event() {}
+
+func (*ContextSessionEvent_FileChunk) isContextSessionEvent_Event() {}
+
+func (*ContextSessionEvent_MobileFileChooserFilesSet) isContextSessionEvent_Event() {}
+
+func (*ContextSessionEvent_MobileDownloadSaved) isContextSessionEvent_Event() {}
 
 type ContextSessionAttachedEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1064,6 +1192,8 @@ type RegisterHookCommand struct {
 	//	*RegisterHookCommand_NewPage
 	//	*RegisterHookCommand_FileChooser
 	//	*RegisterHookCommand_Download
+	//	*RegisterHookCommand_MobileFileChooser
+	//	*RegisterHookCommand_MobileDownload
 	Hook          isRegisterHookCommand_Hook `protobuf_oneof:"hook"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1133,6 +1263,24 @@ func (x *RegisterHookCommand) GetDownload() *RegisterDownloadHook {
 	return nil
 }
 
+func (x *RegisterHookCommand) GetMobileFileChooser() *RegisterMobileFileChooserHook {
+	if x != nil {
+		if x, ok := x.Hook.(*RegisterHookCommand_MobileFileChooser); ok {
+			return x.MobileFileChooser
+		}
+	}
+	return nil
+}
+
+func (x *RegisterHookCommand) GetMobileDownload() *RegisterMobileDownloadHook {
+	if x != nil {
+		if x, ok := x.Hook.(*RegisterHookCommand_MobileDownload); ok {
+			return x.MobileDownload
+		}
+	}
+	return nil
+}
+
 type isRegisterHookCommand_Hook interface {
 	isRegisterHookCommand_Hook()
 }
@@ -1149,11 +1297,23 @@ type RegisterHookCommand_Download struct {
 	Download *RegisterDownloadHook `protobuf:"bytes,3,opt,name=download,proto3,oneof"`
 }
 
+type RegisterHookCommand_MobileFileChooser struct {
+	MobileFileChooser *RegisterMobileFileChooserHook `protobuf:"bytes,4,opt,name=mobile_file_chooser,json=mobileFileChooser,proto3,oneof"`
+}
+
+type RegisterHookCommand_MobileDownload struct {
+	MobileDownload *RegisterMobileDownloadHook `protobuf:"bytes,5,opt,name=mobile_download,json=mobileDownload,proto3,oneof"`
+}
+
 func (*RegisterHookCommand_NewPage) isRegisterHookCommand_Hook() {}
 
 func (*RegisterHookCommand_FileChooser) isRegisterHookCommand_Hook() {}
 
 func (*RegisterHookCommand_Download) isRegisterHookCommand_Hook() {}
+
+func (*RegisterHookCommand_MobileFileChooser) isRegisterHookCommand_Hook() {}
+
+func (*RegisterHookCommand_MobileDownload) isRegisterHookCommand_Hook() {}
 
 type WaitForHookCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1259,6 +1419,8 @@ type HookCompletedEvent struct {
 	//	*HookCompletedEvent_NewPage
 	//	*HookCompletedEvent_FileChooser
 	//	*HookCompletedEvent_Download
+	//	*HookCompletedEvent_MobileFileChooser
+	//	*HookCompletedEvent_MobileDownload
 	Result        isHookCompletedEvent_Result `protobuf_oneof:"result"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1335,6 +1497,24 @@ func (x *HookCompletedEvent) GetDownload() *DownloadHookResult {
 	return nil
 }
 
+func (x *HookCompletedEvent) GetMobileFileChooser() *MobileFileChooserHookResult {
+	if x != nil {
+		if x, ok := x.Result.(*HookCompletedEvent_MobileFileChooser); ok {
+			return x.MobileFileChooser
+		}
+	}
+	return nil
+}
+
+func (x *HookCompletedEvent) GetMobileDownload() *MobileDownloadHookResult {
+	if x != nil {
+		if x, ok := x.Result.(*HookCompletedEvent_MobileDownload); ok {
+			return x.MobileDownload
+		}
+	}
+	return nil
+}
+
 type isHookCompletedEvent_Result interface {
 	isHookCompletedEvent_Result()
 }
@@ -1351,11 +1531,295 @@ type HookCompletedEvent_Download struct {
 	Download *DownloadHookResult `protobuf:"bytes,4,opt,name=download,proto3,oneof"`
 }
 
+type HookCompletedEvent_MobileFileChooser struct {
+	MobileFileChooser *MobileFileChooserHookResult `protobuf:"bytes,5,opt,name=mobile_file_chooser,json=mobileFileChooser,proto3,oneof"`
+}
+
+type HookCompletedEvent_MobileDownload struct {
+	MobileDownload *MobileDownloadHookResult `protobuf:"bytes,6,opt,name=mobile_download,json=mobileDownload,proto3,oneof"`
+}
+
 func (*HookCompletedEvent_NewPage) isHookCompletedEvent_Result() {}
 
 func (*HookCompletedEvent_FileChooser) isHookCompletedEvent_Result() {}
 
 func (*HookCompletedEvent_Download) isHookCompletedEvent_Result() {}
+
+func (*HookCompletedEvent_MobileFileChooser) isHookCompletedEvent_Result() {}
+
+func (*HookCompletedEvent_MobileDownload) isHookCompletedEvent_Result() {}
+
+type UploadFileChunkCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TransferId    string                 `protobuf:"bytes,1,opt,name=transfer_id,json=transferId,proto3" json:"transfer_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Offset        uint64                 `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
+	Data          []byte                 `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+	Last          bool                   `protobuf:"varint,5,opt,name=last,proto3" json:"last,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UploadFileChunkCommand) Reset() {
+	*x = UploadFileChunkCommand{}
+	mi := &file_core_v1_context_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UploadFileChunkCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UploadFileChunkCommand) ProtoMessage() {}
+
+func (x *UploadFileChunkCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UploadFileChunkCommand.ProtoReflect.Descriptor instead.
+func (*UploadFileChunkCommand) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *UploadFileChunkCommand) GetTransferId() string {
+	if x != nil {
+		return x.TransferId
+	}
+	return ""
+}
+
+func (x *UploadFileChunkCommand) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UploadFileChunkCommand) GetOffset() uint64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *UploadFileChunkCommand) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *UploadFileChunkCommand) GetLast() bool {
+	if x != nil {
+		return x.Last
+	}
+	return false
+}
+
+type FileUploadedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TransferId    string                 `protobuf:"bytes,1,opt,name=transfer_id,json=transferId,proto3" json:"transfer_id,omitempty"`
+	FileId        string                 `protobuf:"bytes,2,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Size          uint64                 `protobuf:"varint,4,opt,name=size,proto3" json:"size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FileUploadedEvent) Reset() {
+	*x = FileUploadedEvent{}
+	mi := &file_core_v1_context_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileUploadedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileUploadedEvent) ProtoMessage() {}
+
+func (x *FileUploadedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileUploadedEvent.ProtoReflect.Descriptor instead.
+func (*FileUploadedEvent) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *FileUploadedEvent) GetTransferId() string {
+	if x != nil {
+		return x.TransferId
+	}
+	return ""
+}
+
+func (x *FileUploadedEvent) GetFileId() string {
+	if x != nil {
+		return x.FileId
+	}
+	return ""
+}
+
+func (x *FileUploadedEvent) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *FileUploadedEvent) GetSize() uint64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+type ReadFileChunkCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileId        string                 `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
+	Offset        uint64                 `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	MaxBytes      uint32                 `protobuf:"varint,3,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadFileChunkCommand) Reset() {
+	*x = ReadFileChunkCommand{}
+	mi := &file_core_v1_context_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadFileChunkCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadFileChunkCommand) ProtoMessage() {}
+
+func (x *ReadFileChunkCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadFileChunkCommand.ProtoReflect.Descriptor instead.
+func (*ReadFileChunkCommand) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ReadFileChunkCommand) GetFileId() string {
+	if x != nil {
+		return x.FileId
+	}
+	return ""
+}
+
+func (x *ReadFileChunkCommand) GetOffset() uint64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *ReadFileChunkCommand) GetMaxBytes() uint32 {
+	if x != nil {
+		return x.MaxBytes
+	}
+	return 0
+}
+
+type FileChunkEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileId        string                 `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
+	Offset        uint64                 `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	Data          []byte                 `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	Last          bool                   `protobuf:"varint,4,opt,name=last,proto3" json:"last,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FileChunkEvent) Reset() {
+	*x = FileChunkEvent{}
+	mi := &file_core_v1_context_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileChunkEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileChunkEvent) ProtoMessage() {}
+
+func (x *FileChunkEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileChunkEvent.ProtoReflect.Descriptor instead.
+func (*FileChunkEvent) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *FileChunkEvent) GetFileId() string {
+	if x != nil {
+		return x.FileId
+	}
+	return ""
+}
+
+func (x *FileChunkEvent) GetOffset() uint64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *FileChunkEvent) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *FileChunkEvent) GetLast() bool {
+	if x != nil {
+		return x.Last
+	}
+	return false
+}
 
 type NavigatePageCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1367,7 +1831,7 @@ type NavigatePageCommand struct {
 
 func (x *NavigatePageCommand) Reset() {
 	*x = NavigatePageCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[12]
+	mi := &file_core_v1_context_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1379,7 +1843,7 @@ func (x *NavigatePageCommand) String() string {
 func (*NavigatePageCommand) ProtoMessage() {}
 
 func (x *NavigatePageCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[12]
+	mi := &file_core_v1_context_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1392,7 +1856,7 @@ func (x *NavigatePageCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NavigatePageCommand.ProtoReflect.Descriptor instead.
 func (*NavigatePageCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{12}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *NavigatePageCommand) GetUrl() string {
@@ -1419,7 +1883,7 @@ type ClickElementCommand struct {
 
 func (x *ClickElementCommand) Reset() {
 	*x = ClickElementCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[13]
+	mi := &file_core_v1_context_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1431,7 +1895,7 @@ func (x *ClickElementCommand) String() string {
 func (*ClickElementCommand) ProtoMessage() {}
 
 func (x *ClickElementCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[13]
+	mi := &file_core_v1_context_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1444,7 +1908,7 @@ func (x *ClickElementCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClickElementCommand.ProtoReflect.Descriptor instead.
 func (*ClickElementCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{13}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ClickElementCommand) GetCssSelector() string {
@@ -1471,7 +1935,7 @@ type CountElementsCommand struct {
 
 func (x *CountElementsCommand) Reset() {
 	*x = CountElementsCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[14]
+	mi := &file_core_v1_context_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1483,7 +1947,7 @@ func (x *CountElementsCommand) String() string {
 func (*CountElementsCommand) ProtoMessage() {}
 
 func (x *CountElementsCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[14]
+	mi := &file_core_v1_context_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1496,7 +1960,7 @@ func (x *CountElementsCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CountElementsCommand.ProtoReflect.Descriptor instead.
 func (*CountElementsCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{14}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CountElementsCommand) GetCssSelector() string {
@@ -1524,7 +1988,7 @@ type HighlightElementsCommand struct {
 
 func (x *HighlightElementsCommand) Reset() {
 	*x = HighlightElementsCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[15]
+	mi := &file_core_v1_context_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1536,7 +2000,7 @@ func (x *HighlightElementsCommand) String() string {
 func (*HighlightElementsCommand) ProtoMessage() {}
 
 func (x *HighlightElementsCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[15]
+	mi := &file_core_v1_context_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1549,7 +2013,7 @@ func (x *HighlightElementsCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HighlightElementsCommand.ProtoReflect.Descriptor instead.
 func (*HighlightElementsCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{15}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *HighlightElementsCommand) GetCssSelector() string {
@@ -1583,7 +2047,7 @@ type FocusElementCommand struct {
 
 func (x *FocusElementCommand) Reset() {
 	*x = FocusElementCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[16]
+	mi := &file_core_v1_context_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1595,7 +2059,7 @@ func (x *FocusElementCommand) String() string {
 func (*FocusElementCommand) ProtoMessage() {}
 
 func (x *FocusElementCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[16]
+	mi := &file_core_v1_context_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1608,7 +2072,7 @@ func (x *FocusElementCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FocusElementCommand.ProtoReflect.Descriptor instead.
 func (*FocusElementCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{16}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *FocusElementCommand) GetCssSelector() string {
@@ -1636,7 +2100,7 @@ type FillElementCommand struct {
 
 func (x *FillElementCommand) Reset() {
 	*x = FillElementCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[17]
+	mi := &file_core_v1_context_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1648,7 +2112,7 @@ func (x *FillElementCommand) String() string {
 func (*FillElementCommand) ProtoMessage() {}
 
 func (x *FillElementCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[17]
+	mi := &file_core_v1_context_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1661,7 +2125,7 @@ func (x *FillElementCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FillElementCommand.ProtoReflect.Descriptor instead.
 func (*FillElementCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{17}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *FillElementCommand) GetCssSelector() string {
@@ -1695,7 +2159,7 @@ type HoverElementCommand struct {
 
 func (x *HoverElementCommand) Reset() {
 	*x = HoverElementCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[18]
+	mi := &file_core_v1_context_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1707,7 +2171,7 @@ func (x *HoverElementCommand) String() string {
 func (*HoverElementCommand) ProtoMessage() {}
 
 func (x *HoverElementCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[18]
+	mi := &file_core_v1_context_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1720,7 +2184,7 @@ func (x *HoverElementCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HoverElementCommand.ProtoReflect.Descriptor instead.
 func (*HoverElementCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{18}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *HoverElementCommand) GetCssSelector() string {
@@ -1749,7 +2213,7 @@ type PressKeyCommand struct {
 
 func (x *PressKeyCommand) Reset() {
 	*x = PressKeyCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[19]
+	mi := &file_core_v1_context_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1761,7 +2225,7 @@ func (x *PressKeyCommand) String() string {
 func (*PressKeyCommand) ProtoMessage() {}
 
 func (x *PressKeyCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[19]
+	mi := &file_core_v1_context_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1774,7 +2238,7 @@ func (x *PressKeyCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PressKeyCommand.ProtoReflect.Descriptor instead.
 func (*PressKeyCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{19}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *PressKeyCommand) GetCssSelector() string {
@@ -1815,7 +2279,7 @@ type GetTextContentCommand struct {
 
 func (x *GetTextContentCommand) Reset() {
 	*x = GetTextContentCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[20]
+	mi := &file_core_v1_context_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1827,7 +2291,7 @@ func (x *GetTextContentCommand) String() string {
 func (*GetTextContentCommand) ProtoMessage() {}
 
 func (x *GetTextContentCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[20]
+	mi := &file_core_v1_context_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1840,7 +2304,7 @@ func (x *GetTextContentCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTextContentCommand.ProtoReflect.Descriptor instead.
 func (*GetTextContentCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{20}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetTextContentCommand) GetCssSelector() string {
@@ -1867,7 +2331,7 @@ type GetInnerTextCommand struct {
 
 func (x *GetInnerTextCommand) Reset() {
 	*x = GetInnerTextCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[21]
+	mi := &file_core_v1_context_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1879,7 +2343,7 @@ func (x *GetInnerTextCommand) String() string {
 func (*GetInnerTextCommand) ProtoMessage() {}
 
 func (x *GetInnerTextCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[21]
+	mi := &file_core_v1_context_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1892,7 +2356,7 @@ func (x *GetInnerTextCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInnerTextCommand.ProtoReflect.Descriptor instead.
 func (*GetInnerTextCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{21}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *GetInnerTextCommand) GetCssSelector() string {
@@ -1920,7 +2384,7 @@ type WaitForSelectorCommand struct {
 
 func (x *WaitForSelectorCommand) Reset() {
 	*x = WaitForSelectorCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[22]
+	mi := &file_core_v1_context_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1932,7 +2396,7 @@ func (x *WaitForSelectorCommand) String() string {
 func (*WaitForSelectorCommand) ProtoMessage() {}
 
 func (x *WaitForSelectorCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[22]
+	mi := &file_core_v1_context_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1945,7 +2409,7 @@ func (x *WaitForSelectorCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WaitForSelectorCommand.ProtoReflect.Descriptor instead.
 func (*WaitForSelectorCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{22}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *WaitForSelectorCommand) GetCssSelector() string {
@@ -1979,7 +2443,7 @@ type ScreenshotCommand struct {
 
 func (x *ScreenshotCommand) Reset() {
 	*x = ScreenshotCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[23]
+	mi := &file_core_v1_context_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1991,7 +2455,7 @@ func (x *ScreenshotCommand) String() string {
 func (*ScreenshotCommand) ProtoMessage() {}
 
 func (x *ScreenshotCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[23]
+	mi := &file_core_v1_context_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2004,7 +2468,7 @@ func (x *ScreenshotCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreenshotCommand.ProtoReflect.Descriptor instead.
 func (*ScreenshotCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{23}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ScreenshotCommand) GetRetryOptions() *CommandRetryOptions {
@@ -2031,7 +2495,7 @@ type PageNavigatedEvent struct {
 
 func (x *PageNavigatedEvent) Reset() {
 	*x = PageNavigatedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[24]
+	mi := &file_core_v1_context_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2043,7 +2507,7 @@ func (x *PageNavigatedEvent) String() string {
 func (*PageNavigatedEvent) ProtoMessage() {}
 
 func (x *PageNavigatedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[24]
+	mi := &file_core_v1_context_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2056,7 +2520,7 @@ func (x *PageNavigatedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageNavigatedEvent.ProtoReflect.Descriptor instead.
 func (*PageNavigatedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{24}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *PageNavigatedEvent) GetUrl() string {
@@ -2086,7 +2550,7 @@ type ChromiumBidiInjectionEvent struct {
 
 func (x *ChromiumBidiInjectionEvent) Reset() {
 	*x = ChromiumBidiInjectionEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[25]
+	mi := &file_core_v1_context_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2098,7 +2562,7 @@ func (x *ChromiumBidiInjectionEvent) String() string {
 func (*ChromiumBidiInjectionEvent) ProtoMessage() {}
 
 func (x *ChromiumBidiInjectionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[25]
+	mi := &file_core_v1_context_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2111,7 +2575,7 @@ func (x *ChromiumBidiInjectionEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChromiumBidiInjectionEvent.ProtoReflect.Descriptor instead.
 func (*ChromiumBidiInjectionEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{25}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ChromiumBidiInjectionEvent) GetNote() string {
@@ -2160,7 +2624,7 @@ type ElementClickedEvent struct {
 
 func (x *ElementClickedEvent) Reset() {
 	*x = ElementClickedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[26]
+	mi := &file_core_v1_context_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2172,7 +2636,7 @@ func (x *ElementClickedEvent) String() string {
 func (*ElementClickedEvent) ProtoMessage() {}
 
 func (x *ElementClickedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[26]
+	mi := &file_core_v1_context_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2185,7 +2649,7 @@ func (x *ElementClickedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementClickedEvent.ProtoReflect.Descriptor instead.
 func (*ElementClickedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{26}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ElementClickedEvent) GetCssSelector() string {
@@ -2220,7 +2684,7 @@ type ElementCountedEvent struct {
 
 func (x *ElementCountedEvent) Reset() {
 	*x = ElementCountedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[27]
+	mi := &file_core_v1_context_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2232,7 +2696,7 @@ func (x *ElementCountedEvent) String() string {
 func (*ElementCountedEvent) ProtoMessage() {}
 
 func (x *ElementCountedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[27]
+	mi := &file_core_v1_context_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2245,7 +2709,7 @@ func (x *ElementCountedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementCountedEvent.ProtoReflect.Descriptor instead.
 func (*ElementCountedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{27}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ElementCountedEvent) GetCssSelector() string {
@@ -2280,7 +2744,7 @@ type ElementsHighlightedEvent struct {
 
 func (x *ElementsHighlightedEvent) Reset() {
 	*x = ElementsHighlightedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[28]
+	mi := &file_core_v1_context_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2292,7 +2756,7 @@ func (x *ElementsHighlightedEvent) String() string {
 func (*ElementsHighlightedEvent) ProtoMessage() {}
 
 func (x *ElementsHighlightedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[28]
+	mi := &file_core_v1_context_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2305,7 +2769,7 @@ func (x *ElementsHighlightedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementsHighlightedEvent.ProtoReflect.Descriptor instead.
 func (*ElementsHighlightedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{28}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ElementsHighlightedEvent) GetCssSelector() string {
@@ -2339,7 +2803,7 @@ type ElementFocusedEvent struct {
 
 func (x *ElementFocusedEvent) Reset() {
 	*x = ElementFocusedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[29]
+	mi := &file_core_v1_context_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2351,7 +2815,7 @@ func (x *ElementFocusedEvent) String() string {
 func (*ElementFocusedEvent) ProtoMessage() {}
 
 func (x *ElementFocusedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[29]
+	mi := &file_core_v1_context_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2364,7 +2828,7 @@ func (x *ElementFocusedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementFocusedEvent.ProtoReflect.Descriptor instead.
 func (*ElementFocusedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{29}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *ElementFocusedEvent) GetCssSelector() string {
@@ -2392,7 +2856,7 @@ type ElementFilledEvent struct {
 
 func (x *ElementFilledEvent) Reset() {
 	*x = ElementFilledEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[30]
+	mi := &file_core_v1_context_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2404,7 +2868,7 @@ func (x *ElementFilledEvent) String() string {
 func (*ElementFilledEvent) ProtoMessage() {}
 
 func (x *ElementFilledEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[30]
+	mi := &file_core_v1_context_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2417,7 +2881,7 @@ func (x *ElementFilledEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementFilledEvent.ProtoReflect.Descriptor instead.
 func (*ElementFilledEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{30}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ElementFilledEvent) GetCssSelector() string {
@@ -2451,7 +2915,7 @@ type ElementHoveredEvent struct {
 
 func (x *ElementHoveredEvent) Reset() {
 	*x = ElementHoveredEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[31]
+	mi := &file_core_v1_context_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2463,7 +2927,7 @@ func (x *ElementHoveredEvent) String() string {
 func (*ElementHoveredEvent) ProtoMessage() {}
 
 func (x *ElementHoveredEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[31]
+	mi := &file_core_v1_context_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2476,7 +2940,7 @@ func (x *ElementHoveredEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ElementHoveredEvent.ProtoReflect.Descriptor instead.
 func (*ElementHoveredEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{31}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *ElementHoveredEvent) GetCssSelector() string {
@@ -2504,7 +2968,7 @@ type KeyPressedEvent struct {
 
 func (x *KeyPressedEvent) Reset() {
 	*x = KeyPressedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[32]
+	mi := &file_core_v1_context_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2516,7 +2980,7 @@ func (x *KeyPressedEvent) String() string {
 func (*KeyPressedEvent) ProtoMessage() {}
 
 func (x *KeyPressedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[32]
+	mi := &file_core_v1_context_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2529,7 +2993,7 @@ func (x *KeyPressedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyPressedEvent.ProtoReflect.Descriptor instead.
 func (*KeyPressedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{32}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *KeyPressedEvent) GetCssSelector() string {
@@ -2564,7 +3028,7 @@ type TextContentResolvedEvent struct {
 
 func (x *TextContentResolvedEvent) Reset() {
 	*x = TextContentResolvedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[33]
+	mi := &file_core_v1_context_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2576,7 +3040,7 @@ func (x *TextContentResolvedEvent) String() string {
 func (*TextContentResolvedEvent) ProtoMessage() {}
 
 func (x *TextContentResolvedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[33]
+	mi := &file_core_v1_context_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2589,7 +3053,7 @@ func (x *TextContentResolvedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextContentResolvedEvent.ProtoReflect.Descriptor instead.
 func (*TextContentResolvedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{33}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *TextContentResolvedEvent) GetCssSelector() string {
@@ -2624,7 +3088,7 @@ type InnerTextResolvedEvent struct {
 
 func (x *InnerTextResolvedEvent) Reset() {
 	*x = InnerTextResolvedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[34]
+	mi := &file_core_v1_context_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2636,7 +3100,7 @@ func (x *InnerTextResolvedEvent) String() string {
 func (*InnerTextResolvedEvent) ProtoMessage() {}
 
 func (x *InnerTextResolvedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[34]
+	mi := &file_core_v1_context_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2649,7 +3113,7 @@ func (x *InnerTextResolvedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InnerTextResolvedEvent.ProtoReflect.Descriptor instead.
 func (*InnerTextResolvedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{34}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *InnerTextResolvedEvent) GetCssSelector() string {
@@ -2684,7 +3148,7 @@ type SelectorWaitSatisfiedEvent struct {
 
 func (x *SelectorWaitSatisfiedEvent) Reset() {
 	*x = SelectorWaitSatisfiedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[35]
+	mi := &file_core_v1_context_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2696,7 +3160,7 @@ func (x *SelectorWaitSatisfiedEvent) String() string {
 func (*SelectorWaitSatisfiedEvent) ProtoMessage() {}
 
 func (x *SelectorWaitSatisfiedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[35]
+	mi := &file_core_v1_context_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2709,7 +3173,7 @@ func (x *SelectorWaitSatisfiedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectorWaitSatisfiedEvent.ProtoReflect.Descriptor instead.
 func (*SelectorWaitSatisfiedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{35}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *SelectorWaitSatisfiedEvent) GetCssSelector() string {
@@ -2743,7 +3207,7 @@ type ScreenshotCapturedEvent struct {
 
 func (x *ScreenshotCapturedEvent) Reset() {
 	*x = ScreenshotCapturedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[36]
+	mi := &file_core_v1_context_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2755,7 +3219,7 @@ func (x *ScreenshotCapturedEvent) String() string {
 func (*ScreenshotCapturedEvent) ProtoMessage() {}
 
 func (x *ScreenshotCapturedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[36]
+	mi := &file_core_v1_context_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2768,7 +3232,7 @@ func (x *ScreenshotCapturedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreenshotCapturedEvent.ProtoReflect.Descriptor instead.
 func (*ScreenshotCapturedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{36}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ScreenshotCapturedEvent) GetPngData() []byte {
@@ -2799,7 +3263,7 @@ type AccessibilitySnapshotCommand struct {
 
 func (x *AccessibilitySnapshotCommand) Reset() {
 	*x = AccessibilitySnapshotCommand{}
-	mi := &file_core_v1_context_proto_msgTypes[37]
+	mi := &file_core_v1_context_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2811,7 +3275,7 @@ func (x *AccessibilitySnapshotCommand) String() string {
 func (*AccessibilitySnapshotCommand) ProtoMessage() {}
 
 func (x *AccessibilitySnapshotCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[37]
+	mi := &file_core_v1_context_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2824,7 +3288,7 @@ func (x *AccessibilitySnapshotCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccessibilitySnapshotCommand.ProtoReflect.Descriptor instead.
 func (*AccessibilitySnapshotCommand) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{37}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *AccessibilitySnapshotCommand) GetMode() string {
@@ -2859,7 +3323,7 @@ type AccessibilitySnapshotCapturedEvent struct {
 
 func (x *AccessibilitySnapshotCapturedEvent) Reset() {
 	*x = AccessibilitySnapshotCapturedEvent{}
-	mi := &file_core_v1_context_proto_msgTypes[38]
+	mi := &file_core_v1_context_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2871,7 +3335,7 @@ func (x *AccessibilitySnapshotCapturedEvent) String() string {
 func (*AccessibilitySnapshotCapturedEvent) ProtoMessage() {}
 
 func (x *AccessibilitySnapshotCapturedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_core_v1_context_proto_msgTypes[38]
+	mi := &file_core_v1_context_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2884,7 +3348,7 @@ func (x *AccessibilitySnapshotCapturedEvent) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use AccessibilitySnapshotCapturedEvent.ProtoReflect.Descriptor instead.
 func (*AccessibilitySnapshotCapturedEvent) Descriptor() ([]byte, []int) {
-	return file_core_v1_context_proto_rawDescGZIP(), []int{38}
+	return file_core_v1_context_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *AccessibilitySnapshotCapturedEvent) GetSnapshot() string {
@@ -2905,7 +3369,7 @@ var File_core_v1_context_proto protoreflect.FileDescriptor
 
 const file_core_v1_context_proto_rawDesc = "" +
 	"\n" +
-	"\x15core/v1/context.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x19surfaces/web/v1/web.proto\"\xa3\r\n" +
+	"\x15core/v1/context.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x1fsurfaces/mobile/v1/mobile.proto\x1a\x19surfaces/web/v1/web.proto\"\xb2\x10\n" +
 	"\x15ContextSessionCommand\x12,\n" +
 	"\x12surface_session_id\x18\x01 \x01(\tR\x10surfaceSessionId\x12,\n" +
 	"\x12context_session_id\x18\x02 \x01(\tR\x10contextSessionId\x12D\n" +
@@ -2930,11 +3394,15 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\rregister_hook\x18\x12 \x01(\v2(.allwright.engine.v1.RegisterHookCommandH\x00R\fregisterHook\x12M\n" +
 	"\rwait_for_hook\x18\x13 \x01(\v2'.allwright.engine.v1.WaitForHookCommandH\x00R\vwaitForHook\x12f\n" +
 	"\x16set_file_chooser_files\x18\x14 \x01(\v2/.allwright.engine.v1.SetFileChooserFilesCommandH\x00R\x13setFileChooserFiles\x12O\n" +
-	"\rsave_download\x18\x15 \x01(\v2(.allwright.engine.v1.SaveDownloadCommandH\x00R\fsaveDownloadB\t\n" +
+	"\rsave_download\x18\x15 \x01(\v2(.allwright.engine.v1.SaveDownloadCommandH\x00R\fsaveDownload\x12Y\n" +
+	"\x11upload_file_chunk\x18\x16 \x01(\v2+.allwright.engine.v1.UploadFileChunkCommandH\x00R\x0fuploadFileChunk\x12S\n" +
+	"\x0fread_file_chunk\x18\x17 \x01(\v2).allwright.engine.v1.ReadFileChunkCommandH\x00R\rreadFileChunk\x12y\n" +
+	"\x1dset_mobile_file_chooser_files\x18\x18 \x01(\v25.allwright.engine.v1.SetMobileFileChooserFilesCommandH\x00R\x19setMobileFileChooserFiles\x12b\n" +
+	"\x14save_mobile_download\x18\x19 \x01(\v2..allwright.engine.v1.SaveMobileDownloadCommandH\x00R\x12saveMobileDownloadB\t\n" +
 	"\acommand\"5\n" +
 	"\x19ContextSessionPingCommand\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"\x1c\n" +
-	"\x1aCloseContextSessionCommand\"\xeb\x0f\n" +
+	"\x1aCloseContextSessionCommand\"\xde\x12\n" +
 	"\x13ContextSessionEvent\x12,\n" +
 	"\x12context_session_id\x18\x01 \x01(\tR\x10contextSessionId\x12N\n" +
 	"\battached\x18\x02 \x01(\v20.allwright.engine.v1.ContextSessionAttachedEventH\x00R\battached\x12B\n" +
@@ -2960,7 +3428,12 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\x0fhook_registered\x18\x14 \x01(\v2(.allwright.engine.v1.HookRegisteredEventH\x00R\x0ehookRegistered\x12P\n" +
 	"\x0ehook_completed\x18\x15 \x01(\v2'.allwright.engine.v1.HookCompletedEventH\x00R\rhookCompleted\x12d\n" +
 	"\x16file_chooser_files_set\x18\x16 \x01(\v2-.allwright.engine.v1.FileChooserFilesSetEventH\x00R\x13fileChooserFilesSet\x12P\n" +
-	"\x0edownload_saved\x18\x17 \x01(\v2'.allwright.engine.v1.DownloadSavedEventH\x00R\rdownloadSavedB\a\n" +
+	"\x0edownload_saved\x18\x17 \x01(\v2'.allwright.engine.v1.DownloadSavedEventH\x00R\rdownloadSaved\x12M\n" +
+	"\rfile_uploaded\x18\x18 \x01(\v2&.allwright.engine.v1.FileUploadedEventH\x00R\ffileUploaded\x12D\n" +
+	"\n" +
+	"file_chunk\x18\x19 \x01(\v2#.allwright.engine.v1.FileChunkEventH\x00R\tfileChunk\x12w\n" +
+	"\x1dmobile_file_chooser_files_set\x18\x1a \x01(\v23.allwright.engine.v1.MobileFileChooserFilesSetEventH\x00R\x19mobileFileChooserFilesSet\x12c\n" +
+	"\x15mobile_download_saved\x18\x1b \x01(\v2-.allwright.engine.v1.MobileDownloadSavedEventH\x00R\x13mobileDownloadSavedB\a\n" +
 	"\x05event\"1\n" +
 	"\x1bContextSessionAttachedEvent\x12\x12\n" +
 	"\x04note\x18\x01 \x01(\tR\x04note\"3\n" +
@@ -2969,24 +3442,50 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\x19ContextSessionClosedEvent\x12\x16\n" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\"4\n" +
 	"\x18ContextSessionErrorEvent\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\"\x80\x02\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"\xc2\x03\n" +
 	"\x13RegisterHookCommand\x12E\n" +
 	"\bnew_page\x18\x01 \x01(\v2(.allwright.engine.v1.RegisterNewPageHookH\x00R\anewPage\x12Q\n" +
 	"\ffile_chooser\x18\x02 \x01(\v2,.allwright.engine.v1.RegisterFileChooserHookH\x00R\vfileChooser\x12G\n" +
-	"\bdownload\x18\x03 \x01(\v2).allwright.engine.v1.RegisterDownloadHookH\x00R\bdownloadB\x06\n" +
+	"\bdownload\x18\x03 \x01(\v2).allwright.engine.v1.RegisterDownloadHookH\x00R\bdownload\x12d\n" +
+	"\x13mobile_file_chooser\x18\x04 \x01(\v22.allwright.engine.v1.RegisterMobileFileChooserHookH\x00R\x11mobileFileChooser\x12Z\n" +
+	"\x0fmobile_download\x18\x05 \x01(\v2/.allwright.engine.v1.RegisterMobileDownloadHookH\x00R\x0emobileDownloadB\x06\n" +
 	"\x04hook\"\x93\x01\n" +
 	"\x12WaitForHookCommand\x12\x17\n" +
 	"\ahook_id\x18\x01 \x01(\tR\x06hookId\x12R\n" +
 	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
 	"\x0e_retry_options\".\n" +
 	"\x13HookRegisteredEvent\x12\x17\n" +
-	"\ahook_id\x18\x01 \x01(\tR\x06hookId\"\x94\x02\n" +
+	"\ahook_id\x18\x01 \x01(\tR\x06hookId\"\xd2\x03\n" +
 	"\x12HookCompletedEvent\x12\x17\n" +
 	"\ahook_id\x18\x01 \x01(\tR\x06hookId\x12C\n" +
 	"\bnew_page\x18\x02 \x01(\v2&.allwright.engine.v1.NewPageHookResultH\x00R\anewPage\x12O\n" +
 	"\ffile_chooser\x18\x03 \x01(\v2*.allwright.engine.v1.FileChooserHookResultH\x00R\vfileChooser\x12E\n" +
-	"\bdownload\x18\x04 \x01(\v2'.allwright.engine.v1.DownloadHookResultH\x00R\bdownloadB\b\n" +
+	"\bdownload\x18\x04 \x01(\v2'.allwright.engine.v1.DownloadHookResultH\x00R\bdownload\x12b\n" +
+	"\x13mobile_file_chooser\x18\x05 \x01(\v20.allwright.engine.v1.MobileFileChooserHookResultH\x00R\x11mobileFileChooser\x12X\n" +
+	"\x0fmobile_download\x18\x06 \x01(\v2-.allwright.engine.v1.MobileDownloadHookResultH\x00R\x0emobileDownloadB\b\n" +
 	"\x06result\"\x8d\x01\n" +
+	"\x16UploadFileChunkCommand\x12\x1f\n" +
+	"\vtransfer_id\x18\x01 \x01(\tR\n" +
+	"transferId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
+	"\x06offset\x18\x03 \x01(\x04R\x06offset\x12\x12\n" +
+	"\x04data\x18\x04 \x01(\fR\x04data\x12\x12\n" +
+	"\x04last\x18\x05 \x01(\bR\x04last\"u\n" +
+	"\x11FileUploadedEvent\x12\x1f\n" +
+	"\vtransfer_id\x18\x01 \x01(\tR\n" +
+	"transferId\x12\x17\n" +
+	"\afile_id\x18\x02 \x01(\tR\x06fileId\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
+	"\x04size\x18\x04 \x01(\x04R\x04size\"d\n" +
+	"\x14ReadFileChunkCommand\x12\x17\n" +
+	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\x04R\x06offset\x12\x1b\n" +
+	"\tmax_bytes\x18\x03 \x01(\rR\bmaxBytes\"i\n" +
+	"\x0eFileChunkEvent\x12\x17\n" +
+	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\x04R\x06offset\x12\x12\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\x12\x12\n" +
+	"\x04last\x18\x04 \x01(\bR\x04last\"\x8d\x01\n" +
 	"\x13NavigatePageCommand\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12R\n" +
 	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
@@ -3119,7 +3618,7 @@ func file_core_v1_context_proto_rawDescGZIP() []byte {
 	return file_core_v1_context_proto_rawDescData
 }
 
-var file_core_v1_context_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_core_v1_context_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
 var file_core_v1_context_proto_goTypes = []any{
 	(*ContextSessionCommand)(nil),              // 0: allwright.engine.v1.ContextSessionCommand
 	(*ContextSessionPingCommand)(nil),          // 1: allwright.engine.v1.ContextSessionPingCommand
@@ -3133,112 +3632,136 @@ var file_core_v1_context_proto_goTypes = []any{
 	(*WaitForHookCommand)(nil),                 // 9: allwright.engine.v1.WaitForHookCommand
 	(*HookRegisteredEvent)(nil),                // 10: allwright.engine.v1.HookRegisteredEvent
 	(*HookCompletedEvent)(nil),                 // 11: allwright.engine.v1.HookCompletedEvent
-	(*NavigatePageCommand)(nil),                // 12: allwright.engine.v1.NavigatePageCommand
-	(*ClickElementCommand)(nil),                // 13: allwright.engine.v1.ClickElementCommand
-	(*CountElementsCommand)(nil),               // 14: allwright.engine.v1.CountElementsCommand
-	(*HighlightElementsCommand)(nil),           // 15: allwright.engine.v1.HighlightElementsCommand
-	(*FocusElementCommand)(nil),                // 16: allwright.engine.v1.FocusElementCommand
-	(*FillElementCommand)(nil),                 // 17: allwright.engine.v1.FillElementCommand
-	(*HoverElementCommand)(nil),                // 18: allwright.engine.v1.HoverElementCommand
-	(*PressKeyCommand)(nil),                    // 19: allwright.engine.v1.PressKeyCommand
-	(*GetTextContentCommand)(nil),              // 20: allwright.engine.v1.GetTextContentCommand
-	(*GetInnerTextCommand)(nil),                // 21: allwright.engine.v1.GetInnerTextCommand
-	(*WaitForSelectorCommand)(nil),             // 22: allwright.engine.v1.WaitForSelectorCommand
-	(*ScreenshotCommand)(nil),                  // 23: allwright.engine.v1.ScreenshotCommand
-	(*PageNavigatedEvent)(nil),                 // 24: allwright.engine.v1.PageNavigatedEvent
-	(*ChromiumBidiInjectionEvent)(nil),         // 25: allwright.engine.v1.ChromiumBidiInjectionEvent
-	(*ElementClickedEvent)(nil),                // 26: allwright.engine.v1.ElementClickedEvent
-	(*ElementCountedEvent)(nil),                // 27: allwright.engine.v1.ElementCountedEvent
-	(*ElementsHighlightedEvent)(nil),           // 28: allwright.engine.v1.ElementsHighlightedEvent
-	(*ElementFocusedEvent)(nil),                // 29: allwright.engine.v1.ElementFocusedEvent
-	(*ElementFilledEvent)(nil),                 // 30: allwright.engine.v1.ElementFilledEvent
-	(*ElementHoveredEvent)(nil),                // 31: allwright.engine.v1.ElementHoveredEvent
-	(*KeyPressedEvent)(nil),                    // 32: allwright.engine.v1.KeyPressedEvent
-	(*TextContentResolvedEvent)(nil),           // 33: allwright.engine.v1.TextContentResolvedEvent
-	(*InnerTextResolvedEvent)(nil),             // 34: allwright.engine.v1.InnerTextResolvedEvent
-	(*SelectorWaitSatisfiedEvent)(nil),         // 35: allwright.engine.v1.SelectorWaitSatisfiedEvent
-	(*ScreenshotCapturedEvent)(nil),            // 36: allwright.engine.v1.ScreenshotCapturedEvent
-	(*AccessibilitySnapshotCommand)(nil),       // 37: allwright.engine.v1.AccessibilitySnapshotCommand
-	(*AccessibilitySnapshotCapturedEvent)(nil), // 38: allwright.engine.v1.AccessibilitySnapshotCapturedEvent
-	(*SetFileChooserFilesCommand)(nil),         // 39: allwright.engine.v1.SetFileChooserFilesCommand
-	(*SaveDownloadCommand)(nil),                // 40: allwright.engine.v1.SaveDownloadCommand
-	(*FileChooserFilesSetEvent)(nil),           // 41: allwright.engine.v1.FileChooserFilesSetEvent
-	(*DownloadSavedEvent)(nil),                 // 42: allwright.engine.v1.DownloadSavedEvent
-	(*RegisterNewPageHook)(nil),                // 43: allwright.engine.v1.RegisterNewPageHook
-	(*RegisterFileChooserHook)(nil),            // 44: allwright.engine.v1.RegisterFileChooserHook
-	(*RegisterDownloadHook)(nil),               // 45: allwright.engine.v1.RegisterDownloadHook
-	(*CommandRetryOptions)(nil),                // 46: allwright.engine.v1.CommandRetryOptions
-	(*NewPageHookResult)(nil),                  // 47: allwright.engine.v1.NewPageHookResult
-	(*FileChooserHookResult)(nil),              // 48: allwright.engine.v1.FileChooserHookResult
-	(*DownloadHookResult)(nil),                 // 49: allwright.engine.v1.DownloadHookResult
+	(*UploadFileChunkCommand)(nil),             // 12: allwright.engine.v1.UploadFileChunkCommand
+	(*FileUploadedEvent)(nil),                  // 13: allwright.engine.v1.FileUploadedEvent
+	(*ReadFileChunkCommand)(nil),               // 14: allwright.engine.v1.ReadFileChunkCommand
+	(*FileChunkEvent)(nil),                     // 15: allwright.engine.v1.FileChunkEvent
+	(*NavigatePageCommand)(nil),                // 16: allwright.engine.v1.NavigatePageCommand
+	(*ClickElementCommand)(nil),                // 17: allwright.engine.v1.ClickElementCommand
+	(*CountElementsCommand)(nil),               // 18: allwright.engine.v1.CountElementsCommand
+	(*HighlightElementsCommand)(nil),           // 19: allwright.engine.v1.HighlightElementsCommand
+	(*FocusElementCommand)(nil),                // 20: allwright.engine.v1.FocusElementCommand
+	(*FillElementCommand)(nil),                 // 21: allwright.engine.v1.FillElementCommand
+	(*HoverElementCommand)(nil),                // 22: allwright.engine.v1.HoverElementCommand
+	(*PressKeyCommand)(nil),                    // 23: allwright.engine.v1.PressKeyCommand
+	(*GetTextContentCommand)(nil),              // 24: allwright.engine.v1.GetTextContentCommand
+	(*GetInnerTextCommand)(nil),                // 25: allwright.engine.v1.GetInnerTextCommand
+	(*WaitForSelectorCommand)(nil),             // 26: allwright.engine.v1.WaitForSelectorCommand
+	(*ScreenshotCommand)(nil),                  // 27: allwright.engine.v1.ScreenshotCommand
+	(*PageNavigatedEvent)(nil),                 // 28: allwright.engine.v1.PageNavigatedEvent
+	(*ChromiumBidiInjectionEvent)(nil),         // 29: allwright.engine.v1.ChromiumBidiInjectionEvent
+	(*ElementClickedEvent)(nil),                // 30: allwright.engine.v1.ElementClickedEvent
+	(*ElementCountedEvent)(nil),                // 31: allwright.engine.v1.ElementCountedEvent
+	(*ElementsHighlightedEvent)(nil),           // 32: allwright.engine.v1.ElementsHighlightedEvent
+	(*ElementFocusedEvent)(nil),                // 33: allwright.engine.v1.ElementFocusedEvent
+	(*ElementFilledEvent)(nil),                 // 34: allwright.engine.v1.ElementFilledEvent
+	(*ElementHoveredEvent)(nil),                // 35: allwright.engine.v1.ElementHoveredEvent
+	(*KeyPressedEvent)(nil),                    // 36: allwright.engine.v1.KeyPressedEvent
+	(*TextContentResolvedEvent)(nil),           // 37: allwright.engine.v1.TextContentResolvedEvent
+	(*InnerTextResolvedEvent)(nil),             // 38: allwright.engine.v1.InnerTextResolvedEvent
+	(*SelectorWaitSatisfiedEvent)(nil),         // 39: allwright.engine.v1.SelectorWaitSatisfiedEvent
+	(*ScreenshotCapturedEvent)(nil),            // 40: allwright.engine.v1.ScreenshotCapturedEvent
+	(*AccessibilitySnapshotCommand)(nil),       // 41: allwright.engine.v1.AccessibilitySnapshotCommand
+	(*AccessibilitySnapshotCapturedEvent)(nil), // 42: allwright.engine.v1.AccessibilitySnapshotCapturedEvent
+	(*SetFileChooserFilesCommand)(nil),         // 43: allwright.engine.v1.SetFileChooserFilesCommand
+	(*SaveDownloadCommand)(nil),                // 44: allwright.engine.v1.SaveDownloadCommand
+	(*SetMobileFileChooserFilesCommand)(nil),   // 45: allwright.engine.v1.SetMobileFileChooserFilesCommand
+	(*SaveMobileDownloadCommand)(nil),          // 46: allwright.engine.v1.SaveMobileDownloadCommand
+	(*FileChooserFilesSetEvent)(nil),           // 47: allwright.engine.v1.FileChooserFilesSetEvent
+	(*DownloadSavedEvent)(nil),                 // 48: allwright.engine.v1.DownloadSavedEvent
+	(*MobileFileChooserFilesSetEvent)(nil),     // 49: allwright.engine.v1.MobileFileChooserFilesSetEvent
+	(*MobileDownloadSavedEvent)(nil),           // 50: allwright.engine.v1.MobileDownloadSavedEvent
+	(*RegisterNewPageHook)(nil),                // 51: allwright.engine.v1.RegisterNewPageHook
+	(*RegisterFileChooserHook)(nil),            // 52: allwright.engine.v1.RegisterFileChooserHook
+	(*RegisterDownloadHook)(nil),               // 53: allwright.engine.v1.RegisterDownloadHook
+	(*RegisterMobileFileChooserHook)(nil),      // 54: allwright.engine.v1.RegisterMobileFileChooserHook
+	(*RegisterMobileDownloadHook)(nil),         // 55: allwright.engine.v1.RegisterMobileDownloadHook
+	(*CommandRetryOptions)(nil),                // 56: allwright.engine.v1.CommandRetryOptions
+	(*NewPageHookResult)(nil),                  // 57: allwright.engine.v1.NewPageHookResult
+	(*FileChooserHookResult)(nil),              // 58: allwright.engine.v1.FileChooserHookResult
+	(*DownloadHookResult)(nil),                 // 59: allwright.engine.v1.DownloadHookResult
+	(*MobileFileChooserHookResult)(nil),        // 60: allwright.engine.v1.MobileFileChooserHookResult
+	(*MobileDownloadHookResult)(nil),           // 61: allwright.engine.v1.MobileDownloadHookResult
 }
 var file_core_v1_context_proto_depIdxs = []int32{
 	1,  // 0: allwright.engine.v1.ContextSessionCommand.ping:type_name -> allwright.engine.v1.ContextSessionPingCommand
 	2,  // 1: allwright.engine.v1.ContextSessionCommand.close:type_name -> allwright.engine.v1.CloseContextSessionCommand
-	12, // 2: allwright.engine.v1.ContextSessionCommand.navigate:type_name -> allwright.engine.v1.NavigatePageCommand
-	13, // 3: allwright.engine.v1.ContextSessionCommand.click_element:type_name -> allwright.engine.v1.ClickElementCommand
-	14, // 4: allwright.engine.v1.ContextSessionCommand.count_elements:type_name -> allwright.engine.v1.CountElementsCommand
-	15, // 5: allwright.engine.v1.ContextSessionCommand.highlight_elements:type_name -> allwright.engine.v1.HighlightElementsCommand
-	16, // 6: allwright.engine.v1.ContextSessionCommand.focus_element:type_name -> allwright.engine.v1.FocusElementCommand
-	17, // 7: allwright.engine.v1.ContextSessionCommand.fill_element:type_name -> allwright.engine.v1.FillElementCommand
-	18, // 8: allwright.engine.v1.ContextSessionCommand.hover_element:type_name -> allwright.engine.v1.HoverElementCommand
-	19, // 9: allwright.engine.v1.ContextSessionCommand.press_key:type_name -> allwright.engine.v1.PressKeyCommand
-	20, // 10: allwright.engine.v1.ContextSessionCommand.get_text_content:type_name -> allwright.engine.v1.GetTextContentCommand
-	21, // 11: allwright.engine.v1.ContextSessionCommand.get_inner_text:type_name -> allwright.engine.v1.GetInnerTextCommand
-	22, // 12: allwright.engine.v1.ContextSessionCommand.wait_for_selector:type_name -> allwright.engine.v1.WaitForSelectorCommand
-	23, // 13: allwright.engine.v1.ContextSessionCommand.screenshot:type_name -> allwright.engine.v1.ScreenshotCommand
-	37, // 14: allwright.engine.v1.ContextSessionCommand.accessibility_snapshot:type_name -> allwright.engine.v1.AccessibilitySnapshotCommand
+	16, // 2: allwright.engine.v1.ContextSessionCommand.navigate:type_name -> allwright.engine.v1.NavigatePageCommand
+	17, // 3: allwright.engine.v1.ContextSessionCommand.click_element:type_name -> allwright.engine.v1.ClickElementCommand
+	18, // 4: allwright.engine.v1.ContextSessionCommand.count_elements:type_name -> allwright.engine.v1.CountElementsCommand
+	19, // 5: allwright.engine.v1.ContextSessionCommand.highlight_elements:type_name -> allwright.engine.v1.HighlightElementsCommand
+	20, // 6: allwright.engine.v1.ContextSessionCommand.focus_element:type_name -> allwright.engine.v1.FocusElementCommand
+	21, // 7: allwright.engine.v1.ContextSessionCommand.fill_element:type_name -> allwright.engine.v1.FillElementCommand
+	22, // 8: allwright.engine.v1.ContextSessionCommand.hover_element:type_name -> allwright.engine.v1.HoverElementCommand
+	23, // 9: allwright.engine.v1.ContextSessionCommand.press_key:type_name -> allwright.engine.v1.PressKeyCommand
+	24, // 10: allwright.engine.v1.ContextSessionCommand.get_text_content:type_name -> allwright.engine.v1.GetTextContentCommand
+	25, // 11: allwright.engine.v1.ContextSessionCommand.get_inner_text:type_name -> allwright.engine.v1.GetInnerTextCommand
+	26, // 12: allwright.engine.v1.ContextSessionCommand.wait_for_selector:type_name -> allwright.engine.v1.WaitForSelectorCommand
+	27, // 13: allwright.engine.v1.ContextSessionCommand.screenshot:type_name -> allwright.engine.v1.ScreenshotCommand
+	41, // 14: allwright.engine.v1.ContextSessionCommand.accessibility_snapshot:type_name -> allwright.engine.v1.AccessibilitySnapshotCommand
 	8,  // 15: allwright.engine.v1.ContextSessionCommand.register_hook:type_name -> allwright.engine.v1.RegisterHookCommand
 	9,  // 16: allwright.engine.v1.ContextSessionCommand.wait_for_hook:type_name -> allwright.engine.v1.WaitForHookCommand
-	39, // 17: allwright.engine.v1.ContextSessionCommand.set_file_chooser_files:type_name -> allwright.engine.v1.SetFileChooserFilesCommand
-	40, // 18: allwright.engine.v1.ContextSessionCommand.save_download:type_name -> allwright.engine.v1.SaveDownloadCommand
-	4,  // 19: allwright.engine.v1.ContextSessionEvent.attached:type_name -> allwright.engine.v1.ContextSessionAttachedEvent
-	5,  // 20: allwright.engine.v1.ContextSessionEvent.pong:type_name -> allwright.engine.v1.ContextSessionPongEvent
-	6,  // 21: allwright.engine.v1.ContextSessionEvent.closed:type_name -> allwright.engine.v1.ContextSessionClosedEvent
-	7,  // 22: allwright.engine.v1.ContextSessionEvent.error:type_name -> allwright.engine.v1.ContextSessionErrorEvent
-	24, // 23: allwright.engine.v1.ContextSessionEvent.navigated:type_name -> allwright.engine.v1.PageNavigatedEvent
-	25, // 24: allwright.engine.v1.ContextSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
-	26, // 25: allwright.engine.v1.ContextSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
-	27, // 26: allwright.engine.v1.ContextSessionEvent.element_counted:type_name -> allwright.engine.v1.ElementCountedEvent
-	28, // 27: allwright.engine.v1.ContextSessionEvent.elements_highlighted:type_name -> allwright.engine.v1.ElementsHighlightedEvent
-	29, // 28: allwright.engine.v1.ContextSessionEvent.element_focused:type_name -> allwright.engine.v1.ElementFocusedEvent
-	30, // 29: allwright.engine.v1.ContextSessionEvent.element_filled:type_name -> allwright.engine.v1.ElementFilledEvent
-	31, // 30: allwright.engine.v1.ContextSessionEvent.element_hovered:type_name -> allwright.engine.v1.ElementHoveredEvent
-	32, // 31: allwright.engine.v1.ContextSessionEvent.key_pressed:type_name -> allwright.engine.v1.KeyPressedEvent
-	33, // 32: allwright.engine.v1.ContextSessionEvent.text_content_resolved:type_name -> allwright.engine.v1.TextContentResolvedEvent
-	34, // 33: allwright.engine.v1.ContextSessionEvent.inner_text_resolved:type_name -> allwright.engine.v1.InnerTextResolvedEvent
-	35, // 34: allwright.engine.v1.ContextSessionEvent.selector_wait_satisfied:type_name -> allwright.engine.v1.SelectorWaitSatisfiedEvent
-	36, // 35: allwright.engine.v1.ContextSessionEvent.screenshot_captured:type_name -> allwright.engine.v1.ScreenshotCapturedEvent
-	38, // 36: allwright.engine.v1.ContextSessionEvent.accessibility_snapshot_captured:type_name -> allwright.engine.v1.AccessibilitySnapshotCapturedEvent
-	10, // 37: allwright.engine.v1.ContextSessionEvent.hook_registered:type_name -> allwright.engine.v1.HookRegisteredEvent
-	11, // 38: allwright.engine.v1.ContextSessionEvent.hook_completed:type_name -> allwright.engine.v1.HookCompletedEvent
-	41, // 39: allwright.engine.v1.ContextSessionEvent.file_chooser_files_set:type_name -> allwright.engine.v1.FileChooserFilesSetEvent
-	42, // 40: allwright.engine.v1.ContextSessionEvent.download_saved:type_name -> allwright.engine.v1.DownloadSavedEvent
-	43, // 41: allwright.engine.v1.RegisterHookCommand.new_page:type_name -> allwright.engine.v1.RegisterNewPageHook
-	44, // 42: allwright.engine.v1.RegisterHookCommand.file_chooser:type_name -> allwright.engine.v1.RegisterFileChooserHook
-	45, // 43: allwright.engine.v1.RegisterHookCommand.download:type_name -> allwright.engine.v1.RegisterDownloadHook
-	46, // 44: allwright.engine.v1.WaitForHookCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	47, // 45: allwright.engine.v1.HookCompletedEvent.new_page:type_name -> allwright.engine.v1.NewPageHookResult
-	48, // 46: allwright.engine.v1.HookCompletedEvent.file_chooser:type_name -> allwright.engine.v1.FileChooserHookResult
-	49, // 47: allwright.engine.v1.HookCompletedEvent.download:type_name -> allwright.engine.v1.DownloadHookResult
-	46, // 48: allwright.engine.v1.NavigatePageCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	46, // 49: allwright.engine.v1.ClickElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	46, // 50: allwright.engine.v1.CountElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	46, // 51: allwright.engine.v1.HighlightElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	46, // 52: allwright.engine.v1.FocusElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	46, // 53: allwright.engine.v1.FillElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	46, // 54: allwright.engine.v1.HoverElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	46, // 55: allwright.engine.v1.PressKeyCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	46, // 56: allwright.engine.v1.GetTextContentCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	46, // 57: allwright.engine.v1.GetInnerTextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	46, // 58: allwright.engine.v1.WaitForSelectorCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	46, // 59: allwright.engine.v1.ScreenshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	46, // 60: allwright.engine.v1.AccessibilitySnapshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	61, // [61:61] is the sub-list for method output_type
-	61, // [61:61] is the sub-list for method input_type
-	61, // [61:61] is the sub-list for extension type_name
-	61, // [61:61] is the sub-list for extension extendee
-	0,  // [0:61] is the sub-list for field type_name
+	43, // 17: allwright.engine.v1.ContextSessionCommand.set_file_chooser_files:type_name -> allwright.engine.v1.SetFileChooserFilesCommand
+	44, // 18: allwright.engine.v1.ContextSessionCommand.save_download:type_name -> allwright.engine.v1.SaveDownloadCommand
+	12, // 19: allwright.engine.v1.ContextSessionCommand.upload_file_chunk:type_name -> allwright.engine.v1.UploadFileChunkCommand
+	14, // 20: allwright.engine.v1.ContextSessionCommand.read_file_chunk:type_name -> allwright.engine.v1.ReadFileChunkCommand
+	45, // 21: allwright.engine.v1.ContextSessionCommand.set_mobile_file_chooser_files:type_name -> allwright.engine.v1.SetMobileFileChooserFilesCommand
+	46, // 22: allwright.engine.v1.ContextSessionCommand.save_mobile_download:type_name -> allwright.engine.v1.SaveMobileDownloadCommand
+	4,  // 23: allwright.engine.v1.ContextSessionEvent.attached:type_name -> allwright.engine.v1.ContextSessionAttachedEvent
+	5,  // 24: allwright.engine.v1.ContextSessionEvent.pong:type_name -> allwright.engine.v1.ContextSessionPongEvent
+	6,  // 25: allwright.engine.v1.ContextSessionEvent.closed:type_name -> allwright.engine.v1.ContextSessionClosedEvent
+	7,  // 26: allwright.engine.v1.ContextSessionEvent.error:type_name -> allwright.engine.v1.ContextSessionErrorEvent
+	28, // 27: allwright.engine.v1.ContextSessionEvent.navigated:type_name -> allwright.engine.v1.PageNavigatedEvent
+	29, // 28: allwright.engine.v1.ContextSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
+	30, // 29: allwright.engine.v1.ContextSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
+	31, // 30: allwright.engine.v1.ContextSessionEvent.element_counted:type_name -> allwright.engine.v1.ElementCountedEvent
+	32, // 31: allwright.engine.v1.ContextSessionEvent.elements_highlighted:type_name -> allwright.engine.v1.ElementsHighlightedEvent
+	33, // 32: allwright.engine.v1.ContextSessionEvent.element_focused:type_name -> allwright.engine.v1.ElementFocusedEvent
+	34, // 33: allwright.engine.v1.ContextSessionEvent.element_filled:type_name -> allwright.engine.v1.ElementFilledEvent
+	35, // 34: allwright.engine.v1.ContextSessionEvent.element_hovered:type_name -> allwright.engine.v1.ElementHoveredEvent
+	36, // 35: allwright.engine.v1.ContextSessionEvent.key_pressed:type_name -> allwright.engine.v1.KeyPressedEvent
+	37, // 36: allwright.engine.v1.ContextSessionEvent.text_content_resolved:type_name -> allwright.engine.v1.TextContentResolvedEvent
+	38, // 37: allwright.engine.v1.ContextSessionEvent.inner_text_resolved:type_name -> allwright.engine.v1.InnerTextResolvedEvent
+	39, // 38: allwright.engine.v1.ContextSessionEvent.selector_wait_satisfied:type_name -> allwright.engine.v1.SelectorWaitSatisfiedEvent
+	40, // 39: allwright.engine.v1.ContextSessionEvent.screenshot_captured:type_name -> allwright.engine.v1.ScreenshotCapturedEvent
+	42, // 40: allwright.engine.v1.ContextSessionEvent.accessibility_snapshot_captured:type_name -> allwright.engine.v1.AccessibilitySnapshotCapturedEvent
+	10, // 41: allwright.engine.v1.ContextSessionEvent.hook_registered:type_name -> allwright.engine.v1.HookRegisteredEvent
+	11, // 42: allwright.engine.v1.ContextSessionEvent.hook_completed:type_name -> allwright.engine.v1.HookCompletedEvent
+	47, // 43: allwright.engine.v1.ContextSessionEvent.file_chooser_files_set:type_name -> allwright.engine.v1.FileChooserFilesSetEvent
+	48, // 44: allwright.engine.v1.ContextSessionEvent.download_saved:type_name -> allwright.engine.v1.DownloadSavedEvent
+	13, // 45: allwright.engine.v1.ContextSessionEvent.file_uploaded:type_name -> allwright.engine.v1.FileUploadedEvent
+	15, // 46: allwright.engine.v1.ContextSessionEvent.file_chunk:type_name -> allwright.engine.v1.FileChunkEvent
+	49, // 47: allwright.engine.v1.ContextSessionEvent.mobile_file_chooser_files_set:type_name -> allwright.engine.v1.MobileFileChooserFilesSetEvent
+	50, // 48: allwright.engine.v1.ContextSessionEvent.mobile_download_saved:type_name -> allwright.engine.v1.MobileDownloadSavedEvent
+	51, // 49: allwright.engine.v1.RegisterHookCommand.new_page:type_name -> allwright.engine.v1.RegisterNewPageHook
+	52, // 50: allwright.engine.v1.RegisterHookCommand.file_chooser:type_name -> allwright.engine.v1.RegisterFileChooserHook
+	53, // 51: allwright.engine.v1.RegisterHookCommand.download:type_name -> allwright.engine.v1.RegisterDownloadHook
+	54, // 52: allwright.engine.v1.RegisterHookCommand.mobile_file_chooser:type_name -> allwright.engine.v1.RegisterMobileFileChooserHook
+	55, // 53: allwright.engine.v1.RegisterHookCommand.mobile_download:type_name -> allwright.engine.v1.RegisterMobileDownloadHook
+	56, // 54: allwright.engine.v1.WaitForHookCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	57, // 55: allwright.engine.v1.HookCompletedEvent.new_page:type_name -> allwright.engine.v1.NewPageHookResult
+	58, // 56: allwright.engine.v1.HookCompletedEvent.file_chooser:type_name -> allwright.engine.v1.FileChooserHookResult
+	59, // 57: allwright.engine.v1.HookCompletedEvent.download:type_name -> allwright.engine.v1.DownloadHookResult
+	60, // 58: allwright.engine.v1.HookCompletedEvent.mobile_file_chooser:type_name -> allwright.engine.v1.MobileFileChooserHookResult
+	61, // 59: allwright.engine.v1.HookCompletedEvent.mobile_download:type_name -> allwright.engine.v1.MobileDownloadHookResult
+	56, // 60: allwright.engine.v1.NavigatePageCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	56, // 61: allwright.engine.v1.ClickElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	56, // 62: allwright.engine.v1.CountElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	56, // 63: allwright.engine.v1.HighlightElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	56, // 64: allwright.engine.v1.FocusElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	56, // 65: allwright.engine.v1.FillElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	56, // 66: allwright.engine.v1.HoverElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	56, // 67: allwright.engine.v1.PressKeyCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	56, // 68: allwright.engine.v1.GetTextContentCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	56, // 69: allwright.engine.v1.GetInnerTextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	56, // 70: allwright.engine.v1.WaitForSelectorCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	56, // 71: allwright.engine.v1.ScreenshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	56, // 72: allwright.engine.v1.AccessibilitySnapshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	73, // [73:73] is the sub-list for method output_type
+	73, // [73:73] is the sub-list for method input_type
+	73, // [73:73] is the sub-list for extension type_name
+	73, // [73:73] is the sub-list for extension extendee
+	0,  // [0:73] is the sub-list for field type_name
 }
 
 func init() { file_core_v1_context_proto_init() }
@@ -3247,6 +3770,7 @@ func file_core_v1_context_proto_init() {
 		return
 	}
 	file_core_v1_common_proto_init()
+	file_surfaces_mobile_v1_mobile_proto_init()
 	file_surfaces_web_v1_web_proto_init()
 	file_core_v1_context_proto_msgTypes[0].OneofWrappers = []any{
 		(*ContextSessionCommand_Ping)(nil),
@@ -3268,6 +3792,10 @@ func file_core_v1_context_proto_init() {
 		(*ContextSessionCommand_WaitForHook)(nil),
 		(*ContextSessionCommand_SetFileChooserFiles)(nil),
 		(*ContextSessionCommand_SaveDownload)(nil),
+		(*ContextSessionCommand_UploadFileChunk)(nil),
+		(*ContextSessionCommand_ReadFileChunk)(nil),
+		(*ContextSessionCommand_SetMobileFileChooserFiles)(nil),
+		(*ContextSessionCommand_SaveMobileDownload)(nil),
 	}
 	file_core_v1_context_proto_msgTypes[3].OneofWrappers = []any{
 		(*ContextSessionEvent_Attached)(nil),
@@ -3292,22 +3820,26 @@ func file_core_v1_context_proto_init() {
 		(*ContextSessionEvent_HookCompleted)(nil),
 		(*ContextSessionEvent_FileChooserFilesSet)(nil),
 		(*ContextSessionEvent_DownloadSaved)(nil),
+		(*ContextSessionEvent_FileUploaded)(nil),
+		(*ContextSessionEvent_FileChunk)(nil),
+		(*ContextSessionEvent_MobileFileChooserFilesSet)(nil),
+		(*ContextSessionEvent_MobileDownloadSaved)(nil),
 	}
 	file_core_v1_context_proto_msgTypes[8].OneofWrappers = []any{
 		(*RegisterHookCommand_NewPage)(nil),
 		(*RegisterHookCommand_FileChooser)(nil),
 		(*RegisterHookCommand_Download)(nil),
+		(*RegisterHookCommand_MobileFileChooser)(nil),
+		(*RegisterHookCommand_MobileDownload)(nil),
 	}
 	file_core_v1_context_proto_msgTypes[9].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[11].OneofWrappers = []any{
 		(*HookCompletedEvent_NewPage)(nil),
 		(*HookCompletedEvent_FileChooser)(nil),
 		(*HookCompletedEvent_Download)(nil),
+		(*HookCompletedEvent_MobileFileChooser)(nil),
+		(*HookCompletedEvent_MobileDownload)(nil),
 	}
-	file_core_v1_context_proto_msgTypes[12].OneofWrappers = []any{}
-	file_core_v1_context_proto_msgTypes[13].OneofWrappers = []any{}
-	file_core_v1_context_proto_msgTypes[14].OneofWrappers = []any{}
-	file_core_v1_context_proto_msgTypes[15].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[16].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[17].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[18].OneofWrappers = []any{}
@@ -3316,14 +3848,18 @@ func file_core_v1_context_proto_init() {
 	file_core_v1_context_proto_msgTypes[21].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[22].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[23].OneofWrappers = []any{}
-	file_core_v1_context_proto_msgTypes[37].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[24].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[25].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[26].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[27].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[41].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_core_v1_context_proto_rawDesc), len(file_core_v1_context_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   39,
+			NumMessages:   43,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

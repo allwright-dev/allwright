@@ -35,13 +35,18 @@ impl Fixture {
                 let mut request = [0; 4096];
                 let n = stream.read(&mut request).unwrap_or(0);
                 let request = String::from_utf8_lossy(&request[..n]);
-                let (body, content_type, extra_headers) = if request.starts_with("GET /new ") {
+                let target = request
+                    .lines()
+                    .next()
+                    .and_then(|line| line.split_whitespace().nth(1))
+                    .unwrap_or_default();
+                let (body, content_type, extra_headers) = if target.ends_with("/new") {
                     (
                         "<title>New page</title><h1>New page</h1>",
                         "text/html; charset=utf-8",
                         "",
                     )
-                } else if request.starts_with("GET /download ") {
+                } else if target.ends_with("/download") {
                     (
                         "allwright download",
                         "text/plain; charset=utf-8",

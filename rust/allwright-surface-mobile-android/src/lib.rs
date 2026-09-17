@@ -6,19 +6,23 @@ use allwright_surface_mobile::{
     ConnectOptions, DeviceConnectionKind, DeviceTarget, LaunchOptions, MobileAppKind,
     MobileAutomationBackend, MobileAutomationSessionInfo, MobileBrowserSessionHandle,
     MobileCapabilitySet, MobileClickInfo, MobileCommand, MobileCommandResult, MobileConnectInfo,
-    MobileElementCountInfo, MobileElementInfo, MobileFillInfo, MobilePageInfo,
-    MobilePageSessionHandle, MobilePlatform, MobilePressInfo, MobileRuntimeReadiness,
-    MobileScreenshotInfo, MobileSurfaceProfile, MobileTextInfo, MobileWaitForSelectorInfo,
-    RuntimeMaturity, boot_surface, normalize_selector_for_transport,
+    MobileDownloadInfo, MobileDownloadSavedInfo, MobileElementCountInfo, MobileElementInfo,
+    MobileFileChooserFilesSetInfo, MobileFileChooserInfo, MobileFillInfo, MobileHookRegistration,
+    MobileHookResult, MobileHookType, MobilePageInfo, MobilePageSessionHandle, MobilePlatform,
+    MobilePressInfo, MobileRuntimeReadiness, MobileScreenshotInfo, MobileSurfaceProfile,
+    MobileTextInfo, MobileWaitForSelectorInfo, RuntimeMaturity, boot_surface,
+    normalize_selector_for_transport,
 };
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use regex::Regex;
+use std::collections::HashMap;
 use std::env;
 use std::ffi::{CStr, CString, c_char};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -39,6 +43,35 @@ const ANDROID_NEXT_MILESTONES: &[&str] = &[
     "polish Android-native command semantics across focus, key input, and waits",
     "expand runtime packaging validation across macOS, Linux, and Windows release assets",
 ];
+
+static ANDROID_HOOKS: OnceLock<Mutex<HashMap<String, AndroidHookState>>> = OnceLock::new();
+static ANDROID_CHOOSERS: OnceLock<Mutex<HashMap<String, AndroidChooserState>>> = OnceLock::new();
+static ANDROID_DOWNLOADS: OnceLock<Mutex<HashMap<String, AndroidDownloadState>>> = OnceLock::new();
+
+#[derive(Debug, Clone)]
+enum AndroidHookState {
+    FileChooser {
+        device_id: String,
+        source_package: Option<String>,
+    },
+    Download {
+        device_id: String,
+        existing_files: HashMap<String, String>,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct AndroidChooserState {
+    device_id: String,
+}
+
+#[derive(Debug, Clone)]
+struct AndroidDownloadState {
+    device_id: String,
+    device_path: String,
+    suggested_filename: String,
+    observed_size: Option<u64>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AdbDevice {
@@ -647,6 +680,35 @@ fn plugin_response(result: Result<MobileCommandResult, String>) -> *mut c_char {
 
 fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, String> {
     match command {
+        MobileCommand::RegisterHook {
+            browser_session,
+            page_session,
+            hook_type,
+        } => register_android_hook(&browser_session, &page_session, hook_type)
+            .map(MobileCommandResult::RegisterHook),
+        MobileCommand::PollHook {
+            browser_session,
+            registration,
+        } => poll_android_hook(&browser_session, &registration).map(MobileCommandResult::PollHook),
+        MobileCommand::SetFileChooserFiles {
+            browser_session,
+            page_session,
+            file_chooser_id,
+            files,
+        } => set_android_file_chooser_files(
+            &browser_session,
+            &page_session,
+            &file_chooser_id,
+            &files,
+        )
+        .map(MobileCommandResult::SetFileChooserFiles),
+        MobileCommand::SaveDownload {
+            browser_session,
+            page_session,
+            download_id,
+            path,
+        } => save_android_download(&browser_session, &page_session, &download_id, &path)
+            .map(MobileCommandResult::SaveDownload),
         MobileCommand::Connect(options) => connect(&options).map(MobileCommandResult::Connect),
         MobileCommand::LaunchApp {
             browser_session,
@@ -1000,6 +1062,279 @@ fn current_foreground_app(device_id: &str) -> Result<ForegroundAppInfo, String> 
     let window_dump = run_adb_for_device(device_id, &["shell", "dumpsys", "window", "windows"])
         .or_else(|_| run_adb_for_device(device_id, &["shell", "dumpsys", "window"]))?;
     Ok(parse_foreground_app_from_dumpsys(&window_dump))
+}
+
+fn android_hooks() -> &'static Mutex<HashMap<String, AndroidHookState>> {
+    ANDROID_HOOKS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn android_choosers() -> &'static Mutex<HashMap<String, AndroidChooserState>> {
+    ANDROID_CHOOSERS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn android_downloads() -> &'static Mutex<HashMap<String, AndroidDownloadState>> {
+    ANDROID_DOWNLOADS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn list_public_downloads(device_id: &str) -> Result<HashMap<String, String>, String> {
+    let output = run_adb_for_device(
+        device_id,
+        &["shell", "find", "/sdcard/Download", "-type", "f"],
+    )?;
+    output
+        .lines()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(|path| {
+            let signature = run_adb_for_device(device_id, &["shell", "stat", "-c", "%s:%Y", path])?;
+            Ok((path.to_string(), signature))
+        })
+        .collect()
+}
+
+fn changed_public_download(
+    before: &HashMap<String, String>,
+    after: &HashMap<String, String>,
+) -> Option<String> {
+    after
+        .iter()
+        .find(|(path, signature)| before.get(*path) != Some(*signature))
+        .map(|(path, _)| path.clone())
+}
+
+fn android_file_size(device_id: &str, path: &str) -> Result<u64, String> {
+    run_adb_for_device(device_id, &["shell", "stat", "-c", "%s", path])?
+        .trim()
+        .parse::<u64>()
+        .map_err(|error| format!("Android file size is invalid for {path}: {error}"))
+}
+
+fn is_android_picker(package: Option<&str>) -> bool {
+    package.is_some_and(|package| {
+        let package = package.to_ascii_lowercase();
+        package.contains("documentsui")
+            || package.contains("filepicker")
+            || package.ends_with(".files")
+    })
+}
+
+fn register_android_hook(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    hook_type: MobileHookType,
+) -> Result<MobileHookRegistration, String> {
+    accessibility::validate_scope(browser_session, page_session, "hook")?;
+    let registration_id = accessibility::unique_id("android-hook");
+    let device_id = browser_session.device.device_id.clone();
+    let state = match hook_type {
+        MobileHookType::FileChooser => AndroidHookState::FileChooser {
+            device_id: device_id.clone(),
+            source_package: current_foreground_app(&device_id)?.current_package,
+        },
+        MobileHookType::Download => AndroidHookState::Download {
+            device_id: device_id.clone(),
+            existing_files: list_public_downloads(&device_id)?,
+        },
+    };
+    android_hooks()
+        .lock()
+        .map_err(|_| "Android hook registry is unavailable".to_string())?
+        .insert(registration_id.clone(), state);
+    Ok(MobileHookRegistration {
+        opaque_state: registration_id,
+    })
+}
+
+fn poll_android_hook(
+    browser_session: &MobileBrowserSessionHandle,
+    registration: &MobileHookRegistration,
+) -> Result<MobileHookResult, String> {
+    let registration_id = &registration.opaque_state;
+    let state = android_hooks()
+        .lock()
+        .map_err(|_| "Android hook registry is unavailable".to_string())?
+        .get(registration_id)
+        .cloned()
+        .ok_or_else(|| "Android hook registration is no longer available".to_string())?;
+    match state {
+        AndroidHookState::FileChooser {
+            device_id,
+            source_package,
+        } => {
+            if device_id != browser_session.device.device_id {
+                return Err("Android hook belongs to a different device".to_string());
+            }
+            let foreground = current_foreground_app(&device_id)?;
+            if foreground.current_package == source_package
+                || !is_android_picker(foreground.current_package.as_deref())
+            {
+                return Err("Android file chooser hook is still waiting for a picker".to_string());
+            }
+            let chooser_id = accessibility::unique_id("android-chooser");
+            android_choosers()
+                .lock()
+                .map_err(|_| "Android chooser registry is unavailable".to_string())?
+                .insert(chooser_id.clone(), AndroidChooserState { device_id });
+            android_hooks()
+                .lock()
+                .map_err(|_| "Android hook registry is unavailable".to_string())?
+                .remove(registration_id);
+            Ok(MobileHookResult::FileChooser(MobileFileChooserInfo {
+                file_chooser_id: chooser_id,
+                is_multiple: false,
+                note: "Android system document picker opened".to_string(),
+            }))
+        }
+        AndroidHookState::Download {
+            device_id,
+            existing_files,
+        } => {
+            if device_id != browser_session.device.device_id {
+                return Err("Android hook belongs to a different device".to_string());
+            }
+            let current = list_public_downloads(&device_id)?;
+            let Some(device_path) = changed_public_download(&existing_files, &current) else {
+                return Err(
+                    "Android download hook is still waiting for a public download".to_string(),
+                );
+            };
+            let suggested_filename = Path::new(&device_path)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("download")
+                .to_string();
+            let download_id = accessibility::unique_id("android-download");
+            android_downloads()
+                .lock()
+                .map_err(|_| "Android download registry is unavailable".to_string())?
+                .insert(
+                    download_id.clone(),
+                    AndroidDownloadState {
+                        device_id,
+                        device_path,
+                        suggested_filename: suggested_filename.clone(),
+                        observed_size: None,
+                    },
+                );
+            android_hooks()
+                .lock()
+                .map_err(|_| "Android hook registry is unavailable".to_string())?
+                .remove(registration_id);
+            Ok(MobileHookResult::Download(MobileDownloadInfo {
+                download_id,
+                suggested_filename,
+                note: "Android public download started".to_string(),
+            }))
+        }
+    }
+}
+
+fn set_android_file_chooser_files(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    file_chooser_id: &str,
+    files: &[String],
+) -> Result<MobileFileChooserFilesSetInfo, String> {
+    accessibility::validate_scope(browser_session, page_session, "file chooser")?;
+    if files.len() != 1 {
+        return Err("Android file chooser currently supports exactly one file".to_string());
+    }
+    let chooser = android_choosers()
+        .lock()
+        .map_err(|_| "Android chooser registry is unavailable".to_string())?
+        .get(file_chooser_id)
+        .cloned()
+        .ok_or_else(|| format!("unknown Android file chooser {file_chooser_id}"))?;
+    if chooser.device_id != browser_session.device.device_id {
+        return Err("Android file chooser belongs to a different device".to_string());
+    }
+    let source = fs::canonicalize(&files[0])
+        .map_err(|error| format!("resolve staged upload {}: {error}", files[0]))?;
+    let filename = source
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "staged upload requires a valid file name".to_string())?;
+    let remote_path = format!("/sdcard/Download/{filename}");
+    run_adb_for_device(
+        &chooser.device_id,
+        &["push", &source.to_string_lossy(), &remote_path],
+    )?;
+    let _ = run_adb_for_device(
+        &chooser.device_id,
+        &[
+            "shell",
+            "am",
+            "broadcast",
+            "-a",
+            "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+            "-d",
+            &format!("file://{remote_path}"),
+        ],
+    );
+    let source_snapshot = adb_dump_source(&chooser.device_id)?;
+    let nodes = parse_android_ui_nodes(&source_snapshot.source)?;
+    let node = nodes
+        .iter()
+        .find(|node| {
+            node.text.as_deref() == Some(filename) || node.content_desc.as_deref() == Some(filename)
+        })
+        .ok_or_else(|| format!("Android picker does not show staged file {filename}"))?;
+    let (x, y) = node
+        .bounds
+        .ok_or_else(|| format!("Android picker file {filename} has no selectable bounds"))?
+        .center();
+    run_adb_for_device(
+        &chooser.device_id,
+        &["shell", "input", "tap", &x.to_string(), &y.to_string()],
+    )?;
+    android_choosers()
+        .lock()
+        .map_err(|_| "Android chooser registry is unavailable".to_string())?
+        .remove(file_chooser_id);
+    Ok(MobileFileChooserFilesSetInfo {
+        file_chooser_id: file_chooser_id.to_string(),
+        files: files.to_vec(),
+        note: format!("staged and selected {filename} in the Android document picker"),
+    })
+}
+
+fn save_android_download(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    download_id: &str,
+    path: &str,
+) -> Result<MobileDownloadSavedInfo, String> {
+    accessibility::validate_scope(browser_session, page_session, "download")?;
+    let mut downloads = android_downloads()
+        .lock()
+        .map_err(|_| "Android download registry is unavailable".to_string())?;
+    let download = downloads
+        .get_mut(download_id)
+        .ok_or_else(|| format!("unknown Android download {download_id}"))?;
+    if download.device_id != browser_session.device.device_id {
+        return Err("Android download belongs to a different device".to_string());
+    }
+    let size = android_file_size(&download.device_id, &download.device_path)?;
+    if download.observed_size != Some(size) {
+        download.observed_size = Some(size);
+        return Err("Android download is still in progress".to_string());
+    }
+    if let Some(parent) = Path::new(path).parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("create Android download staging directory: {error}"))?;
+    }
+    run_adb_for_device(&download.device_id, &["pull", &download.device_path, path])?;
+    let saved = fs::canonicalize(path)
+        .map_err(|error| format!("resolve pulled Android download {path}: {error}"))?;
+    let result = MobileDownloadSavedInfo {
+        download_id: download_id.to_string(),
+        path: saved.to_string_lossy().to_string(),
+        suggested_filename: download.suggested_filename.clone(),
+        size,
+        note: "pulled completed Android download to server staging".to_string(),
+    };
+    downloads.remove(download_id);
+    Ok(result)
 }
 
 fn adb_click(
@@ -2148,6 +2483,45 @@ fn encode_adb_text(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recognizes_standard_android_picker_packages() {
+        assert!(is_android_picker(Some("com.google.android.documentsui")));
+        assert!(is_android_picker(Some("com.vendor.filepicker")));
+        assert!(is_android_picker(Some("com.android.files")));
+        assert!(!is_android_picker(Some("com.example.app")));
+        assert!(!is_android_picker(None));
+    }
+
+    #[test]
+    fn detects_new_and_replaced_public_downloads() {
+        let before = HashMap::from([
+            (
+                "/sdcard/Download/existing.pdf".to_string(),
+                "10:1".to_string(),
+            ),
+            (
+                "/sdcard/Download/replaced.pdf".to_string(),
+                "20:1".to_string(),
+            ),
+        ]);
+        let unchanged = before.clone();
+        assert_eq!(changed_public_download(&before, &unchanged), None);
+
+        let mut replaced = before.clone();
+        replaced.insert(
+            "/sdcard/Download/replaced.pdf".to_string(),
+            "21:2".to_string(),
+        );
+        assert_eq!(
+            changed_public_download(&before, &replaced).as_deref(),
+            Some("/sdcard/Download/replaced.pdf")
+        );
+
+        let mut added = before.clone();
+        added.insert("/sdcard/Download/new.pdf".to_string(), "1:2".to_string());
+        assert!(changed_public_download(&before, &added).is_some());
+    }
 
     #[tokio::test]
     async fn boots_android_runtime() {

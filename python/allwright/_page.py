@@ -3,6 +3,8 @@ from __future__ import annotations
 from ._web_locators import WebLocators, TextMatcher, semantic_selector
 
 import threading
+import os
+import uuid
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
@@ -165,13 +167,14 @@ class Page(WebLocators):
             handle = self._ensure_handle()
             self._ensure_open()
             command_options = options or CommandOptions()
+            file_ids = [self._upload_local_file(handle, path) for path in files]
             handle.send(
                 engine_pb2.ContextSessionCommand(
                     surface_session_id=self.surface_session_id,
                     context_session_id=self.session_id,
                     set_file_chooser_files=engine_pb2.SetFileChooserFilesCommand(
                         file_chooser_id=file_chooser_id,
-                        files=files,
+                        file_ids=file_ids,
                         retry_options=retry_options(command_options.timeout_ms),
                     ),
                 )
@@ -205,7 +208,6 @@ class Page(WebLocators):
                     context_session_id=self.session_id,
                     save_download=engine_pb2.SaveDownloadCommand(
                         download_id=download_id,
-                        path=str(path),
                         retry_options=retry_options(command_options.timeout_ms),
                     ),
                 )
@@ -215,11 +217,91 @@ class Page(WebLocators):
                 match event.WhichOneof("event"):
                     case "download_saved":
                         if event.download_saved.download_id == download_id:
+                            self._download_to_local_file(
+                                handle, event.download_saved.file_id, str(path)
+                            )
                             return
                     case "error":
                         raise AllwrightError(
                             f"page session error while saving download: {event.error.message}"
                         )
+
+    def _upload_local_file(self, handle: StreamHandle, path: str) -> str:
+        transfer_id = str(uuid.uuid4())
+        size = os.path.getsize(path)
+        offset = 0
+        with open(path, "rb") as source:
+            while True:
+                data = source.read(256 * 1024)
+                last = offset + len(data) >= size
+                handle.send(
+                    engine_pb2.ContextSessionCommand(
+                        surface_session_id=self.surface_session_id,
+                        context_session_id=self.session_id,
+                        upload_file_chunk=engine_pb2.UploadFileChunkCommand(
+                            transfer_id=transfer_id,
+                            name=os.path.basename(path),
+                            offset=offset,
+                            data=data,
+                            last=last,
+                        ),
+                    )
+                )
+                offset += len(data)
+                if last:
+                    break
+        while True:
+            event = handle.recv("receive page session event while uploading file")
+            match event.WhichOneof("event"):
+                case "file_uploaded":
+                    if event.file_uploaded.transfer_id == transfer_id:
+                        return event.file_uploaded.file_id
+                case "error":
+                    raise AllwrightError(
+                        f"page session error while uploading file: {event.error.message}"
+                    )
+
+    def _download_to_local_file(
+        self, handle: StreamHandle, file_id: str, path: str
+    ) -> None:
+        temporary_path = f"{path}.allwright-{uuid.uuid4()}.tmp"
+        offset = 0
+        try:
+            with open(temporary_path, "xb") as destination:
+                while True:
+                    handle.send(
+                        engine_pb2.ContextSessionCommand(
+                            surface_session_id=self.surface_session_id,
+                            context_session_id=self.session_id,
+                            read_file_chunk=engine_pb2.ReadFileChunkCommand(
+                                file_id=file_id,
+                                offset=offset,
+                                max_bytes=256 * 1024,
+                            ),
+                        )
+                    )
+                    event = handle.recv("receive page session event while downloading file")
+                    if event.WhichOneof("event") == "error":
+                        raise AllwrightError(
+                            f"page session error while downloading file: {event.error.message}"
+                        )
+                    if (
+                        event.WhichOneof("event") != "file_chunk"
+                        or event.file_chunk.file_id != file_id
+                        or event.file_chunk.offset != offset
+                    ):
+                        continue
+                    destination.write(event.file_chunk.data)
+                    offset += len(event.file_chunk.data)
+                    if event.file_chunk.last:
+                        break
+            os.replace(temporary_path, path)
+        except Exception:
+            try:
+                os.unlink(temporary_path)
+            except FileNotFoundError:
+                pass
+            raise
 
     def goto(self, url: str, options: CommandOptions | None = None) -> NavigateResult:
         from ._runtime import retry_options

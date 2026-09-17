@@ -55,6 +55,10 @@ Download download = hook.waitFor();
 download.saveAs(Path.of("artifacts", download.suggestedFilename()));
 ```
 
+These paths are local to the Java test process and are streamed through a
+remote Allwright server when necessary. `AndroidApp.registerHook` supports
+`Hooks.FILE_CHOOSER` and `Hooks.DOWNLOAD` with the same lifecycle.
+
 Maven:
 
 ```xml

@@ -225,8 +225,28 @@ const download = await downloadHook.wait();
 await download.saveAs(`artifacts/${download.suggestedFilename}`);
 ```
 
+Upload and download paths are always resolved by the client on the machine
+running the test. Files are streamed through the engine, so the same API works
+when the Allwright server runs on another machine.
+
+Android app contexts support the same file hooks (but not `newPage`):
+
+```ts
+const chooserHook = await app.registerHook(hooks.fileChooser);
+await app.click("button.attach");
+await (await chooserHook.wait()).setFiles("fixtures/photo.png");
+
+const downloadHook = await app.registerHook(hooks.download);
+await app.click("button.download");
+const download = await downloadHook.wait();
+await download.saveAs(`artifacts/${download.suggestedFilename}`);
+```
+
+Android uploads currently support the system DocumentsUI picker with one file.
+Android downloads observe files created in the device's public Downloads directory.
+
 Hook registration and waiting are generic engine operations. New-page,
-file-chooser, and download hook types/results remain owned by the web surface;
+file-chooser, and download hook types/results remain owned by their surface;
 future dialog hooks can use the same lifecycle without adding per-event methods.
 
 ## Client Experience

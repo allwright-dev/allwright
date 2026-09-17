@@ -1,4 +1,6 @@
 import unittest
+import tempfile
+from pathlib import Path
 
 from allwright import Browser, Page, hooks
 from allwright._proto import engine_pb2
@@ -61,26 +63,52 @@ class HookTest(unittest.TestCase):
                 )
             ),
             engine_pb2.ContextSessionEvent(
+                file_uploaded=engine_pb2.FileUploadedEvent(
+                    transfer_id="upload-one", file_id="file-1"
+                )
+            ),
+            engine_pb2.ContextSessionEvent(
+                file_uploaded=engine_pb2.FileUploadedEvent(
+                    transfer_id="upload-two", file_id="file-2"
+                )
+            ),
+            engine_pb2.ContextSessionEvent(
                 file_chooser_files_set=engine_pb2.FileChooserFilesSetEvent(
                     file_chooser_id="chooser-1",
-                    files=["one.txt", "two.txt"],
+                    file_ids=["file-1", "file-2"],
                 )
             ),
         )
         page = Page(None, "browser-1", "page-1")
         page._handle = stream
 
-        hook = page.register_hook(hooks.file_chooser)
-        chooser = hook.wait()
-        chooser.set_files(["one.txt", "two.txt"])
+        with tempfile.TemporaryDirectory() as directory:
+            one = Path(directory, "one.txt")
+            two = Path(directory, "two.txt")
+            one.write_text("one")
+            two.write_text("two")
+            hook = page.register_hook(hooks.file_chooser)
+            chooser = hook.wait()
+            # Match the fake transfer ids to the client-generated values.
+            original_recv = stream.recv
+            upload_index = 0
+            def recv(description):
+                nonlocal upload_index
+                event = original_recv(description)
+                if event.WhichOneof("event") == "file_uploaded":
+                    event.file_uploaded.transfer_id = stream.commands[-1].upload_file_chunk.transfer_id
+                    upload_index += 1
+                return event
+            stream.recv = recv
+            chooser.set_files([str(one), str(two)])
 
         self.assertTrue(chooser.is_multiple)
         self.assertIs(chooser.page, page)
         self.assertEqual(stream.commands[0].register_hook.WhichOneof("hook"), "file_chooser")
-        self.assertEqual(stream.commands[2].WhichOneof("command"), "set_file_chooser_files")
+        self.assertEqual(stream.commands[4].WhichOneof("command"), "set_file_chooser_files")
         self.assertEqual(
-            list(stream.commands[2].set_file_chooser_files.files),
-            ["one.txt", "two.txt"],
+            list(stream.commands[4].set_file_chooser_files.file_ids),
+            ["file-1", "file-2"],
         )
 
     def test_download_hook_returns_typed_download_and_saves_it(self):
@@ -101,16 +129,27 @@ class HookTest(unittest.TestCase):
             engine_pb2.ContextSessionEvent(
                 download_saved=engine_pb2.DownloadSavedEvent(
                     download_id="download-1",
-                    path="artifacts/report.csv",
+                    file_id="file-download-1",
+                )
+            ),
+            engine_pb2.ContextSessionEvent(
+                file_chunk=engine_pb2.FileChunkEvent(
+                    file_id="file-download-1",
+                    offset=0,
+                    data=b"report contents",
+                    last=True,
                 )
             ),
         )
         page = Page(None, "browser-1", "page-1")
         page._handle = stream
 
-        hook = page.register_hook(hooks.download)
-        download = hook.wait()
-        download.save_as("artifacts/report.csv")
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory, "report.csv")
+            hook = page.register_hook(hooks.download)
+            download = hook.wait()
+            download.save_as(str(destination))
+            self.assertEqual(destination.read_text(), "report contents")
 
         self.assertIs(download.page, page)
         self.assertEqual(download.url, "https://example.test/report.csv")
@@ -118,7 +157,7 @@ class HookTest(unittest.TestCase):
         self.assertEqual(stream.commands[0].register_hook.WhichOneof("hook"), "download")
         self.assertEqual(stream.commands[2].WhichOneof("command"), "save_download")
         self.assertEqual(stream.commands[2].save_download.download_id, "download-1")
-        self.assertEqual(stream.commands[2].save_download.path, "artifacts/report.csv")
+        self.assertEqual(stream.commands[3].WhichOneof("command"), "read_file_chunk")
 
 
 if __name__ == "__main__":

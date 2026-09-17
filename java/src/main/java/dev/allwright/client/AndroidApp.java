@@ -1,7 +1,13 @@
 package dev.allwright.client;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.UUID;
+import com.google.protobuf.ByteString;
 
 import dev.allwright.engine.v1.ClickElementCommand;
 import dev.allwright.engine.v1.CountElementsCommand;
@@ -14,8 +20,17 @@ import dev.allwright.engine.v1.GetTextContentCommand;
 import dev.allwright.engine.v1.PressKeyCommand;
 import dev.allwright.engine.v1.ScreenshotCommand;
 import dev.allwright.engine.v1.WaitForSelectorCommand;
+import dev.allwright.engine.v1.HookCompletedEvent;
+import dev.allwright.engine.v1.RegisterHookCommand;
+import dev.allwright.engine.v1.RegisterMobileFileChooserHook;
+import dev.allwright.engine.v1.RegisterMobileDownloadHook;
+import dev.allwright.engine.v1.WaitForHookCommand;
+import dev.allwright.engine.v1.SetMobileFileChooserFilesCommand;
+import dev.allwright.engine.v1.SaveMobileDownloadCommand;
+import dev.allwright.engine.v1.UploadFileChunkCommand;
+import dev.allwright.engine.v1.ReadFileChunkCommand;
 
-public final class AndroidApp {
+public final class AndroidApp implements HookContext {
     private final RuntimeSupport.RuntimeClient runtime;
     private final String surfaceSessionId;
     private final String sessionId;
@@ -421,6 +436,163 @@ public final class AndroidApp {
                 default -> {
                 }
             }
+        }
+    }
+
+    public synchronized <T> Hook<T> registerHook(HookType<T> type) {
+        if (!"file_chooser".equals(type.name()) && !"download".equals(type.name())) {
+            throw new AllwrightException("hook type " + type.name() + " is not supported by Android apps");
+        }
+        var handle = ensureStream();
+        RegisterHookCommand register = "file_chooser".equals(type.name())
+                ? RegisterHookCommand.newBuilder().setMobileFileChooser(RegisterMobileFileChooserHook.newBuilder()).build()
+                : RegisterHookCommand.newBuilder().setMobileDownload(RegisterMobileDownloadHook.newBuilder()).build();
+        handle.send(ContextSessionCommand.newBuilder().setSurfaceSessionId(surfaceSessionId)
+                .setContextSessionId(sessionId).setRegisterHook(register).build());
+        while (true) {
+            ContextSessionEvent event = handle.recv("register Android hook");
+            if (event.getEventCase() == ContextSessionEvent.EventCase.HOOK_REGISTERED) {
+                return new Hook<>(this, event.getHookRegistered().getHookId(), type);
+            }
+            if (event.getEventCase() == ContextSessionEvent.EventCase.ERROR) {
+                throw new AllwrightException(event.getError().getMessage());
+            }
+        }
+    }
+
+    @Override
+    public synchronized <T> T waitForHook(String hookId, HookType<T> type, CommandOptions options) {
+        var handle = ensureStream();
+        WaitForHookCommand.Builder wait = WaitForHookCommand.newBuilder().setHookId(hookId);
+        if (options != null && CommandSupport.hasTimeout(options.timeoutMs())) {
+            wait.setRetryOptions(CommandSupport.commandRetryOptions(options.timeoutMs()));
+        }
+        handle.send(ContextSessionCommand.newBuilder().setSurfaceSessionId(surfaceSessionId)
+                .setContextSessionId(sessionId).setWaitForHook(wait).build());
+        while (true) {
+            ContextSessionEvent event = handle.recv("wait for Android hook");
+            if (event.getEventCase() == ContextSessionEvent.EventCase.HOOK_COMPLETED
+                    && hookId.equals(event.getHookCompleted().getHookId())) {
+                return type.decode(this, event.getHookCompleted());
+            }
+            if (event.getEventCase() == ContextSessionEvent.EventCase.ERROR) {
+                throw new AllwrightException(event.getError().getMessage());
+            }
+        }
+    }
+
+    @Override
+    public synchronized void setHookFileChooserFiles(
+            String chooserId, java.util.List<String> files, CommandOptions options
+    ) {
+        var handle = ensureStream();
+        java.util.List<String> fileIds = new java.util.ArrayList<>();
+        for (String file : files) fileIds.add(uploadLocalFile(handle, Path.of(file)));
+        SetMobileFileChooserFilesCommand.Builder command = SetMobileFileChooserFilesCommand.newBuilder()
+                .setFileChooserId(chooserId).addAllFileIds(fileIds);
+        if (options != null && CommandSupport.hasTimeout(options.timeoutMs())) {
+            command.setRetryOptions(CommandSupport.commandRetryOptions(options.timeoutMs()));
+        }
+        handle.send(ContextSessionCommand.newBuilder().setSurfaceSessionId(surfaceSessionId)
+                .setContextSessionId(sessionId).setSetMobileFileChooserFiles(command).build());
+        while (true) {
+            ContextSessionEvent event = handle.recv("set Android file chooser files");
+            if (event.getEventCase() == ContextSessionEvent.EventCase.MOBILE_FILE_CHOOSER_FILES_SET
+                    && chooserId.equals(event.getMobileFileChooserFilesSet().getFileChooserId())) return;
+            if (event.getEventCase() == ContextSessionEvent.EventCase.ERROR) {
+                throw new AllwrightException(event.getError().getMessage());
+            }
+        }
+    }
+
+    @Override
+    public synchronized void saveHookDownload(String downloadId, String path, CommandOptions options) {
+        var handle = ensureStream();
+        SaveMobileDownloadCommand.Builder command = SaveMobileDownloadCommand.newBuilder()
+                .setDownloadId(downloadId);
+        if (options != null && CommandSupport.hasTimeout(options.timeoutMs())) {
+            command.setRetryOptions(CommandSupport.commandRetryOptions(options.timeoutMs()));
+        }
+        handle.send(ContextSessionCommand.newBuilder().setSurfaceSessionId(surfaceSessionId)
+                .setContextSessionId(sessionId).setSaveMobileDownload(command).build());
+        while (true) {
+            ContextSessionEvent event = handle.recv("save Android download");
+            if (event.getEventCase() == ContextSessionEvent.EventCase.MOBILE_DOWNLOAD_SAVED
+                    && downloadId.equals(event.getMobileDownloadSaved().getDownloadId())) {
+                downloadToLocalFile(handle, event.getMobileDownloadSaved().getFileId(), Path.of(path));
+                return;
+            }
+            if (event.getEventCase() == ContextSessionEvent.EventCase.ERROR) {
+                throw new AllwrightException(event.getError().getMessage());
+            }
+        }
+    }
+
+    private String uploadLocalFile(
+            RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle, Path path
+    ) {
+        String transferId = UUID.randomUUID().toString();
+        try (InputStream source = Files.newInputStream(path)) {
+            long size = Files.size(path);
+            long offset = 0;
+            while (true) {
+                byte[] data = source.readNBytes(256 * 1024);
+                boolean last = offset + data.length >= size;
+                handle.send(ContextSessionCommand.newBuilder().setSurfaceSessionId(surfaceSessionId)
+                        .setContextSessionId(sessionId)
+                        .setUploadFileChunk(UploadFileChunkCommand.newBuilder()
+                                .setTransferId(transferId).setName(path.getFileName().toString())
+                                .setOffset(offset).setData(ByteString.copyFrom(data)).setLast(last)).build());
+                offset += data.length;
+                if (last) break;
+            }
+        } catch (IOException error) {
+            throw new AllwrightException("failed to read upload: " + error.getMessage());
+        }
+        while (true) {
+            ContextSessionEvent event = handle.recv("upload Android chooser file");
+            if (event.getEventCase() == ContextSessionEvent.EventCase.FILE_UPLOADED
+                    && transferId.equals(event.getFileUploaded().getTransferId())) {
+                return event.getFileUploaded().getFileId();
+            }
+            if (event.getEventCase() == ContextSessionEvent.EventCase.ERROR) {
+                throw new AllwrightException(event.getError().getMessage());
+            }
+        }
+    }
+
+    private void downloadToLocalFile(
+            RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle,
+            String fileId, Path path
+    ) {
+        Path temporary = path.resolveSibling(path.getFileName() + ".allwright-" + UUID.randomUUID() + ".tmp");
+        try (OutputStream destination = Files.newOutputStream(temporary)) {
+            long offset = 0;
+            while (true) {
+                handle.send(ContextSessionCommand.newBuilder().setSurfaceSessionId(surfaceSessionId)
+                        .setContextSessionId(sessionId)
+                        .setReadFileChunk(ReadFileChunkCommand.newBuilder().setFileId(fileId)
+                                .setOffset(offset).setMaxBytes(256 * 1024)).build());
+                ContextSessionEvent event = handle.recv("download Android file");
+                if (event.getEventCase() == ContextSessionEvent.EventCase.ERROR) {
+                    throw new AllwrightException(event.getError().getMessage());
+                }
+                if (event.getEventCase() != ContextSessionEvent.EventCase.FILE_CHUNK
+                        || !fileId.equals(event.getFileChunk().getFileId())
+                        || event.getFileChunk().getOffset() != offset) continue;
+                byte[] data = event.getFileChunk().getData().toByteArray();
+                destination.write(data);
+                offset += data.length;
+                if (event.getFileChunk().getLast()) break;
+            }
+        } catch (IOException error) {
+            try { Files.deleteIfExists(temporary); } catch (IOException ignored) { }
+            throw new AllwrightException("failed to save Android download: " + error.getMessage());
+        }
+        try {
+            Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException error) {
+            throw new AllwrightException("failed to finish Android download: " + error.getMessage());
         }
     }
 

@@ -56,3 +56,44 @@ message AppLaunchedEvent {
   optional string activity_name = 4;
   optional string webview_context = 5;
 }
+
+message RegisterMobileFileChooserHook {}
+
+message MobileFileChooserHookResult {
+  string file_chooser_id = 1;
+  bool is_multiple = 2;
+  string note = 3;
+}
+
+message SetMobileFileChooserFilesCommand {
+  string file_chooser_id = 1;
+  repeated string file_ids = 2;
+  optional CommandRetryOptions retry_options = 3;
+}
+
+message MobileFileChooserFilesSetEvent {
+  string file_chooser_id = 1;
+  repeated string file_ids = 2;
+  string note = 3;
+}
+
+message RegisterMobileDownloadHook {}
+
+message MobileDownloadHookResult {
+  string download_id = 1;
+  string suggested_filename = 2;
+  string note = 3;
+}
+
+message SaveMobileDownloadCommand {
+  string download_id = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+
+message MobileDownloadSavedEvent {
+  string download_id = 1;
+  string file_id = 2;
+  string suggested_filename = 3;
+  uint64 size = 4;
+  string note = 5;
+}

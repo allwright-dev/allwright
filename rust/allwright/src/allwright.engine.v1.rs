@@ -77,6 +77,66 @@ pub struct AppLaunchedEvent {
     #[prost(string, optional, tag = "5")]
     pub webview_context: ::core::option::Option<::prost::alloc::string::String>,
 }
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct RegisterMobileFileChooserHook {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MobileFileChooserHookResult {
+    #[prost(string, tag = "1")]
+    pub file_chooser_id: ::prost::alloc::string::String,
+    #[prost(bool, tag = "2")]
+    pub is_multiple: bool,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SetMobileFileChooserFilesCommand {
+    #[prost(string, tag = "1")]
+    pub file_chooser_id: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag = "2")]
+    pub file_ids: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(message, optional, tag = "3")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MobileFileChooserFilesSetEvent {
+    #[prost(string, tag = "1")]
+    pub file_chooser_id: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag = "2")]
+    pub file_ids: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct RegisterMobileDownloadHook {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MobileDownloadHookResult {
+    #[prost(string, tag = "1")]
+    pub download_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub suggested_filename: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SaveMobileDownloadCommand {
+    #[prost(string, tag = "1")]
+    pub download_id: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MobileDownloadSavedEvent {
+    #[prost(string, tag = "1")]
+    pub download_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub file_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub suggested_filename: ::prost::alloc::string::String,
+    #[prost(uint64, tag = "4")]
+    pub size: u64,
+    #[prost(string, tag = "5")]
+    pub note: ::prost::alloc::string::String,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum MobilePlatform {
@@ -205,7 +265,7 @@ pub struct SetFileChooserFilesCommand {
     #[prost(string, tag = "1")]
     pub file_chooser_id: ::prost::alloc::string::String,
     #[prost(string, repeated, tag = "2")]
-    pub files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub file_ids: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "3")]
     pub retry_options: ::core::option::Option<CommandRetryOptions>,
 }
@@ -214,7 +274,7 @@ pub struct FileChooserFilesSetEvent {
     #[prost(string, tag = "1")]
     pub file_chooser_id: ::prost::alloc::string::String,
     #[prost(string, repeated, tag = "2")]
-    pub files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub file_ids: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(string, tag = "3")]
     pub note: ::prost::alloc::string::String,
 }
@@ -235,9 +295,7 @@ pub struct DownloadHookResult {
 pub struct SaveDownloadCommand {
     #[prost(string, tag = "1")]
     pub download_id: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub path: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "3")]
+    #[prost(message, optional, tag = "2")]
     pub retry_options: ::core::option::Option<CommandRetryOptions>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -245,8 +303,12 @@ pub struct DownloadSavedEvent {
     #[prost(string, tag = "1")]
     pub download_id: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
-    pub path: ::prost::alloc::string::String,
+    pub file_id: ::prost::alloc::string::String,
     #[prost(string, tag = "3")]
+    pub suggested_filename: ::prost::alloc::string::String,
+    #[prost(uint64, tag = "4")]
+    pub size: u64,
+    #[prost(string, tag = "5")]
     pub note: ::prost::alloc::string::String,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
@@ -374,7 +436,7 @@ pub struct ContextSessionCommand {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_command::Command",
-        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21"
+        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25"
     )]
     pub command: ::core::option::Option<context_session_command::Command>,
 }
@@ -420,6 +482,14 @@ pub mod context_session_command {
         SetFileChooserFiles(super::SetFileChooserFilesCommand),
         #[prost(message, tag = "21")]
         SaveDownload(super::SaveDownloadCommand),
+        #[prost(message, tag = "22")]
+        UploadFileChunk(super::UploadFileChunkCommand),
+        #[prost(message, tag = "23")]
+        ReadFileChunk(super::ReadFileChunkCommand),
+        #[prost(message, tag = "24")]
+        SetMobileFileChooserFiles(super::SetMobileFileChooserFilesCommand),
+        #[prost(message, tag = "25")]
+        SaveMobileDownload(super::SaveMobileDownloadCommand),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -435,7 +505,7 @@ pub struct ContextSessionEvent {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_event::Event",
-        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23"
+        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27"
     )]
     pub event: ::core::option::Option<context_session_event::Event>,
 }
@@ -487,6 +557,14 @@ pub mod context_session_event {
         FileChooserFilesSet(super::FileChooserFilesSetEvent),
         #[prost(message, tag = "23")]
         DownloadSaved(super::DownloadSavedEvent),
+        #[prost(message, tag = "24")]
+        FileUploaded(super::FileUploadedEvent),
+        #[prost(message, tag = "25")]
+        FileChunk(super::FileChunkEvent),
+        #[prost(message, tag = "26")]
+        MobileFileChooserFilesSet(super::MobileFileChooserFilesSetEvent),
+        #[prost(message, tag = "27")]
+        MobileDownloadSaved(super::MobileDownloadSavedEvent),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -511,7 +589,7 @@ pub struct ContextSessionErrorEvent {
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct RegisterHookCommand {
-    #[prost(oneof = "register_hook_command::Hook", tags = "1, 2, 3")]
+    #[prost(oneof = "register_hook_command::Hook", tags = "1, 2, 3, 4, 5")]
     pub hook: ::core::option::Option<register_hook_command::Hook>,
 }
 /// Nested message and enum types in `RegisterHookCommand`.
@@ -524,6 +602,10 @@ pub mod register_hook_command {
         FileChooser(super::RegisterFileChooserHook),
         #[prost(message, tag = "3")]
         Download(super::RegisterDownloadHook),
+        #[prost(message, tag = "4")]
+        MobileFileChooser(super::RegisterMobileFileChooserHook),
+        #[prost(message, tag = "5")]
+        MobileDownload(super::RegisterMobileDownloadHook),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -542,7 +624,7 @@ pub struct HookRegisteredEvent {
 pub struct HookCompletedEvent {
     #[prost(string, tag = "1")]
     pub hook_id: ::prost::alloc::string::String,
-    #[prost(oneof = "hook_completed_event::Result", tags = "2, 3, 4")]
+    #[prost(oneof = "hook_completed_event::Result", tags = "2, 3, 4, 5, 6")]
     pub result: ::core::option::Option<hook_completed_event::Result>,
 }
 /// Nested message and enum types in `HookCompletedEvent`.
@@ -555,7 +637,55 @@ pub mod hook_completed_event {
         FileChooser(super::FileChooserHookResult),
         #[prost(message, tag = "4")]
         Download(super::DownloadHookResult),
+        #[prost(message, tag = "5")]
+        MobileFileChooser(super::MobileFileChooserHookResult),
+        #[prost(message, tag = "6")]
+        MobileDownload(super::MobileDownloadHookResult),
     }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UploadFileChunkCommand {
+    #[prost(string, tag = "1")]
+    pub transfer_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub name: ::prost::alloc::string::String,
+    #[prost(uint64, tag = "3")]
+    pub offset: u64,
+    #[prost(bytes = "vec", tag = "4")]
+    pub data: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bool, tag = "5")]
+    pub last: bool,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileUploadedEvent {
+    #[prost(string, tag = "1")]
+    pub transfer_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub file_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub name: ::prost::alloc::string::String,
+    #[prost(uint64, tag = "4")]
+    pub size: u64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ReadFileChunkCommand {
+    #[prost(string, tag = "1")]
+    pub file_id: ::prost::alloc::string::String,
+    #[prost(uint64, tag = "2")]
+    pub offset: u64,
+    #[prost(uint32, tag = "3")]
+    pub max_bytes: u32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileChunkEvent {
+    #[prost(string, tag = "1")]
+    pub file_id: ::prost::alloc::string::String,
+    #[prost(uint64, tag = "2")]
+    pub offset: u64,
+    #[prost(bytes = "vec", tag = "3")]
+    pub data: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bool, tag = "4")]
+    pub last: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NavigatePageCommand {

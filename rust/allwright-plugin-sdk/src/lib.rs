@@ -149,6 +149,8 @@ pub struct DownloadInfo {
 pub struct DownloadSavedInfo {
     pub download_id: String,
     pub path: String,
+    pub suggested_filename: String,
+    pub size: u64,
     pub note: String,
 }
 

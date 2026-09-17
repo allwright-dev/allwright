@@ -137,14 +137,14 @@ export interface Hook<T> {
 
 export interface FileChooser {
   readonly id: string;
-  readonly page: Page;
+  readonly page: Page | MobileAndroidApp;
   isMultiple(): boolean;
   setFiles(files: string | string[], options?: CommandOptions): Promise<void>;
 }
 
 export interface Download {
   readonly id: string;
-  readonly page: Page;
+  readonly page: Page | MobileAndroidApp;
   readonly url: string;
   readonly suggestedFilename: string;
   saveAs(path: string, options?: CommandOptions): Promise<void>;
@@ -226,6 +226,7 @@ export interface MobileAndroidApp {
   innerText(selector: string, options?: CommandOptions): Promise<TextResult>;
   waitForSelector(selector: string, options?: WaitForSelectorOptions): Promise<WaitForSelectorResult>;
   screenshot(options?: ScreenshotOptions): Promise<ScreenshotResult>;
+  registerHook<T>(type: HookType<T>): Promise<Hook<T>>;
 }
 
 export interface MobileAndroidDevice {
@@ -464,15 +465,37 @@ export interface ContextSessionEvent {
       suggestedFilename?: string;
       note?: string;
     };
+    mobileFileChooser?: {
+      fileChooserId?: string;
+      isMultiple?: boolean;
+      note?: string;
+    };
+    mobileDownload?: {
+      downloadId?: string;
+      suggestedFilename?: string;
+      note?: string;
+    };
   };
   fileChooserFilesSet?: {
     fileChooserId?: string;
-    files?: string[];
+    fileIds?: string[];
     note?: string;
   };
   downloadSaved?: {
     downloadId?: string;
-    path?: string;
+    fileId?: string;
+    suggestedFilename?: string;
+    size?: string;
+    note?: string;
+  };
+  fileUploaded?: { transferId?: string; fileId?: string; name?: string; size?: string };
+  fileChunk?: { fileId?: string; offset?: string; data?: Uint8Array; last?: boolean };
+  mobileFileChooserFilesSet?: { fileChooserId?: string; fileIds?: string[]; note?: string };
+  mobileDownloadSaved?: {
+    downloadId?: string;
+    fileId?: string;
+    suggestedFilename?: string;
+    size?: string;
     note?: string;
   };
   navigated?: {
@@ -574,6 +597,8 @@ export interface RegisterHookRequest {
     newPage?: Record<string, never>;
     fileChooser?: Record<string, never>;
     download?: Record<string, never>;
+    mobileFileChooser?: Record<string, never>;
+    mobileDownload?: Record<string, never>;
   };
 }
 
@@ -582,7 +607,6 @@ export interface SaveDownloadRequest {
   contextSessionId: string;
   saveDownload: {
     downloadId: string;
-    path: string;
     retryOptions?: { timeoutMs?: number };
   };
 }
@@ -592,7 +616,44 @@ export interface SetFileChooserFilesRequest {
   contextSessionId: string;
   setFileChooserFiles: {
     fileChooserId: string;
-    files: string[];
+    fileIds: string[];
+    retryOptions?: { timeoutMs?: number };
+  };
+}
+
+export interface UploadFileChunkRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
+  uploadFileChunk: {
+    transferId: string;
+    name: string;
+    offset: string;
+    data: Uint8Array;
+    last: boolean;
+  };
+}
+
+export interface ReadFileChunkRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
+  readFileChunk: { fileId: string; offset: string; maxBytes: number };
+}
+
+export interface SetMobileFileChooserFilesRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
+  setMobileFileChooserFiles: {
+    fileChooserId: string;
+    fileIds: string[];
+    retryOptions?: { timeoutMs?: number };
+  };
+}
+
+export interface SaveMobileDownloadRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
+  saveMobileDownload: {
+    downloadId: string;
     retryOptions?: { timeoutMs?: number };
   };
 }
@@ -814,6 +875,10 @@ export type ContextSessionRequest =
   | WaitForHookRequest
   | SetFileChooserFilesRequest
   | SaveDownloadRequest
+  | UploadFileChunkRequest
+  | ReadFileChunkRequest
+  | SetMobileFileChooserFilesRequest
+  | SaveMobileDownloadRequest
   | NavigateRequest
   | ClickRequest
   | CountRequest
