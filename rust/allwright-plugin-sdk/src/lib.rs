@@ -106,6 +106,8 @@ pub struct PageInfo {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum HookType {
     NewPage,
+    FileChooser,
+    Download,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -117,6 +119,37 @@ pub struct HookRegistration {
 #[serde(tag = "hook_type", content = "value", rename_all = "snake_case")]
 pub enum HookResult {
     NewPage(PageInfo),
+    FileChooser(FileChooserInfo),
+    Download(DownloadInfo),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FileChooserInfo {
+    pub file_chooser_id: String,
+    pub is_multiple: bool,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FileChooserFilesSetInfo {
+    pub file_chooser_id: String,
+    pub files: Vec<String>,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DownloadInfo {
+    pub download_id: String,
+    pub url: String,
+    pub suggested_filename: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DownloadSavedInfo {
+    pub download_id: String,
+    pub path: String,
+    pub note: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -219,6 +252,18 @@ pub enum PluginCommand {
     PollHook {
         browser_session: BrowserSessionHandle,
         registration: HookRegistration,
+    },
+    SetFileChooserFiles {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        file_chooser_id: String,
+        files: Vec<String>,
+    },
+    SaveDownload {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        download_id: String,
+        path: String,
     },
     ClosePage {
         browser_session: BrowserSessionHandle,
@@ -394,6 +439,8 @@ pub enum PluginResult {
     OpenPage(PageInfo),
     RegisterHook(HookRegistration),
     PollHook(HookResult),
+    SetFileChooserFiles(FileChooserFilesSetInfo),
+    SaveDownload(DownloadSavedInfo),
     ClosePage,
     NavigatePage(TabNavigationInfo),
     ClickElement(ClickInfo),
@@ -454,6 +501,47 @@ mod tests {
                     browsing_context_id: None,
                     mapper_target_id: None,
                 },
+            }))),
+            error: None,
+        };
+
+        let json = serde_json::to_string(&envelope).unwrap();
+        assert_eq!(
+            serde_json::from_str::<PluginEnvelope>(&json).unwrap(),
+            envelope
+        );
+    }
+
+    #[test]
+    fn file_chooser_hook_envelope_round_trips() {
+        let envelope = PluginEnvelope {
+            ok: true,
+            result: Some(PluginResult::PollHook(HookResult::FileChooser(
+                FileChooserInfo {
+                    file_chooser_id: "chooser-1".to_string(),
+                    is_multiple: true,
+                    note: "opened".to_string(),
+                },
+            ))),
+            error: None,
+        };
+
+        let json = serde_json::to_string(&envelope).unwrap();
+        assert_eq!(
+            serde_json::from_str::<PluginEnvelope>(&json).unwrap(),
+            envelope
+        );
+    }
+
+    #[test]
+    fn download_hook_envelope_round_trips() {
+        let envelope = PluginEnvelope {
+            ok: true,
+            result: Some(PluginResult::PollHook(HookResult::Download(DownloadInfo {
+                download_id: "download-1".to_string(),
+                url: "https://example.test/report.csv".to_string(),
+                suggested_filename: "report.csv".to_string(),
+                note: "started".to_string(),
             }))),
             error: None,
         };

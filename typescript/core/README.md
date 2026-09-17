@@ -33,6 +33,20 @@ await page.click("a[target=_blank]");
 const newPage = await hook.wait();
 ```
 
+```ts
+const hook = await page.registerHook(hooks.fileChooser);
+await page.click("button.open-upload");
+const chooser = await hook.wait();
+await chooser.setFiles("fixtures/document.pdf");
+```
+
+```ts
+const hook = await page.registerHook(hooks.download);
+await page.click("a.download-report");
+const download = await hook.wait();
+await download.saveAs(`artifacts/${download.suggestedFilename}`);
+```
+
 Runnable examples live in [examples/web-basic.ts](./examples/web-basic.ts) and [examples/android-basic.ts](./examples/android-basic.ts).
 
 Shared config files are stack-agnostic and can live in `allwright.config.yaml` or `allwright.config.json`.

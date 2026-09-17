@@ -30,6 +30,8 @@ message ContextSessionCommand {
     AccessibilitySnapshotCommand accessibility_snapshot = 17;
     RegisterHookCommand register_hook = 18;
     WaitForHookCommand wait_for_hook = 19;
+    SetFileChooserFilesCommand set_file_chooser_files = 20;
+    SaveDownloadCommand save_download = 21;
   }
 }
 
@@ -63,6 +65,8 @@ message ContextSessionEvent {
     AccessibilitySnapshotCapturedEvent accessibility_snapshot_captured = 19;
     HookRegisteredEvent hook_registered = 20;
     HookCompletedEvent hook_completed = 21;
+    FileChooserFilesSetEvent file_chooser_files_set = 22;
+    DownloadSavedEvent download_saved = 23;
   }
 }
 
@@ -85,6 +89,8 @@ message ContextSessionErrorEvent {
 message RegisterHookCommand {
   oneof hook {
     RegisterNewPageHook new_page = 1;
+    RegisterFileChooserHook file_chooser = 2;
+    RegisterDownloadHook download = 3;
   }
 }
 
@@ -102,6 +108,8 @@ message HookCompletedEvent {
 
   oneof result {
     NewPageHookResult new_page = 2;
+    FileChooserHookResult file_chooser = 3;
+    DownloadHookResult download = 4;
   }
 }
 

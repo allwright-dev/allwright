@@ -5,10 +5,11 @@ pub use accessibility::{accessibility_snapshot, accessibility_snapshot_with_mode
 use allwright_plugin_sdk::{
     ALLWRIGHT_PLUGIN_API_VERSION, AutomationSessionInfo, BrowserKind, BrowserLaunchInfo,
     BrowserSessionHandle, ChromeLaunchInfo, ChromeTabInfo, ChromiumBidiMapperInfo, ClickInfo,
-    ElementCountInfo, FillInfo, FocusInfo, HighlightElementsInfo, HookRegistration, HookResult,
-    HookType, HoverInfo, PageInfo, PageSessionHandle, PluginCommand, PluginEnvelope, PluginResult,
-    PressKeyInfo, ScreenshotInfo, SurfaceFamily, SurfacePlugin, SurfacePluginDescriptor,
-    TabNavigationInfo, TextInfo, WaitForSelectorInfo,
+    DownloadInfo, DownloadSavedInfo, ElementCountInfo, FileChooserFilesSetInfo, FileChooserInfo,
+    FillInfo, FocusInfo, HighlightElementsInfo, HookRegistration, HookResult, HookType, HoverInfo,
+    PageInfo, PageSessionHandle, PluginCommand, PluginEnvelope, PluginResult, PressKeyInfo,
+    ScreenshotInfo, SurfaceFamily, SurfacePlugin, SurfacePluginDescriptor, TabNavigationInfo,
+    TextInfo, WaitForSelectorInfo,
 };
 use base64::Engine as _;
 use std::borrow::Cow;
@@ -23,11 +24,12 @@ use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
 
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{Value, json};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::net::TcpStream;
 use tokio::sync::{Mutex, MutexGuard};
-use tokio::time::{Duration, sleep};
+use tokio::time::{Duration, sleep, timeout};
 use tokio_tungstenite::MaybeTlsStream;
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::connect_async;
@@ -86,7 +88,81 @@ struct FirefoxSessionState {
 
 static FIREFOX_SESSION_REGISTRY: OnceLock<Mutex<HashMap<String, FirefoxSessionState>>> =
     OnceLock::new();
+static FILE_CHOOSER_HOOK_REGISTRY: OnceLock<Mutex<HashMap<String, FileChooserHookState>>> =
+    OnceLock::new();
+static FILE_CHOOSER_REGISTRY: OnceLock<Mutex<HashMap<String, FileChooserState>>> = OnceLock::new();
+static FILE_CHOOSER_COUNTER: AtomicU64 = AtomicU64::new(1);
+static DOWNLOAD_HOOK_REGISTRY: OnceLock<Mutex<HashMap<String, DownloadHookState>>> =
+    OnceLock::new();
+static DOWNLOAD_REGISTRY: OnceLock<Mutex<HashMap<String, DownloadState>>> = OnceLock::new();
+static DOWNLOAD_COUNTER: AtomicU64 = AtomicU64::new(1);
 static PLUGIN_RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+
+enum FileChooserHookState {
+    Chromium {
+        connection: CdpConnection,
+        mapper_session_id: String,
+        subscription_id: String,
+        mapper_target_id: String,
+    },
+    Firefox {
+        connection_id: String,
+        subscription_id: String,
+    },
+}
+
+#[derive(Clone)]
+enum FileChooserState {
+    Chromium {
+        cdp_websocket_url: String,
+        mapper_target_id: String,
+        browsing_context_id: String,
+        shared_id: String,
+    },
+    Firefox {
+        connection_id: String,
+        browsing_context_id: String,
+        shared_id: String,
+    },
+}
+
+enum DownloadHookState {
+    Chromium {
+        connection: CdpConnection,
+        mapper_session_id: String,
+        subscription_id: String,
+        target_id: String,
+        browsing_context_id: String,
+        download_dir: PathBuf,
+    },
+    Firefox {
+        connection_id: String,
+        subscription_id: String,
+        browsing_context_id: String,
+        download_dir: PathBuf,
+    },
+}
+
+enum DownloadState {
+    Chromium {
+        connection: CdpConnection,
+        mapper_session_id: String,
+        subscription_id: String,
+        cdp_websocket_url: String,
+        target_id: String,
+        protocol_download_id: String,
+        download_dir: PathBuf,
+        suggested_filename: String,
+    },
+    Firefox {
+        connection_id: String,
+        subscription_id: String,
+        browsing_context_id: String,
+        protocol_download_id: String,
+        download_dir: PathBuf,
+        suggested_filename: String,
+    },
+}
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct WebPlugin;
@@ -334,6 +410,189 @@ pub async fn register_hook(
             "source_page_id": source_page_id,
             "existing_page_ids": top_level_pages(browser_session).await?.into_iter().map(|page| page.id).collect::<Vec<_>>(),
         }),
+        HookType::FileChooser => {
+            let registration_id = next_file_chooser_id("file-chooser-hook");
+            let hook_state = match (browser_session, page_session) {
+                (
+                    BrowserSessionHandle::Chromium { cdp_websocket_url },
+                    PageSessionHandle::Chromium {
+                        browsing_context_id,
+                        mapper_target_id,
+                        ..
+                    },
+                ) => {
+                    let (mut connection, mapper, context) = chromium_bidi_session(
+                        cdp_websocket_url,
+                        mapper_target_id.as_deref(),
+                        browsing_context_id.as_deref(),
+                    )
+                    .await?;
+                    let response = connection
+                        .send_bidi_command(
+                            &mapper.mapper_session_id,
+                            &json!({
+                                "id": 7001,
+                                "method": "session.subscribe",
+                                "params": {
+                                    "events": ["input.fileDialogOpened"],
+                                    "contexts": [context],
+                                },
+                            }),
+                        )
+                        .await?;
+                    FileChooserHookState::Chromium {
+                        connection,
+                        mapper_session_id: mapper.mapper_session_id,
+                        subscription_id: required_string(&response, "/result/subscription")?,
+                        mapper_target_id: mapper.mapper_target_id,
+                    }
+                }
+                (
+                    BrowserSessionHandle::Firefox { connection_id, .. },
+                    PageSessionHandle::Firefox {
+                        browsing_context_id,
+                    },
+                ) => {
+                    let mut sessions = firefox_session_guard(connection_id).await?;
+                    let response = sessions
+                        .get_mut(connection_id)
+                        .expect("Firefox session guard validated connection id")
+                        .connection
+                        .send_command(
+                            "session.subscribe",
+                            json!({
+                                "events": ["input.fileDialogOpened"],
+                                "contexts": [browsing_context_id],
+                            }),
+                        )
+                        .await?;
+                    FileChooserHookState::Firefox {
+                        connection_id: connection_id.clone(),
+                        subscription_id: required_string(&response, "/result/subscription")?,
+                    }
+                }
+                _ => unreachable!("hook backend was validated above"),
+            };
+            file_chooser_hook_registry()
+                .lock()
+                .await
+                .insert(registration_id.clone(), hook_state);
+            json!({
+                "hook_type": "file_chooser",
+                "registration_id": registration_id,
+                "source_page_id": source_page_id,
+            })
+        }
+        HookType::Download => {
+            let registration_id = next_download_id("download-hook");
+            let download_dir = create_download_dir()?;
+            let hook_state = match (browser_session, page_session) {
+                (
+                    BrowserSessionHandle::Chromium { cdp_websocket_url },
+                    PageSessionHandle::Chromium {
+                        target_id,
+                        browsing_context_id,
+                        mapper_target_id,
+                    },
+                ) => {
+                    let (mut connection, mapper, context) = chromium_bidi_session(
+                        cdp_websocket_url,
+                        mapper_target_id.as_deref(),
+                        browsing_context_id.as_deref(),
+                    )
+                    .await?;
+                    let response = connection
+                        .send_bidi_command(
+                            &mapper.mapper_session_id,
+                            &json!({
+                                "id": 7201,
+                                "method": "session.subscribe",
+                                "params": {
+                                    "events": [
+                                        "browsingContext.downloadWillBegin",
+                                        "browsingContext.downloadEnd"
+                                    ],
+                                    "contexts": [context],
+                                },
+                            }),
+                        )
+                        .await?;
+                    connection
+                        .send_bidi_command(
+                            &mapper.mapper_session_id,
+                            &json!({
+                                "id": 7202,
+                                "method": "browser.setDownloadBehavior",
+                                "params": {
+                                    "downloadBehavior": {
+                                        "type": "allowed",
+                                        "destinationFolder": download_dir.to_string_lossy(),
+                                    }
+                                },
+                            }),
+                        )
+                        .await?;
+                    DownloadHookState::Chromium {
+                        connection,
+                        mapper_session_id: mapper.mapper_session_id,
+                        subscription_id: required_string(&response, "/result/subscription")?,
+                        target_id: target_id.clone(),
+                        browsing_context_id: context,
+                        download_dir,
+                    }
+                }
+                (
+                    BrowserSessionHandle::Firefox { connection_id, .. },
+                    PageSessionHandle::Firefox {
+                        browsing_context_id,
+                    },
+                ) => {
+                    let mut sessions = firefox_session_guard(connection_id).await?;
+                    let bidi = &mut sessions
+                        .get_mut(connection_id)
+                        .expect("Firefox session guard validated connection id")
+                        .connection;
+                    let response = bidi
+                        .send_command(
+                            "session.subscribe",
+                            json!({
+                                "events": [
+                                    "browsingContext.downloadWillBegin",
+                                    "browsingContext.downloadEnd"
+                                ],
+                                "contexts": [browsing_context_id],
+                            }),
+                        )
+                        .await?;
+                    bidi.send_command(
+                        "browser.setDownloadBehavior",
+                        json!({
+                            "downloadBehavior": {
+                                "type": "allowed",
+                                "destinationFolder": download_dir.to_string_lossy(),
+                            }
+                        }),
+                    )
+                    .await?;
+                    DownloadHookState::Firefox {
+                        connection_id: connection_id.clone(),
+                        subscription_id: required_string(&response, "/result/subscription")?,
+                        browsing_context_id: browsing_context_id.clone(),
+                        download_dir,
+                    }
+                }
+                _ => unreachable!("hook backend was validated above"),
+            };
+            download_hook_registry()
+                .lock()
+                .await
+                .insert(registration_id.clone(), hook_state);
+            json!({
+                "hook_type": "download",
+                "registration_id": registration_id,
+                "source_page_id": source_page_id,
+            })
+        }
     };
     Ok(HookRegistration {
         opaque_state: state.to_string(),
@@ -346,9 +605,18 @@ pub async fn poll_hook(
 ) -> Result<HookResult, String> {
     let state: Value = serde_json::from_str(&registration.opaque_state)
         .map_err(|error| format!("failed to decode web hook state: {error}"))?;
-    if state.get("hook_type").and_then(Value::as_str) != Some("new_page") {
-        return Err("web hook state has an unsupported hook type".to_string());
+    match state.get("hook_type").and_then(Value::as_str) {
+        Some("new_page") => poll_new_page_hook(browser_session, &state).await,
+        Some("file_chooser") => poll_file_chooser_hook(browser_session, &state).await,
+        Some("download") => poll_download_hook(browser_session, &state).await,
+        _ => Err("web hook state has an unsupported hook type".to_string()),
     }
+}
+
+async fn poll_new_page_hook(
+    browser_session: &BrowserSessionHandle,
+    state: &Value,
+) -> Result<HookResult, String> {
     let existing_page_ids = state
         .get("existing_page_ids")
         .and_then(Value::as_array)
@@ -383,6 +651,452 @@ pub async fn poll_hook(
         note: "new page hook completed".to_string(),
         page_session,
     }))
+}
+
+async fn poll_file_chooser_hook(
+    browser_session: &BrowserSessionHandle,
+    state: &Value,
+) -> Result<HookResult, String> {
+    let registration_id = state
+        .get("registration_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "file chooser hook state is missing registration_id".to_string())?;
+    let mut hooks = file_chooser_hook_registry().lock().await;
+    let hook = hooks
+        .get_mut(registration_id)
+        .ok_or_else(|| "file chooser hook registration is no longer available".to_string())?;
+
+    let (chooser_state, is_multiple) = match hook {
+        FileChooserHookState::Chromium {
+            connection,
+            mapper_session_id,
+            subscription_id,
+            mapper_target_id,
+        } => {
+            let event = connection
+                .poll_bidi_event(mapper_session_id, "input.fileDialogOpened")
+                .await?
+                .ok_or_else(|| "file chooser hook is still waiting for a dialog".to_string())?;
+            let shared_id = required_string(&event, "/params/element/sharedId")?;
+            let browsing_context_id = required_string(&event, "/params/context")?;
+            let is_multiple = event
+                .pointer("/params/multiple")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            connection
+                .send_bidi_command(
+                    mapper_session_id,
+                    &json!({
+                        "id": 7002,
+                        "method": "session.unsubscribe",
+                        "params": { "subscriptions": [subscription_id] },
+                    }),
+                )
+                .await?;
+            let cdp_websocket_url = match browser_session {
+                BrowserSessionHandle::Chromium { cdp_websocket_url } => cdp_websocket_url.clone(),
+                _ => return Err("file chooser browser backend changed while waiting".to_string()),
+            };
+            (
+                FileChooserState::Chromium {
+                    cdp_websocket_url,
+                    mapper_target_id: mapper_target_id.clone(),
+                    browsing_context_id,
+                    shared_id,
+                },
+                is_multiple,
+            )
+        }
+        FileChooserHookState::Firefox {
+            connection_id,
+            subscription_id,
+        } => {
+            let mut sessions = firefox_session_guard(connection_id).await?;
+            let bidi = &mut sessions
+                .get_mut(connection_id)
+                .expect("Firefox session guard validated connection id")
+                .connection;
+            let event = bidi
+                .poll_event("input.fileDialogOpened")
+                .await?
+                .ok_or_else(|| "file chooser hook is still waiting for a dialog".to_string())?;
+            let shared_id = required_string(&event, "/params/element/sharedId")?;
+            let browsing_context_id = required_string(&event, "/params/context")?;
+            let is_multiple = event
+                .pointer("/params/multiple")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            bidi.send_command(
+                "session.unsubscribe",
+                json!({ "subscriptions": [subscription_id] }),
+            )
+            .await?;
+            (
+                FileChooserState::Firefox {
+                    connection_id: connection_id.clone(),
+                    browsing_context_id,
+                    shared_id,
+                },
+                is_multiple,
+            )
+        }
+    };
+
+    hooks.remove(registration_id);
+    drop(hooks);
+    let file_chooser_id = next_file_chooser_id("file-chooser");
+    file_chooser_registry()
+        .lock()
+        .await
+        .insert(file_chooser_id.clone(), chooser_state);
+    Ok(HookResult::FileChooser(FileChooserInfo {
+        file_chooser_id,
+        is_multiple,
+        note: "file chooser hook completed".to_string(),
+    }))
+}
+
+async fn poll_download_hook(
+    browser_session: &BrowserSessionHandle,
+    state: &Value,
+) -> Result<HookResult, String> {
+    let registration_id = state
+        .get("registration_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "download hook state is missing registration_id".to_string())?;
+    let mut hooks = download_hook_registry().lock().await;
+    let hook = hooks
+        .get_mut(registration_id)
+        .ok_or_else(|| "download hook registration is no longer available".to_string())?;
+
+    let (download_state, protocol_download_id, url, suggested_filename) = match hook {
+        DownloadHookState::Chromium {
+            connection,
+            mapper_session_id,
+            subscription_id,
+            target_id,
+            browsing_context_id,
+            download_dir,
+        } => {
+            let event = connection
+                .poll_bidi_event(mapper_session_id, "browsingContext.downloadWillBegin")
+                .await?
+                .ok_or_else(|| "download hook is still waiting for a download".to_string())?;
+            let event_context = required_string(&event, "/params/context")?;
+            if &event_context != browsing_context_id {
+                return Err("download started in a different browsing context".to_string());
+            }
+            let protocol_download_id = download_event_id(&event)?;
+            let url = required_string(&event, "/params/url")?;
+            let suggested_filename = required_string(&event, "/params/suggestedFilename")?;
+            let cdp_websocket_url = match browser_session {
+                BrowserSessionHandle::Chromium { cdp_websocket_url } => cdp_websocket_url.clone(),
+                _ => return Err("download browser backend changed while waiting".to_string()),
+            };
+            (
+                DownloadState::Chromium {
+                    connection: std::mem::replace(
+                        connection,
+                        CdpConnection::connect(&cdp_websocket_url).await?,
+                    ),
+                    mapper_session_id: mapper_session_id.clone(),
+                    subscription_id: subscription_id.clone(),
+                    cdp_websocket_url,
+                    target_id: target_id.clone(),
+                    protocol_download_id: protocol_download_id.clone(),
+                    download_dir: download_dir.clone(),
+                    suggested_filename: suggested_filename.clone(),
+                },
+                protocol_download_id,
+                url,
+                suggested_filename,
+            )
+        }
+        DownloadHookState::Firefox {
+            connection_id,
+            subscription_id,
+            browsing_context_id,
+            download_dir,
+        } => {
+            let mut sessions = firefox_session_guard(connection_id).await?;
+            let bidi = &mut sessions
+                .get_mut(connection_id)
+                .expect("Firefox session guard validated connection id")
+                .connection;
+            let event = bidi
+                .poll_event("browsingContext.downloadWillBegin")
+                .await?
+                .ok_or_else(|| "download hook is still waiting for a download".to_string())?;
+            let event_context = required_string(&event, "/params/context")?;
+            if &event_context != browsing_context_id {
+                return Err("download started in a different browsing context".to_string());
+            }
+            let protocol_download_id = download_event_id(&event)?;
+            let url = required_string(&event, "/params/url")?;
+            let suggested_filename = required_string(&event, "/params/suggestedFilename")?;
+            (
+                DownloadState::Firefox {
+                    connection_id: connection_id.clone(),
+                    subscription_id: subscription_id.clone(),
+                    browsing_context_id: browsing_context_id.clone(),
+                    protocol_download_id: protocol_download_id.clone(),
+                    download_dir: download_dir.clone(),
+                    suggested_filename: suggested_filename.clone(),
+                },
+                protocol_download_id,
+                url,
+                suggested_filename,
+            )
+        }
+    };
+
+    hooks.remove(registration_id);
+    drop(hooks);
+    let download_id = next_download_id("download");
+    download_registry()
+        .lock()
+        .await
+        .insert(download_id.clone(), download_state);
+    Ok(HookResult::Download(DownloadInfo {
+        download_id,
+        url,
+        suggested_filename,
+        note: format!("download {protocol_download_id} started"),
+    }))
+}
+
+pub async fn save_download(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    download_id: &str,
+    path: &str,
+) -> Result<DownloadSavedInfo, String> {
+    let mut downloads = download_registry().lock().await;
+    let download = downloads
+        .get_mut(download_id)
+        .ok_or_else(|| format!("unknown download {download_id}"))?;
+
+    let (event, download_dir, suggested_filename) = match download {
+        DownloadState::Chromium {
+            connection,
+            mapper_session_id,
+            subscription_id,
+            cdp_websocket_url,
+            target_id,
+            protocol_download_id,
+            download_dir,
+            suggested_filename,
+            ..
+        } => {
+            match (browser_session, page_session) {
+                (
+                    BrowserSessionHandle::Chromium {
+                        cdp_websocket_url: url,
+                    },
+                    PageSessionHandle::Chromium {
+                        target_id: page_target_id,
+                        ..
+                    },
+                ) if url == cdp_websocket_url && page_target_id == target_id => {}
+                _ => return Err("download does not belong to this page session".to_string()),
+            }
+            let event = connection
+                .poll_bidi_event(mapper_session_id, "browsingContext.downloadEnd")
+                .await?
+                .ok_or_else(|| "download is still in progress".to_string())?;
+            if download_event_id(&event)? != *protocol_download_id {
+                return Err("received completion for a different download".to_string());
+            }
+            connection
+                .send_bidi_command(
+                    mapper_session_id,
+                    &json!({
+                        "id": 7203,
+                        "method": "session.unsubscribe",
+                        "params": { "subscriptions": [subscription_id] },
+                    }),
+                )
+                .await?;
+            (event, download_dir.clone(), suggested_filename.clone())
+        }
+        DownloadState::Firefox {
+            connection_id,
+            subscription_id,
+            browsing_context_id,
+            protocol_download_id,
+            download_dir,
+            suggested_filename,
+            ..
+        } => {
+            match (browser_session, page_session) {
+                (
+                    BrowserSessionHandle::Firefox {
+                        connection_id: id, ..
+                    },
+                    PageSessionHandle::Firefox {
+                        browsing_context_id: context,
+                    },
+                ) if id == connection_id && context == browsing_context_id => {}
+                _ => return Err("download does not belong to this page session".to_string()),
+            }
+            let mut sessions = firefox_session_guard(connection_id).await?;
+            let bidi = &mut sessions
+                .get_mut(connection_id)
+                .expect("Firefox session guard validated connection id")
+                .connection;
+            let event = bidi
+                .poll_event("browsingContext.downloadEnd")
+                .await?
+                .ok_or_else(|| "download is still in progress".to_string())?;
+            if download_event_id(&event)? != *protocol_download_id {
+                return Err("received completion for a different download".to_string());
+            }
+            bidi.send_command(
+                "session.unsubscribe",
+                json!({ "subscriptions": [subscription_id] }),
+            )
+            .await?;
+            (event, download_dir.clone(), suggested_filename.clone())
+        }
+    };
+
+    let status = required_string(&event, "/params/status")?;
+    if status != "complete" {
+        return Err(format!("download ended with status {status}"));
+    }
+    let source = event
+        .pointer("/params/filepath")
+        .and_then(Value::as_str)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| download_dir.join(&suggested_filename));
+    if !source.is_file() {
+        return Err(format!(
+            "completed download file is not available at {}",
+            source.display()
+        ));
+    }
+    let destination = PathBuf::from(path);
+    let destination = if destination.is_absolute() {
+        destination
+    } else {
+        std::env::current_dir()
+            .map_err(|error| format!("resolve current directory: {error}"))?
+            .join(destination)
+    };
+    let parent = destination.parent().ok_or_else(|| {
+        format!(
+            "download destination has no parent: {}",
+            destination.display()
+        )
+    })?;
+    if !parent.is_dir() {
+        return Err(format!(
+            "download destination directory does not exist: {}",
+            parent.display()
+        ));
+    }
+    fs::copy(&source, &destination).map_err(|error| {
+        format!(
+            "save download from {} to {}: {error}",
+            source.display(),
+            destination.display()
+        )
+    })?;
+    let saved_path = fs::canonicalize(&destination)
+        .map_err(|error| format!("resolve saved download {}: {error}", destination.display()))?;
+    downloads.remove(download_id);
+    let _ = fs::remove_dir_all(&download_dir);
+    Ok(DownloadSavedInfo {
+        download_id: download_id.to_string(),
+        path: saved_path.to_string_lossy().to_string(),
+        note: "saved completed download".to_string(),
+    })
+}
+
+pub async fn set_file_chooser_files(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    file_chooser_id: &str,
+    files: &[String],
+) -> Result<FileChooserFilesSetInfo, String> {
+    let resolved_files = files
+        .iter()
+        .map(|file| {
+            fs::canonicalize(file)
+                .map(|path| path.to_string_lossy().to_string())
+                .map_err(|error| format!("resolve upload path {file}: {error}"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let chooser = file_chooser_registry()
+        .lock()
+        .await
+        .get(file_chooser_id)
+        .cloned()
+        .ok_or_else(|| format!("unknown file chooser {file_chooser_id}"))?;
+
+    match (browser_session, page_session, chooser) {
+        (
+            BrowserSessionHandle::Chromium { cdp_websocket_url },
+            PageSessionHandle::Chromium { .. },
+            FileChooserState::Chromium {
+                cdp_websocket_url: chooser_url,
+                mapper_target_id,
+                browsing_context_id,
+                shared_id,
+            },
+        ) if cdp_websocket_url == &chooser_url => {
+            let (mut cdp, mapper, context) = chromium_bidi_session(
+                cdp_websocket_url,
+                Some(&mapper_target_id),
+                Some(&browsing_context_id),
+            )
+            .await?;
+            cdp.send_bidi_command(
+                &mapper.mapper_session_id,
+                &json!({
+                    "id": 7003,
+                    "method": "input.setFiles",
+                    "params": {
+                        "context": context,
+                        "element": { "sharedId": shared_id },
+                        "files": resolved_files,
+                    },
+                }),
+            )
+            .await?;
+        }
+        (
+            BrowserSessionHandle::Firefox { connection_id, .. },
+            PageSessionHandle::Firefox { .. },
+            FileChooserState::Firefox {
+                connection_id: chooser_connection_id,
+                browsing_context_id,
+                shared_id,
+            },
+        ) if connection_id == &chooser_connection_id => {
+            let mut sessions = firefox_session_guard(connection_id).await?;
+            sessions
+                .get_mut(connection_id)
+                .expect("Firefox session guard validated connection id")
+                .connection
+                .send_command(
+                    "input.setFiles",
+                    json!({
+                        "context": browsing_context_id,
+                        "element": { "sharedId": shared_id },
+                        "files": resolved_files,
+                    }),
+                )
+                .await?;
+        }
+        _ => return Err("file chooser does not belong to this page session".to_string()),
+    }
+
+    Ok(FileChooserFilesSetInfo {
+        file_chooser_id: file_chooser_id.to_string(),
+        files: resolved_files,
+        note: "set file chooser files".to_string(),
+    })
 }
 
 pub async fn close_page(
@@ -463,10 +1177,6 @@ pub async fn navigate_chrome_tab(
         )
         .await?;
     let session_id = required_string(&attach, "/sessionId")?;
-
-    cdp.send_command("Page.enable", json!({}), Some(&session_id))
-        .await?;
-    cdp.navigate_and_wait_for_load(&session_id, url).await?;
     let frame_tree = cdp
         .send_command("Page.getFrameTree", json!({}), Some(&session_id))
         .await?;
@@ -480,20 +1190,40 @@ pub async fn navigate_chrome_tab(
     )
     .await?;
 
+    let mapper = cdp.ensure_chromium_bidi_mapper(None).await?;
+    let response = cdp
+        .send_bidi_command(
+            &mapper.mapper_session_id,
+            &json!({
+                "id": 7100,
+                "method": "browsingContext.navigate",
+                "params": {
+                    "context": browsing_context_id,
+                    "url": url,
+                    "wait": "complete",
+                },
+            }),
+        )
+        .await?;
+    let navigated_url = required_string(&response, "/result/url")?;
+
     Ok(TabNavigationInfo {
-        url: url.to_string(),
-        note: "navigated Chrome tab via CDP and observed Page.loadEventFired".to_string(),
+        url: navigated_url,
+        note: "navigated Chromium tab via injected WebDriver BiDi".to_string(),
         page_session: PageSessionHandle::Chromium {
             target_id: target_id.to_string(),
             browsing_context_id: Some(browsing_context_id),
-            mapper_target_id: None,
+            mapper_target_id: Some(mapper.mapper_target_id.clone()),
         },
         automation: AutomationSessionInfo {
-            bidi_session_id: String::new(),
-            note: String::new(),
-            mapper_target_id: None,
-            mapper_session_id: None,
-            package_version: None,
+            bidi_session_id: format!("chromium-bidi:{target_id}"),
+            note: format!(
+                "navigated through the pinned chromium-bidi@{} mapper",
+                mapper.package_version
+            ),
+            mapper_target_id: Some(mapper.mapper_target_id),
+            mapper_session_id: Some(mapper.mapper_session_id),
+            package_version: Some(mapper.package_version),
         },
     })
 }
@@ -509,29 +1239,45 @@ pub async fn navigate_page(
             PageSessionHandle::Chromium {
                 target_id,
                 browsing_context_id,
-                ..
+                mapper_target_id,
             },
         ) => {
-            let navigation = navigate_chrome_tab(cdp_websocket_url, target_id, url).await?;
-            let (resolved_browsing_context_id, mapper) = resolve_bidi_context_for_tab(
+            if url.trim().is_empty() {
+                return Err("navigate command requires a non-empty url".to_string());
+            }
+            let (mut cdp, mapper, resolved_browsing_context_id) = chromium_bidi_session(
                 cdp_websocket_url,
-                None,
+                mapper_target_id.as_deref(),
                 browsing_context_id.as_deref(),
-                Some(&navigation.url),
             )
             .await?;
+            let response = cdp
+                .send_bidi_command(
+                    &mapper.mapper_session_id,
+                    &json!({
+                        "id": 7101,
+                        "method": "browsingContext.navigate",
+                        "params": {
+                            "context": resolved_browsing_context_id,
+                            "url": url,
+                            "wait": "complete",
+                        },
+                    }),
+                )
+                .await?;
+            let navigated_url = required_string(&response, "/result/url")?;
             Ok(TabNavigationInfo {
-                url: navigation.url,
-                note: navigation.note,
+                url: navigated_url,
+                note: "navigated Chromium tab via injected WebDriver BiDi".to_string(),
                 page_session: PageSessionHandle::Chromium {
                     target_id: target_id.to_string(),
-                    browsing_context_id: Some(resolved_browsing_context_id),
+                    browsing_context_id: Some(resolved_browsing_context_id.clone()),
                     mapper_target_id: Some(mapper.mapper_target_id.clone()),
                 },
                 automation: AutomationSessionInfo {
-                    bidi_session_id: format!("chromium-bidi:{target_id}"),
+                    bidi_session_id: format!("chromium-bidi:{resolved_browsing_context_id}"),
                     note: format!(
-                        "chromium-bidi mapper ready from pinned chromium-bidi@{} after navigation",
+                        "navigated through the pinned chromium-bidi@{} mapper",
                         mapper.package_version
                     ),
                     mapper_target_id: Some(mapper.mapper_target_id),
@@ -1088,18 +1834,18 @@ pub async fn click_element(
                 .expect("Firefox session guard validated connection id")
                 .connection;
             let query_first_js = selector_query_first_js(parsed.kind);
-            firefox_evaluate_void(
+            let center = firefox_evaluate_json(
                 bidi,
                 browsing_context_id,
                 &format!(
-                    "(() => {{
+                    "JSON.stringify((() => {{
                         const selector = {};
                         const requirements = {};
                         {}
                         const element = {query_first_js};
                         const prepared = allwrightPrepareElement(element, selector, '{}', requirements);
-                        prepared.element.click();
-                    }})()",
+                        return prepared.center;
+                    }})())",
                     json_string_literal(&parsed.value, "click selector")?,
                     discovery_requirements_literal(DiscoveryRequirements {
                         require_match: true,
@@ -1112,10 +1858,29 @@ pub async fn click_element(
                 ),
             )
             .await?;
+            let x = json_f64(&center, "/x")?;
+            let y = json_f64(&center, "/y")?;
+            bidi.send_command(
+                "input.performActions",
+                json!({
+                    "context": browsing_context_id,
+                    "actions": [{
+                        "type": "pointer",
+                        "id": "allwright-mouse",
+                        "parameters": { "pointerType": "mouse" },
+                        "actions": [
+                            { "type": "pointerMove", "origin": "viewport", "x": x, "y": y },
+                            { "type": "pointerDown", "button": 0 },
+                            { "type": "pointerUp", "button": 0 }
+                        ]
+                    }]
+                }),
+            )
+            .await?;
             Ok(ClickInfo {
                 css_selector: css_selector.to_string(),
                 note: format!(
-                    "clicked element via Firefox WebDriver BiDi using {} {}",
+                    "clicked element via Firefox WebDriver BiDi input.performActions using {} {}",
                     selector_kind_label(parsed.kind),
                     parsed.value
                 ),
@@ -2783,7 +3548,11 @@ fn launch_firefox_with_remote_agent(browser_binary: &str) -> Result<BrowserLaunc
                 json!({
                     "capabilities": {
                         "alwaysMatch": {
-                            "acceptInsecureCerts": true
+                            "acceptInsecureCerts": true,
+                            "unhandledPromptBehavior": {
+                                "default": "dismiss",
+                                "file": "ignore"
+                            }
                         }
                     }
                 }),
@@ -3198,6 +3967,52 @@ fn firefox_session_registry() -> &'static Mutex<HashMap<String, FirefoxSessionSt
     FIREFOX_SESSION_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+fn file_chooser_hook_registry() -> &'static Mutex<HashMap<String, FileChooserHookState>> {
+    FILE_CHOOSER_HOOK_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn file_chooser_registry() -> &'static Mutex<HashMap<String, FileChooserState>> {
+    FILE_CHOOSER_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn download_hook_registry() -> &'static Mutex<HashMap<String, DownloadHookState>> {
+    DOWNLOAD_HOOK_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn download_registry() -> &'static Mutex<HashMap<String, DownloadState>> {
+    DOWNLOAD_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn next_file_chooser_id(prefix: &str) -> String {
+    format!(
+        "{prefix}-{}",
+        FILE_CHOOSER_COUNTER.fetch_add(1, Ordering::Relaxed)
+    )
+}
+
+fn next_download_id(prefix: &str) -> String {
+    format!(
+        "{prefix}-{}",
+        DOWNLOAD_COUNTER.fetch_add(1, Ordering::Relaxed)
+    )
+}
+
+fn create_download_dir() -> Result<PathBuf, String> {
+    let dir = std::env::temp_dir().join(next_download_id("allwright-downloads"));
+    fs::create_dir_all(&dir).map_err(|error| {
+        format!(
+            "failed to create download directory {}: {error}",
+            dir.display()
+        )
+    })?;
+    fs::canonicalize(&dir).map_err(|error| {
+        format!(
+            "failed to resolve download directory {}: {error}",
+            dir.display()
+        )
+    })
+}
+
 async fn firefox_session_guard(
     connection_id: &str,
 ) -> Result<MutexGuard<'static, HashMap<String, FirefoxSessionState>>, String> {
@@ -3397,6 +4212,7 @@ struct MapperConnectionInfo {
 struct CdpConnection {
     socket: CdpSocket,
     next_id: u64,
+    pending_bidi_events: VecDeque<Value>,
 }
 
 impl CdpConnection {
@@ -3404,7 +4220,11 @@ impl CdpConnection {
         let (socket, _) = connect_async(cdp_websocket_url).await.map_err(|error| {
             format!("failed to connect to CDP websocket {cdp_websocket_url}: {error}")
         })?;
-        Ok(Self { socket, next_id: 1 })
+        Ok(Self {
+            socket,
+            next_id: 1,
+            pending_bidi_events: VecDeque::new(),
+        })
     }
 
     async fn send_command(
@@ -3800,6 +4620,9 @@ impl CdpConnection {
             let response = serde_json::from_str::<Value>(payload)
                 .map_err(|error| format!("failed to parse BiDi mapper response JSON: {error}"))?;
             if response.get("id").and_then(Value::as_u64) != Some(command_id) {
+                if response.get("method").is_some() {
+                    self.pending_bidi_events.push_back(response);
+                }
                 continue;
             }
 
@@ -3823,6 +4646,45 @@ impl CdpConnection {
                     return Err(format!("BiDi mapper response is missing type: {response}"));
                 }
             }
+        }
+    }
+
+    async fn poll_bidi_event(
+        &mut self,
+        mapper_session_id: &str,
+        method: &str,
+    ) -> Result<Option<Value>, String> {
+        if let Some(index) = self
+            .pending_bidi_events
+            .iter()
+            .position(|event| event.get("method").and_then(Value::as_str) == Some(method))
+        {
+            return Ok(self.pending_bidi_events.remove(index));
+        }
+
+        let message = match timeout(Duration::from_millis(10), self.next_json_message()).await {
+            Ok(result) => result?,
+            Err(_) => return Ok(None),
+        };
+        if message.get("sessionId").and_then(Value::as_str) != Some(mapper_session_id)
+            || message.get("method").and_then(Value::as_str) != Some("Runtime.bindingCalled")
+            || message.pointer("/params/name").and_then(Value::as_str) != Some("sendBidiResponse")
+        {
+            return Ok(None);
+        }
+        let payload = message
+            .pointer("/params/payload")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "Runtime.bindingCalled payload is missing".to_string())?;
+        let event = serde_json::from_str::<Value>(payload)
+            .map_err(|error| format!("failed to parse BiDi mapper event JSON: {error}"))?;
+        if event.get("method").and_then(Value::as_str) == Some(method) {
+            Ok(Some(event))
+        } else {
+            if event.get("method").is_some() {
+                self.pending_bidi_events.push_back(event);
+            }
+            Ok(None)
         }
     }
 
@@ -3916,50 +4778,6 @@ impl CdpConnection {
         Err("BiDi browsing context resolution exhausted retries unexpectedly".to_string())
     }
 
-    async fn navigate_and_wait_for_load(
-        &mut self,
-        session_id: &str,
-        url: &str,
-    ) -> Result<(), String> {
-        let id = self.next_id;
-        self.next_id += 1;
-
-        let payload = json!({
-            "id": id,
-            "method": "Page.navigate",
-            "params": {
-                "url": url,
-            },
-            "sessionId": session_id,
-        });
-        self.socket
-            .send(Message::Text(payload.to_string().into()))
-            .await
-            .map_err(|error| format!("failed to send CDP command Page.navigate: {error}"))?;
-
-        let mut navigate_confirmed = false;
-        let mut load_seen = false;
-
-        loop {
-            let message = self.next_json_message().await?;
-
-            if message.get("id").and_then(Value::as_u64) == Some(id) {
-                if let Some(error) = message.get("error") {
-                    return Err(format!("CDP command Page.navigate failed: {error}"));
-                }
-                navigate_confirmed = true;
-            } else if message.get("sessionId").and_then(Value::as_str) == Some(session_id)
-                && message.get("method").and_then(Value::as_str) == Some("Page.loadEventFired")
-            {
-                load_seen = true;
-            }
-
-            if navigate_confirmed && load_seen {
-                return Ok(());
-            }
-        }
-    }
-
     async fn next_json_message(&mut self) -> Result<Value, String> {
         loop {
             let message = self
@@ -3999,6 +4817,7 @@ impl CdpConnection {
 struct BidiConnection {
     socket: BidiSocket,
     next_id: u64,
+    pending_events: VecDeque<Value>,
 }
 
 impl BidiConnection {
@@ -4006,7 +4825,11 @@ impl BidiConnection {
         let (socket, _) = connect_async(bidi_websocket_url).await.map_err(|error| {
             format!("failed to connect to WebDriver BiDi websocket {bidi_websocket_url}: {error}")
         })?;
-        Ok(Self { socket, next_id: 1 })
+        Ok(Self {
+            socket,
+            next_id: 1,
+            pending_events: VecDeque::new(),
+        })
     }
 
     async fn send_command(&mut self, method: &str, params: Value) -> Result<Value, String> {
@@ -4025,6 +4848,7 @@ impl BidiConnection {
         loop {
             let message = self.next_json_message().await?;
             if message.get("id").and_then(Value::as_u64) != Some(id) {
+                self.pending_events.push_back(message);
                 continue;
             }
 
@@ -4039,6 +4863,27 @@ impl BidiConnection {
             }
 
             return Ok(message);
+        }
+    }
+
+    async fn poll_event(&mut self, method: &str) -> Result<Option<Value>, String> {
+        if let Some(index) = self
+            .pending_events
+            .iter()
+            .position(|event| event.get("method").and_then(Value::as_str) == Some(method))
+        {
+            return Ok(self.pending_events.remove(index));
+        }
+        match timeout(Duration::from_millis(10), self.next_json_message()).await {
+            Ok(Ok(event)) if event.get("method").and_then(Value::as_str) == Some(method) => {
+                Ok(Some(event))
+            }
+            Ok(Ok(event)) => {
+                self.pending_events.push_back(event);
+                Ok(None)
+            }
+            Ok(Err(error)) => Err(error),
+            Err(_) => Ok(None),
         }
     }
 
@@ -4117,6 +4962,16 @@ fn required_string(value: &Value, pointer: &str) -> Result<String, String> {
         .map(str::to_string)
         .filter(|value| !value.is_empty())
         .ok_or_else(|| format!("missing string field at JSON pointer {pointer}"))
+}
+
+fn download_event_id(event: &Value) -> Result<String, String> {
+    event
+        .pointer("/params/download")
+        .or_else(|| event.pointer("/params/navigation"))
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| "download event is missing its download identifier".to_string())
 }
 
 fn js_single_quote(value: &str) -> String {
@@ -4317,6 +5172,26 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             poll_hook(&browser_session, &registration)
                 .await
                 .map(PluginResult::PollHook)
+        }),
+        PluginCommand::SetFileChooserFiles {
+            browser_session,
+            page_session,
+            file_chooser_id,
+            files,
+        } => block_on_plugin_future(async move {
+            set_file_chooser_files(&browser_session, &page_session, &file_chooser_id, &files)
+                .await
+                .map(PluginResult::SetFileChooserFiles)
+        }),
+        PluginCommand::SaveDownload {
+            browser_session,
+            page_session,
+            download_id,
+            path,
+        } => block_on_plugin_future(async move {
+            save_download(&browser_session, &page_session, &download_id, &path)
+                .await
+                .map(PluginResult::SaveDownload)
         }),
         PluginCommand::ClosePage {
             browser_session,

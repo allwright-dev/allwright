@@ -22,6 +22,10 @@ import dev.allwright.engine.v1.WaitForSelectorCommand;
 import dev.allwright.engine.v1.HookCompletedEvent;
 import dev.allwright.engine.v1.RegisterHookCommand;
 import dev.allwright.engine.v1.RegisterNewPageHook;
+import dev.allwright.engine.v1.RegisterFileChooserHook;
+import dev.allwright.engine.v1.RegisterDownloadHook;
+import dev.allwright.engine.v1.SaveDownloadCommand;
+import dev.allwright.engine.v1.SetFileChooserFilesCommand;
 import dev.allwright.engine.v1.WaitForHookCommand;
 import java.util.function.Function;
 
@@ -67,14 +71,23 @@ public final class Page implements AutoCloseable, WebLocators {
     public synchronized <T> Hook<T> registerHook(HookType<T> type) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
-        if (type == null || !"new_page".equals(type.name())) {
+        if (type == null || !("new_page".equals(type.name())
+                || "file_chooser".equals(type.name())
+                || "download".equals(type.name()))) {
             throw new AllwrightException("unsupported hook type");
+        }
+        RegisterHookCommand.Builder register = RegisterHookCommand.newBuilder();
+        if ("new_page".equals(type.name())) {
+            register.setNewPage(RegisterNewPageHook.newBuilder().build());
+        } else if ("file_chooser".equals(type.name())) {
+            register.setFileChooser(RegisterFileChooserHook.newBuilder().build());
+        } else {
+            register.setDownload(RegisterDownloadHook.newBuilder().build());
         }
         handle.send(ContextSessionCommand.newBuilder()
                 .setSurfaceSessionId(browserSessionId)
                 .setContextSessionId(sessionId)
-                .setRegisterHook(RegisterHookCommand.newBuilder()
-                        .setNewPage(RegisterNewPageHook.newBuilder().build()).build())
+                .setRegisterHook(register.build())
                 .build());
         while (true) {
             ContextSessionEvent event = handle.recv("receive page session event while registering hook");
@@ -113,6 +126,70 @@ public final class Page implements AutoCloseable, WebLocators {
                 }
                 case ERROR -> throw new AllwrightException(
                         "page session error while waiting for hook: " + event.getError().getMessage());
+                default -> { }
+            }
+        }
+    }
+
+    synchronized void setFileChooserFiles(
+            String fileChooserId,
+            java.util.List<String> files,
+            CommandOptions options
+    ) {
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
+        ensureOpen();
+        CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+        SetFileChooserFilesCommand.Builder setFiles = SetFileChooserFilesCommand.newBuilder()
+                .setFileChooserId(fileChooserId)
+                .addAllFiles(files);
+        if (CommandSupport.hasTimeout(resolvedOptions.timeoutMs())) {
+            setFiles.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
+        }
+        handle.send(ContextSessionCommand.newBuilder()
+                .setSurfaceSessionId(browserSessionId)
+                .setContextSessionId(sessionId)
+                .setSetFileChooserFiles(setFiles.build())
+                .build());
+        while (true) {
+            ContextSessionEvent event = handle.recv("receive page session event while setting chooser files");
+            switch (event.getEventCase()) {
+                case FILE_CHOOSER_FILES_SET -> {
+                    if (fileChooserId.equals(event.getFileChooserFilesSet().getFileChooserId())) {
+                        return;
+                    }
+                }
+                case ERROR -> throw new AllwrightException(
+                        "page session error while setting chooser files: " + event.getError().getMessage());
+                default -> { }
+            }
+        }
+    }
+
+    synchronized void saveDownload(String downloadId, String path, CommandOptions options) {
+        RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
+        ensureOpen();
+        CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+        SaveDownloadCommand.Builder save = SaveDownloadCommand.newBuilder()
+                .setDownloadId(downloadId)
+                .setPath(path);
+        if (CommandSupport.hasTimeout(resolvedOptions.timeoutMs())) {
+            save.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
+        }
+        handle.send(ContextSessionCommand.newBuilder()
+                .setSurfaceSessionId(browserSessionId)
+                .setContextSessionId(sessionId)
+                .setSaveDownload(save.build())
+                .build());
+        while (true) {
+            ContextSessionEvent event = handle.recv("receive page session event while saving download");
+            switch (event.getEventCase()) {
+                case DOWNLOAD_SAVED -> {
+                    if (downloadId.equals(event.getDownloadSaved().getDownloadId())) {
+                        return;
+                    }
+                }
+                case ERROR -> throw new AllwrightException(
+                        "page session error while saving download: " + event.getError().getMessage());
                 default -> { }
             }
         }

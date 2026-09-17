@@ -46,3 +46,44 @@ message NewPageHookResult {
   string context_session_id = 1;
   string note = 2;
 }
+
+message RegisterFileChooserHook {}
+
+message FileChooserHookResult {
+  string file_chooser_id = 1;
+  bool is_multiple = 2;
+  string note = 3;
+}
+
+message SetFileChooserFilesCommand {
+  string file_chooser_id = 1;
+  repeated string files = 2;
+  optional CommandRetryOptions retry_options = 3;
+}
+
+message FileChooserFilesSetEvent {
+  string file_chooser_id = 1;
+  repeated string files = 2;
+  string note = 3;
+}
+
+message RegisterDownloadHook {}
+
+message DownloadHookResult {
+  string download_id = 1;
+  string url = 2;
+  string suggested_filename = 3;
+  string note = 4;
+}
+
+message SaveDownloadCommand {
+  string download_id = 1;
+  string path = 2;
+  optional CommandRetryOptions retry_options = 3;
+}
+
+message DownloadSavedEvent {
+  string download_id = 1;
+  string path = 2;
+  string note = 3;
+}

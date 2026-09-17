@@ -32,7 +32,10 @@ mod types;
 mod web_locators;
 
 pub use config::{find_config_file, launch_configured_browser, load_config_file, resolve_config};
-pub use hook::{Hook, HookType, NEW_PAGE, NewPage};
+pub use hook::{
+    DOWNLOAD, Download, DownloadHook, FILE_CHOOSER, FileChooser, FileChooserHook, Hook, HookType,
+    NEW_PAGE, NewPage,
+};
 pub use launch::{chromium, firefox, launch_browser, launch_chrome, launch_firefox};
 pub use runtime::{ping, set_server_addr, shutdown};
 pub use types::*;

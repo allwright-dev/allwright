@@ -11,6 +11,8 @@ import type {
   CountResult,
   ElementResult,
   FillResult,
+  FileChooser,
+  Download,
   HighlightOptions,
   HighlightResult,
   Hook,
@@ -53,7 +55,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
   readonly browserSessionId: string;
 
   async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
-    if (type.name !== "newPage") {
+    if (type.name !== "newPage" && type.name !== "fileChooser" && type.name !== "download") {
       throw formatActionError("register hook", `unsupported hook type: ${type.name}`);
     }
     const handle = await this.#getHandle();
@@ -61,7 +63,11 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     handle.stream.write({
       surfaceSessionId: this.browserSessionId,
       contextSessionId: this.sessionId,
-      registerHook: { newPage: {} },
+      registerHook: type.name === "newPage"
+        ? { newPage: {} }
+        : type.name === "fileChooser"
+          ? { fileChooser: {} }
+          : { download: {} },
     });
 
     while (true) {
@@ -98,10 +104,79 @@ export class PageImpl extends WebLocatorBuilders implements Page {
         if (type.name === "newPage" && event.hookCompleted.newPage?.contextSessionId) {
           return this.#createPage(event.hookCompleted.newPage.contextSessionId) as T;
         }
+        if (type.name === "fileChooser" && event.hookCompleted.fileChooser?.fileChooserId) {
+          return new FileChooserImpl(
+            this,
+            event.hookCompleted.fileChooser.fileChooserId,
+            event.hookCompleted.fileChooser.isMultiple ?? false,
+          ) as T;
+        }
+        if (type.name === "download" && event.hookCompleted.download?.downloadId) {
+          return new DownloadImpl(
+            this,
+            event.hookCompleted.download.downloadId,
+            event.hookCompleted.download.url ?? "",
+            event.hookCompleted.download.suggestedFilename ?? "",
+          ) as T;
+        }
         throw formatActionError(`wait for ${type.name} hook`, "hook returned an invalid result");
       }
       if (event.error?.message) {
         throw formatActionError(`wait for ${type.name} hook`, event.error.message);
+      }
+    }
+  }
+
+  async setFileChooserFiles(
+    fileChooserId: string,
+    files: string[],
+    options: CommandOptions = {},
+  ): Promise<void> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
+      setFileChooserFiles: {
+        fileChooserId,
+        files,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.fileChooserFilesSet?.fileChooserId === fileChooserId) {
+        return;
+      }
+      if (event.error?.message) {
+        throw formatActionError("set file chooser files", event.error.message);
+      }
+    }
+  }
+
+  async saveDownload(
+    downloadId: string,
+    path: string,
+    options: CommandOptions = {},
+  ): Promise<void> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.browserSessionId,
+      contextSessionId: this.sessionId,
+      saveDownload: {
+        downloadId,
+        path,
+        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.downloadSaved?.downloadId === downloadId) {
+        return;
+      }
+      if (event.error?.message) {
+        throw formatActionError("save download", event.error.message);
       }
     }
   }
@@ -640,5 +715,38 @@ export class PageImpl extends WebLocatorBuilders implements Page {
         // grpc-js may reject cancel/end ordering depending on stream state.
       }
     });
+  }
+}
+
+export class FileChooserImpl implements FileChooser {
+  constructor(
+    readonly page: PageImpl,
+    readonly id: string,
+    readonly multiple: boolean,
+  ) {}
+
+  isMultiple(): boolean {
+    return this.multiple;
+  }
+
+  async setFiles(files: string | string[], options: CommandOptions = {}): Promise<void> {
+    const paths = typeof files === "string" ? [files] : files;
+    if (!this.multiple && paths.length > 1) {
+      throw formatActionError("set file chooser files", "file chooser does not accept multiple files");
+    }
+    await this.page.setFileChooserFiles(this.id, paths, options);
+  }
+}
+
+export class DownloadImpl implements Download {
+  constructor(
+    readonly page: PageImpl,
+    readonly id: string,
+    readonly url: string,
+    readonly suggestedFilename: string,
+  ) {}
+
+  async saveAs(path: string, options: CommandOptions = {}): Promise<void> {
+    await this.page.saveDownload(this.id, path, options);
   }
 }

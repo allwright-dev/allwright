@@ -422,6 +422,446 @@ func (x *NewPageHookResult) GetNote() string {
 	return ""
 }
 
+type RegisterFileChooserHook struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterFileChooserHook) Reset() {
+	*x = RegisterFileChooserHook{}
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterFileChooserHook) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterFileChooserHook) ProtoMessage() {}
+
+func (x *RegisterFileChooserHook) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterFileChooserHook.ProtoReflect.Descriptor instead.
+func (*RegisterFileChooserHook) Descriptor() ([]byte, []int) {
+	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{6}
+}
+
+type FileChooserHookResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileChooserId string                 `protobuf:"bytes,1,opt,name=file_chooser_id,json=fileChooserId,proto3" json:"file_chooser_id,omitempty"`
+	IsMultiple    bool                   `protobuf:"varint,2,opt,name=is_multiple,json=isMultiple,proto3" json:"is_multiple,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FileChooserHookResult) Reset() {
+	*x = FileChooserHookResult{}
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileChooserHookResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileChooserHookResult) ProtoMessage() {}
+
+func (x *FileChooserHookResult) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileChooserHookResult.ProtoReflect.Descriptor instead.
+func (*FileChooserHookResult) Descriptor() ([]byte, []int) {
+	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *FileChooserHookResult) GetFileChooserId() string {
+	if x != nil {
+		return x.FileChooserId
+	}
+	return ""
+}
+
+func (x *FileChooserHookResult) GetIsMultiple() bool {
+	if x != nil {
+		return x.IsMultiple
+	}
+	return false
+}
+
+func (x *FileChooserHookResult) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type SetFileChooserFilesCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileChooserId string                 `protobuf:"bytes,1,opt,name=file_chooser_id,json=fileChooserId,proto3" json:"file_chooser_id,omitempty"`
+	Files         []string               `protobuf:"bytes,2,rep,name=files,proto3" json:"files,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,3,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetFileChooserFilesCommand) Reset() {
+	*x = SetFileChooserFilesCommand{}
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetFileChooserFilesCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetFileChooserFilesCommand) ProtoMessage() {}
+
+func (x *SetFileChooserFilesCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetFileChooserFilesCommand.ProtoReflect.Descriptor instead.
+func (*SetFileChooserFilesCommand) Descriptor() ([]byte, []int) {
+	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *SetFileChooserFilesCommand) GetFileChooserId() string {
+	if x != nil {
+		return x.FileChooserId
+	}
+	return ""
+}
+
+func (x *SetFileChooserFilesCommand) GetFiles() []string {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *SetFileChooserFilesCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type FileChooserFilesSetEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileChooserId string                 `protobuf:"bytes,1,opt,name=file_chooser_id,json=fileChooserId,proto3" json:"file_chooser_id,omitempty"`
+	Files         []string               `protobuf:"bytes,2,rep,name=files,proto3" json:"files,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FileChooserFilesSetEvent) Reset() {
+	*x = FileChooserFilesSetEvent{}
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileChooserFilesSetEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileChooserFilesSetEvent) ProtoMessage() {}
+
+func (x *FileChooserFilesSetEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FileChooserFilesSetEvent.ProtoReflect.Descriptor instead.
+func (*FileChooserFilesSetEvent) Descriptor() ([]byte, []int) {
+	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *FileChooserFilesSetEvent) GetFileChooserId() string {
+	if x != nil {
+		return x.FileChooserId
+	}
+	return ""
+}
+
+func (x *FileChooserFilesSetEvent) GetFiles() []string {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *FileChooserFilesSetEvent) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type RegisterDownloadHook struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterDownloadHook) Reset() {
+	*x = RegisterDownloadHook{}
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterDownloadHook) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterDownloadHook) ProtoMessage() {}
+
+func (x *RegisterDownloadHook) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterDownloadHook.ProtoReflect.Descriptor instead.
+func (*RegisterDownloadHook) Descriptor() ([]byte, []int) {
+	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{10}
+}
+
+type DownloadHookResult struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	DownloadId        string                 `protobuf:"bytes,1,opt,name=download_id,json=downloadId,proto3" json:"download_id,omitempty"`
+	Url               string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	SuggestedFilename string                 `protobuf:"bytes,3,opt,name=suggested_filename,json=suggestedFilename,proto3" json:"suggested_filename,omitempty"`
+	Note              string                 `protobuf:"bytes,4,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *DownloadHookResult) Reset() {
+	*x = DownloadHookResult{}
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DownloadHookResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DownloadHookResult) ProtoMessage() {}
+
+func (x *DownloadHookResult) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DownloadHookResult.ProtoReflect.Descriptor instead.
+func (*DownloadHookResult) Descriptor() ([]byte, []int) {
+	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *DownloadHookResult) GetDownloadId() string {
+	if x != nil {
+		return x.DownloadId
+	}
+	return ""
+}
+
+func (x *DownloadHookResult) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *DownloadHookResult) GetSuggestedFilename() string {
+	if x != nil {
+		return x.SuggestedFilename
+	}
+	return ""
+}
+
+func (x *DownloadHookResult) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type SaveDownloadCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DownloadId    string                 `protobuf:"bytes,1,opt,name=download_id,json=downloadId,proto3" json:"download_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,3,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SaveDownloadCommand) Reset() {
+	*x = SaveDownloadCommand{}
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SaveDownloadCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SaveDownloadCommand) ProtoMessage() {}
+
+func (x *SaveDownloadCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SaveDownloadCommand.ProtoReflect.Descriptor instead.
+func (*SaveDownloadCommand) Descriptor() ([]byte, []int) {
+	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *SaveDownloadCommand) GetDownloadId() string {
+	if x != nil {
+		return x.DownloadId
+	}
+	return ""
+}
+
+func (x *SaveDownloadCommand) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *SaveDownloadCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type DownloadSavedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DownloadId    string                 `protobuf:"bytes,1,opt,name=download_id,json=downloadId,proto3" json:"download_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DownloadSavedEvent) Reset() {
+	*x = DownloadSavedEvent{}
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DownloadSavedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DownloadSavedEvent) ProtoMessage() {}
+
+func (x *DownloadSavedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DownloadSavedEvent.ProtoReflect.Descriptor instead.
+func (*DownloadSavedEvent) Descriptor() ([]byte, []int) {
+	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *DownloadSavedEvent) GetDownloadId() string {
+	if x != nil {
+		return x.DownloadId
+	}
+	return ""
+}
+
+func (x *DownloadSavedEvent) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *DownloadSavedEvent) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
 var File_surfaces_web_v1_web_proto protoreflect.FileDescriptor
 
 const file_surfaces_web_v1_web_proto_rawDesc = "" +
@@ -453,7 +893,40 @@ const file_surfaces_web_v1_web_proto_rawDesc = "" +
 	"\x13RegisterNewPageHook\"U\n" +
 	"\x11NewPageHookResult\x12,\n" +
 	"\x12context_session_id\x18\x01 \x01(\tR\x10contextSessionId\x12\x12\n" +
-	"\x04note\x18\x02 \x01(\tR\x04note*`\n" +
+	"\x04note\x18\x02 \x01(\tR\x04note\"\x19\n" +
+	"\x17RegisterFileChooserHook\"t\n" +
+	"\x15FileChooserHookResult\x12&\n" +
+	"\x0ffile_chooser_id\x18\x01 \x01(\tR\rfileChooserId\x12\x1f\n" +
+	"\vis_multiple\x18\x02 \x01(\bR\n" +
+	"isMultiple\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"\xc0\x01\n" +
+	"\x1aSetFileChooserFilesCommand\x12&\n" +
+	"\x0ffile_chooser_id\x18\x01 \x01(\tR\rfileChooserId\x12\x14\n" +
+	"\x05files\x18\x02 \x03(\tR\x05files\x12R\n" +
+	"\rretry_options\x18\x03 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"l\n" +
+	"\x18FileChooserFilesSetEvent\x12&\n" +
+	"\x0ffile_chooser_id\x18\x01 \x01(\tR\rfileChooserId\x12\x14\n" +
+	"\x05files\x18\x02 \x03(\tR\x05files\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"\x16\n" +
+	"\x14RegisterDownloadHook\"\x8a\x01\n" +
+	"\x12DownloadHookResult\x12\x1f\n" +
+	"\vdownload_id\x18\x01 \x01(\tR\n" +
+	"downloadId\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\x12-\n" +
+	"\x12suggested_filename\x18\x03 \x01(\tR\x11suggestedFilename\x12\x12\n" +
+	"\x04note\x18\x04 \x01(\tR\x04note\"\xb0\x01\n" +
+	"\x13SaveDownloadCommand\x12\x1f\n" +
+	"\vdownload_id\x18\x01 \x01(\tR\n" +
+	"downloadId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12R\n" +
+	"\rretry_options\x18\x03 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"]\n" +
+	"\x12DownloadSavedEvent\x12\x1f\n" +
+	"\vdownload_id\x18\x01 \x01(\tR\n" +
+	"downloadId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note*`\n" +
 	"\vBrowserKind\x12\x1c\n" +
 	"\x18BROWSER_KIND_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15BROWSER_KIND_CHROMIUM\x10\x01\x12\x18\n" +
@@ -473,27 +946,37 @@ func file_surfaces_web_v1_web_proto_rawDescGZIP() []byte {
 }
 
 var file_surfaces_web_v1_web_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_surfaces_web_v1_web_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_surfaces_web_v1_web_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_surfaces_web_v1_web_proto_goTypes = []any{
-	(BrowserKind)(0),             // 0: allwright.engine.v1.BrowserKind
-	(*LaunchBrowserCommand)(nil), // 1: allwright.engine.v1.LaunchBrowserCommand
-	(*BrowserLaunchedEvent)(nil), // 2: allwright.engine.v1.BrowserLaunchedEvent
-	(*LaunchChromeCommand)(nil),  // 3: allwright.engine.v1.LaunchChromeCommand
-	(*ChromeLaunchedEvent)(nil),  // 4: allwright.engine.v1.ChromeLaunchedEvent
-	(*RegisterNewPageHook)(nil),  // 5: allwright.engine.v1.RegisterNewPageHook
-	(*NewPageHookResult)(nil),    // 6: allwright.engine.v1.NewPageHookResult
-	(*CommandRetryOptions)(nil),  // 7: allwright.engine.v1.CommandRetryOptions
+	(BrowserKind)(0),                   // 0: allwright.engine.v1.BrowserKind
+	(*LaunchBrowserCommand)(nil),       // 1: allwright.engine.v1.LaunchBrowserCommand
+	(*BrowserLaunchedEvent)(nil),       // 2: allwright.engine.v1.BrowserLaunchedEvent
+	(*LaunchChromeCommand)(nil),        // 3: allwright.engine.v1.LaunchChromeCommand
+	(*ChromeLaunchedEvent)(nil),        // 4: allwright.engine.v1.ChromeLaunchedEvent
+	(*RegisterNewPageHook)(nil),        // 5: allwright.engine.v1.RegisterNewPageHook
+	(*NewPageHookResult)(nil),          // 6: allwright.engine.v1.NewPageHookResult
+	(*RegisterFileChooserHook)(nil),    // 7: allwright.engine.v1.RegisterFileChooserHook
+	(*FileChooserHookResult)(nil),      // 8: allwright.engine.v1.FileChooserHookResult
+	(*SetFileChooserFilesCommand)(nil), // 9: allwright.engine.v1.SetFileChooserFilesCommand
+	(*FileChooserFilesSetEvent)(nil),   // 10: allwright.engine.v1.FileChooserFilesSetEvent
+	(*RegisterDownloadHook)(nil),       // 11: allwright.engine.v1.RegisterDownloadHook
+	(*DownloadHookResult)(nil),         // 12: allwright.engine.v1.DownloadHookResult
+	(*SaveDownloadCommand)(nil),        // 13: allwright.engine.v1.SaveDownloadCommand
+	(*DownloadSavedEvent)(nil),         // 14: allwright.engine.v1.DownloadSavedEvent
+	(*CommandRetryOptions)(nil),        // 15: allwright.engine.v1.CommandRetryOptions
 }
 var file_surfaces_web_v1_web_proto_depIdxs = []int32{
-	0, // 0: allwright.engine.v1.LaunchBrowserCommand.browser_kind:type_name -> allwright.engine.v1.BrowserKind
-	7, // 1: allwright.engine.v1.LaunchBrowserCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	0, // 2: allwright.engine.v1.BrowserLaunchedEvent.browser_kind:type_name -> allwright.engine.v1.BrowserKind
-	7, // 3: allwright.engine.v1.LaunchChromeCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	0,  // 0: allwright.engine.v1.LaunchBrowserCommand.browser_kind:type_name -> allwright.engine.v1.BrowserKind
+	15, // 1: allwright.engine.v1.LaunchBrowserCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	0,  // 2: allwright.engine.v1.BrowserLaunchedEvent.browser_kind:type_name -> allwright.engine.v1.BrowserKind
+	15, // 3: allwright.engine.v1.LaunchChromeCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	15, // 4: allwright.engine.v1.SetFileChooserFilesCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	15, // 5: allwright.engine.v1.SaveDownloadCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	6,  // [6:6] is the sub-list for method output_type
+	6,  // [6:6] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_surfaces_web_v1_web_proto_init() }
@@ -504,13 +987,15 @@ func file_surfaces_web_v1_web_proto_init() {
 	file_core_v1_common_proto_init()
 	file_surfaces_web_v1_web_proto_msgTypes[0].OneofWrappers = []any{}
 	file_surfaces_web_v1_web_proto_msgTypes[2].OneofWrappers = []any{}
+	file_surfaces_web_v1_web_proto_msgTypes[8].OneofWrappers = []any{}
+	file_surfaces_web_v1_web_proto_msgTypes[12].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_surfaces_web_v1_web_proto_rawDesc), len(file_surfaces_web_v1_web_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

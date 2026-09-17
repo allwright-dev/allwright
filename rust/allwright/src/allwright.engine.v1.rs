@@ -189,6 +189,66 @@ pub struct NewPageHookResult {
     #[prost(string, tag = "2")]
     pub note: ::prost::alloc::string::String,
 }
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct RegisterFileChooserHook {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileChooserHookResult {
+    #[prost(string, tag = "1")]
+    pub file_chooser_id: ::prost::alloc::string::String,
+    #[prost(bool, tag = "2")]
+    pub is_multiple: bool,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SetFileChooserFilesCommand {
+    #[prost(string, tag = "1")]
+    pub file_chooser_id: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag = "2")]
+    pub files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(message, optional, tag = "3")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileChooserFilesSetEvent {
+    #[prost(string, tag = "1")]
+    pub file_chooser_id: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag = "2")]
+    pub files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct RegisterDownloadHook {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DownloadHookResult {
+    #[prost(string, tag = "1")]
+    pub download_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub url: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub suggested_filename: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SaveDownloadCommand {
+    #[prost(string, tag = "1")]
+    pub download_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub path: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "3")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DownloadSavedEvent {
+    #[prost(string, tag = "1")]
+    pub download_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub path: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum BrowserKind {
@@ -314,7 +374,7 @@ pub struct ContextSessionCommand {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_command::Command",
-        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19"
+        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21"
     )]
     pub command: ::core::option::Option<context_session_command::Command>,
 }
@@ -356,6 +416,10 @@ pub mod context_session_command {
         RegisterHook(super::RegisterHookCommand),
         #[prost(message, tag = "19")]
         WaitForHook(super::WaitForHookCommand),
+        #[prost(message, tag = "20")]
+        SetFileChooserFiles(super::SetFileChooserFilesCommand),
+        #[prost(message, tag = "21")]
+        SaveDownload(super::SaveDownloadCommand),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -371,7 +435,7 @@ pub struct ContextSessionEvent {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_event::Event",
-        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21"
+        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23"
     )]
     pub event: ::core::option::Option<context_session_event::Event>,
 }
@@ -419,6 +483,10 @@ pub mod context_session_event {
         HookRegistered(super::HookRegisteredEvent),
         #[prost(message, tag = "21")]
         HookCompleted(super::HookCompletedEvent),
+        #[prost(message, tag = "22")]
+        FileChooserFilesSet(super::FileChooserFilesSetEvent),
+        #[prost(message, tag = "23")]
+        DownloadSaved(super::DownloadSavedEvent),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -443,7 +511,7 @@ pub struct ContextSessionErrorEvent {
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct RegisterHookCommand {
-    #[prost(oneof = "register_hook_command::Hook", tags = "1")]
+    #[prost(oneof = "register_hook_command::Hook", tags = "1, 2, 3")]
     pub hook: ::core::option::Option<register_hook_command::Hook>,
 }
 /// Nested message and enum types in `RegisterHookCommand`.
@@ -452,6 +520,10 @@ pub mod register_hook_command {
     pub enum Hook {
         #[prost(message, tag = "1")]
         NewPage(super::RegisterNewPageHook),
+        #[prost(message, tag = "2")]
+        FileChooser(super::RegisterFileChooserHook),
+        #[prost(message, tag = "3")]
+        Download(super::RegisterDownloadHook),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -470,7 +542,7 @@ pub struct HookRegisteredEvent {
 pub struct HookCompletedEvent {
     #[prost(string, tag = "1")]
     pub hook_id: ::prost::alloc::string::String,
-    #[prost(oneof = "hook_completed_event::Result", tags = "2")]
+    #[prost(oneof = "hook_completed_event::Result", tags = "2, 3, 4")]
     pub result: ::core::option::Option<hook_completed_event::Result>,
 }
 /// Nested message and enum types in `HookCompletedEvent`.
@@ -479,6 +551,10 @@ pub mod hook_completed_event {
     pub enum Result {
         #[prost(message, tag = "2")]
         NewPage(super::NewPageHookResult),
+        #[prost(message, tag = "3")]
+        FileChooser(super::FileChooserHookResult),
+        #[prost(message, tag = "4")]
+        Download(super::DownloadHookResult),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

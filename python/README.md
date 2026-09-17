@@ -41,3 +41,17 @@ hook = page.register_hook(hooks.new_page)
 page.click("a[target=_blank]")
 new_page = hook.wait()
 ```
+
+```python
+hook = page.register_hook(hooks.file_chooser)
+page.click("button.open-upload")
+chooser = hook.wait()
+chooser.set_files("fixtures/document.pdf")
+```
+
+```python
+hook = page.register_hook(hooks.download)
+page.click("a.download-report")
+download = hook.wait()
+download.save_as(f"artifacts/{download.suggested_filename}")
+```

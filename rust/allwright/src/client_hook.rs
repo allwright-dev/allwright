@@ -6,8 +6,10 @@ use crate::proto::context_session_event::Event as ContextEvent;
 use crate::proto::hook_completed_event::Result as HookCompletionResult;
 use crate::proto::register_hook_command::Hook as RegisterHook;
 use crate::proto::{
-    ContextSessionCommand, RegisterHookCommand, RegisterNewPageHook, WaitForHookCommand,
+    ContextSessionCommand, RegisterDownloadHook, RegisterFileChooserHook, RegisterHookCommand,
+    RegisterNewPageHook, SaveDownloadCommand, SetFileChooserFilesCommand, WaitForHookCommand,
 };
+use std::path::Path;
 use tokio::sync::Mutex as AsyncMutex;
 
 use super::command::command_retry_options;
@@ -44,7 +46,9 @@ impl private::Sealed for NewPage {
     }
 
     fn decode(page: &Tab, result: HookCompletionResult) -> Result<<Self as HookType>::Output> {
-        let HookCompletionResult::NewPage(new_page) = result;
+        let HookCompletionResult::NewPage(new_page) = result else {
+            return Err(Error::new("new page hook completed with an invalid result"));
+        };
         Ok(Tab {
             inner: Arc::new(TabInner {
                 runtime: Arc::clone(&page.inner.runtime),
@@ -53,6 +57,209 @@ impl private::Sealed for NewPage {
                 state: AsyncMutex::new(TabState::default()),
             }),
         })
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FileChooserHook;
+
+pub const FILE_CHOOSER: FileChooserHook = FileChooserHook;
+
+impl HookType for FileChooserHook {
+    type Output = FileChooser;
+}
+
+impl private::Sealed for FileChooserHook {
+    fn name() -> &'static str {
+        "file_chooser"
+    }
+
+    fn decode(page: &Tab, result: HookCompletionResult) -> Result<<Self as HookType>::Output> {
+        let HookCompletionResult::FileChooser(file_chooser) = result else {
+            return Err(Error::new(
+                "file chooser hook completed with an invalid result",
+            ));
+        };
+        Ok(FileChooser {
+            page: page.clone(),
+            id: file_chooser.file_chooser_id,
+            is_multiple: file_chooser.is_multiple,
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct FileChooser {
+    page: Tab,
+    id: String,
+    is_multiple: bool,
+}
+
+impl FileChooser {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn is_multiple(&self) -> bool {
+        self.is_multiple
+    }
+
+    pub fn page(&self) -> &Tab {
+        &self.page
+    }
+
+    pub async fn set_file(&self, file: impl AsRef<Path>) -> Result<()> {
+        self.set_files([file]).await
+    }
+
+    pub async fn set_files<I, P>(&self, files: I) -> Result<()>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let files = files
+            .into_iter()
+            .map(|file| file.as_ref().to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+        let mut state = self.page.inner.state.lock().await;
+        let handle = self.page.ensure_handle(&mut state).await?;
+        ensure_tab_open(handle, &self.page.inner.session_id)?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.page.inner.surface_session_id.clone(),
+                context_session_id: self.page.inner.session_id.clone(),
+                command: Some(ContextCommand::SetFileChooserFiles(
+                    SetFileChooserFilesCommand {
+                        file_chooser_id: self.id.clone(),
+                        files,
+                        retry_options: None,
+                    },
+                )),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send SetFileChooserFilesCommand"))?;
+        loop {
+            let event = handle
+                .events
+                .message()
+                .await?
+                .ok_or_else(|| Error::new("page session closed while setting chooser files"))?;
+            match event.event {
+                Some(ContextEvent::FileChooserFilesSet(result))
+                    if result.file_chooser_id == self.id =>
+                {
+                    return Ok(());
+                }
+                Some(ContextEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "page session error while setting chooser files: {}",
+                        error.message
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DownloadHook;
+
+pub const DOWNLOAD: DownloadHook = DownloadHook;
+
+impl HookType for DownloadHook {
+    type Output = Download;
+}
+
+impl private::Sealed for DownloadHook {
+    fn name() -> &'static str {
+        "download"
+    }
+
+    fn decode(page: &Tab, result: HookCompletionResult) -> Result<<Self as HookType>::Output> {
+        let HookCompletionResult::Download(download) = result else {
+            return Err(Error::new("download hook completed with an invalid result"));
+        };
+        Ok(Download {
+            page: page.clone(),
+            id: download.download_id,
+            url: download.url,
+            suggested_filename: download.suggested_filename,
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct Download {
+    page: Tab,
+    id: String,
+    url: String,
+    suggested_filename: String,
+}
+
+impl Download {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn page(&self) -> &Tab {
+        &self.page
+    }
+
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    pub fn suggested_filename(&self) -> &str {
+        &self.suggested_filename
+    }
+
+    pub async fn save_as(&self, path: impl AsRef<Path>) -> Result<()> {
+        self.save_as_with_options(path, CommandOptions::default())
+            .await
+    }
+
+    pub async fn save_as_with_options(
+        &self,
+        path: impl AsRef<Path>,
+        options: CommandOptions,
+    ) -> Result<()> {
+        let mut state = self.page.inner.state.lock().await;
+        let handle = self.page.ensure_handle(&mut state).await?;
+        ensure_tab_open(handle, &self.page.inner.session_id)?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.page.inner.surface_session_id.clone(),
+                context_session_id: self.page.inner.session_id.clone(),
+                command: Some(ContextCommand::SaveDownload(SaveDownloadCommand {
+                    download_id: self.id.clone(),
+                    path: path.as_ref().to_string_lossy().to_string(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send SaveDownloadCommand"))?;
+        loop {
+            let event = handle
+                .events
+                .message()
+                .await?
+                .ok_or_else(|| Error::new("page session closed while saving download"))?;
+            match event.event {
+                Some(ContextEvent::DownloadSaved(result)) if result.download_id == self.id => {
+                    return Ok(());
+                }
+                Some(ContextEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "page session error while saving download: {}",
+                        error.message
+                    )));
+                }
+                _ => {}
+            }
+        }
     }
 }
 
@@ -126,6 +333,10 @@ impl Tab {
                 command: Some(ContextCommand::RegisterHook(RegisterHookCommand {
                     hook: match T::name() {
                         "new_page" => Some(RegisterHook::NewPage(RegisterNewPageHook {})),
+                        "file_chooser" => {
+                            Some(RegisterHook::FileChooser(RegisterFileChooserHook {}))
+                        }
+                        "download" => Some(RegisterHook::Download(RegisterDownloadHook {})),
                         _ => return Err(Error::new("unsupported hook type")),
                     },
                 })),

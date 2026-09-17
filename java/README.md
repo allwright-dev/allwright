@@ -29,10 +29,30 @@ For an action that opens a tab, register the generic typed hook first:
 ```java
 import dev.allwright.client.Hook;
 import dev.allwright.client.Hooks;
+import dev.allwright.client.Page;
 
 Hook<Page> hook = page.registerHook(Hooks.NEW_PAGE);
 page.click("a[target=_blank]");
 Page newPage = hook.waitFor();
+```
+
+```java
+import dev.allwright.client.FileChooser;
+import java.nio.file.Path;
+
+Hook<FileChooser> hook = page.registerHook(Hooks.FILE_CHOOSER);
+page.click("button.open-upload");
+FileChooser chooser = hook.waitFor();
+chooser.setFiles(Path.of("fixtures/document.pdf"));
+```
+
+```java
+import dev.allwright.client.Download;
+
+Hook<Download> hook = page.registerHook(Hooks.DOWNLOAD);
+page.click("a.download-report");
+Download download = hook.waitFor();
+download.saveAs(Path.of("artifacts", download.suggestedFilename()));
 ```
 
 Maven:

@@ -31,3 +31,19 @@ let hook = page.register_hook(allwright::NEW_PAGE).await?;
 page.click("a[target=_blank]").await?;
 let new_page = hook.wait().await?;
 ```
+
+```rust,no_run
+let hook = page.register_hook(allwright::FILE_CHOOSER).await?;
+page.click("button.open-upload").await?;
+let chooser = hook.wait().await?;
+chooser.set_file("fixtures/document.pdf").await?;
+```
+
+```rust,no_run
+let hook = page.register_hook(allwright::DOWNLOAD).await?;
+page.click("a.download-report").await?;
+let download = hook.wait().await?;
+download
+    .save_as(format!("artifacts/{}", download.suggested_filename()))
+    .await?;
+```

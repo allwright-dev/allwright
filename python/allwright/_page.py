@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Callable, TypeVar
 
 from ._locator import Locator
-from ._hooks import Hook, HookType
+from ._hooks import Download, FileChooser, Hook, HookType
 from ._proto import engine_pb2
 from ._selectors import normalize_selector_for_transport
 from ._transport import RuntimeClient, StreamHandle
@@ -66,15 +66,25 @@ class Page(WebLocators):
         with self._lock:
             handle = self._ensure_handle()
             self._ensure_open()
-            if hook_type.name != "new_page":
+            if hook_type.name not in {"new_page", "file_chooser", "download"}:
                 raise AllwrightError(f"unsupported hook type: {hook_type.name}")
+            if hook_type.name == "new_page":
+                register_hook = engine_pb2.RegisterHookCommand(
+                    new_page=engine_pb2.RegisterNewPageHook()
+                )
+            elif hook_type.name == "file_chooser":
+                register_hook = engine_pb2.RegisterHookCommand(
+                    file_chooser=engine_pb2.RegisterFileChooserHook()
+                )
+            else:
+                register_hook = engine_pb2.RegisterHookCommand(
+                    download=engine_pb2.RegisterDownloadHook()
+                )
             handle.send(
                 engine_pb2.ContextSessionCommand(
                     surface_session_id=self.surface_session_id,
                     context_session_id=self.session_id,
-                    register_hook=engine_pb2.RegisterHookCommand(
-                        new_page=engine_pb2.RegisterNewPageHook()
-                    ),
+                    register_hook=register_hook,
                 )
             )
             while True:
@@ -124,10 +134,91 @@ class Page(WebLocators):
                                 else Page(self._runtime, self.surface_session_id, session_id)
                             )
                             return page  # type: ignore[return-value]
+                        if hook_type.name == "file_chooser" and completed.WhichOneof("result") == "file_chooser":
+                            return FileChooser(
+                                self,
+                                completed.file_chooser.file_chooser_id,
+                                completed.file_chooser.is_multiple,
+                            )  # type: ignore[return-value]
+                        if hook_type.name == "download" and completed.WhichOneof("result") == "download":
+                            return Download(
+                                self,
+                                completed.download.download_id,
+                                completed.download.url,
+                                completed.download.suggested_filename,
+                            )  # type: ignore[return-value]
                         raise AllwrightError("hook completed with an invalid result")
                     case "error":
                         raise AllwrightError(
                             f"page session error while waiting for hook: {event.error.message}"
+                        )
+
+    def _set_file_chooser_files(
+        self,
+        file_chooser_id: str,
+        files: list[str],
+        options: CommandOptions | None = None,
+    ) -> None:
+        from ._runtime import retry_options
+
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            command_options = options or CommandOptions()
+            handle.send(
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
+                    set_file_chooser_files=engine_pb2.SetFileChooserFilesCommand(
+                        file_chooser_id=file_chooser_id,
+                        files=files,
+                        retry_options=retry_options(command_options.timeout_ms),
+                    ),
+                )
+            )
+            while True:
+                event = handle.recv("receive page session event while setting chooser files")
+                match event.WhichOneof("event"):
+                    case "file_chooser_files_set":
+                        if event.file_chooser_files_set.file_chooser_id == file_chooser_id:
+                            return
+                    case "error":
+                        raise AllwrightError(
+                            f"page session error while setting chooser files: {event.error.message}"
+                        )
+
+    def _save_download(
+        self,
+        download_id: str,
+        path: str,
+        options: CommandOptions | None = None,
+    ) -> None:
+        from ._runtime import retry_options
+
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            command_options = options or CommandOptions()
+            handle.send(
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self.surface_session_id,
+                    context_session_id=self.session_id,
+                    save_download=engine_pb2.SaveDownloadCommand(
+                        download_id=download_id,
+                        path=str(path),
+                        retry_options=retry_options(command_options.timeout_ms),
+                    ),
+                )
+            )
+            while True:
+                event = handle.recv("receive page session event while saving download")
+                match event.WhichOneof("event"):
+                    case "download_saved":
+                        if event.download_saved.download_id == download_id:
+                            return
+                    case "error":
+                        raise AllwrightError(
+                            f"page session error while saving download: {event.error.message}"
                         )
 
     def goto(self, url: str, options: CommandOptions | None = None) -> NavigateResult:

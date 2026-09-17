@@ -430,6 +430,50 @@ pub async fn poll_hook(
     }
 }
 
+pub async fn set_file_chooser_files(
+    surface_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    file_chooser_id: &str,
+    files: &[String],
+) -> Result<allwright_plugin_sdk::FileChooserFilesSetInfo, String> {
+    match invoke_web_expected(
+        "SetFileChooserFilesCommand",
+        PluginCommand::SetFileChooserFiles {
+            browser_session: surface_session.clone(),
+            page_session: page_session.clone(),
+            file_chooser_id: file_chooser_id.to_string(),
+            files: files.to_vec(),
+        },
+    )
+    .await?
+    {
+        PluginResult::SetFileChooserFiles(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for SetFileChooserFiles".to_string()),
+    }
+}
+
+pub async fn save_download(
+    surface_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    download_id: &str,
+    path: &str,
+) -> Result<allwright_plugin_sdk::DownloadSavedInfo, String> {
+    match invoke_web_expected(
+        "SaveDownloadCommand",
+        PluginCommand::SaveDownload {
+            browser_session: surface_session.clone(),
+            page_session: page_session.clone(),
+            download_id: download_id.to_string(),
+            path: path.to_string(),
+        },
+    )
+    .await?
+    {
+        PluginResult::SaveDownload(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for SaveDownload".to_string()),
+    }
+}
+
 pub async fn close_page(
     surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,

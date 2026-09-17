@@ -19,6 +19,8 @@ import type {
   LaunchOptions,
   MobileSurfaceNamespace,
   Page,
+  FileChooser,
+  Download,
   HookType,
   ResolveConfigOptions,
   ResolvedAllwrightConfig,
@@ -36,6 +38,8 @@ export type {
   BrowserType,
   Hook,
   HookType,
+  FileChooser,
+  Download,
   ClickResult,
   CommandOptions,
   CountResult,
@@ -71,6 +75,8 @@ export const chromium: BrowserType = new BrowserTypeImpl("chromium");
 export const firefox: BrowserType = new BrowserTypeImpl("firefox");
 export const hooks = {
   newPage: Object.freeze({ name: "newPage" }) as HookType<Page>,
+  fileChooser: Object.freeze({ name: "fileChooser" }) as HookType<FileChooser>,
+  download: Object.freeze({ name: "download" }) as HookType<Download>,
 };
 export { mobile };
 

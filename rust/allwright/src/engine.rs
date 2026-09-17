@@ -27,18 +27,20 @@ use proto::{
     CloseSurfaceSessionCommand, CommandRetryOptions, ConnectMobileCommand, ContextOpenedEvent,
     ContextSessionAttachedEvent, ContextSessionClosedEvent, ContextSessionCommand,
     ContextSessionErrorEvent, ContextSessionEvent, ContextSessionPingCommand,
-    ContextSessionPongEvent, CountElementsCommand, DeviceConnectionKind, ElementClickedEvent,
-    ElementCountedEvent, ElementFilledEvent, ElementFocusedEvent, ElementHoveredEvent,
-    ElementsHighlightedEvent, FillElementCommand, FocusElementCommand, GetInnerTextCommand,
+    ContextSessionPongEvent, CountElementsCommand, DeviceConnectionKind, DownloadHookResult,
+    DownloadSavedEvent, ElementClickedEvent, ElementCountedEvent, ElementFilledEvent,
+    ElementFocusedEvent, ElementHoveredEvent, ElementsHighlightedEvent, FileChooserFilesSetEvent,
+    FileChooserHookResult, FillElementCommand, FocusElementCommand, GetInnerTextCommand,
     GetTextContentCommand, HighlightElementsCommand, HookCompletedEvent, HookRegisteredEvent,
     HoverElementCommand, InnerTextResolvedEvent, KeyPressedEvent, LaunchAppCommand,
     LaunchBrowserCommand, LaunchChromeCommand, MobileConnectedEvent,
     MobilePlatform as ProtoMobilePlatform, NavigatePageCommand, NewPageHookResult,
     OpenContextCommand, PageNavigatedEvent, PingRequest, PingResponse, PressKeyCommand,
-    RegisterHookCommand, ScreenshotCapturedEvent, ScreenshotCommand, SelectorWaitSatisfiedEvent,
-    SessionPingCommand, SessionPongEvent, SurfaceSessionClosedEvent, SurfaceSessionCommand,
-    SurfaceSessionErrorEvent, SurfaceSessionEvent, TextContentResolvedEvent, WaitForHookCommand,
-    WaitForSelectorCommand, context_session_command::Command as ContextCommand,
+    RegisterHookCommand, SaveDownloadCommand, ScreenshotCapturedEvent, ScreenshotCommand,
+    SelectorWaitSatisfiedEvent, SessionPingCommand, SessionPongEvent, SetFileChooserFilesCommand,
+    SurfaceSessionClosedEvent, SurfaceSessionCommand, SurfaceSessionErrorEvent,
+    SurfaceSessionEvent, TextContentResolvedEvent, WaitForHookCommand, WaitForSelectorCommand,
+    context_session_command::Command as ContextCommand,
     context_session_event::Event as ContextEvent,
     hook_completed_event::Result as HookCompletionResult,
     register_hook_command::Hook as RegisterHook,
@@ -761,6 +763,8 @@ async fn handle_tab_command(
         Some(ContextCommand::RegisterHook(RegisterHookCommand { hook })) => {
             let plugin_hook_type = match hook {
                 Some(RegisterHook::NewPage(_)) => PluginHookType::NewPage,
+                Some(RegisterHook::FileChooser(_)) => PluginHookType::FileChooser,
+                Some(RegisterHook::Download(_)) => PluginHookType::Download,
                 None => {
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
@@ -883,6 +887,145 @@ async fn handle_tab_command(
                         should_close: false,
                     })
                 }
+                Ok(HookResult::FileChooser(file_chooser)) => {
+                    state.lock().await.hooks.remove(&hook_id);
+                    Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::HookCompleted(HookCompletedEvent {
+                                hook_id,
+                                result: Some(HookCompletionResult::FileChooser(
+                                    FileChooserHookResult {
+                                        file_chooser_id: file_chooser.file_chooser_id,
+                                        is_multiple: file_chooser.is_multiple,
+                                        note: file_chooser.note,
+                                    },
+                                )),
+                            }),
+                        )],
+                        should_close: false,
+                    })
+                }
+                Ok(HookResult::Download(download)) => {
+                    state.lock().await.hooks.remove(&hook_id);
+                    Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::HookCompleted(HookCompletedEvent {
+                                hook_id,
+                                result: Some(HookCompletionResult::Download(DownloadHookResult {
+                                    download_id: download.download_id,
+                                    url: download.url,
+                                    suggested_filename: download.suggested_filename,
+                                    note: download.note,
+                                })),
+                            }),
+                        )],
+                        should_close: false,
+                    })
+                }
+                Err(message) => Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent { message }),
+                    )],
+                    should_close: false,
+                }),
+            }
+        }
+        Some(ContextCommand::SetFileChooserFiles(SetFileChooserFilesCommand {
+            file_chooser_id,
+            files,
+            retry_options,
+        })) => {
+            let (surface_session, page_session) = match (&surface_session, &page_session) {
+                (
+                    EngineBrowserSessionHandle::Web(surface_session),
+                    EnginePageSessionHandle::Web(page_session),
+                ) => (surface_session, page_session),
+                _ => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "file chooser requires a web page session".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            };
+            let result =
+                retry_with_timeout(command_retry_policy(retry_options.as_ref()), || async {
+                    web_lib::set_file_chooser_files(
+                        surface_session,
+                        page_session,
+                        &file_chooser_id,
+                        &files,
+                    )
+                    .await
+                })
+                .await;
+            match result {
+                Ok(result) => Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::FileChooserFilesSet(FileChooserFilesSetEvent {
+                            file_chooser_id: result.file_chooser_id,
+                            files: result.files,
+                            note: result.note,
+                        }),
+                    )],
+                    should_close: false,
+                }),
+                Err(message) => Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent { message }),
+                    )],
+                    should_close: false,
+                }),
+            }
+        }
+        Some(ContextCommand::SaveDownload(SaveDownloadCommand {
+            download_id,
+            path,
+            retry_options,
+        })) => {
+            let (surface_session, page_session) = match (&surface_session, &page_session) {
+                (
+                    EngineBrowserSessionHandle::Web(surface_session),
+                    EnginePageSessionHandle::Web(page_session),
+                ) => (surface_session, page_session),
+                _ => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "download requires a web page session".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+            };
+            let result =
+                retry_with_timeout(command_retry_policy(retry_options.as_ref()), || async {
+                    web_lib::save_download(surface_session, page_session, &download_id, &path).await
+                })
+                .await;
+            match result {
+                Ok(result) => Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::DownloadSaved(DownloadSavedEvent {
+                            download_id: result.download_id,
+                            path: result.path,
+                            note: result.note,
+                        }),
+                    )],
+                    should_close: false,
+                }),
                 Err(message) => Ok(TabCommandOutcome {
                     events: vec![tab_event(
                         &context_session_id,

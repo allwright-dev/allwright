@@ -206,9 +206,28 @@ await page.click("a[target=_blank]");
 const newPage = await newPageHook.wait();
 ```
 
-Hook registration and waiting are generic engine operations. The new-page hook
-type and result remain owned by the web surface; future download, dialog, and
-file-chooser hooks can use the same lifecycle without adding per-event methods.
+File uploads use the same lifecycle and return a typed file chooser:
+
+```ts
+const chooserHook = await page.registerHook(hooks.fileChooser);
+await page.click("button.open-upload");
+const chooser = await chooserHook.wait();
+await chooser.setFiles(["fixtures/photo.png"]);
+```
+
+Downloads follow the same lifecycle. The hook resolves when the download starts;
+`saveAs` waits for it to finish and copies it to the requested path:
+
+```ts
+const downloadHook = await page.registerHook(hooks.download);
+await page.click("a.download-report");
+const download = await downloadHook.wait();
+await download.saveAs(`artifacts/${download.suggestedFilename}`);
+```
+
+Hook registration and waiting are generic engine operations. New-page,
+file-chooser, and download hook types/results remain owned by the web surface;
+future dialog hooks can use the same lifecycle without adding per-event methods.
 
 ## Client Experience
 

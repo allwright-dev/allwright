@@ -135,6 +135,21 @@ export interface Hook<T> {
   wait(options?: CommandOptions): Promise<T>;
 }
 
+export interface FileChooser {
+  readonly id: string;
+  readonly page: Page;
+  isMultiple(): boolean;
+  setFiles(files: string | string[], options?: CommandOptions): Promise<void>;
+}
+
+export interface Download {
+  readonly id: string;
+  readonly page: Page;
+  readonly url: string;
+  readonly suggestedFilename: string;
+  saveAs(path: string, options?: CommandOptions): Promise<void>;
+}
+
 export interface Browser extends BrowserInfo {
   page(): Page;
   initialPage(): Page;
@@ -438,6 +453,27 @@ export interface ContextSessionEvent {
       contextSessionId?: string;
       note?: string;
     };
+    fileChooser?: {
+      fileChooserId?: string;
+      isMultiple?: boolean;
+      note?: string;
+    };
+    download?: {
+      downloadId?: string;
+      url?: string;
+      suggestedFilename?: string;
+      note?: string;
+    };
+  };
+  fileChooserFilesSet?: {
+    fileChooserId?: string;
+    files?: string[];
+    note?: string;
+  };
+  downloadSaved?: {
+    downloadId?: string;
+    path?: string;
+    note?: string;
   };
   navigated?: {
     url?: string;
@@ -536,6 +572,28 @@ export interface RegisterHookRequest {
   contextSessionId: string;
   registerHook: {
     newPage?: Record<string, never>;
+    fileChooser?: Record<string, never>;
+    download?: Record<string, never>;
+  };
+}
+
+export interface SaveDownloadRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
+  saveDownload: {
+    downloadId: string;
+    path: string;
+    retryOptions?: { timeoutMs?: number };
+  };
+}
+
+export interface SetFileChooserFilesRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
+  setFileChooserFiles: {
+    fileChooserId: string;
+    files: string[];
+    retryOptions?: { timeoutMs?: number };
   };
 }
 
@@ -754,6 +812,8 @@ export type ContextSessionRequest =
   | ContextPingRequest
   | RegisterHookRequest
   | WaitForHookRequest
+  | SetFileChooserFilesRequest
+  | SaveDownloadRequest
   | NavigateRequest
   | ClickRequest
   | CountRequest

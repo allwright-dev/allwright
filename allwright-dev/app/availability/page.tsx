@@ -31,6 +31,8 @@ const webAvailable = [
   "Launch a real Chromium or Firefox browser — no separate driver to install or version-match",
   "Open and close tabs within a browser session",
   "Register a typed hook before an action and wait for the new tab that action opens",
+  "Register a typed file-chooser hook and upload one or multiple local files",
+  "Register a typed download hook and save the completed download to a local path",
   "Navigate to a URL",
   "Click an element",
   "Type into a field",
@@ -49,7 +51,6 @@ const webAvailable = [
 ];
 
 const webNotYetAvailable = [
-  "File upload and download handling",
   "Browser dialogs (alerts, confirms, prompts)",
   "Network mocking or request interception",
   "Cookies and saved session state",
