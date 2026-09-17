@@ -368,6 +368,9 @@ function createLazyAndroidApp(appResource: LazyResource<MobileAndroidApp>): Mobi
     locator(selector: string) {
       return createLazyAndroidLocator(appResource, async () => selector);
     },
+    async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
+      return (await appResource.get()).registerHook(type);
+    },
     async click(selector: string, options?: CommandOptions) {
       return (await appResource.get()).click(selector, options);
     },
