@@ -250,6 +250,15 @@ function InitOgDiagram() {
   const { width, height } = DIAGRAM_SIZE;
   const midY = 130;
   const files = ["package.json", "vitest.config.ts", "tests/web.spec.ts"];
+  // Status lines draw their own checkmark as an SVG polyline rather than a "✔"
+  // glyph: satori has no local coverage for that character, so it falls back
+  // to fetching it from a remote font/emoji CDN, which fails the build if
+  // that network call can't complete (e.g. no egress in the build sandbox).
+  const checks = [
+    { label: "TypeScript", y: midY - 20 },
+    { label: "Web", y: midY + 2 },
+    { label: "installed", y: midY + 24 },
+  ];
 
   return (
     <div style={{ position: "relative", width, height, display: "flex" }}>
@@ -257,17 +266,30 @@ function InitOgDiagram() {
         <rect x={0} y={midY - 54} width={196} height={108} rx={14} fill="rgba(16,41,45,0.55)" stroke={LINE} strokeWidth={2} />
         <line x1={202} y1={midY} x2={244} y2={midY} stroke={MUTED} strokeWidth={2} />
         <rect x={250} y={midY - 60} width={170} height={120} rx={14} fill="none" stroke={BRAND_TO} strokeWidth={2} />
+        {checks.map((check) => (
+          <polyline
+            key={check.label}
+            points={`16,${check.y + 6} 19,${check.y + 9} 25,${check.y + 1}`}
+            fill="none"
+            stroke={BRAND_TO}
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
       </svg>
 
       <div style={{ position: "absolute", left: 16, top: midY - 40, display: "flex", fontSize: 13, fontFamily: "monospace", color: BRAND_TO }}>
         $ npm init allwright
       </div>
-      <div style={{ position: "absolute", left: 16, top: midY - 12, display: "flex", fontSize: 12, fontFamily: "monospace", color: MUTED }}>
-        ✔ TypeScript ✔ Web
-      </div>
-      <div style={{ position: "absolute", left: 16, top: midY + 12, display: "flex", fontSize: 12, fontFamily: "monospace", color: MUTED }}>
-        ✔ installed
-      </div>
+      {checks.map((check) => (
+        <div
+          key={check.label}
+          style={{ position: "absolute", left: 32, top: check.y, display: "flex", fontSize: 12, fontFamily: "monospace", color: MUTED }}
+        >
+          {check.label}
+        </div>
+      ))}
 
       {files.map((file, i) => (
         <div
