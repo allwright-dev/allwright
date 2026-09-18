@@ -108,7 +108,18 @@ finally {
     }
 }
 
-Write-Host "Installed allwright to $(Join-Path $InstallDir 'allwright.exe')"
+$installedPath = Join-Path $InstallDir "allwright.exe"
+Write-Host "Installed allwright to $installedPath"
+$installedVersion = (& $installedPath --version).Trim()
+$expectedVersion = $Version.TrimStart("v")
+if ($installedVersion -ne "allwright $expectedVersion") {
+    throw "Installed binary reports '$installedVersion'; expected 'allwright $expectedVersion'"
+}
+
+$resolved = Get-Command allwright -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($resolved -and $resolved.Source -ne $installedPath) {
+    Write-Warning "Your shell resolves allwright to $($resolved.Source), so $installedPath may be shadowed by an older binary. Move $InstallDir earlier on PATH or remove the stale executable."
+}
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if (-not $userPath) {
     $userPath = ""

@@ -109,6 +109,10 @@ Install the CLI:
 curl -fsSL https://raw.githubusercontent.com/allwright-dev/allwright/main/scripts/install.sh | bash
 ```
 
+The installer verifies the downloaded binary's version. If an older package-manager-installed
+`allwright` appears earlier on `PATH`, it reports the exact shadowing executable instead of
+silently making the new install look stale.
+
 or:
 
 ```bash
@@ -371,7 +375,7 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds 
 - `@allwright.dev/vitest` publish to npm after syncing `typescript/vitest/package.json` and its dependency on `@allwright.dev/core` from the tag
 - `allwright` CLI archives for the current OS matrix
 - `allwright-surface-web` plugin archives for the current OS matrix
-- crates.io publish for the Rust `web` profile after syncing every crate version from the tag
+- crates.io publish for every Rust core, CLI, and surface-plugin crate after syncing and verifying every crate version from the tag
 
 - Linux `x86_64-unknown-linux-gnu`
 - Windows `x86_64-pc-windows-msvc`

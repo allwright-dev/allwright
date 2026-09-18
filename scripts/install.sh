@@ -12,6 +12,7 @@ trap cleanup EXIT
 
 default_install_root() {
   local candidate
+  local existing_allwright
   local path_dir
   local old_ifs="$IFS"
 
@@ -44,6 +45,20 @@ default_install_root() {
         ;;
     esac
   }
+
+  # Upgrade the executable that the current shell already resolves. Otherwise a
+  # stale cargo/npm-managed binary earlier on PATH can shadow the fresh release
+  # installed into /usr/local/bin or ~/.local/bin.
+  existing_allwright="$(command -v allwright 2>/dev/null || true)"
+  if [[ -n "$existing_allwright" && "$existing_allwright" == */* ]]; then
+    candidate="$(dirname "$existing_allwright")"
+    if ! is_tool_managed_dir "$candidate" \
+      && [[ -f "$existing_allwright" && -w "$existing_allwright" && -w "$candidate" ]]
+    then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  fi
 
   for candidate in \
     "/usr/local/bin" \
@@ -134,6 +149,20 @@ install -m 755 "$tmp_dir/bin/allwright" "$install_root/allwright"
 chmod +x "$install_root/allwright"
 
 echo "Installed allwright to $install_root/allwright"
+installed_version="$("$install_root/allwright" --version)"
+expected_version="${version#v}"
+if [[ "$installed_version" != "allwright $expected_version" ]]; then
+  echo "error: installed binary reports '$installed_version'; expected 'allwright $expected_version'" >&2
+  exit 1
+fi
+
+resolved_allwright="$(command -v allwright 2>/dev/null || true)"
+if [[ -n "$resolved_allwright" && "$resolved_allwright" != "$install_root/allwright" ]]; then
+  echo >&2
+  echo "warning: your shell still resolves allwright to $resolved_allwright" >&2
+  echo "The newly installed $install_root/allwright may be shadowed by an older binary." >&2
+  echo "Move $install_root earlier on PATH or remove the stale executable, then run: hash -r" >&2
+fi
 case ":$PATH:" in
   *":$install_root:"*) ;;
   *)

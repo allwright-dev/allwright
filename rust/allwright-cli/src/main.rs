@@ -88,7 +88,13 @@ fn handle_plugin_command(command: PluginCommand) -> Result<(), Box<dyn Error>> {
                 let status = installed
                     .iter()
                     .find(|entry| entry.id == plugin.id)
-                    .map(|entry| format!("installed@{}", entry.version))
+                    .map(|entry| {
+                        if entry.version == plugin.version {
+                            format!("installed@{}", entry.version)
+                        } else {
+                            format!("outdated@{} (expected@{})", entry.version, plugin.version)
+                        }
+                    })
                     .unwrap_or_else(|| "available".to_string());
                 println!(
                     "{}\t{}\t{}\t{}\t{}",

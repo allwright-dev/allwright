@@ -21,9 +21,9 @@ mobile_android_crates=(
 
 full_crates=(
   allwright-plugin-sdk
-  allwright-core
   allwright-surface-mobile
   allwright-surface-desktop
+  allwright-core
   allwright-surface-web
   allwright-surface-mobile-android
   allwright-surface-mobile-ios

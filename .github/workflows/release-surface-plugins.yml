@@ -221,16 +221,18 @@ jobs:
           chmod +x ./scripts/sync-version.sh
           ./scripts/sync-version.sh "${GITHUB_REF_NAME#v}"
 
+      - name: Verify Rust package versions match tag
+        shell: bash
+        run: bash ./scripts/verify-rust-release-version.sh "${GITHUB_REF_NAME}"
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Publish crates.io web profile
+      - name: Publish all crates.io packages
         shell: bash
-        run: ./scripts/publish-crates.sh publish web
-
-      - name: Publish crates.io Android plugin profile
-        shell: bash
-        run: ./scripts/publish-crates.sh publish mobile-android
+        env:
+          ALLOW_EXPERIMENTAL_SURFACES: "1"
+        run: ./scripts/publish-crates.sh publish full
 
   ensure-github-release:
     name: Ensure GitHub release exists
@@ -296,6 +298,10 @@ jobs:
           chmod +x ./scripts/sync-version.sh
           ./scripts/sync-version.sh "${GITHUB_REF_NAME#v}"
 
+      - name: Verify Rust package versions match tag
+        shell: bash
+        run: bash ./scripts/verify-rust-release-version.sh "${GITHUB_REF_NAME}"
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -303,6 +309,28 @@ jobs:
 
       - name: Build allwright CLI
         run: cargo build -p allwright --release --target ${{ matrix.target }}
+
+      - name: Verify allwright CLI version
+        shell: bash
+        env:
+          BINARY_NAME: ${{ matrix.binary_name }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          target_arch="${TARGET%%-*}"
+          host_arch="$(uname -m)"
+          if [[ "$host_arch" == "arm64" ]]; then
+            host_arch="aarch64"
+          fi
+          if [[ "$target_arch" != "$host_arch" ]]; then
+            echo "Skipping execution of ${TARGET} binary on ${host_arch} host; Cargo metadata version was verified above."
+            exit 0
+          fi
+          actual="$("target/${TARGET}/release/${BINARY_NAME}" --version)"
+          expected="allwright ${GITHUB_REF_NAME#v}"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "CLI version mismatch: got '$actual', expected '$expected'" >&2
+            exit 1
+          fi
 
       - name: Package release asset
         id: package
@@ -370,6 +398,10 @@ jobs:
         run: |
           chmod +x ./scripts/sync-version.sh
           ./scripts/sync-version.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Verify Rust package versions match tag
+        shell: bash
+        run: bash ./scripts/verify-rust-release-version.sh "${GITHUB_REF_NAME}"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -445,6 +477,10 @@ jobs:
         run: |
           chmod +x ./scripts/sync-version.sh
           ./scripts/sync-version.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Verify Rust package versions match tag
+        shell: bash
+        run: bash ./scripts/verify-rust-release-version.sh "${GITHUB_REF_NAME}"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
