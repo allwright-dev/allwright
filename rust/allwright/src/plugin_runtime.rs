@@ -257,7 +257,17 @@ fn install_plugin_package(
     let install_root = plugin_install_root(plugin_id)?;
     let runtime_artifact = plugin_runtime_artifact_filename(plugin_id)?;
 
+    println!(
+        "Installing plugin `{plugin_id}` from {package_name}@{version} for {}-{}...",
+        env::consts::OS,
+        env::consts::ARCH
+    );
+
     if install_root.exists() {
+        println!(
+            "Removing previous installation at {}...",
+            install_root.display()
+        );
         fs::remove_dir_all(&install_root).map_err(|error| {
             format!(
                 "failed to remove previous plugin installation {}: {error}",
@@ -265,6 +275,7 @@ fn install_plugin_package(
             )
         })?;
     }
+    println!("Preparing install directory {}...", install_root.display());
     fs::create_dir_all(&install_root).map_err(|error| {
         format!(
             "failed to prepare plugin install directory {}: {error}",
@@ -273,6 +284,10 @@ fn install_plugin_package(
     })?;
 
     if let Some(local_artifact) = repo_local_plugin_artifact_path(plugin_id, version) {
+        println!(
+            "Using local plugin artifact {} for `{plugin_id}`...",
+            local_artifact.display()
+        );
         let destination = install_root.join("lib").join(&runtime_artifact);
         if let Some(parent) = destination.parent() {
             fs::create_dir_all(parent).map_err(|error| {
@@ -289,11 +304,13 @@ fn install_plugin_package(
                 destination.display()
             )
         })?;
+        println!("Verified runtime artifact `{runtime_artifact}`.");
         return Ok(());
     }
 
     let asset_name = plugin_asset_name(plugin_id, version)?;
     let asset_bytes = download_plugin_release_asset(version, &asset_name)?;
+    println!("Unpacking {asset_name} into {}...", install_root.display());
     unpack_plugin_release_asset(&asset_name, &asset_bytes, &install_root)?;
 
     let runtime_path = install_root.join("lib").join(&runtime_artifact);
@@ -302,6 +319,7 @@ fn install_plugin_package(
             "downloaded plugin `{plugin_id}` from {package_name}@{version} but did not find runtime artifact `{runtime_artifact}`"
         ));
     }
+    println!("Verified runtime artifact `{runtime_artifact}`.");
     Ok(())
 }
 
@@ -376,14 +394,46 @@ fn download_plugin_release_asset(version: &str, asset_name: &str) -> Result<Vec<
             request = request.bearer_auth(token);
         }
     }
+    println!("Downloading {asset_name} from {url}...");
     let mut response = request
         .send()
         .and_then(|response| response.error_for_status())
         .map_err(|error| format!("failed to download plugin asset {asset_name}: {error}"))?;
+    let total_bytes = response.content_length();
     let mut bytes = Vec::new();
-    response
-        .read_to_end(&mut bytes)
-        .map_err(|error| format!("failed to read plugin asset {asset_name}: {error}"))?;
+    let mut buffer = [0_u8; 64 * 1024];
+    let mut downloaded = 0_u64;
+    let mut next_progress_marker = 0_u64;
+
+    loop {
+        let read = response
+            .read(&mut buffer)
+            .map_err(|error| format!("failed to read plugin asset {asset_name}: {error}"))?;
+        if read == 0 {
+            break;
+        }
+
+        bytes.extend_from_slice(&buffer[..read]);
+        downloaded += read as u64;
+
+        match total_bytes {
+            Some(total) if total > 0 => {
+                let percent = downloaded.saturating_mul(100) / total;
+                if percent >= next_progress_marker || downloaded == total {
+                    println!("Downloaded {downloaded}/{total} bytes ({percent}%)...");
+                    next_progress_marker = percent.saturating_add(10);
+                }
+            }
+            _ => {
+                if downloaded >= next_progress_marker {
+                    println!("Downloaded {downloaded} bytes...");
+                    next_progress_marker = downloaded.saturating_add(512 * 1024);
+                }
+            }
+        }
+    }
+
+    println!("Download complete: {} bytes.", bytes.len());
     Ok(bytes)
 }
 
