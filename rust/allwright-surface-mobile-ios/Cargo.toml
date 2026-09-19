@@ -11,6 +11,6 @@ keywords = ["automation", "ios", "mobile", "plugin"]
 categories = ["development-tools::testing", "api-bindings"]
 
 [dependencies]
-allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.1.11" }
-allwright-surface-mobile = { path = "../allwright-surface-mobile", version = "0.1.11" }
+allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.1.12" }
+allwright-surface-mobile = { path = "../allwright-surface-mobile", version = "0.1.12" }
 tokio = { workspace = true }
