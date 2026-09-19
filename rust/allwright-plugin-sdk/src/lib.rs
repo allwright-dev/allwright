@@ -373,65 +373,6 @@ pub enum PluginCommand {
         browsing_context_id: Option<String>,
         url: Option<String>,
     },
-    ClickElementViaCdp {
-        cdp_websocket_url: String,
-        target_id: String,
-        css_selector: String,
-    },
-    CountElementsViaCdp {
-        cdp_websocket_url: String,
-        target_id: String,
-        css_selector: String,
-    },
-    HighlightElementsViaCdp {
-        cdp_websocket_url: String,
-        target_id: String,
-        css_selector: String,
-        duration_ms: u64,
-    },
-    FocusElementViaCdp {
-        cdp_websocket_url: String,
-        target_id: String,
-        css_selector: String,
-    },
-    FillElementViaCdp {
-        cdp_websocket_url: String,
-        target_id: String,
-        css_selector: String,
-        value: String,
-    },
-    HoverElementViaCdp {
-        cdp_websocket_url: String,
-        target_id: String,
-        css_selector: String,
-    },
-    PressKeyViaCdp {
-        cdp_websocket_url: String,
-        target_id: String,
-        css_selector: String,
-        key: String,
-        text: Option<String>,
-    },
-    GetTextContentViaCdp {
-        cdp_websocket_url: String,
-        target_id: String,
-        css_selector: String,
-    },
-    GetInnerTextViaCdp {
-        cdp_websocket_url: String,
-        target_id: String,
-        css_selector: String,
-    },
-    WaitForSelectorViaCdp {
-        cdp_websocket_url: String,
-        target_id: String,
-        css_selector: String,
-        visible: bool,
-    },
-    ScreenshotViaCdp {
-        cdp_websocket_url: String,
-        target_id: String,
-    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -468,17 +409,6 @@ pub enum PluginResult {
         browsing_context_id: String,
         mapper: ChromiumBidiMapperInfo,
     },
-    ClickElementViaCdp(ClickInfo),
-    CountElementsViaCdp(ElementCountInfo),
-    HighlightElementsViaCdp(HighlightElementsInfo),
-    FocusElementViaCdp(FocusInfo),
-    FillElementViaCdp(FillInfo),
-    HoverElementViaCdp(HoverInfo),
-    PressKeyViaCdp(PressKeyInfo),
-    GetTextContentViaCdp(TextInfo),
-    GetInnerTextViaCdp(TextInfo),
-    WaitForSelectorViaCdp(WaitForSelectorInfo),
-    ScreenshotViaCdp(ScreenshotInfo),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

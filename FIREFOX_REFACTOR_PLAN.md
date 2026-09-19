@@ -69,7 +69,6 @@ Current SDK types in [rust/allwright-plugin-sdk/src/lib.rs](rust/allwright-plugi
 - `ChromiumBidiMapperInfo`
 - `PluginCommand::OpenChromeWindow`
 - `PluginCommand::NavigateChromeTab`
-- `PluginCommand::ClickElementViaCdp`
 
 Problem:
 

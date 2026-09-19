@@ -66,7 +66,6 @@ struct DiscoveryRequirements {
 
 #[derive(Debug, Clone)]
 struct ParsedSelector<'a> {
-    raw: &'a str,
     value: Cow<'a, str>,
     kind: SelectorKind,
 }
@@ -80,6 +79,10 @@ struct ExplicitSelectorPrefix {
 const CHROMIUM_BIDI_NPM_VERSION: &str = "17.0.2";
 const CHROMIUM_BIDI_MAPPER_BUNDLE: &str =
     include_str!("../third_party/chromium-bidi/17.0.2/mapperTab.js");
+
+fn suppressed_file_dialog_behavior() -> Value {
+    json!({ "file": "dismiss" })
+}
 
 struct FirefoxSessionState {
     process_id: u32,
@@ -183,50 +186,33 @@ pub fn open_chrome_window(chrome_binary: Option<&str>) -> Result<ChromeLaunchInf
 }
 
 pub async fn discover_initial_tab(cdp_websocket_url: &str) -> Result<ChromeTabInfo, String> {
-    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-
-    for _ in 0..100 {
-        let targets = cdp
-            .send_command("Target.getTargets", json!({}), None)
-            .await?;
-        if let Some(page_target) = targets
-            .get("targetInfos")
-            .and_then(Value::as_array)
-            .and_then(|target_infos| {
-                target_infos.iter().find(|target_info| {
-                    target_info.get("type").and_then(Value::as_str) == Some("page")
-                })
-            })
-        {
-            let target_id = required_string(page_target, "/targetId")?;
-            return Ok(ChromeTabInfo {
-                note: "tracked initial Chrome tab via CDP".to_string(),
-                target_id,
-            });
-        }
-
-        sleep(Duration::from_millis(50)).await;
-    }
-
-    Err("timed out waiting for the initial Chrome page target over CDP".to_string())
+    let (pages, _) = chromium_top_level_pages(cdp_websocket_url, None).await?;
+    let page = pages.into_iter().next().ok_or_else(|| {
+        "WebDriver BiDi returned no initial Chromium browsing context".to_string()
+    })?;
+    Ok(ChromeTabInfo {
+        note: "tracked initial Chromium tab via WebDriver BiDi".to_string(),
+        target_id: page.id,
+    })
 }
 
 pub async fn open_chrome_tab(cdp_websocket_url: &str) -> Result<ChromeTabInfo, String> {
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let create_target = cdp
-        .send_command(
-            "Target.createTarget",
-            json!({
-                "url": "about:blank",
-                "background": false,
+    let mapper = cdp.ensure_chromium_bidi_mapper(None).await?;
+    let created = cdp
+        .send_bidi_command(
+            &mapper.mapper_session_id,
+            &json!({
+                "id": 2,
+                "method": "browsingContext.create",
+                "params": { "type": "tab", "background": false },
             }),
-            None,
         )
         .await?;
-    let target_id = required_string(&create_target, "/targetId")?;
+    let target_id = required_string(&created, "/result/context")?;
 
     Ok(ChromeTabInfo {
-        note: "opened Chrome tab via CDP".to_string(),
+        note: "opened Chromium tab via WebDriver BiDi".to_string(),
         target_id,
     })
 }
@@ -248,8 +234,13 @@ pub fn launch_browser(
     match browser_kind {
         BrowserKind::Chromium => {
             let launch = open_chrome_window(browser_binary)?;
-            let initial_page = block_on_plugin_future(async {
-                discover_initial_tab(&launch.cdp_websocket_url).await
+            let (initial_page, mapper) = block_on_plugin_future(async {
+                let (pages, mapper) =
+                    chromium_top_level_pages(&launch.cdp_websocket_url, None).await?;
+                let page = pages.into_iter().next().ok_or_else(|| {
+                    "WebDriver BiDi returned no initial Chromium browsing context".to_string()
+                })?;
+                Ok::<_, String>((page, mapper))
             })?;
             Ok(BrowserLaunchInfo {
                 browser_kind,
@@ -261,11 +252,11 @@ pub fn launch_browser(
                     cdp_websocket_url: launch.cdp_websocket_url,
                 },
                 initial_page: PageInfo {
-                    note: initial_page.note,
+                    note: "tracked initial Chromium tab via WebDriver BiDi".to_string(),
                     page_session: PageSessionHandle::Chromium {
-                        target_id: initial_page.target_id,
-                        browsing_context_id: None,
-                        mapper_target_id: None,
+                        target_id: initial_page.id.clone(),
+                        browsing_context_id: Some(initial_page.id),
+                        mapper_target_id: Some(mapper.mapper_target_id),
                     },
                 },
             })
@@ -277,13 +268,25 @@ pub fn launch_browser(
 pub async fn open_page(browser_session: &BrowserSessionHandle) -> Result<PageInfo, String> {
     match browser_session {
         BrowserSessionHandle::Chromium { cdp_websocket_url } => {
-            let tab = open_chrome_tab(cdp_websocket_url).await?;
+            let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+            let mapper = cdp.ensure_chromium_bidi_mapper(None).await?;
+            let created = cdp
+                .send_bidi_command(
+                    &mapper.mapper_session_id,
+                    &json!({
+                        "id": 2,
+                        "method": "browsingContext.create",
+                        "params": { "type": "tab", "background": false },
+                    }),
+                )
+                .await?;
+            let context = required_string(&created, "/result/context")?;
             Ok(PageInfo {
-                note: tab.note,
+                note: "opened Chromium tab via WebDriver BiDi".to_string(),
                 page_session: PageSessionHandle::Chromium {
-                    target_id: tab.target_id,
-                    browsing_context_id: None,
-                    mapper_target_id: None,
+                    target_id: context.clone(),
+                    browsing_context_id: Some(context),
+                    mapper_target_id: Some(mapper.mapper_target_id),
                 },
             })
         }
@@ -318,38 +321,52 @@ struct TopLevelPage {
     opener_id: Option<String>,
 }
 
+async fn chromium_top_level_pages(
+    cdp_websocket_url: &str,
+    mapper_target_id: Option<&str>,
+) -> Result<(Vec<TopLevelPage>, MapperConnectionInfo), String> {
+    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
+    let mapper = cdp.ensure_chromium_bidi_mapper(mapper_target_id).await?;
+    let tree = cdp
+        .send_bidi_command(
+            &mapper.mapper_session_id,
+            &json!({
+                "id": 2,
+                "method": "browsingContext.getTree",
+                "params": { "maxDepth": 0 },
+            }),
+        )
+        .await?;
+    let pages = tree
+        .pointer("/result/contexts")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|context| {
+            context
+                .get("context")
+                .and_then(Value::as_str)
+                .map(|id| TopLevelPage {
+                    id: id.to_string(),
+                    opener_id: context
+                        .get("originalOpener")
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                })
+        })
+        .collect();
+    Ok((pages, mapper))
+}
+
 async fn top_level_pages(
     browser_session: &BrowserSessionHandle,
+    mapper_target_id: Option<&str>,
 ) -> Result<Vec<TopLevelPage>, String> {
     match browser_session {
         BrowserSessionHandle::Chromium { cdp_websocket_url } => {
-            let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-            let targets = cdp
-                .send_command("Target.getTargets", json!({}), None)
-                .await?;
-            Ok(targets
-                .get("targetInfos")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter(|target| {
-                    target.get("type").and_then(Value::as_str) == Some("page")
-                        && target.get("url").and_then(Value::as_str)
-                            != Some("about:blank#MAPPER_TARGET")
-                })
-                .filter_map(|target| {
-                    target
-                        .get("targetId")
-                        .and_then(Value::as_str)
-                        .map(|id| TopLevelPage {
-                            id: id.to_string(),
-                            opener_id: target
-                                .get("openerId")
-                                .and_then(Value::as_str)
-                                .map(str::to_string),
-                        })
-                })
-                .collect())
+            chromium_top_level_pages(cdp_websocket_url, mapper_target_id)
+                .await
+                .map(|(pages, _)| pages)
         }
         BrowserSessionHandle::Firefox { connection_id, .. } => {
             let mut sessions = firefox_session_guard(connection_id).await?;
@@ -392,6 +409,12 @@ pub async fn register_hook(
     page_session: &PageSessionHandle,
     hook_type: HookType,
 ) -> Result<HookRegistration, String> {
+    let mapper_target_id = match page_session {
+        PageSessionHandle::Chromium {
+            mapper_target_id, ..
+        } => mapper_target_id.as_deref(),
+        PageSessionHandle::Firefox { .. } => None,
+    };
     let source_page_id = match (browser_session, page_session) {
         (BrowserSessionHandle::Chromium { .. }, PageSessionHandle::Chromium { target_id, .. }) => {
             target_id
@@ -408,7 +431,8 @@ pub async fn register_hook(
         HookType::NewPage => json!({
             "hook_type": "new_page",
             "source_page_id": source_page_id,
-            "existing_page_ids": top_level_pages(browser_session).await?.into_iter().map(|page| page.id).collect::<Vec<_>>(),
+            "mapper_target_id": mapper_target_id,
+            "existing_page_ids": top_level_pages(browser_session, mapper_target_id).await?.into_iter().map(|page| page.id).collect::<Vec<_>>(),
         }),
         HookType::FileChooser => {
             let registration_id = next_file_chooser_id("file-chooser-hook");
@@ -625,7 +649,8 @@ async fn poll_new_page_hook(
         .get("source_page_id")
         .and_then(Value::as_str)
         .ok_or_else(|| "new page hook state is missing source_page_id".to_string())?;
-    let page_id = top_level_pages(browser_session)
+    let mapper_target_id = state.get("mapper_target_id").and_then(Value::as_str);
+    let page_id = top_level_pages(browser_session, mapper_target_id)
         .await?
         .into_iter()
         .find(|page| {
@@ -638,9 +663,9 @@ async fn poll_new_page_hook(
 
     let page_session = match browser_session {
         BrowserSessionHandle::Chromium { .. } => PageSessionHandle::Chromium {
-            target_id: page_id.id,
-            browsing_context_id: None,
-            mapper_target_id: None,
+            target_id: page_id.id.clone(),
+            browsing_context_id: Some(page_id.id),
+            mapper_target_id: mapper_target_id.map(str::to_string),
         },
         BrowserSessionHandle::Firefox { .. } => PageSessionHandle::Firefox {
             browsing_context_id: page_id.id,
@@ -1111,8 +1136,29 @@ pub async fn close_page(
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
-            PageSessionHandle::Chromium { target_id, .. },
-        ) => close_chrome_tab(cdp_websocket_url, target_id).await,
+            PageSessionHandle::Chromium {
+                target_id,
+                browsing_context_id,
+                mapper_target_id,
+            },
+        ) => {
+            let (mut cdp, mapper, context) = chromium_bidi_session(
+                cdp_websocket_url,
+                mapper_target_id.as_deref(),
+                Some(browsing_context_id.as_deref().unwrap_or(target_id)),
+            )
+            .await?;
+            cdp.send_bidi_command(
+                &mapper.mapper_session_id,
+                &json!({
+                    "id": 2,
+                    "method": "browsingContext.close",
+                    "params": { "context": context },
+                }),
+            )
+            .await?;
+            Ok(())
+        }
         (
             BrowserSessionHandle::Firefox { connection_id, .. },
             PageSessionHandle::Firefox {
@@ -1139,26 +1185,17 @@ pub async fn close_page(
 
 pub async fn close_chrome_tab(cdp_websocket_url: &str, target_id: &str) -> Result<(), String> {
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let response = cdp
-        .send_command(
-            "Target.closeTarget",
-            json!({
-                "targetId": target_id,
-            }),
-            None,
-        )
-        .await?;
-    let success = response
-        .get("success")
-        .and_then(Value::as_bool)
-        .unwrap_or(false);
-    if success {
-        Ok(())
-    } else {
-        Err(format!(
-            "CDP Target.closeTarget reported unsuccessful close for target {target_id}"
-        ))
-    }
+    let mapper = cdp.ensure_chromium_bidi_mapper(None).await?;
+    cdp.send_bidi_command(
+        &mapper.mapper_session_id,
+        &json!({
+            "id": 2,
+            "method": "browsingContext.close",
+            "params": { "context": target_id },
+        }),
+    )
+    .await?;
+    Ok(())
 }
 
 pub async fn navigate_chrome_tab(
@@ -1171,30 +1208,6 @@ pub async fn navigate_chrome_tab(
     }
 
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let attach = cdp
-        .send_command(
-            "Target.attachToTarget",
-            json!({
-                "targetId": target_id,
-                "flatten": true,
-            }),
-            None,
-        )
-        .await?;
-    let session_id = required_string(&attach, "/sessionId")?;
-    let frame_tree = cdp
-        .send_command("Page.getFrameTree", json!({}), Some(&session_id))
-        .await?;
-    let browsing_context_id = required_string(&frame_tree, "/frameTree/frame/id")?;
-    cdp.send_command(
-        "Target.detachFromTarget",
-        json!({
-            "sessionId": session_id,
-        }),
-        None,
-    )
-    .await?;
-
     let mapper = cdp.ensure_chromium_bidi_mapper(None).await?;
     let response = cdp
         .send_bidi_command(
@@ -1203,7 +1216,7 @@ pub async fn navigate_chrome_tab(
                 "id": 7100,
                 "method": "browsingContext.navigate",
                 "params": {
-                    "context": browsing_context_id,
+                    "context": target_id,
                     "url": url,
                     "wait": "complete",
                 },
@@ -1217,7 +1230,7 @@ pub async fn navigate_chrome_tab(
         note: "navigated Chromium tab via injected WebDriver BiDi".to_string(),
         page_session: PageSessionHandle::Chromium {
             target_id: target_id.to_string(),
-            browsing_context_id: Some(browsing_context_id),
+            browsing_context_id: Some(target_id.to_string()),
             mapper_target_id: Some(mapper.mapper_target_id.clone()),
         },
         automation: AutomationSessionInfo {
@@ -1336,468 +1349,16 @@ pub async fn inject_chromium_bidi_mapper(
     cdp_websocket_url: &str,
 ) -> Result<ChromiumBidiMapperInfo, String> {
     let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let mapper_target = cdp
-        .send_command(
-            "Target.createTarget",
-            json!({
-                "url": "about:blank#MAPPER_TARGET",
-                "hidden": true,
-                "background": true,
-            }),
-            None,
-        )
-        .await?;
-    let mapper_target_id = required_string(&mapper_target, "/targetId")?;
-
-    let attached = cdp
-        .send_command(
-            "Target.attachToTarget",
-            json!({
-                "targetId": mapper_target_id,
-                "flatten": true,
-            }),
-            None,
-        )
-        .await?;
-    let mapper_session_id = required_string(&attached, "/sessionId")?;
-
-    cdp.send_command("Runtime.enable", json!({}), Some(&mapper_session_id))
-        .await?;
-    cdp.send_command(
-        "Target.exposeDevToolsProtocol",
-        json!({
-            "bindingName": "cdp",
-            "targetId": mapper_target_id,
-            "inheritPermissions": true,
-        }),
-        None,
-    )
-    .await?;
-    cdp.send_command(
-        "Runtime.addBinding",
-        json!({
-            "name": "sendBidiResponse",
-        }),
-        Some(&mapper_session_id),
-    )
-    .await?;
-    cdp.evaluate_expression(&mapper_session_id, CHROMIUM_BIDI_MAPPER_BUNDLE, false)
-        .await?;
-    cdp.evaluate_expression(
-        &mapper_session_id,
-        &format!(
-            "window.runMapperInstance('{}')",
-            js_single_quote(&mapper_target_id)
-        ),
-        true,
-    )
-    .await?;
+    let mapper = cdp.ensure_chromium_bidi_mapper(None).await?;
 
     Ok(ChromiumBidiMapperInfo {
         package_version: CHROMIUM_BIDI_NPM_VERSION.to_string(),
-        mapper_target_id,
-        mapper_session_id,
+        mapper_target_id: mapper.mapper_target_id,
+        mapper_session_id: mapper.mapper_session_id,
         note: format!(
             "injected chromium-bidi mapper from pinned published chromium-bidi@{} artifact into hidden mapper target",
             CHROMIUM_BIDI_NPM_VERSION
         ),
-    })
-}
-
-pub async fn click_element_via_cdp(
-    cdp_websocket_url: &str,
-    target_id: &str,
-    css_selector: &str,
-) -> Result<ClickInfo, String> {
-    let parsed = parse_selector("click_element", css_selector)?;
-
-    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let session_id = cdp.prepare_page_target_session(target_id).await?;
-    let discovered = discover_elements_via_cdp(
-        &mut cdp,
-        &session_id,
-        css_selector,
-        DiscoveryRequirements {
-            require_match: true,
-            require_visible: true,
-            require_pointer_interactable: true,
-            ..DiscoveryRequirements::default()
-        },
-    )
-    .await?;
-    let center = discovered.first_center.ok_or_else(|| {
-        format!(
-            "element discovery did not return a clickable center for {} {}",
-            selector_kind_label(parsed.kind),
-            parsed.value
-        )
-    })?;
-    cdp.dispatch_mouse_click(&session_id, center.x, center.y)
-        .await?;
-    cdp.detach_from_target(&session_id).await?;
-
-    Ok(ClickInfo {
-        css_selector: css_selector.to_string(),
-        note: format!(
-            "clicked element via CDP mouse events using {} {}",
-            selector_kind_label(parsed.kind),
-            parsed.value
-        ),
-        bidi_session_id: String::new(),
-    })
-}
-
-pub async fn count_elements_via_cdp(
-    cdp_websocket_url: &str,
-    target_id: &str,
-    css_selector: &str,
-) -> Result<ElementCountInfo, String> {
-    let parsed = parse_selector("count_elements", css_selector)?;
-
-    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let session_id = cdp.prepare_page_target_session(target_id).await?;
-    let discovered = discover_elements_via_cdp(
-        &mut cdp,
-        &session_id,
-        css_selector,
-        DiscoveryRequirements::default(),
-    )
-    .await?;
-    cdp.detach_from_target(&session_id).await?;
-
-    Ok(ElementCountInfo {
-        css_selector: css_selector.to_string(),
-        count: discovered.count,
-        note: format!(
-            "counted {} element(s) matching {} {}",
-            discovered.count,
-            selector_kind_label(parsed.kind),
-            parsed.value
-        ),
-    })
-}
-
-pub async fn highlight_elements_via_cdp(
-    cdp_websocket_url: &str,
-    target_id: &str,
-    css_selector: &str,
-    duration_ms: u32,
-) -> Result<HighlightElementsInfo, String> {
-    let parsed = parse_selector("highlight_elements", css_selector)?;
-
-    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let session_id = cdp.prepare_page_target_session(target_id).await?;
-    let discovered = discover_elements_via_cdp(
-        &mut cdp,
-        &session_id,
-        css_selector,
-        DiscoveryRequirements::default(),
-    )
-    .await?;
-
-    let selector_literal = serde_json::to_string(&parsed.value)
-        .map_err(|error| format!("failed to serialize selector for highlight: {error}"))?;
-    let query_all_js = selector_query_all_js(parsed.kind);
-    let duration_ms = duration_ms.max(1);
-    cdp.evaluate_expression(
-        &session_id,
-        &format!(
-            "(() => {{
-                const selector = {selector_literal};
-                const durationMs = {duration_ms};
-                const elements = {query_all_js};
-                for (const element of elements) {{
-                    if (!(element instanceof HTMLElement)) {{
-                        continue;
-                    }}
-                    element.scrollIntoView({{ block: 'center', inline: 'center', behavior: 'instant' }});
-                    const priorOutline = element.style.outline;
-                    const priorOutlineOffset = element.style.outlineOffset;
-                    const priorBackgroundColor = element.style.backgroundColor;
-                    element.style.outline = '3px solid #ff5a36';
-                    element.style.outlineOffset = '2px';
-                    element.style.backgroundColor = 'rgba(255, 235, 59, 0.35)';
-                    window.setTimeout(() => {{
-                        element.style.outline = priorOutline;
-                        element.style.outlineOffset = priorOutlineOffset;
-                        element.style.backgroundColor = priorBackgroundColor;
-                    }}, durationMs);
-                }}
-                return elements.length;
-            }})()"
-        ),
-        true,
-    )
-    .await?;
-    cdp.detach_from_target(&session_id).await?;
-
-    Ok(HighlightElementsInfo {
-        css_selector: css_selector.to_string(),
-        count: discovered.count,
-        note: format!(
-            "highlighted {} element(s) matching {} {} for {duration_ms}ms",
-            discovered.count,
-            selector_kind_label(parsed.kind),
-            parsed.value
-        ),
-    })
-}
-
-pub async fn focus_element_via_cdp(
-    cdp_websocket_url: &str,
-    target_id: &str,
-    css_selector: &str,
-) -> Result<FocusInfo, String> {
-    let parsed = parse_selector("focus_element", css_selector)?;
-    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let session_id = cdp.prepare_page_target_session(target_id).await?;
-    discover_elements_via_cdp(
-        &mut cdp,
-        &session_id,
-        css_selector,
-        DiscoveryRequirements {
-            require_match: true,
-            require_visible: true,
-            focus_first_match: true,
-            require_focus: true,
-            ..DiscoveryRequirements::default()
-        },
-    )
-    .await?;
-    cdp.detach_from_target(&session_id).await?;
-
-    Ok(FocusInfo {
-        css_selector: css_selector.to_string(),
-        note: format!(
-            "focused element matching {} {}",
-            selector_kind_label(parsed.kind),
-            parsed.value
-        ),
-    })
-}
-
-pub async fn fill_element_via_cdp(
-    cdp_websocket_url: &str,
-    target_id: &str,
-    css_selector: &str,
-    value: &str,
-) -> Result<FillInfo, String> {
-    let parsed = parse_selector("fill_element", css_selector)?;
-    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let session_id = cdp.prepare_page_target_session(target_id).await?;
-    discover_elements_via_cdp(
-        &mut cdp,
-        &session_id,
-        css_selector,
-        DiscoveryRequirements {
-            require_match: true,
-            require_visible: true,
-            require_editable: true,
-            focus_first_match: true,
-            require_focus: true,
-            ..DiscoveryRequirements::default()
-        },
-    )
-    .await?;
-    let selector_literal = json_string_literal(&parsed.value, "fill selector")?;
-    let value_literal = json_string_literal(value, "fill value")?;
-    cdp.evaluate_expression(
-        &session_id,
-        &dom_set_value_and_dispatch_events_js(parsed.kind, &selector_literal, &value_literal),
-        true,
-    )
-    .await?;
-    cdp.detach_from_target(&session_id).await?;
-
-    Ok(FillInfo {
-        css_selector: css_selector.to_string(),
-        value: value.to_string(),
-        note: format!(
-            "filled element matching {} {}",
-            selector_kind_label(parsed.kind),
-            parsed.value
-        ),
-    })
-}
-
-pub async fn hover_element_via_cdp(
-    cdp_websocket_url: &str,
-    target_id: &str,
-    css_selector: &str,
-) -> Result<HoverInfo, String> {
-    let parsed = parse_selector("hover_element", css_selector)?;
-    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let session_id = cdp.prepare_page_target_session(target_id).await?;
-    let discovered = discover_elements_via_cdp(
-        &mut cdp,
-        &session_id,
-        css_selector,
-        DiscoveryRequirements {
-            require_match: true,
-            require_visible: true,
-            require_pointer_interactable: true,
-            ..DiscoveryRequirements::default()
-        },
-    )
-    .await?;
-    let center = discovered.first_center.ok_or_else(|| {
-        format!(
-            "element discovery did not return a hover center for {} {}",
-            selector_kind_label(parsed.kind),
-            parsed.value
-        )
-    })?;
-    cdp.dispatch_mouse_move(&session_id, center.x, center.y)
-        .await?;
-    cdp.detach_from_target(&session_id).await?;
-
-    Ok(HoverInfo {
-        css_selector: css_selector.to_string(),
-        note: format!(
-            "hovered element matching {} {}",
-            selector_kind_label(parsed.kind),
-            parsed.value
-        ),
-    })
-}
-
-pub async fn press_key_via_cdp(
-    cdp_websocket_url: &str,
-    target_id: &str,
-    css_selector: &str,
-    key: &str,
-    text: Option<&str>,
-) -> Result<PressKeyInfo, String> {
-    let parsed = parse_selector("press_key", css_selector)?;
-    if key.trim().is_empty() {
-        return Err("press_key command requires a non-empty key".to_string());
-    }
-
-    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let session_id = cdp.prepare_page_target_session(target_id).await?;
-    discover_elements_via_cdp(
-        &mut cdp,
-        &session_id,
-        css_selector,
-        DiscoveryRequirements {
-            require_match: true,
-            require_visible: true,
-            focus_first_match: true,
-            require_focus: true,
-            ..DiscoveryRequirements::default()
-        },
-    )
-    .await?;
-    cdp.dispatch_key_press(&session_id, key, text).await?;
-    cdp.detach_from_target(&session_id).await?;
-
-    Ok(PressKeyInfo {
-        css_selector: css_selector.to_string(),
-        key: key.to_string(),
-        note: format!(
-            "pressed key {key} on element matching {} {}",
-            selector_kind_label(parsed.kind),
-            parsed.value
-        ),
-    })
-}
-
-pub async fn get_text_content_via_cdp(
-    cdp_websocket_url: &str,
-    target_id: &str,
-    css_selector: &str,
-) -> Result<TextInfo, String> {
-    get_text_via_cdp(cdp_websocket_url, target_id, css_selector, "textContent")
-        .await
-        .map(|mut info| {
-            let parsed = parse_selector("get_text_content", css_selector)
-                .expect("selector was already validated for textContent resolution");
-            info.note = format!(
-                "resolved textContent for {} {}",
-                selector_kind_label(parsed.kind),
-                parsed.value
-            );
-            info
-        })
-}
-
-pub async fn get_inner_text_via_cdp(
-    cdp_websocket_url: &str,
-    target_id: &str,
-    css_selector: &str,
-) -> Result<TextInfo, String> {
-    get_text_via_cdp(cdp_websocket_url, target_id, css_selector, "innerText")
-        .await
-        .map(|mut info| {
-            let parsed = parse_selector("get_inner_text", css_selector)
-                .expect("selector was already validated for innerText resolution");
-            info.note = format!(
-                "resolved innerText for {} {}",
-                selector_kind_label(parsed.kind),
-                parsed.value
-            );
-            info
-        })
-}
-
-pub async fn wait_for_selector_via_cdp(
-    cdp_websocket_url: &str,
-    target_id: &str,
-    css_selector: &str,
-    visible: bool,
-) -> Result<WaitForSelectorInfo, String> {
-    let parsed = parse_selector("wait_for_selector", css_selector)?;
-    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let session_id = cdp.prepare_page_target_session(target_id).await?;
-    let discovered = discover_elements_via_cdp(
-        &mut cdp,
-        &session_id,
-        css_selector,
-        DiscoveryRequirements {
-            require_visible: visible,
-            ..DiscoveryRequirements::default()
-        },
-    )
-    .await?;
-    let success = if visible {
-        discovered.first_center.is_some()
-    } else {
-        discovered.count > 0
-    };
-    cdp.detach_from_target(&session_id).await?;
-
-    if !success {
-        return Err(if visible {
-            format!(
-                "no visible element matches {} {}",
-                selector_kind_label(parsed.kind),
-                parsed.value
-            )
-        } else {
-            format!(
-                "no element matches {} {}",
-                selector_kind_label(parsed.kind),
-                parsed.value
-            )
-        });
-    }
-
-    Ok(WaitForSelectorInfo {
-        css_selector: css_selector.to_string(),
-        visible,
-        note: if visible {
-            format!(
-                "visible element matched {} {}",
-                selector_kind_label(parsed.kind),
-                parsed.value
-            )
-        } else {
-            format!(
-                "element matched {} {}",
-                selector_kind_label(parsed.kind),
-                parsed.value
-            )
-        },
     })
 }
 
@@ -2658,28 +2219,6 @@ pub async fn wait_for_selector(
     }
 }
 
-pub async fn screenshot_via_cdp(
-    cdp_websocket_url: &str,
-    target_id: &str,
-    full_page: bool,
-) -> Result<ScreenshotInfo, String> {
-    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let session_id = cdp.prepare_page_target_session(target_id).await?;
-    let response = cdp
-        .send_command(
-            "Page.captureScreenshot",
-            json!({ "captureBeyondViewport": full_page }),
-            Some(&session_id),
-        )
-        .await?;
-    cdp.detach_from_target(&session_id).await?;
-
-    Ok(ScreenshotInfo {
-        png_data: decode_base64_field(&response, "/data", "CDP screenshot data")?,
-        note: "captured Chromium screenshot via CDP Page.captureScreenshot".to_string(),
-    })
-}
-
 pub async fn screenshot(
     browser_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
@@ -2737,116 +2276,6 @@ pub async fn screenshot(
         }
         _ => Err("browser/page backend mismatch while capturing screenshot".to_string()),
     }
-}
-
-async fn discover_elements_via_cdp(
-    cdp: &mut CdpConnection,
-    session_id: &str,
-    selector: &str,
-    requirements: DiscoveryRequirements,
-) -> Result<DiscoveredElements, String> {
-    let selector_literal = json_string_literal(selector, "selector for discovery")?;
-    let selector_segments_literal = selector_segments_literal("discover_elements", selector)?;
-    let selector_kind_label = selector_chain_kind_label("discover_elements", selector)?;
-    let query_all_js = selector_chain_query_all_js();
-    let requirements_literal = discovery_requirements_literal(requirements);
-    let expression = format!(
-        "(() => {{
-            const selector = {selector_literal};
-            const selectorSegments = {selector_segments_literal};
-            const selectorChainQueryAll = () => {query_all_js};
-            const elements = {query_all_js};
-            const first = elements[0] ?? null;
-            const requirements = {requirements_literal};
-            {actionability_helpers_js}
-            if (requirements.requireMatch && !first) {{
-                throw new Error(`No element matches {selector_kind_label}: ${{selector}}`);
-            }}
-            const prepared = first
-                ? allwrightPrepareElement(first, selector, '{selector_kind_label}', requirements)
-                : null;
-            return {{
-                count: elements.length,
-                first: prepared?.center ?? null
-            }};
-        }})()",
-        actionability_helpers_js = actionability_helpers_js(),
-    );
-    let result = cdp
-        .evaluate_expression(session_id, &expression, true)
-        .await?;
-    let count = json_u32(&result, "/result/value/count")?;
-    let first_center = if result.pointer("/result/value/first").is_some()
-        && !result
-            .pointer("/result/value/first")
-            .is_some_and(Value::is_null)
-    {
-        Some(ElementCenter {
-            x: json_f64(&result, "/result/value/first/x")?,
-            y: json_f64(&result, "/result/value/first/y")?,
-        })
-    } else {
-        None
-    };
-
-    Ok(DiscoveredElements {
-        count,
-        first_center,
-    })
-}
-
-async fn get_text_via_cdp(
-    cdp_websocket_url: &str,
-    target_id: &str,
-    selector: &str,
-    property: &str,
-) -> Result<TextInfo, String> {
-    let parsed = parse_selector("get_text", selector)?;
-    let mut cdp = CdpConnection::connect(cdp_websocket_url).await?;
-    let session_id = cdp.prepare_page_target_session(target_id).await?;
-    discover_elements_via_cdp(
-        &mut cdp,
-        &session_id,
-        selector,
-        DiscoveryRequirements {
-            require_match: true,
-            ..DiscoveryRequirements::default()
-        },
-    )
-    .await?;
-    let selector_literal = json_string_literal(selector, "text selector")?;
-    let selector_segments_literal = selector_segments_literal("get_text", selector)?;
-    let property_literal = json_string_literal(property, "text property")?;
-    let selector_kind_label = selector_chain_kind_label("get_text", selector)?;
-    let query_first_js = selector_chain_query_first_js();
-    let result = cdp
-        .evaluate_expression(
-            &session_id,
-            &format!(
-                "(() => {{
-                    const selector = {selector_literal};
-                    const selectorSegments = {selector_segments_literal};
-                    const selectorChainQueryAll = () => {};
-                    const property = {property_literal};
-                    const element = {query_first_js};
-                    if (!element) {{
-                        throw new Error(`No element matches {selector_kind_label}: ${{selector}}`);
-                    }}
-                    const value = element[property];
-                    return typeof value === 'string' ? value : '';
-                }})()",
-                selector_chain_query_all_js(),
-            ),
-            true,
-        )
-        .await?;
-    cdp.detach_from_target(&session_id).await?;
-
-    Ok(TextInfo {
-        css_selector: parsed.raw.to_string(),
-        text: json_string(&result, "/result/value")?,
-        note: String::new(),
-    })
 }
 
 fn dom_set_value_and_dispatch_events_js(
@@ -3440,7 +2869,37 @@ fn create_chrome_user_data_dir() -> Result<PathBuf, String> {
             dir.display()
         )
     })?;
+    let default_profile = dir.join("Default");
+    fs::create_dir_all(&default_profile).map_err(|error| {
+        format!(
+            "failed to create Chrome default profile {}: {error}",
+            default_profile.display()
+        )
+    })?;
+    let preferences = default_profile.join("Preferences");
+    fs::write(&preferences, chromium_profile_preferences().to_string()).map_err(|error| {
+        format!(
+            "failed to write Chrome automation preferences {}: {error}",
+            preferences.display()
+        )
+    })?;
     Ok(dir)
+}
+
+fn chromium_profile_preferences() -> Value {
+    json!({
+        "download": {
+            "prompt_for_download": false,
+        },
+        "download_bubble": {
+            "partial_view_enabled": false,
+        },
+        "profile": {
+            "default_content_setting_values": {
+                "automatic_downloads": 1,
+            },
+        },
+    })
 }
 
 fn wait_for_cdp_endpoint(user_data_dir: &std::path::Path) -> Result<String, String> {
@@ -3554,10 +3013,7 @@ fn launch_firefox_with_remote_agent(browser_binary: &str) -> Result<BrowserLaunc
                     "capabilities": {
                         "alwaysMatch": {
                             "acceptInsecureCerts": true,
-                            "unhandledPromptBehavior": {
-                                "default": "dismiss",
-                                "file": "ignore"
-                            }
+                            "unhandledPromptBehavior": suppressed_file_dialog_behavior()
                         }
                     }
                 }),
@@ -3608,7 +3064,21 @@ fn create_firefox_user_data_dir() -> Result<PathBuf, String> {
             dir.display()
         )
     })?;
+    let user_js = dir.join("user.js");
+    fs::write(&user_js, firefox_download_preferences()).map_err(|error| {
+        format!(
+            "failed to write Firefox automation preferences {}: {error}",
+            user_js.display()
+        )
+    })?;
     Ok(dir)
+}
+
+fn firefox_download_preferences() -> &'static str {
+    r#"user_pref("browser.download.useDownloadDir", true);
+user_pref("browser.download.always_ask_before_handling_new_types", false);
+user_pref("browser.download.alwaysOpenPanel", false);
+"#
 }
 
 fn choose_loopback_port() -> Result<u16, String> {
@@ -3652,7 +3122,6 @@ fn parse_selector<'a>(command_name: &str, selector: &'a str) -> Result<ParsedSel
         && parse_selector_chain(command_name, trimmed)?.len() > 1
     {
         return Ok(ParsedSelector {
-            raw: selector,
             value: Cow::Owned(format!(
                 "{{\"chain\":{}}}",
                 selector_segments_literal(command_name, trimmed)?
@@ -3662,7 +3131,6 @@ fn parse_selector<'a>(command_name: &str, selector: &'a str) -> Result<ParsedSel
     }
     if trimmed.to_ascii_lowercase().starts_with("aw=") {
         return Ok(ParsedSelector {
-            raw: selector,
             value: parse_selector_value(&trimmed[3..])?,
             kind: SelectorKind::Structured,
         });
@@ -3671,40 +3139,34 @@ fn parse_selector<'a>(command_name: &str, selector: &'a str) -> Result<ParsedSel
     let parsed = if lowercase.starts_with("xpath=") {
         let value = parse_selector_value(&trimmed[6..])?;
         ParsedSelector {
-            raw: selector,
             value,
             kind: SelectorKind::XPath,
         }
     } else if lowercase.starts_with("xpath:") {
         let value = parse_selector_value(&trimmed[6..])?;
         ParsedSelector {
-            raw: selector,
             value,
             kind: SelectorKind::XPath,
         }
     } else if lowercase.starts_with("css=") {
         let value = parse_selector_value(&trimmed[4..])?;
         ParsedSelector {
-            raw: selector,
             value,
             kind: SelectorKind::Css,
         }
     } else if lowercase.starts_with("css:") {
         let value = parse_selector_value(&trimmed[4..])?;
         ParsedSelector {
-            raw: selector,
             value,
             kind: SelectorKind::Css,
         }
     } else if looks_like_xpath(trimmed) {
         ParsedSelector {
-            raw: selector,
             value: Cow::Borrowed(trimmed),
             kind: SelectorKind::XPath,
         }
     } else {
         ParsedSelector {
-            raw: selector,
             value: Cow::Borrowed(trimmed),
             kind: SelectorKind::Css,
         }
@@ -3849,7 +3311,6 @@ fn parse_selector_chain<'a>(
                     ));
                 }
                 segments.push(ParsedSelector {
-                    raw: selector,
                     value,
                     kind: current_prefix.kind,
                 });
@@ -3869,7 +3330,6 @@ fn parse_selector_chain<'a>(
         ));
     }
     segments.push(ParsedSelector {
-        raw: selector,
         value,
         kind: current_prefix.kind,
     });
@@ -3959,13 +3419,6 @@ fn selector_chain_kind_label(command_name: &str, selector: &str) -> Result<Strin
 
 fn selector_chain_query_all_js() -> String {
     semantic_query_js("selectorSegments")
-}
-
-fn selector_chain_query_first_js() -> &'static str {
-    "(() => {
-        const elements = selectorChainQueryAll();
-        return elements[0] ?? null;
-    })()"
 }
 
 fn firefox_session_registry() -> &'static Mutex<HashMap<String, FirefoxSessionState>> {
@@ -4292,127 +3745,6 @@ impl CdpConnection {
         Ok(result)
     }
 
-    async fn attach_to_target(&mut self, target_id: &str) -> Result<String, String> {
-        let attached = self
-            .send_command(
-                "Target.attachToTarget",
-                json!({
-                    "targetId": target_id,
-                    "flatten": true,
-                }),
-                None,
-            )
-            .await?;
-        required_string(&attached, "/sessionId")
-    }
-
-    async fn prepare_page_target_session(&mut self, target_id: &str) -> Result<String, String> {
-        let session_id = self.attach_to_target(target_id).await?;
-        self.send_command("Runtime.enable", json!({}), Some(&session_id))
-            .await?;
-        self.send_command("Page.enable", json!({}), Some(&session_id))
-            .await?;
-        Ok(session_id)
-    }
-
-    async fn detach_from_target(&mut self, session_id: &str) -> Result<(), String> {
-        self.send_command(
-            "Target.detachFromTarget",
-            json!({
-                "sessionId": session_id,
-            }),
-            None,
-        )
-        .await?;
-        Ok(())
-    }
-
-    async fn dispatch_mouse_click(
-        &mut self,
-        session_id: &str,
-        x: f64,
-        y: f64,
-    ) -> Result<(), String> {
-        self.dispatch_mouse_move(session_id, x, y).await?;
-        self.send_command(
-            "Input.dispatchMouseEvent",
-            json!({
-                "type": "mousePressed",
-                "x": x,
-                "y": y,
-                "button": "left",
-                "buttons": 1,
-                "clickCount": 1,
-            }),
-            Some(session_id),
-        )
-        .await?;
-        self.send_command(
-            "Input.dispatchMouseEvent",
-            json!({
-                "type": "mouseReleased",
-                "x": x,
-                "y": y,
-                "button": "left",
-                "buttons": 0,
-                "clickCount": 1,
-            }),
-            Some(session_id),
-        )
-        .await?;
-        Ok(())
-    }
-
-    async fn dispatch_mouse_move(
-        &mut self,
-        session_id: &str,
-        x: f64,
-        y: f64,
-    ) -> Result<(), String> {
-        self.send_command(
-            "Input.dispatchMouseEvent",
-            json!({
-                "type": "mouseMoved",
-                "x": x,
-                "y": y,
-                "button": "none",
-                "buttons": 0,
-            }),
-            Some(session_id),
-        )
-        .await?;
-        Ok(())
-    }
-
-    async fn dispatch_key_press(
-        &mut self,
-        session_id: &str,
-        key: &str,
-        text: Option<&str>,
-    ) -> Result<(), String> {
-        self.send_command(
-            "Input.dispatchKeyEvent",
-            json!({
-                "type": "keyDown",
-                "key": key,
-                "text": text.unwrap_or(""),
-            }),
-            Some(session_id),
-        )
-        .await?;
-        self.send_command(
-            "Input.dispatchKeyEvent",
-            json!({
-                "type": "keyUp",
-                "key": key,
-                "text": text.unwrap_or(""),
-            }),
-            Some(session_id),
-        )
-        .await?;
-        Ok(())
-    }
-
     async fn ensure_chromium_bidi_mapper(
         &mut self,
         existing_mapper_target_id: Option<&str>,
@@ -4494,7 +3826,11 @@ impl CdpConnection {
                     "id": 1,
                     "method": "session.new",
                     "params": {
-                        "capabilities": {}
+                        "capabilities": {
+                            "alwaysMatch": {
+                                "unhandledPromptBehavior": suppressed_file_dialog_behavior()
+                            }
+                        }
                     }
                 }),
             )
@@ -5395,122 +4731,6 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
                 mapper,
             })
         }),
-        PluginCommand::ClickElementViaCdp {
-            cdp_websocket_url,
-            target_id,
-            css_selector,
-        } => block_on_plugin_future(async move {
-            let result =
-                click_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
-            Ok(PluginResult::ClickElementViaCdp(result))
-        }),
-        PluginCommand::CountElementsViaCdp {
-            cdp_websocket_url,
-            target_id,
-            css_selector,
-        } => block_on_plugin_future(async move {
-            let result =
-                count_elements_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
-            Ok(PluginResult::CountElementsViaCdp(result))
-        }),
-        PluginCommand::HighlightElementsViaCdp {
-            cdp_websocket_url,
-            target_id,
-            css_selector,
-            duration_ms,
-        } => block_on_plugin_future(async move {
-            let duration_ms = u32::try_from(duration_ms)
-                .map_err(|_| format!("highlight duration {duration_ms} exceeds u32"))?;
-            let result = highlight_elements_via_cdp(
-                &cdp_websocket_url,
-                &target_id,
-                &css_selector,
-                duration_ms,
-            )
-            .await?;
-            Ok(PluginResult::HighlightElementsViaCdp(result))
-        }),
-        PluginCommand::FocusElementViaCdp {
-            cdp_websocket_url,
-            target_id,
-            css_selector,
-        } => block_on_plugin_future(async move {
-            let result =
-                focus_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
-            Ok(PluginResult::FocusElementViaCdp(result))
-        }),
-        PluginCommand::FillElementViaCdp {
-            cdp_websocket_url,
-            target_id,
-            css_selector,
-            value,
-        } => block_on_plugin_future(async move {
-            let result =
-                fill_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector, &value).await?;
-            Ok(PluginResult::FillElementViaCdp(result))
-        }),
-        PluginCommand::HoverElementViaCdp {
-            cdp_websocket_url,
-            target_id,
-            css_selector,
-        } => block_on_plugin_future(async move {
-            let result =
-                hover_element_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
-            Ok(PluginResult::HoverElementViaCdp(result))
-        }),
-        PluginCommand::PressKeyViaCdp {
-            cdp_websocket_url,
-            target_id,
-            css_selector,
-            key,
-            text,
-        } => block_on_plugin_future(async move {
-            let result = press_key_via_cdp(
-                &cdp_websocket_url,
-                &target_id,
-                &css_selector,
-                &key,
-                text.as_deref(),
-            )
-            .await?;
-            Ok(PluginResult::PressKeyViaCdp(result))
-        }),
-        PluginCommand::GetTextContentViaCdp {
-            cdp_websocket_url,
-            target_id,
-            css_selector,
-        } => block_on_plugin_future(async move {
-            let result =
-                get_text_content_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
-            Ok(PluginResult::GetTextContentViaCdp(result))
-        }),
-        PluginCommand::GetInnerTextViaCdp {
-            cdp_websocket_url,
-            target_id,
-            css_selector,
-        } => block_on_plugin_future(async move {
-            let result =
-                get_inner_text_via_cdp(&cdp_websocket_url, &target_id, &css_selector).await?;
-            Ok(PluginResult::GetInnerTextViaCdp(result))
-        }),
-        PluginCommand::WaitForSelectorViaCdp {
-            cdp_websocket_url,
-            target_id,
-            css_selector,
-            visible,
-        } => block_on_plugin_future(async move {
-            let result =
-                wait_for_selector_via_cdp(&cdp_websocket_url, &target_id, &css_selector, visible)
-                    .await?;
-            Ok(PluginResult::WaitForSelectorViaCdp(result))
-        }),
-        PluginCommand::ScreenshotViaCdp {
-            cdp_websocket_url,
-            target_id,
-        } => block_on_plugin_future(async move {
-            let result = screenshot_via_cdp(&cdp_websocket_url, &target_id, false).await?;
-            Ok(PluginResult::ScreenshotViaCdp(result))
-        }),
     }
 }
 
@@ -5558,7 +4778,63 @@ pub unsafe extern "C" fn allwright_plugin_free_string(value: *mut c_char) {
 
 #[cfg(test)]
 mod tests {
-    use super::{SelectorKind, parse_selector};
+    use super::{
+        SelectorKind, chromium_profile_preferences, firefox_download_preferences, parse_selector,
+        suppressed_file_dialog_behavior,
+    };
+
+    #[test]
+    fn bidi_sessions_dismiss_native_file_dialogs() {
+        assert_eq!(
+            suppressed_file_dialog_behavior().pointer("/file"),
+            Some(&serde_json::Value::String("dismiss".to_string()))
+        );
+    }
+
+    #[test]
+    fn chromium_automation_has_no_direct_cdp_fallbacks() {
+        let source = include_str!("lib.rs");
+        for (prefix, suffix) in [
+            ("Via", "Cdp"),
+            ("_via_", "cdp"),
+            ("Target.", "getTargets"),
+            ("Target.", "closeTarget"),
+            ("Page.", "getFrameTree"),
+            ("Page.", "captureScreenshot"),
+            ("Input.", "dispatchMouseEvent"),
+            ("Input.", "dispatchKeyEvent"),
+        ] {
+            let forbidden = format!("{prefix}{suffix}");
+            assert!(
+                !source.contains(&forbidden),
+                "direct CDP automation token must not appear in the web surface: {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn browser_profiles_suppress_download_prompts_and_panels() {
+        let chromium = chromium_profile_preferences();
+        assert_eq!(
+            chromium.pointer("/download/prompt_for_download"),
+            Some(&serde_json::Value::Bool(false))
+        );
+        assert_eq!(
+            chromium.pointer("/download_bubble/partial_view_enabled"),
+            Some(&serde_json::Value::Bool(false))
+        );
+        assert_eq!(
+            chromium.pointer("/profile/default_content_setting_values/automatic_downloads"),
+            Some(&serde_json::Value::Number(1.into()))
+        );
+
+        let firefox = firefox_download_preferences();
+        assert!(firefox.contains(r#""browser.download.useDownloadDir", true"#));
+        assert!(
+            firefox.contains(r#""browser.download.always_ask_before_handling_new_types", false"#)
+        );
+        assert!(firefox.contains(r#""browser.download.alwaysOpenPanel", false"#));
+    }
 
     #[test]
     fn parse_selector_detects_explicit_xpath_prefix() {
