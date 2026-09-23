@@ -121,6 +121,12 @@ function createLazyLocator(
     get selector(): string {
       throw new Error("lazy locator selector is not available before the page fixture is initialized");
     },
+    async frame(options?: CommandOptions) {
+      return (await pageResource.get()).locator(await selectorFactory()).frame(options);
+    },
+    async Frame(options?: CommandOptions) {
+      return (await pageResource.get()).locator(await selectorFactory()).Frame(options);
+    },
     async click(options?: Parameters<Locator["click"]>[0]) {
       return (await pageResource.get()).locator(await selectorFactory()).click(options);
     },
@@ -209,6 +215,9 @@ function createLazyPage(pageResource: LazyResource<Page>): Page {
     locator(selector: string, options?: Parameters<Locator["filter"]>[0]) {
       const result = createLazyLocator(pageResource, async () => selector);
       return options ? result.filter(options) : result;
+    },
+    async frame(selector: string, options?: CommandOptions) {
+      return (await pageResource.get()).frame(selector, options);
     },
     async goto(url: string, options?: CommandOptions) {
       return (await pageResource.get()).goto(url, options);
