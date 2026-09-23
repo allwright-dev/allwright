@@ -170,6 +170,7 @@ fn proto_device_connection_kind(value: MobileDeviceConnectionKind) -> DeviceConn
 
 #[derive(Debug, Default)]
 struct EngineState {
+    frame_sessions: std::collections::HashSet<String>,
     browser_sessions: HashMap<String, BrowserSessionState>,
     tab_sessions: HashMap<String, TabSessionState>,
     hooks: HashMap<String, HookState>,
@@ -248,6 +249,16 @@ where
 
         sleep(policy.retry_interval).await;
     }
+}
+
+async fn resolve_frame_before_deadline<T, F, Fut>(policy: RetryPolicy, operation: F) -> Result<T, String>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T, String>>,
+{
+    tokio::time::timeout(policy.timeout, retry_with_timeout(policy, operation))
+        .await
+        .unwrap_or_else(|_| Err("timed out waiting for frame to load and become stable".to_string()))
 }
 
 fn next_surface_session_id() -> String {
@@ -1020,6 +1031,32 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
+        Some(ContextCommand::ResolveFrame(command)) => {
+            let policy = command_retry_policy(command.retry_options.as_ref());
+            let started = Instant::now();
+            let result = resolve_frame_before_deadline(policy, || async {
+                match (&surface_session, &page_session) {
+                    (EngineBrowserSessionHandle::Web(browser), EnginePageSessionHandle::Web(page)) =>
+                        web_lib::resolve_frame(browser, page, &command.css_selector,
+                            policy.timeout.saturating_sub(started.elapsed()).as_millis() as u64).await,
+                    _ => Err("frames are only supported on web pages".to_string()),
+                }
+            }).await;
+            let event = match result {
+                Ok(page) => {
+                    let id = next_context_session_id();
+                    let mut state = state.lock().await;
+                    state.frame_sessions.insert(id.clone());
+                    state.tab_sessions.insert(id.clone(), TabSessionState {
+                        surface_session_id: surface_session_id.clone(),
+                        page_session: EnginePageSessionHandle::Web(page.page_session), current_url: None,
+                    });
+                    ContextEvent::FrameResolved(proto::FrameResolvedEvent { context_session_id: id })
+                }
+                Err(message) => ContextEvent::Error(ContextSessionErrorEvent { message }),
+            };
+            Ok(TabCommandOutcome { events: vec![tab_event(&context_session_id, event)], should_close: false })
+        }
         Some(ContextCommand::RegisterHook(RegisterHookCommand { hook })) => {
             let registration = match (hook, &surface_session, &page_session) {
                 (
@@ -1589,9 +1626,9 @@ async fn handle_tab_command(
                     EngineBrowserSessionHandle::Web(surface_session),
                     EnginePageSessionHandle::Web(page_session),
                 ) => {
-                    web_lib::close_page(surface_session, page_session)
-                        .await
-                        .map_err(Status::internal)?;
+                    if !state.lock().await.frame_sessions.remove(&context_session_id) {
+                        web_lib::close_page(surface_session, page_session).await.map_err(Status::internal)?;
+                    }
                 }
                 (
                     EngineBrowserSessionHandle::Mobile(surface_session),
@@ -2434,6 +2471,8 @@ impl EngineService for EngineGrpcService {
             state
                 .tab_sessions
                 .retain(|_, context_session| context_session.surface_session_id != session_id);
+            let live_contexts: std::collections::HashSet<_> = state.tab_sessions.keys().cloned().collect();
+            state.frame_sessions.retain(|id| live_contexts.contains(id));
             state
                 .hooks
                 .retain(|_, hook| hook.surface_session_id != session_id);
@@ -2556,6 +2595,45 @@ mod tests {
             },
         );
         Arc::new(Mutex::new(state))
+    }
+
+    #[tokio::test]
+    async fn frame_deadline_covers_in_flight_resolution_and_retries() {
+        let policy = RetryPolicy { timeout: Duration::from_millis(30), retry_interval: Duration::from_millis(1) };
+        let start = Instant::now();
+        let result = resolve_frame_before_deadline(policy, || async {
+            sleep(Duration::from_secs(5)).await;
+            Ok(())
+        }).await;
+        assert!(result.unwrap_err().contains("timed out"));
+        assert!(start.elapsed() < Duration::from_secs(1));
+        let mut attempts = 0;
+        let result = resolve_frame_before_deadline(policy, || {
+            attempts += 1;
+            std::future::ready(if attempts == 2 { Ok(()) } else { Err("not ready".into()) })
+        }).await;
+        assert!(result.is_ok());
+        assert_eq!(attempts, 2);
+    }
+
+    #[tokio::test]
+    async fn closing_frame_releases_only_its_session() {
+        let state = transfer_test_state();
+        {
+            let mut state = state.lock().await;
+            let parent = state.tab_sessions.get("context-1").unwrap().clone();
+            state.tab_sessions.insert("frame-1".into(), parent);
+            state.frame_sessions.insert("frame-1".into());
+        }
+        let outcome = handle_tab_command(state.clone(), ContextSessionCommand {
+            surface_session_id: "surface-1".into(), context_session_id: "frame-1".into(),
+            command: Some(ContextCommand::Close(CloseContextSessionCommand {})),
+        }).await.unwrap();
+        assert!(outcome.should_close);
+        let state = state.lock().await;
+        assert!(state.tab_sessions.contains_key("context-1"));
+        assert!(!state.tab_sessions.contains_key("frame-1"));
+        assert!(!state.frame_sessions.contains("frame-1"));
     }
 
     #[tokio::test]

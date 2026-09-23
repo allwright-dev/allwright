@@ -78,6 +78,26 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
         return page;
     }
 
+    public synchronized Page frame(String selector, CommandOptions options) {
+        var handle = ensureStream();
+        ensureOpen();
+        var command = dev.allwright.engine.v1.ResolveFrameCommand.newBuilder()
+            .setCssSelector(SelectorSupport.normalizeSelectorForTransport(selector));
+        var resolved = options == null ? new CommandOptions() : options;
+        if (CommandSupport.hasTimeout(resolved.timeoutMs())) command.setRetryOptions(CommandSupport.commandRetryOptions(resolved.timeoutMs()));
+        handle.send(ContextSessionCommand.newBuilder().setSurfaceSessionId(browserSessionId)
+            .setContextSessionId(sessionId).setResolveFrame(command).build());
+        while (true) {
+            var event = handle.recv("resolve frame");
+            switch (event.getEventCase()) {
+                case FRAME_RESOLVED -> { return pageFromHook(event.getFrameResolved().getContextSessionId()); }
+                case ERROR -> throw new AllwrightException(event.getError().getMessage());
+                case CLOSED -> { closed = true; throw new AllwrightException("page closed while resolving frame"); }
+                default -> { }
+            }
+        }
+    }
+
     public synchronized <T> Hook<T> registerHook(HookType<T> type) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();

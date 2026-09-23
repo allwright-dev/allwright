@@ -1,3 +1,5 @@
+mod frames;
+pub use frames::resolve_frame;
 mod accessibility;
 mod accessibility_yaml;
 pub use accessibility::{accessibility_snapshot, accessibility_snapshot_with_mode};
@@ -3668,6 +3670,7 @@ struct MapperConnectionInfo {
 }
 
 struct CdpConnection {
+    websocket_url: String,
     socket: CdpSocket,
     next_id: u64,
     pending_bidi_events: VecDeque<Value>,
@@ -3679,6 +3682,7 @@ impl CdpConnection {
             format!("failed to connect to CDP websocket {cdp_websocket_url}: {error}")
         })?;
         Ok(Self {
+            websocket_url: cdp_websocket_url.to_string(),
             socket,
             next_id: 1,
             pending_bidi_events: VecDeque::new(),
@@ -3791,16 +3795,6 @@ impl CdpConnection {
 
         self.send_command("Runtime.enable", json!({}), Some(&mapper_session_id))
             .await?;
-        self.send_command(
-            "Target.exposeDevToolsProtocol",
-            json!({
-                "bindingName": "cdp",
-                "targetId": mapper_target_id,
-                "inheritPermissions": true,
-            }),
-            None,
-        )
-        .await?;
         self.ensure_runtime_binding(&mapper_session_id, "sendBidiResponse")
             .await?;
 
@@ -3809,6 +3803,16 @@ impl CdpConnection {
                 .mapper_runtime_is_initialized(&mapper_session_id)
                 .await?
         {
+            self.send_command(
+                "Target.exposeDevToolsProtocol",
+                json!({
+                    "bindingName": "cdp",
+                    "targetId": mapper_target_id,
+                    "inheritPermissions": true,
+                }),
+                None,
+            )
+            .await?;
             self.evaluate_expression(&mapper_session_id, CHROMIUM_BIDI_MAPPER_BUNDLE, false)
                 .await?;
             self.evaluate_expression(
@@ -3845,18 +3849,17 @@ impl CdpConnection {
     }
 
     async fn create_bidi_mapper_target(&mut self) -> Result<String, String> {
-        let created = self
-            .send_command(
-                "Target.createTarget",
-                json!({
-                    "url": "about:blank#MAPPER_TARGET",
-                    "hidden": true,
-                    "background": true,
-                }),
-                None,
-            )
-            .await?;
-        required_string(&created, "/targetId")
+        // Chromium destroys hidden targets when their creating CDP connection closes.
+        // Keep that connection alive for the mapper's lifetime, independently of commands.
+        let mut owner = CdpConnection::connect(&self.websocket_url).await?;
+        let created = owner.send_command("Target.createTarget", json!({
+            "url": "about:blank#MAPPER_TARGET", "hidden": true, "background": true,
+        }), None).await?;
+        let target = required_string(&created, "/targetId")?;
+        tokio::spawn(async move {
+            while owner.next_json_message().await.is_ok() {}
+        });
+        Ok(target)
     }
 
     async fn ensure_runtime_binding(&mut self, session_id: &str, name: &str) -> Result<(), String> {
@@ -4047,10 +4050,6 @@ impl CdpConnection {
                 });
                 match self.send_bidi_command(mapper_session_id, &probe).await {
                     Ok(_) => return Ok(existing_context_id.to_string()),
-                    Err(error)
-                        if error.contains("no such frame")
-                            || error.contains("Context ")
-                            || error.contains("invalid argument") => {}
                     Err(error) => return Err(error),
                 }
             }
@@ -4156,6 +4155,7 @@ impl CdpConnection {
 }
 
 struct BidiConnection {
+    frame_contexts: std::collections::HashSet<String>,
     socket: BidiSocket,
     next_id: u64,
     pending_events: VecDeque<Value>,
@@ -4167,6 +4167,7 @@ impl BidiConnection {
             format!("failed to connect to WebDriver BiDi websocket {bidi_websocket_url}: {error}")
         })?;
         Ok(Self {
+            frame_contexts: std::collections::HashSet::new(),
             socket,
             next_id: 1,
             pending_events: VecDeque::new(),
@@ -4174,6 +4175,20 @@ impl BidiConnection {
     }
 
     async fn send_command(&mut self, method: &str, params: Value) -> Result<Value, String> {
+        if let Some(context) = params.pointer("/target/context").or_else(|| params.get("context")).and_then(Value::as_str) {
+            if self.frame_contexts.contains(context) {
+                // Firefox can retain script realms in the back/forward cache after a
+                // frame leaves the active document. Only active tree members are pages.
+                let tree = self.send_command_raw("browsingContext.getTree", json!({})).await?;
+                if !frames::tree_contains_context(&tree, context) {
+                    return Err(format!("frame browsing context {context} is detached"));
+                }
+            }
+        }
+        self.send_command_raw(method, params).await
+    }
+
+    async fn send_command_raw(&mut self, method: &str, params: Value) -> Result<Value, String> {
         let id = self.next_id;
         self.next_id += 1;
         let payload = json!({
@@ -4492,6 +4507,11 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
         } => {
             launch_browser(browser_kind, browser_binary.as_deref()).map(PluginResult::LaunchBrowser)
         }
+        PluginCommand::ResolveFrame { browser_session, page_session, css_selector, timeout_ms } => block_on_plugin_future(async move {
+            timeout(Duration::from_millis(timeout_ms), resolve_frame(&browser_session, &page_session, &css_selector))
+                .await.map_err(|_| "timed out waiting for frame to load and become stable".to_string())?
+                .map(PluginResult::ResolveFrame)
+        }),
         PluginCommand::OpenPage { browser_session } => block_on_plugin_future(async move {
             open_page(&browser_session)
                 .await

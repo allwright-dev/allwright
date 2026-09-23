@@ -243,6 +243,12 @@ pub enum PluginCommand {
         browser_kind: BrowserKind,
         browser_binary: Option<String>,
     },
+    ResolveFrame {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        css_selector: String,
+        timeout_ms: u64,
+    },
     OpenPage {
         browser_session: BrowserSessionHandle,
     },
@@ -379,6 +385,7 @@ pub enum PluginCommand {
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum PluginResult {
     LaunchBrowser(BrowserLaunchInfo),
+    ResolveFrame(PageInfo),
     OpenPage(PageInfo),
     RegisterHook(HookRegistration),
     PollHook(HookResult),

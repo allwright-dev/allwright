@@ -28,6 +28,9 @@ export class LocatorImpl extends WebLocatorBuilders implements Locator {
     this.selector = input.selector;
   }
 
+  frame(options: CommandOptions = {}): Promise<Page> { return this.page.frame(this.selector, options); }
+  Frame(options: CommandOptions = {}): Promise<Page> { return this.frame(options); }
+
   async click(options: CommandOptions = {}): Promise<ClickResult> {
     return this.page.click(this.selector, options);
   }

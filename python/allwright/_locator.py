@@ -30,6 +30,9 @@ class Locator(WebLocators):
     page: Page
     selector: str
 
+    def frame(self, options: CommandOptions | None = None) -> Page:
+        return self.page.frame(self.selector, options)
+
     def locator(self, selector: str) -> Locator:
         return Locator(page=self.page, selector=chain_selector_for_transport(self.selector, selector))
 

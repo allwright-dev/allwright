@@ -56,6 +56,19 @@ export class PageImpl extends WebLocatorBuilders implements Page {
   readonly sessionId: string;
   readonly browserSessionId: string;
 
+  async frame(selector: string, options: CommandOptions = {}): Promise<Page> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({ surfaceSessionId: this.browserSessionId, contextSessionId: this.sessionId,
+      resolveFrame: { cssSelector: normalizeSelectorForTransport(selector), retryOptions: options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : undefined } });
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.frameResolved?.contextSessionId) return this.#createPage(event.frameResolved.contextSessionId);
+      if (event.error?.message) throw formatActionError("resolve frame", event.error.message, selector);
+      if (event.closed) { handle.closed = true; throw new Error("page closed while resolving frame"); }
+    }
+  }
+
   async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
     if (type.name !== "newPage" && type.name !== "fileChooser" && type.name !== "download") {
       throw formatActionError("register hook", `unsupported hook type: ${type.name}`);

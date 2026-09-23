@@ -23,6 +23,55 @@ impl Tab {
         &self.inner.session_id
     }
 
+    pub async fn frame_with_options(
+        &self,
+        selector: impl Into<String>,
+        options: CommandOptions,
+    ) -> Result<Tab> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_tab_open(handle, &self.inner.session_id)?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::ResolveFrame(
+                    crate::proto::ResolveFrameCommand {
+                        css_selector: normalize_selector_for_transport(&selector.into()),
+                        retry_options: command_retry_options(options.timeout_ms),
+                    },
+                )),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send ResolveFrameCommand"))?;
+        loop {
+            let event = handle
+                .events
+                .message()
+                .await?
+                .ok_or_else(|| Error::new("page closed while resolving frame"))?;
+            match event.event {
+                Some(ContextEvent::FrameResolved(frame)) => {
+                    return Ok(Tab {
+                        inner: std::sync::Arc::new(super::types::TabInner {
+                            runtime: self.inner.runtime.clone(),
+                            surface_session_id: self.inner.surface_session_id.clone(),
+                            session_id: frame.context_session_id,
+                            state: tokio::sync::Mutex::new(TabState::default()),
+                        }),
+                    });
+                }
+                Some(ContextEvent::Error(error)) => return Err(Error::new(error.message)),
+                Some(ContextEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new("page closed while resolving frame"));
+                }
+                _ => {}
+            }
+        }
+    }
+
     pub async fn goto(&self, url: impl Into<String>) -> Result<NavigateResult> {
         self.navigate(url).await
     }

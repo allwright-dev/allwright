@@ -870,6 +870,103 @@ func (x *DownloadSavedEvent) GetNote() string {
 	return ""
 }
 
+// Resolve an iframe locator to a page after its document has loaded and settled.
+type ResolveFrameCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveFrameCommand) Reset() {
+	*x = ResolveFrameCommand{}
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveFrameCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveFrameCommand) ProtoMessage() {}
+
+func (x *ResolveFrameCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveFrameCommand.ProtoReflect.Descriptor instead.
+func (*ResolveFrameCommand) Descriptor() ([]byte, []int) {
+	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ResolveFrameCommand) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *ResolveFrameCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type FrameResolvedEvent struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ContextSessionId string                 `protobuf:"bytes,1,opt,name=context_session_id,json=contextSessionId,proto3" json:"context_session_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *FrameResolvedEvent) Reset() {
+	*x = FrameResolvedEvent{}
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FrameResolvedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FrameResolvedEvent) ProtoMessage() {}
+
+func (x *FrameResolvedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_web_v1_web_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FrameResolvedEvent.ProtoReflect.Descriptor instead.
+func (*FrameResolvedEvent) Descriptor() ([]byte, []int) {
+	return file_surfaces_web_v1_web_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *FrameResolvedEvent) GetContextSessionId() string {
+	if x != nil {
+		return x.ContextSessionId
+	}
+	return ""
+}
+
 var File_surfaces_web_v1_web_proto protoreflect.FileDescriptor
 
 const file_surfaces_web_v1_web_proto_rawDesc = "" +
@@ -935,7 +1032,13 @@ const file_surfaces_web_v1_web_proto_rawDesc = "" +
 	"\afile_id\x18\x02 \x01(\tR\x06fileId\x12-\n" +
 	"\x12suggested_filename\x18\x03 \x01(\tR\x11suggestedFilename\x12\x12\n" +
 	"\x04size\x18\x04 \x01(\x04R\x04size\x12\x12\n" +
-	"\x04note\x18\x05 \x01(\tR\x04note*`\n" +
+	"\x04note\x18\x05 \x01(\tR\x04note\"\x9e\x01\n" +
+	"\x13ResolveFrameCommand\x12!\n" +
+	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12R\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"B\n" +
+	"\x12FrameResolvedEvent\x12,\n" +
+	"\x12context_session_id\x18\x01 \x01(\tR\x10contextSessionId*`\n" +
 	"\vBrowserKind\x12\x1c\n" +
 	"\x18BROWSER_KIND_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15BROWSER_KIND_CHROMIUM\x10\x01\x12\x18\n" +
@@ -955,7 +1058,7 @@ func file_surfaces_web_v1_web_proto_rawDescGZIP() []byte {
 }
 
 var file_surfaces_web_v1_web_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_surfaces_web_v1_web_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_surfaces_web_v1_web_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_surfaces_web_v1_web_proto_goTypes = []any{
 	(BrowserKind)(0),                   // 0: allwright.engine.v1.BrowserKind
 	(*LaunchBrowserCommand)(nil),       // 1: allwright.engine.v1.LaunchBrowserCommand
@@ -972,20 +1075,23 @@ var file_surfaces_web_v1_web_proto_goTypes = []any{
 	(*DownloadHookResult)(nil),         // 12: allwright.engine.v1.DownloadHookResult
 	(*SaveDownloadCommand)(nil),        // 13: allwright.engine.v1.SaveDownloadCommand
 	(*DownloadSavedEvent)(nil),         // 14: allwright.engine.v1.DownloadSavedEvent
-	(*CommandRetryOptions)(nil),        // 15: allwright.engine.v1.CommandRetryOptions
+	(*ResolveFrameCommand)(nil),        // 15: allwright.engine.v1.ResolveFrameCommand
+	(*FrameResolvedEvent)(nil),         // 16: allwright.engine.v1.FrameResolvedEvent
+	(*CommandRetryOptions)(nil),        // 17: allwright.engine.v1.CommandRetryOptions
 }
 var file_surfaces_web_v1_web_proto_depIdxs = []int32{
 	0,  // 0: allwright.engine.v1.LaunchBrowserCommand.browser_kind:type_name -> allwright.engine.v1.BrowserKind
-	15, // 1: allwright.engine.v1.LaunchBrowserCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	17, // 1: allwright.engine.v1.LaunchBrowserCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
 	0,  // 2: allwright.engine.v1.BrowserLaunchedEvent.browser_kind:type_name -> allwright.engine.v1.BrowserKind
-	15, // 3: allwright.engine.v1.LaunchChromeCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	15, // 4: allwright.engine.v1.SetFileChooserFilesCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	15, // 5: allwright.engine.v1.SaveDownloadCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	6,  // [6:6] is the sub-list for method output_type
-	6,  // [6:6] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	17, // 3: allwright.engine.v1.LaunchChromeCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	17, // 4: allwright.engine.v1.SetFileChooserFilesCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	17, // 5: allwright.engine.v1.SaveDownloadCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	17, // 6: allwright.engine.v1.ResolveFrameCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	7,  // [7:7] is the sub-list for method output_type
+	7,  // [7:7] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_surfaces_web_v1_web_proto_init() }
@@ -998,13 +1104,14 @@ func file_surfaces_web_v1_web_proto_init() {
 	file_surfaces_web_v1_web_proto_msgTypes[2].OneofWrappers = []any{}
 	file_surfaces_web_v1_web_proto_msgTypes[8].OneofWrappers = []any{}
 	file_surfaces_web_v1_web_proto_msgTypes[12].OneofWrappers = []any{}
+	file_surfaces_web_v1_web_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_surfaces_web_v1_web_proto_rawDesc), len(file_surfaces_web_v1_web_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   14,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -37,6 +37,7 @@ message ContextSessionCommand {
     ReadFileChunkCommand read_file_chunk = 23;
     SetMobileFileChooserFilesCommand set_mobile_file_chooser_files = 24;
     SaveMobileDownloadCommand save_mobile_download = 25;
+    ResolveFrameCommand resolve_frame = 26;
   }
 }
 
@@ -76,6 +77,7 @@ message ContextSessionEvent {
     FileChunkEvent file_chunk = 25;
     MobileFileChooserFilesSetEvent mobile_file_chooser_files_set = 26;
     MobileDownloadSavedEvent mobile_download_saved = 27;
+    FrameResolvedEvent frame_resolved = 28;
   }
 }
 

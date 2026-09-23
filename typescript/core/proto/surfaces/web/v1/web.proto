@@ -88,3 +88,12 @@ message DownloadSavedEvent {
   uint64 size = 4;
   string note = 5;
 }
+
+// Resolve an iframe locator to a page after its document has loaded and settled.
+message ResolveFrameCommand {
+  string css_selector = 1;
+  optional CommandRetryOptions retry_options = 2;
+}
+message FrameResolvedEvent {
+  string context_session_id = 1;
+}

@@ -22,6 +22,16 @@ impl Locator {
         }
     }
 
+    pub async fn frame(&self) -> Result<Page> {
+        self.frame_with_options(CommandOptions::default()).await
+    }
+
+    pub async fn frame_with_options(&self, options: CommandOptions) -> Result<Page> {
+        self.page
+            .frame_with_options(self.selector.clone(), options)
+            .await
+    }
+
     pub async fn click(&self) -> Result<ClickResult> {
         self.page.click(self.selector.clone()).await
     }

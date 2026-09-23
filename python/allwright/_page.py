@@ -64,6 +64,27 @@ class Page(WebLocators):
     def locator(self, selector: str) -> Locator:
         return Locator(page=self, selector=normalize_selector_for_transport(selector))
 
+    def frame(self, selector: str, options: CommandOptions | None = None) -> Page:
+        from ._runtime import retry_options
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self.surface_session_id, context_session_id=self.session_id,
+                resolve_frame=engine_pb2.ResolveFrameCommand(
+                    css_selector=normalize_selector_for_transport(selector),
+                    retry_options=retry_options((options or CommandOptions()).timeout_ms))))
+            while True:
+                event = handle.recv("resolve frame")
+                if event.WhichOneof("event") == "frame_resolved":
+                    session_id = event.frame_resolved.context_session_id
+                    return self._page_factory(session_id) if self._page_factory else Page(self._runtime, self.surface_session_id, session_id)
+                if event.WhichOneof("event") == "error":
+                    raise AllwrightError(event.error.message)
+                if event.WhichOneof("event") == "closed":
+                    self._closed = True
+                    raise AllwrightError("page closed while resolving frame")
+
     def register_hook(self, hook_type: HookType[T]) -> Hook[T]:
         with self._lock:
             handle = self._ensure_handle()

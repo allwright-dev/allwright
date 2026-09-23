@@ -163,6 +163,7 @@ export interface Browser extends BrowserInfo {
 }
 
 export interface Page extends PageInfo, WebLocators {
+  frame(selector: string, options?: CommandOptions): Promise<Page>;
   registerHook<T>(type: HookType<T>): Promise<Hook<T>>;
   accessibilitySnapshot(options?: AccessibilitySnapshotOptions): Promise<string>;
   locator(selector: string, options?: LocatorFilterOptions): Locator;
@@ -243,6 +244,8 @@ export interface MobileSurfaceNamespace {
 }
 
 export interface Locator extends WebLocators {
+  frame(options?: CommandOptions): Promise<Page>;
+  Frame(options?: CommandOptions): Promise<Page>;
   not(other: Locator): Locator;
   filter(options?: LocatorFilterOptions): Locator;
   nth(index: number): Locator;
@@ -430,6 +433,7 @@ export interface SurfaceSessionEvent {
 }
 
 export interface ContextSessionEvent {
+  frameResolved?: { contextSessionId?: string };
   accessibilitySnapshotCaptured?: { snapshot?: string; format?: string };
   contextSessionId?: string;
   event?: string;
@@ -870,6 +874,7 @@ export type SurfaceSessionRequest =
   | CloseSurfaceRequest;
 
 export type ContextSessionRequest =
+  | { surfaceSessionId: string; contextSessionId: string; resolveFrame: { cssSelector: string; retryOptions?: { timeoutMs: number } } }
   | ContextPingRequest
   | RegisterHookRequest
   | WaitForHookRequest

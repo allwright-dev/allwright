@@ -311,6 +311,19 @@ pub struct DownloadSavedEvent {
     #[prost(string, tag = "5")]
     pub note: ::prost::alloc::string::String,
 }
+/// Resolve an iframe locator to a page after its document has loaded and settled.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ResolveFrameCommand {
+    #[prost(string, tag = "1")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FrameResolvedEvent {
+    #[prost(string, tag = "1")]
+    pub context_session_id: ::prost::alloc::string::String,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum BrowserKind {
@@ -436,7 +449,7 @@ pub struct ContextSessionCommand {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_command::Command",
-        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25"
+        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26"
     )]
     pub command: ::core::option::Option<context_session_command::Command>,
 }
@@ -490,6 +503,8 @@ pub mod context_session_command {
         SetMobileFileChooserFiles(super::SetMobileFileChooserFilesCommand),
         #[prost(message, tag = "25")]
         SaveMobileDownload(super::SaveMobileDownloadCommand),
+        #[prost(message, tag = "26")]
+        ResolveFrame(super::ResolveFrameCommand),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -505,7 +520,7 @@ pub struct ContextSessionEvent {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_event::Event",
-        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27"
+        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28"
     )]
     pub event: ::core::option::Option<context_session_event::Event>,
 }
@@ -565,6 +580,8 @@ pub mod context_session_event {
         MobileFileChooserFilesSet(super::MobileFileChooserFilesSetEvent),
         #[prost(message, tag = "27")]
         MobileDownloadSaved(super::MobileDownloadSavedEvent),
+        #[prost(message, tag = "28")]
+        FrameResolved(super::FrameResolvedEvent),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

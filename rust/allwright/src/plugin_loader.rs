@@ -985,3 +985,24 @@ pub async fn accessibility_snapshot_mobile(
         _ => Err("mobile plugin returned an unexpected accessibility snapshot response".into()),
     }
 }
+
+pub async fn resolve_frame(
+    browser: &BrowserSessionHandle,
+    page: &PageSessionHandle,
+    selector: &str,
+    timeout_ms: u64,
+) -> Result<PageInfo, String> {
+    let command = PluginCommand::ResolveFrame {
+        browser_session: browser.clone(),
+        page_session: page.clone(),
+        css_selector: selector.to_string(),
+        timeout_ms,
+    };
+    // Keep the engine deadline pollable while the synchronous plugin ABI executes.
+    match tokio::task::spawn_blocking(move || invoke_web(command))
+        .await.map_err(|error| error.to_string())??
+    {
+        PluginResult::ResolveFrame(page) => Ok(page),
+        _ => Err("web plugin returned an unexpected response for ResolveFrame".to_string()),
+    }
+}

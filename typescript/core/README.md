@@ -79,3 +79,19 @@ suites:
 ```
 
 The TypeScript package exports `findConfigFile()`, `loadConfigFile()`, `resolveConfig()`, and `launchConfiguredBrowser()` so runner packages can consume the same config model without inventing language-specific config files.
+
+### Iframes
+
+An iframe resolves to a normal `Page`, including nested and cross-origin frames:
+
+```ts
+const frame = await page.locator("#checkout-frame").Frame({ timeoutMs: 10_000 });
+await frame.locator("input[name=email]").fill("buyer@example.com");
+const nested = await frame.locator("iframe").frame({ timeoutMs: 5_000 });
+```
+
+`Frame()` and `frame()` are aliases. The timeout covers finding exactly one iframe,
+resolving its browsing context, and waiting for a fully loaded document with 200 ms
+without DOM mutations. The default is 10 seconds. Closing the frame page releases
+its session; it does not remove the iframe or close the parent tab. Resolve a new
+frame page after the iframe is replaced.

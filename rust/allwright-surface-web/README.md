@@ -133,3 +133,19 @@ registry. The collector owns `aria-ref` on referenced elements and replaces any
 existing value there. DOM changes can invalidate references; capture again when
 needed. These modes take behavioral inspiration from Playwright but do not claim
 identical tree output.
+
+### Iframes as pages
+
+Resolve an iframe locator to a page using `await page.locator("iframe").Frame({ timeoutMs: 10_000 })`
+(TypeScript; `.frame()` is also supported). Go uses `locator.Frame(ctx, CommandOptions{Timeout: ...})`,
+Rust uses `locator.frame_with_options(...)`, and Java/Python use `locator.frame(options)`.
+The returned page supports ordinary locators and can resolve nested frames the same way.
+
+Resolution requires exactly one iframe, waits for its document to reach `readyState = complete`
+and remain free of DOM mutations for 200 ms, and retries within the command timeout
+(default 10 seconds). This is a document readiness check, not a network-idle guarantee.
+Cross-origin frames are resolved through [WebDriver BiDi window values](https://www.w3.org/TR/webdriver-bidi/#type-script-WindowProxyRemoteValue); their contents
+are accessed in the child browsing context, without reading the child DOM from the parent.
+Chromium uses the existing BiDi mapper transport; Firefox uses native BiDi.
+Closing a frame page releases its Allwright session without closing the containing tab
+or removing the iframe. A detached frame handle fails; resolve the locator again after replacement.

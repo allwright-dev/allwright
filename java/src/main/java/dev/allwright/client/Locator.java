@@ -9,6 +9,9 @@ public final class Locator implements WebLocators {
         this.selector = selector;
     }
 
+    public Page frame() { return frame(new CommandOptions()); }
+    public Page frame(CommandOptions options) { return page.frame(selector, options); }
+
     public Page page() {
         return page;
     }
