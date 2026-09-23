@@ -1,0 +1,155 @@
+---
+title: "Iframes are just pages now"
+description: "allwright v0.1.13 resolves any iframe — nested or cross-origin — to a normal Page with one call, waiting until its document has actually loaded and settled."
+date: "2026-09-23"
+author: "The allwright team"
+published: true
+tags: ["iframes", "release", "changelog", "web testing", "cross-origin", "webdriver bidi"]
+keywords:
+  [
+    "iframe testing automation",
+    "cross-origin iframe testing",
+    "nested iframe automation",
+    "playwright frameLocator alternative",
+    "webdriver bidi iframe",
+    "test payment iframe",
+    "allwright frame api",
+  ]
+---
+
+Checkout forms, embedded video players, OAuth consent screens, support chat
+widgets, CAPTCHA boxes: some of the most important UI in a real web app lives
+inside an iframe, very often one served from another origin. Selectors in the
+parent page can't see into it, and scripts in the parent page aren't allowed
+to read it. **v0.1.13** adds a single call that turns any iframe into a page
+you already know how to drive.
+
+## One call, and you have a page
+
+```ts
+import { expect, test } from "@allwright.dev/vitest";
+
+test("pays through the embedded checkout", async ({ page }) => {
+  await page.goto("https://shop.example.com/cart");
+
+  const checkout = await page.locator("#checkout-frame").frame();
+  await checkout.getByLabel("Email").fill("buyer@example.com");
+  await checkout.getByRole("button", { name: "Pay" }).click();
+
+  await expect(checkout.getByText("Payment received")).toBeVisible();
+});
+```
+
+`locator.frame()` returns a normal `Page`, not a separate frame type with a
+smaller API. `click`, `fill`, the `getBy*` builders, `accessibilitySnapshot`,
+and every retrying `expect` matcher work on it the same way they do on a
+top-level tab. In TypeScript, `Frame()` is an alias for `frame()`, and
+`page.frame(selector)` is shorthand for `page.locator(selector).frame()`.
+
+## Nested frames work the same way
+
+A frame page is a page, so it has `locator()` too, and resolving an iframe
+inside it is the same call:
+
+```ts
+const outer = await page.locator("#widget").frame();
+const inner = await outer.locator("iframe").frame({ timeoutMs: 5_000 });
+await inner.getByRole("checkbox", { name: "I'm not a robot" }).click();
+```
+
+The inner locator is scoped to the outer frame's document, so `iframe` means
+"the iframe inside this frame", not "any iframe anywhere on the tab".
+
+## Cross-origin, without breaking the rules
+
+A cross-origin iframe is the case that usually breaks automation tools. The
+browser won't let the parent page read the child's DOM, so any approach that
+runs a script in the parent and reaches into `contentDocument` stops working
+the moment the frame comes from another domain.
+
+allwright doesn't reach through the parent at all. It asks the browser, over
+WebDriver BiDi, for the iframe element's
+[window proxy](https://www.w3.org/TR/webdriver-bidi/#type-script-WindowProxyRemoteValue),
+which identifies the child's own browsing context. From then on, every
+command for that frame page runs directly in that context. Same-origin and
+cross-origin frames go through the same path, so neither one needs special
+handling in your test. Chromium does this through the WebDriver BiDi mapper
+allwright already uses for everything else; Firefox uses its native BiDi.
+
+## It waits for the frame to be ready, not just present
+
+An iframe element can exist in the DOM a long time before anything useful is
+in it. Resolving it too early is how you end up with a flaky test that clicks
+into a blank document. So `frame()` doesn't return until three things are
+true:
+
+1. **The locator matches exactly one iframe**, and that iframe has started
+   loading its real document, not the placeholder `about:blank` a new iframe
+   starts with. If it matches none or several, `frame()` keeps retrying. If
+   the count never gets to one, the timeout error tells you how many it found.
+2. **Its document has reached `readyState === "complete"`.**
+3. **The document has gone 200 ms without a DOM mutation**, so a frame that's
+   still rendering its own content isn't handed back half-built.
+
+All three retry within one command timeout, which defaults to 10 seconds and
+can be set per call:
+
+```ts
+const slowFrame = await page.locator("iframe.report").frame({ timeoutMs: 30_000 });
+```
+
+This is a document readiness check, **not** a network-idle guarantee. A frame
+that keeps polling an API after it renders will still resolve. A frame that
+mutates its DOM without ever pausing (a ticking clock, an animation driven by
+DOM writes) will never settle, and resolution will time out with a clear
+error. If you see that, find something inside the frame to wait on instead,
+with a locator and a retrying `expect`.
+
+## Lifecycle: what closing a frame page does
+
+A frame page has its own allwright session, and closing it releases only that
+session. The containing tab stays open and the iframe stays in the DOM.
+
+If the app replaces the iframe, for example by re-rendering the component or
+navigating it to a new document that creates a fresh element, the old frame
+page is detached. Commands on it fail clearly instead of silently running
+against a different frame. Call `frame()` on the locator again to get the new
+one.
+
+## Every language
+
+As with every other allwright API, it shipped in all five clients at once.
+Only the spelling changes:
+
+| Language | Resolve an iframe |
+| --- | --- |
+| TypeScript | `await page.locator("iframe").frame({ timeoutMs: 10_000 })` |
+| Python | `page.locator("iframe").frame(CommandOptions(timeout_ms=10_000))` |
+| Java | `page.locator("iframe").frame(new CommandOptions(10_000))` |
+| Rust | `page.locator("iframe").frame().await?` |
+| Go | `page.Locator("iframe").Frame(ctx, allwright.CommandOptions{Timeout: 10 * time.Second})` |
+
+Each one returns that client's ordinary page type. Rust also has
+`frame_with_options`, and Python, Java, and Rust can resolve directly from a
+page with a selector.
+
+## Under the hood
+
+On the engine side this is one new command and one new event:
+`ResolveFrameCommand` carries the iframe's selector and retry options, and
+`FrameResolvedEvent` returns the new page session's id. Resolution and
+readiness live entirely in the web surface plugin and use only WebDriver BiDi
+commands. The engine core does what it does for any new tab: it registers the
+returned session and routes commands to it. That's why a frame page isn't a
+special case anywhere in the client libraries. As far as they're concerned,
+it's just another page.
+
+## Where to go next
+
+- Read the [API reference](/reference) for `frame` in your language.
+- Read the [Changelog](/changelog) for v0.1.13 and the releases just before
+  it, including Android file hooks and the change that stops native dialogs
+  from ever appearing.
+- Check [Availability](/availability) for the current, capability-by-capability
+  picture of what works today.
+- Star or watch [the repo](https://github.com/allwright-dev/allwright).

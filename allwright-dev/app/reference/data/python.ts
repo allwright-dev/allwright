@@ -169,6 +169,13 @@ export const pythonReference: LanguageReference = {
           description: "Registers a lifecycle hook before the action that triggers it.",
           since: "v0.1.5",
         },
+        {
+          name: "frame",
+          kind: "method",
+          signature: "def frame(self, selector: str, options: CommandOptions | None = None) -> Page",
+          description: "Resolves the single iframe matching selector to a Page once its document has loaded and settled. Same as page.locator(selector).frame(options) — see Locator.frame.",
+          since: "v0.1.13",
+        },
       ],
     },
     {
@@ -228,6 +235,14 @@ export const pythonReference: LanguageReference = {
           signature: "def locator(self, selector: str) -> Locator",
           description: "Chains a nested raw selector under this locator.",
           since: "v0.0.33",
+        },
+        {
+          name: "frame",
+          kind: "method",
+          signature: "def frame(self, options: CommandOptions | None = None) -> Page",
+          description: "Resolves this iframe — nested or cross-origin — to a normal Page, waiting for exactly one match whose document is complete and has gone 200 ms without DOM mutations. timeout_ms (default 10 000) covers the whole resolution; closing the returned page releases its session without closing the parent tab.",
+          since: "v0.1.13",
+          example: 'frame = page.locator("#checkout-frame").frame(CommandOptions(timeout_ms=10_000))\nframe.locator("input[name=email]").fill("buyer@example.com")\nnested = frame.locator("iframe").frame()',
         },
       ],
     },

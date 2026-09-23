@@ -162,6 +162,13 @@ export const rustReference: LanguageReference = {
           description: "Registers a lifecycle hook before the action that triggers it. HookType is sealed — only the provided NEW_PAGE/FILE_CHOOSER/DOWNLOAD tags implement it.",
           since: "v0.1.5",
         },
+        {
+          name: "frame_with_options",
+          kind: "method",
+          signature: "pub async fn frame_with_options(&self, selector: impl Into<String>, options: CommandOptions) -> Result<Tab>",
+          description: "Resolves the single iframe matching selector to a page once its document has loaded and settled. Same as page.locator(selector).frame_with_options(options) — see Locator::frame.",
+          since: "v0.1.13",
+        },
       ],
     },
     {
@@ -212,6 +219,14 @@ export const rustReference: LanguageReference = {
           signature: "pub fn locator(&self, css_selector: impl Into<String>) -> Locator",
           description: "Creates a child locator scoped/chained under this one.",
           since: "v0.0.33",
+        },
+        {
+          name: "Locator::frame",
+          kind: "method",
+          signature: "pub async fn frame(&self) -> Result<Page>\npub async fn frame_with_options(&self, options: CommandOptions) -> Result<Page>",
+          description: "Resolves this iframe — nested or cross-origin — to a normal Page, waiting for exactly one match whose document is complete and has gone 200 ms without DOM mutations. timeout_ms (default 10 000) covers the whole resolution; closing the returned page releases its session without closing the parent tab. Tab::frame_with_options(selector, options) does the same from a page.",
+          since: "v0.1.13",
+          example: 'let frame = page.locator("#checkout-frame").frame().await?;\nframe.locator("input[name=email]").fill("buyer@example.com").await?;\nlet nested = frame.locator("iframe").frame().await?;',
         },
       ],
     },

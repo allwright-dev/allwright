@@ -213,6 +213,14 @@ export const goReference: LanguageReference = {
           description: "Chains a nested raw selector under this locator, scoping the search to its descendants.",
           since: "v0.0.33",
         },
+        {
+          name: "(*Locator).Frame",
+          kind: "method",
+          signature: "func (l *Locator) Frame(ctx context.Context, options ...CommandOptions) (*Page, error)",
+          description: "Resolves this iframe — nested or cross-origin — to a normal *Page, waiting for exactly one match whose document is complete and has gone 200 ms without DOM mutations. Timeout (default 10s) covers the whole resolution; closing the returned page releases its session without closing the parent tab.",
+          since: "v0.1.13",
+          example: 'frame, err := page.Locator("#checkout-frame").Frame(ctx, allwright.CommandOptions{Timeout: 10 * time.Second})\nframe.Locator("input[name=email]").Fill(ctx, "buyer@example.com")\nnested, err := frame.Locator("iframe").Frame(ctx)',
+        },
       ],
     },
     {

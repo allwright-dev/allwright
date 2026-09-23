@@ -15,6 +15,44 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "v0.1.13",
+    date: "2026-09-23",
+    title: "Iframes as pages",
+    highlights: [
+      "locator.frame() resolves an iframe to a normal Page across all five clients (TypeScript also accepts Frame(), Go spells it Frame(ctx, ...)) — the same locators, actions, and retrying assertions as any top-level page, and it can resolve nested frames the same way.",
+      "Cross-origin frames work without reading the child DOM from the parent: the frame is resolved to its own WebDriver BiDi browsing context, over the existing Chromium mapper or Firefox's native BiDi.",
+      "Resolution waits for exactly one matching iframe whose document has reached readyState complete and gone 200 ms without DOM mutations, retrying within the command timeout (default 10 seconds, configurable per call). This is a document readiness check, not a network-idle guarantee.",
+      "Closing a frame page releases its session without closing the parent tab or removing the iframe; a detached frame fails clearly, so resolve the locator again after the iframe is replaced.",
+    ],
+  },
+  {
+    version: "v0.1.12",
+    date: "2026-09-19",
+    title: "No native dialogs, and every Chromium operation over BiDi",
+    highlights: [
+      "File-chooser sessions now tell the browser to dismiss its file prompt, and download hooks set an explicit download destination before the triggering action, so neither an OS file picker nor a native Save As dialog can ever appear during a run.",
+      "Chromium tab discovery, creation, and closing moved from CDP onto WebDriver BiDi, joining navigation, input, screenshots, and hooks — CDP is now used only to bootstrap and carry messages for the BiDi mapper.",
+    ],
+  },
+  {
+    version: "v0.1.10 – v0.1.11",
+    date: "2026-09-18",
+    title: "Clearer installs and plugin versions",
+    highlights: [
+      "The CLI installer verifies the downloaded binary's version and, if an older package-manager-installed allwright appears earlier on PATH, names the exact executable shadowing it.",
+      "allwright plugin list now reports outdated@<version> (expected@<version>) for a surface plugin that doesn't match the engine, and plugin installs print download and unpack progress.",
+    ],
+  },
+  {
+    version: "v0.1.8 – v0.1.9",
+    date: "2026-09-17",
+    title: "File hooks reach Android, and paths stay client-local",
+    highlights: [
+      "Android apps gained the same fileChooser and download hooks as web, registered on the app instead of a page — the system DocumentsUI picker with a single file, and downloads written to the device's public Downloads directory. newPage is web-only.",
+      "Upload and download paths are always resolved on the machine running the test: files stream through the engine in chunks, so setFiles and saveAs work the same when the allwright server runs on another machine.",
+    ],
+  },
+  {
     version: "v0.1.7",
     date: "2026-09-17",
     title: "File chooser and download hooks",

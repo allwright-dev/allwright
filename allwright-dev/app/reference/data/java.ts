@@ -165,6 +165,13 @@ export const javaReference: LanguageReference = {
           description: "Arms a lifecycle hook before the action that triggers it.",
           since: "v0.1.5",
         },
+        {
+          name: "frame",
+          kind: "method",
+          signature: "public synchronized Page frame(String selector, CommandOptions options)",
+          description: "Resolves the single iframe matching selector to a Page once its document has loaded and settled. Same as page.locator(selector).frame(options) — see Locator.frame.",
+          since: "v0.1.13",
+        },
       ],
     },
     {
@@ -223,6 +230,14 @@ export const javaReference: LanguageReference = {
           signature: "public Locator locator(String childSelector)",
           description: "Builds a nested locator scoped inside this one.",
           since: "v0.0.33",
+        },
+        {
+          name: "Locator.frame",
+          kind: "method",
+          signature: "public Page frame()\npublic Page frame(CommandOptions options)",
+          description: "Resolves this iframe — nested or cross-origin — to a normal Page, waiting for exactly one match whose document is complete and has gone 200 ms without DOM mutations. timeoutMs (default 10 000) covers the whole resolution; closing the returned page releases its session without closing the parent tab.",
+          since: "v0.1.13",
+          example: 'Page frame = page.locator("#checkout-frame").frame(new CommandOptions(10_000));\nframe.locator("input[name=email]").fill("buyer@example.com");\nPage nested = frame.locator("iframe").frame();',
         },
       ],
     },

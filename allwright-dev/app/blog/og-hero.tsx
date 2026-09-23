@@ -380,6 +380,48 @@ function HooksOgDiagram() {
   );
 }
 
+function IframesOgDiagram() {
+  const { width, height } = DIAGRAM_SIZE;
+  const pages = [
+    { label: "pay.example.com", y: 44 },
+    { label: "captcha.example.net", y: 164 },
+  ];
+
+  return (
+    <div style={{ position: "relative", width, height, display: "flex" }}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ position: "absolute", left: 0, top: 0 }}>
+        <rect x={0} y={10} width={180} height={240} rx={14} fill="rgba(16,41,45,0.55)" stroke={LINE} strokeWidth={2} />
+        <rect x={16} y={48} width={148} height={186} rx={10} fill="none" stroke={BRAND_TO} strokeWidth={2} strokeDasharray="6 4" />
+        <rect x={32} y={128} width={116} height={90} rx={8} fill="none" stroke={BRAND_FROM} strokeWidth={2} strokeDasharray="6 4" />
+        <line x1={164} y1={72} x2={250} y2={pages[0].y + 26} stroke={BRAND_TO} strokeWidth={2} />
+        <line x1={148} y1={172} x2={250} y2={pages[1].y + 26} stroke={BRAND_TO} strokeWidth={2} />
+        {pages.map((page) => (
+          <rect key={`box-${page.label}`} x={250} y={page.y} width={170} height={52} rx={10} fill="none" stroke={BRAND_TO} strokeWidth={2} />
+        ))}
+      </svg>
+
+      <div style={{ position: "absolute", left: 16, top: 20, display: "flex", fontSize: 12, fontFamily: "monospace", color: MUTED }}>
+        shop.example.com
+      </div>
+      <div style={{ position: "absolute", left: 28, top: 58, display: "flex", fontSize: 12, fontFamily: "monospace", color: BRAND_TO }}>
+        {"<iframe>"}
+      </div>
+      <div style={{ position: "absolute", left: 44, top: 138, display: "flex", fontSize: 12, fontFamily: "monospace", color: BRAND_FROM }}>
+        {"<iframe>"}
+      </div>
+      {pages.map((page) => (
+        <div
+          key={`label-${page.label}`}
+          style={{ position: "absolute", left: 264, top: page.y + 8, display: "flex", flexDirection: "column" }}
+        >
+          <div style={{ display: "flex", fontSize: 14, fontWeight: 700, color: INK_SOFT }}>Page</div>
+          <div style={{ display: "flex", fontSize: 11, fontFamily: "monospace", color: INK }}>{page.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const ogHeroRegistry: Record<string, () => React.ReactElement> = {
   "get-started-with-typescript": TypeScriptOgDiagram,
   "why-allwright-if-playwright-exists": EngineOgDiagram,
@@ -388,6 +430,7 @@ const ogHeroRegistry: Record<string, () => React.ReactElement> = {
   "npm-init-allwright": InitOgDiagram,
   "v0-1-0-is-here": MilestoneOgDiagram,
   "hooks-popups-uploads-downloads": HooksOgDiagram,
+  "iframes-as-pages": IframesOgDiagram,
 };
 
 /** Returns the post's diagram element for its social-preview card, or null for posts without one (their card falls back to a text-only layout). */

@@ -567,6 +567,71 @@ function HooksHero({ variant }: { variant?: HeroVariant }) {
   );
 }
 
+function IframesHero({ variant }: { variant?: HeroVariant }) {
+  const resolved = [
+    { label: "checkout frame", origin: "pay.example.com", y: 110 },
+    { label: "nested frame", origin: "captcha.example.net", y: 270 },
+  ];
+
+  return (
+    <HeroFrame
+      variant={variant}
+      label="Left: a browser tab containing a cross-origin iframe, which itself contains a nested iframe. Right: frame() turns each iframe into its own ordinary page, marked ready once its document has loaded and settled."
+    >
+      <defs>
+        <ArrowMarker id="hero-iframes-arrow" />
+      </defs>
+
+      {/* Parent tab */}
+      <rect x={70} y={60} width={460} height={340} rx={18} fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
+      <circle cx={96} cy={84} r={5} fill="var(--muted)" opacity="0.6" />
+      <circle cx={114} cy={84} r={5} fill="var(--muted)" opacity="0.6" />
+      <circle cx={132} cy={84} r={5} fill="var(--muted)" opacity="0.6" />
+      <text x={300} y={89} textAnchor="middle" fontSize="12.5" fontFamily="var(--font-mono)" fill="var(--muted)">
+        shop.example.com
+      </text>
+      <line x1={70} y1={106} x2={530} y2={106} stroke="currentColor" strokeWidth="1" opacity="0.6" />
+
+      {/* Outer iframe */}
+      <rect x={110} y={130} width={380} height={240} rx={14} fill="none" stroke="var(--accent)" strokeWidth="1.4" strokeDasharray="6 4" />
+      <text x={130} y={156} fontSize="12" fontFamily="var(--font-mono)" fill="var(--accent)">
+        {"<iframe> pay.example.com"}
+      </text>
+
+      {/* Nested iframe */}
+      <rect x={160} y={220} width={280} height={120} rx={12} fill="none" stroke="var(--accent-2)" strokeWidth="1.4" strokeDasharray="6 4" />
+      <text x={180} y={246} fontSize="12" fontFamily="var(--font-mono)" fill="var(--accent-2)">
+        {"<iframe> captcha.example.net"}
+      </text>
+
+      {/* Arrows from each iframe to its resolved page */}
+      <line x1={490} y1={170} x2={800} y2={resolved[0].y + 40} stroke="currentColor" strokeWidth="1.4" markerEnd="url(#hero-iframes-arrow)" />
+      <line x1={440} y1={290} x2={800} y2={resolved[1].y + 40} stroke="currentColor" strokeWidth="1.4" markerEnd="url(#hero-iframes-arrow)" />
+      <text x={640} y={148} textAnchor="middle" fontSize="13" fontFamily="var(--font-mono)" fill="var(--muted)">
+        .frame()
+      </text>
+      <text x={640} y={338} textAnchor="middle" fontSize="13" fontFamily="var(--font-mono)" fill="var(--muted)">
+        .frame()
+      </text>
+
+      {resolved.map((page) => (
+        <g key={page.label}>
+          <rect x={800} y={page.y} width={320} height={80} rx={14} fill="var(--card)" stroke="var(--accent)" strokeWidth="1.4" />
+          <text x={830} y={page.y + 34} fontSize="15" fontWeight="600" fill="var(--ink)">
+            Page
+          </text>
+          <text x={830} y={page.y + 56} fontSize="12" fontFamily="var(--font-mono)" fill="var(--muted)">
+            {page.origin}
+          </text>
+          <text x={1096} y={page.y + 34} textAnchor="end" fontSize="11" fill="var(--accent)">
+            ● ready
+          </text>
+        </g>
+      ))}
+    </HeroFrame>
+  );
+}
+
 function DefaultHero({ variant }: { variant?: HeroVariant }) {
   return (
     <HeroFrame variant={variant} label="The allwright logo mark on a gradient card">
@@ -596,6 +661,7 @@ const heroRegistry: Record<string, (props: { variant?: HeroVariant }) => React.R
   "npm-init-allwright": InitHero,
   "v0-1-0-is-here": MilestoneHero,
   "hooks-popups-uploads-downloads": HooksHero,
+  "iframes-as-pages": IframesHero,
 };
 
 export function HeroImage({ slug, variant }: { slug: string; variant?: HeroVariant }) {
