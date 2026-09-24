@@ -1,6 +1,7 @@
 import { WebLocatorBuilders, semanticSelector, type LocatorFilterOptions } from "./web-locators.js";
 import { chainSelectorForTransport } from "./selectors.js";
 import type {
+  BoundingBox, CapturedOption, CaptureResult,
   ClickResult,
   CommandOptions,
   CountResult,
@@ -57,6 +58,25 @@ export class LocatorImpl extends WebLocatorBuilders implements Locator {
 
   async press(key: string, options: PressOptions = {}): Promise<PressResult> {
     return this.page.press(this.selector, key, options);
+  }
+
+  async inputValue(options: CommandOptions = {}): Promise<string> {
+    return this.page.inputValue(this.selector, options);
+  }
+  async selectedOptions(options: CommandOptions = {}): Promise<CapturedOption[]> {
+    return this.page.selectedOptions(this.selector, options);
+  }
+  async selectedText(options: CommandOptions = {}): Promise<string | null> {
+    return this.page.selectedText(this.selector, options);
+  }
+  async isChecked(options: CommandOptions = {}): Promise<boolean> {
+    return this.page.isChecked(this.selector, options);
+  }
+  async getAttribute(name: string, options: CommandOptions = {}): Promise<string | null> {
+    return this.page.getAttribute(this.selector, name, options);
+  }
+  async boundingBox(options: CommandOptions = {}): Promise<BoundingBox | null> {
+    return this.page.boundingBox(this.selector, options);
   }
 
   async textContent(options: CommandOptions = {}): Promise<TextResult> {

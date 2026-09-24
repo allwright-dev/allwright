@@ -158,3 +158,18 @@ class AccessibilitySnapshotOptions:
     format: str = "json"
     timeout_ms: int | None = None
     mode: str = "default"
+
+
+@dataclass(slots=True)
+class CapturedOption:
+    value: str
+    label: str
+    index: int
+
+
+@dataclass(slots=True)
+class BoundingBox:
+    x: float
+    y: float
+    width: float
+    height: float

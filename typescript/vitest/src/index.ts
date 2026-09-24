@@ -1,6 +1,6 @@
 import { createLocatorExpect, createPageExpect } from "./expectations.js";
-import type { RetryExpectationOptions, PageExpectMatchers, LocatorExpectMatchers } from "./expectations.js";
-export type { RetryExpectationOptions, TextExpectationOptions, VisibleExpectationOptions, PageExpectMatchers, LocatorExpectMatchers } from "./expectations.js";
+import type { RetryExpectationOptions, PageExpectMatchers, LocatorExpectMatchers, MobilePageExpectMatchers, MobileLocatorExpectMatchers } from "./expectations.js";
+export type { RetryExpectationOptions, TextExpectationOptions, VisibleExpectationOptions, SelectedOptionExpectation, PageExpectMatchers, LocatorExpectMatchers, MobilePageExpectMatchers, MobileLocatorExpectMatchers } from "./expectations.js";
 import {
   launchConfiguredBrowser,
   mobile,
@@ -148,6 +148,24 @@ function createLazyLocator(
     async press(key: string, options?: Parameters<Locator["press"]>[1]) {
       return (await pageResource.get()).locator(await selectorFactory()).press(key, options);
     },
+    async inputValue(options?: CommandOptions) {
+      return (await pageResource.get()).locator(await selectorFactory()).inputValue(options);
+    },
+    async selectedOptions(options?: CommandOptions) {
+      return (await pageResource.get()).locator(await selectorFactory()).selectedOptions(options);
+    },
+    async selectedText(options?: CommandOptions) {
+      return (await pageResource.get()).locator(await selectorFactory()).selectedText(options);
+    },
+    async isChecked(options?: CommandOptions) {
+      return (await pageResource.get()).locator(await selectorFactory()).isChecked(options);
+    },
+    async getAttribute(name: string, options?: CommandOptions) {
+      return (await pageResource.get()).locator(await selectorFactory()).getAttribute(name, options);
+    },
+    async boundingBox(options?: CommandOptions) {
+      return (await pageResource.get()).locator(await selectorFactory()).boundingBox(options);
+    },
     async textContent(options?: Parameters<Locator["textContent"]>[0]) {
       return (await pageResource.get()).locator(await selectorFactory()).textContent(options);
     },
@@ -245,6 +263,27 @@ function createLazyPage(pageResource: LazyResource<Page>): Page {
     },
     async press(selector: string, key: string, options?: Parameters<Page["press"]>[2]) {
       return (await pageResource.get()).press(selector, key, options);
+    },
+    async url(options?: CommandOptions) {
+      return (await pageResource.get()).url(options);
+    },
+    async inputValue(selector: string, options?: CommandOptions) {
+      return (await pageResource.get()).inputValue(selector, options);
+    },
+    async selectedOptions(selector: string, options?: CommandOptions) {
+      return (await pageResource.get()).selectedOptions(selector, options);
+    },
+    async selectedText(selector: string, options?: CommandOptions) {
+      return (await pageResource.get()).selectedText(selector, options);
+    },
+    async isChecked(selector: string, options?: CommandOptions) {
+      return (await pageResource.get()).isChecked(selector, options);
+    },
+    async getAttribute(selector: string, name: string, options?: CommandOptions) {
+      return (await pageResource.get()).getAttribute(selector, name, options);
+    },
+    async boundingBox(selector: string, options?: CommandOptions) {
+      return (await pageResource.get()).boundingBox(selector, options);
     },
     async textContent(selector: string, options?: CommandOptions) {
       return (await pageResource.get()).textContent(selector, options);
@@ -635,8 +674,8 @@ type VitestExpect = typeof vitestExpect;
 interface AllwrightExpect extends VitestExpect {
   (actual: Page): PageExpectMatchers;
   (actual: Locator): LocatorExpectMatchers;
-  (actual: MobileAndroidApp): PageExpectMatchers;
-  (actual: MobileAndroidLocator): LocatorExpectMatchers;
+  (actual: MobileAndroidApp): MobilePageExpectMatchers;
+  (actual: MobileAndroidLocator): MobileLocatorExpectMatchers;
   <T>(actual: T): Assertion<T>;
 }
 

@@ -164,3 +164,27 @@ Both locators must belong to the same page. `.not(other)` removes matching nodes
 The same exclusion API is available in the core web clients as TypeScript/Java
 `.not(other)`, Go `.Not(other)`, Rust `.not(&other)`, and Python `.not_(other)`.
 Native Android locator exclusion is not exposed by this web selector API.
+
+### Retrying state expectations
+
+Assert against the page or locator so each attempt reads fresh state:
+
+```ts
+await expect(page).toHaveURL('https://example.com/dashboard');
+await expect(page).toHaveURL(/\/dashboard(?:\?|$)/, { timeoutMs: 10_000 });
+await expect(page.locator('input')).toHaveValue(/ready/i);
+await expect(page.locator('select')).toHaveSelectedOptions(['a', 'b']);
+await expect(page.locator('select')).toHaveSelectedOptions([{ value: 'a', label: /Alpha/ }]);
+await expect(page.locator('textarea')).toHaveSelectedText('selected words');
+await expect(page.locator('input[type=checkbox]')).toBeChecked();
+await expect(page.locator('h1')).toHaveText('Welcome');
+await expect(page.locator('a')).toHaveAttribute('href', /dashboard/);
+await expect(page.locator('button')).toHaveBoundingBox({ width: 100, height: 40 });
+await expect(page.locator('input[type=radio]')).not().toBeChecked();
+```
+
+Every element matcher also has a page form, such as `expect(page).toHaveValue('#name', 'Alice')` or `expect(page).toHaveAttribute('a', 'href', '/home')`. These state matchers are web-only; Android retains its text/count/visibility matchers.
+
+All Allwright page/app/locator expectations retry until they match or the timeout expires, including `.not` and `.not()`. Defaults come from the shared assertion configuration, falling back to 5 seconds and a 100 ms interval. Override these with `{ timeoutMs, intervalMs }`. In-flight reads and nested command timeout hints are bounded by the remaining assertion budget; `timeoutMs: 0` makes one observation without polling. Ordinary assertions on already captured values, such as `expect(await page.url()).toBe(...)`, use standard Vitest behavior and do not re-read the page.
+
+String URL expectations match the complete URL exactly; regex expectations match the current URL on every attempt without modifying the regex's `lastIndex`. Values, selected text, and attributes also accept strings or regexes. `null` asserts a missing attribute or unsupported textbox selection; an empty string is distinct. Selected-option arrays match in order and require the same number of options. Entries can be exact values, value regexes, or objects specifying value, label, and/or index. Bounding-box expectations compare only the supplied coordinates/dimensions exactly in viewport CSS pixels; `null` expects no visible box. `.not.toBeChecked()` expects an unchecked control. Missing elements and read errors cannot satisfy negation.

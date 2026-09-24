@@ -449,7 +449,7 @@ pub struct ContextSessionCommand {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_command::Command",
-        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26"
+        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27"
     )]
     pub command: ::core::option::Option<context_session_command::Command>,
 }
@@ -505,6 +505,8 @@ pub mod context_session_command {
         SaveMobileDownload(super::SaveMobileDownloadCommand),
         #[prost(message, tag = "26")]
         ResolveFrame(super::ResolveFrameCommand),
+        #[prost(message, tag = "27")]
+        Capture(super::CaptureCommand),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -520,7 +522,7 @@ pub struct ContextSessionEvent {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_event::Event",
-        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28"
+        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29"
     )]
     pub event: ::core::option::Option<context_session_event::Event>,
 }
@@ -582,6 +584,8 @@ pub mod context_session_event {
         MobileDownloadSaved(super::MobileDownloadSavedEvent),
         #[prost(message, tag = "28")]
         FrameResolved(super::FrameResolvedEvent),
+        #[prost(message, tag = "29")]
+        CaptureResolved(super::CaptureResolvedEvent),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -930,6 +934,95 @@ pub struct AccessibilitySnapshotCapturedEvent {
     pub snapshot: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub format: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CaptureCommand {
+    #[prost(enumeration = "CaptureKind", tag = "1")]
+    pub kind: i32,
+    #[prost(string, tag = "2")]
+    pub css_selector: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub attribute_name: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "4")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CapturedOption {
+    #[prost(string, tag = "1")]
+    pub value: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub label: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "3")]
+    pub index: u32,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct BoundingBox {
+    #[prost(double, tag = "1")]
+    pub x: f64,
+    #[prost(double, tag = "2")]
+    pub y: f64,
+    #[prost(double, tag = "3")]
+    pub width: f64,
+    #[prost(double, tag = "4")]
+    pub height: f64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CaptureResolvedEvent {
+    /// Absent for a missing attribute or unsupported text selection.
+    #[prost(string, optional, tag = "1")]
+    pub value: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(bool, optional, tag = "2")]
+    pub checked: ::core::option::Option<bool>,
+    #[prost(message, repeated, tag = "3")]
+    pub selected_options: ::prost::alloc::vec::Vec<CapturedOption>,
+    /// Viewport coordinates in CSS pixels, absent for an element without a visible box.
+    #[prost(message, optional, tag = "4")]
+    pub bounding_box: ::core::option::Option<BoundingBox>,
+}
+/// Read-only web inspection. Element reads use the first locator match.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum CaptureKind {
+    Unspecified = 0,
+    Url = 1,
+    InputValue = 2,
+    SelectedOptions = 3,
+    SelectedText = 4,
+    Checked = 5,
+    Attribute = 6,
+    BoundingBox = 7,
+}
+impl CaptureKind {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "CAPTURE_KIND_UNSPECIFIED",
+            Self::Url => "CAPTURE_KIND_URL",
+            Self::InputValue => "CAPTURE_KIND_INPUT_VALUE",
+            Self::SelectedOptions => "CAPTURE_KIND_SELECTED_OPTIONS",
+            Self::SelectedText => "CAPTURE_KIND_SELECTED_TEXT",
+            Self::Checked => "CAPTURE_KIND_CHECKED",
+            Self::Attribute => "CAPTURE_KIND_ATTRIBUTE",
+            Self::BoundingBox => "CAPTURE_KIND_BOUNDING_BOX",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "CAPTURE_KIND_UNSPECIFIED" => Some(Self::Unspecified),
+            "CAPTURE_KIND_URL" => Some(Self::Url),
+            "CAPTURE_KIND_INPUT_VALUE" => Some(Self::InputValue),
+            "CAPTURE_KIND_SELECTED_OPTIONS" => Some(Self::SelectedOptions),
+            "CAPTURE_KIND_SELECTED_TEXT" => Some(Self::SelectedText),
+            "CAPTURE_KIND_CHECKED" => Some(Self::Checked),
+            "CAPTURE_KIND_ATTRIBUTE" => Some(Self::Attribute),
+            "CAPTURE_KIND_BOUNDING_BOX" => Some(Self::BoundingBox),
+            _ => None,
+        }
+    }
 }
 /// Generated client implementations.
 pub mod engine_service_client {

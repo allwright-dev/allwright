@@ -923,6 +923,60 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
         }
     }
 
+    private dev.allwright.engine.v1.CaptureResolvedEvent capture(dev.allwright.engine.v1.CaptureKind kind, String selector, String attribute, CommandOptions options) {
+        var handle = ensureStream();
+        ensureOpen();
+        var resolved = options == null ? new CommandOptions() : options;
+        var capture = dev.allwright.engine.v1.CaptureCommand.newBuilder().setKind(kind)
+                .setCssSelector(selector.isEmpty() ? "" : SelectorSupport.normalizeSelectorForTransport(selector)).setAttributeName(attribute);
+        if (CommandSupport.hasTimeout(resolved.timeoutMs())) capture.setRetryOptions(CommandSupport.commandRetryOptions(resolved.timeoutMs()));
+        handle.send(ContextSessionCommand.newBuilder().setSurfaceSessionId(browserSessionId).setContextSessionId(sessionId).setCapture(capture).build());
+        while (true) {
+            var event = handle.recv("receive capture result");
+            switch (event.getEventCase()) {
+                case CAPTURE_RESOLVED -> { return event.getCaptureResolved(); }
+                case ERROR -> throw new AllwrightException(event.getError().getMessage());
+                case CLOSED -> { closed = true; throw new AllwrightException("page session closed while capturing"); }
+                default -> {}
+            }
+        }
+    }
+    public synchronized String url() { return url(new CommandOptions()); }
+    public synchronized String url(CommandOptions options) {
+        var r = capture(dev.allwright.engine.v1.CaptureKind.CAPTURE_KIND_URL, "", "", options);
+        return r.getValue();
+    }
+    public synchronized String inputValue(String selector) { return inputValue(selector, new CommandOptions()); }
+    public synchronized String inputValue(String selector, CommandOptions options) {
+        var r = capture(dev.allwright.engine.v1.CaptureKind.CAPTURE_KIND_INPUT_VALUE, selector, "", options);
+        return r.getValue();
+    }
+    public synchronized java.util.List<CapturedOption> selectedOptions(String selector) { return selectedOptions(selector, new CommandOptions()); }
+    public synchronized java.util.List<CapturedOption> selectedOptions(String selector, CommandOptions options) {
+        var r = capture(dev.allwright.engine.v1.CaptureKind.CAPTURE_KIND_SELECTED_OPTIONS, selector, "", options);
+        return r.getSelectedOptionsList().stream().map(o -> new CapturedOption(o.getValue(), o.getLabel(), o.getIndex())).toList();
+    }
+    public synchronized String selectedText(String selector) { return selectedText(selector, new CommandOptions()); }
+    public synchronized String selectedText(String selector, CommandOptions options) {
+        var r = capture(dev.allwright.engine.v1.CaptureKind.CAPTURE_KIND_SELECTED_TEXT, selector, "", options);
+        return r.hasValue() ? r.getValue() : null;
+    }
+    public synchronized boolean isChecked(String selector) { return isChecked(selector, new CommandOptions()); }
+    public synchronized boolean isChecked(String selector, CommandOptions options) {
+        var r = capture(dev.allwright.engine.v1.CaptureKind.CAPTURE_KIND_CHECKED, selector, "", options);
+        return r.getChecked();
+    }
+    public synchronized String getAttribute(String selector, String name) { return getAttribute(selector, name, new CommandOptions()); }
+    public synchronized String getAttribute(String selector, String name, CommandOptions options) {
+        var r = capture(dev.allwright.engine.v1.CaptureKind.CAPTURE_KIND_ATTRIBUTE, selector, name, options);
+        return r.hasValue() ? r.getValue() : null;
+    }
+    public synchronized BoundingBox boundingBox(String selector) { return boundingBox(selector, new CommandOptions()); }
+    public synchronized BoundingBox boundingBox(String selector, CommandOptions options) {
+        var r = capture(dev.allwright.engine.v1.CaptureKind.CAPTURE_KIND_BOUNDING_BOX, selector, "", options);
+        return r.hasBoundingBox() ? new BoundingBox(r.getBoundingBox().getX(), r.getBoundingBox().getY(), r.getBoundingBox().getWidth(), r.getBoundingBox().getHeight()) : null;
+    }
+
     private TextResult readText(String selector, CommandOptions options, boolean textContent) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();

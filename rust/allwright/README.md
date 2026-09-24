@@ -52,3 +52,5 @@ These paths are local to the Rust test process and are streamed through a
 remote Allwright server when necessary. Android app contexts expose the same
 `register_hook(FILE_CHOOSER)` / `register_hook(DOWNLOAD)` lifecycle and return
 mobile chooser/download handles.
+
+Web state reads: `page.url().await`, `locator.input_value().await`, `locator.selected_options().await`, `locator.selected_text().await`, `locator.is_checked().await`, `locator.get_attribute(name).await`, and `locator.bounding_box().await`. Element methods also accept selectors on `Page`; `_with_options` variants accept `CommandOptions`. Selected options return `Vec<CapturedOption>`; boxes return `Option<BoundingBox>` in frame/page viewport CSS pixels. Missing attributes, unsupported text selections, and hidden/zero-area boxes return `None`. Existing `text_content()` and `inner_text()` read element text. See the [shared semantics](../../typescript/core/README.md#read-page-and-element-state).

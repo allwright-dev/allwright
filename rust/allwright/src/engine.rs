@@ -2168,6 +2168,64 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
+        Some(ContextCommand::Capture(command)) => {
+            let kind = proto::CaptureKind::try_from(command.kind)
+                .map_err(|_| Status::invalid_argument("unknown capture kind"))?;
+            let kind = match kind {
+                proto::CaptureKind::Url => "url",
+                proto::CaptureKind::InputValue => "input_value",
+                proto::CaptureKind::SelectedOptions => "selected_options",
+                proto::CaptureKind::SelectedText => "selected_text",
+                proto::CaptureKind::Checked => "checked",
+                proto::CaptureKind::Attribute => "attribute",
+                proto::CaptureKind::BoundingBox => "bounding_box",
+                proto::CaptureKind::Unspecified => {
+                    return Err(Status::invalid_argument("capture kind is required"));
+                }
+            };
+            let (EngineBrowserSessionHandle::Web(browser), EnginePageSessionHandle::Web(page)) =
+                (&surface_session, &page_session)
+            else {
+                return Err(Status::invalid_argument("capture requires a web context"));
+            };
+            let result =
+                retry_with_timeout(command_retry_policy(command.retry_options.as_ref()), || {
+                    web_lib::capture(
+                        browser,
+                        page,
+                        kind,
+                        &command.css_selector,
+                        &command.attribute_name,
+                    )
+                })
+                .await
+                .map_err(Status::internal)?;
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(
+                    &context_session_id,
+                    ContextEvent::CaptureResolved(proto::CaptureResolvedEvent {
+                        value: result.value,
+                        checked: result.checked,
+                        selected_options: result
+                            .selected_options
+                            .into_iter()
+                            .map(|o| proto::CapturedOption {
+                                value: o.value,
+                                label: o.label,
+                                index: o.index,
+                            })
+                            .collect(),
+                        bounding_box: result.bounding_box.map(|b| proto::BoundingBox {
+                            x: b.x,
+                            y: b.y,
+                            width: b.width,
+                            height: b.height,
+                        }),
+                    }),
+                )],
+                should_close: false,
+            })
+        }
         Some(ContextCommand::GetTextContent(GetTextContentCommand {
             css_selector,
             retry_options,

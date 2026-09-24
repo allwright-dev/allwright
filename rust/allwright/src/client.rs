@@ -2,6 +2,8 @@
 mod bootstrap;
 #[path = "client_browser.rs"]
 mod browser;
+#[path = "client_capture.rs"]
+mod capture;
 #[path = "client_command.rs"]
 mod command;
 #[path = "client_config.rs"]

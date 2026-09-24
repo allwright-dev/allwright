@@ -45,10 +45,11 @@ const webAvailable = [
   "Count matching elements",
   "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
   "Read visible or raw text from an element",
+  "Capture the current page URL, live input values, selected options and text, checkbox/radio state, attributes, and element bounding boxes",
   "Wait for an element to appear or become visible",
   "Capture screenshots",
   "Read page accessibility snapshots as JSON or standard YAML, with queryable element references in AI mode",
-  "Retrying text/count/visibility assertions, including negation (via @allwright.dev/vitest)",
+  "Retrying URL, value, selection, checked state, text, attribute, bounding-box, count, and visibility assertions, including negation (via @allwright.dev/vitest)",
 ];
 
 const webNotYetAvailable = [

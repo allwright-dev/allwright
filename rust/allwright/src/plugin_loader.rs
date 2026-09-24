@@ -1006,3 +1006,27 @@ pub async fn resolve_frame(
         _ => Err("web plugin returned an unexpected response for ResolveFrame".to_string()),
     }
 }
+
+pub async fn capture(
+    surface_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    kind: &str,
+    css_selector: &str,
+    attribute_name: &str,
+) -> Result<allwright_plugin_sdk::CaptureInfo, String> {
+    match invoke_web_expected(
+        "CaptureCommand",
+        PluginCommand::Capture {
+            browser_session: surface_session.clone(),
+            page_session: page_session.clone(),
+            kind: kind.to_string(),
+            css_selector: css_selector.to_string(),
+            attribute_name: attribute_name.to_string(),
+        },
+    )
+    .await?
+    {
+        PluginResult::Capture(result) => Ok(result),
+        _ => Err("web plugin returned an unexpected response for Capture".into()),
+    }
+}

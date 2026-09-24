@@ -66,3 +66,6 @@ node_modules/
 
 # Local Go build cache
 /.gocache/
+
+# Local capture regression engine/plugin installation
+/.tmp/capture-home/

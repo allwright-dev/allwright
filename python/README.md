@@ -59,3 +59,5 @@ download.save_as(f"artifacts/{download.suggested_filename}")
 These paths are local to the Python test process and are streamed through a
 remote Allwright server when necessary. Android app contexts support
 `hooks.file_chooser` and `hooks.download` with the same lifecycle.
+
+Web state reads: `page.url()`, `locator.input_value()`, `locator.selected_options()`, `locator.selected_text()`, `locator.is_checked()`, `locator.get_attribute(name)`, and `locator.bounding_box()`. Element methods also accept selectors on `Page`. Selected options return `CapturedOption(value, label, index)` objects; boxes return `BoundingBox(x, y, width, height)` in frame/page viewport CSS pixels. Missing attributes, unsupported text selections, and hidden/zero-area boxes return `None`. Existing `text_content()` and `inner_text()` read element text. See the [shared semantics](../typescript/core/README.md#read-page-and-element-state).

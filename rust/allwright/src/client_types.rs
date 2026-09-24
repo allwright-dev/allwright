@@ -378,3 +378,17 @@ pub enum AccessibilitySnapshotMode {
     Autoexpect,
     Codegen,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CapturedOption {
+    pub value: String,
+    pub label: String,
+    pub index: u32,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoundingBox {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}

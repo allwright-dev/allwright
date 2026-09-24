@@ -1,3 +1,5 @@
+mod capture;
+pub use capture::capture;
 mod frames;
 pub use frames::resolve_frame;
 mod accessibility;
@@ -4642,6 +4644,23 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             )
             .await
             .map(PluginResult::PressKey)
+        }),
+        PluginCommand::Capture {
+            browser_session,
+            page_session,
+            kind,
+            css_selector,
+            attribute_name,
+        } => block_on_plugin_future(async move {
+            capture(
+                &browser_session,
+                &page_session,
+                &kind,
+                &css_selector,
+                &attribute_name,
+            )
+            .await
+            .map(PluginResult::Capture)
         }),
         PluginCommand::GetTextContent {
             browser_session,

@@ -1,4 +1,5 @@
 from .client import (
+    CapturedOption, BoundingBox,
     Browser,
     BrowserType,
     ClickResult,
@@ -48,6 +49,7 @@ from .client import (
 )
 
 __all__ = [
+    "CapturedOption", "BoundingBox",
     "Browser",
     "BrowserType",
     "ClickResult",

@@ -163,6 +163,14 @@ export interface Browser extends BrowserInfo {
 }
 
 export interface Page extends PageInfo, WebLocators {
+  url(options?: CommandOptions): Promise<string>;
+  inputValue(selector: string, options?: CommandOptions): Promise<string>;
+  selectedOptions(selector: string, options?: CommandOptions): Promise<CapturedOption[]>;
+  selectedText(selector: string, options?: CommandOptions): Promise<string | null>;
+  isChecked(selector: string, options?: CommandOptions): Promise<boolean>;
+  getAttribute(selector: string, name: string, options?: CommandOptions): Promise<string | null>;
+  boundingBox(selector: string, options?: CommandOptions): Promise<BoundingBox | null>;
+
   frame(selector: string, options?: CommandOptions): Promise<Page>;
   registerHook<T>(type: HookType<T>): Promise<Hook<T>>;
   accessibilitySnapshot(options?: AccessibilitySnapshotOptions): Promise<string>;
@@ -244,6 +252,13 @@ export interface MobileSurfaceNamespace {
 }
 
 export interface Locator extends WebLocators {
+  inputValue(options?: CommandOptions): Promise<string>;
+  selectedOptions(options?: CommandOptions): Promise<CapturedOption[]>;
+  selectedText(options?: CommandOptions): Promise<string | null>;
+  isChecked(options?: CommandOptions): Promise<boolean>;
+  getAttribute(name: string, options?: CommandOptions): Promise<string | null>;
+  boundingBox(options?: CommandOptions): Promise<BoundingBox | null>;
+
   frame(options?: CommandOptions): Promise<Page>;
   Frame(options?: CommandOptions): Promise<Page>;
   not(other: Locator): Locator;
@@ -433,6 +448,7 @@ export interface SurfaceSessionEvent {
 }
 
 export interface ContextSessionEvent {
+  captureResolved?: CaptureResult;
   frameResolved?: { contextSessionId?: string };
   accessibilitySnapshotCaptured?: { snapshot?: string; format?: string };
   contextSessionId?: string;
@@ -874,6 +890,7 @@ export type SurfaceSessionRequest =
   | CloseSurfaceRequest;
 
 export type ContextSessionRequest =
+  | { surfaceSessionId: string; contextSessionId: string; capture: { kind: string; cssSelector: string; attributeName: string; retryOptions?: { timeoutMs: number } } }
   | { surfaceSessionId: string; contextSessionId: string; resolveFrame: { cssSelector: string; retryOptions?: { timeoutMs: number } } }
   | ContextPingRequest
   | RegisterHookRequest
@@ -981,4 +998,10 @@ export class EventQueue<T> {
       this.#waiters.push({ resolve, reject });
     });
   }
+}
+
+export interface CapturedOption { value: string; label: string; index: number; }
+export interface BoundingBox { x: number; y: number; width: number; height: number; }
+export interface CaptureResult {
+  value?: string; checked?: boolean; selectedOptions?: CapturedOption[]; boundingBox?: BoundingBox;
 }

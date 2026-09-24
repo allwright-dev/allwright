@@ -107,3 +107,5 @@ try (Browser browser = Allwright.firefox().launch()) {
     page.waitForSelector("xpath=//h1[text()=\"Form Inputs\"]");
 }
 ```
+
+Web state reads: `page.url()`, `locator.inputValue()`, `locator.selectedOptions()`, `locator.selectedText()`, `locator.isChecked()`, `locator.getAttribute(name)`, and `locator.boundingBox()`. Element methods also accept selectors on `Page`; overloads accept `CommandOptions`. Selected options return `List<CapturedOption>`; boxes return `BoundingBox` in frame/page viewport CSS pixels. Missing attributes, unsupported text selections, and hidden/zero-area boxes return `null`. Existing `textContent()` and `innerText()` read element text. See the [shared semantics](../typescript/core/README.md#read-page-and-element-state).

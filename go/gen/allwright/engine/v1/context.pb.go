@@ -21,6 +21,71 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Read-only web inspection. Element reads use the first locator match.
+type CaptureKind int32
+
+const (
+	CaptureKind_CAPTURE_KIND_UNSPECIFIED      CaptureKind = 0
+	CaptureKind_CAPTURE_KIND_URL              CaptureKind = 1
+	CaptureKind_CAPTURE_KIND_INPUT_VALUE      CaptureKind = 2
+	CaptureKind_CAPTURE_KIND_SELECTED_OPTIONS CaptureKind = 3
+	CaptureKind_CAPTURE_KIND_SELECTED_TEXT    CaptureKind = 4
+	CaptureKind_CAPTURE_KIND_CHECKED          CaptureKind = 5
+	CaptureKind_CAPTURE_KIND_ATTRIBUTE        CaptureKind = 6
+	CaptureKind_CAPTURE_KIND_BOUNDING_BOX     CaptureKind = 7
+)
+
+// Enum value maps for CaptureKind.
+var (
+	CaptureKind_name = map[int32]string{
+		0: "CAPTURE_KIND_UNSPECIFIED",
+		1: "CAPTURE_KIND_URL",
+		2: "CAPTURE_KIND_INPUT_VALUE",
+		3: "CAPTURE_KIND_SELECTED_OPTIONS",
+		4: "CAPTURE_KIND_SELECTED_TEXT",
+		5: "CAPTURE_KIND_CHECKED",
+		6: "CAPTURE_KIND_ATTRIBUTE",
+		7: "CAPTURE_KIND_BOUNDING_BOX",
+	}
+	CaptureKind_value = map[string]int32{
+		"CAPTURE_KIND_UNSPECIFIED":      0,
+		"CAPTURE_KIND_URL":              1,
+		"CAPTURE_KIND_INPUT_VALUE":      2,
+		"CAPTURE_KIND_SELECTED_OPTIONS": 3,
+		"CAPTURE_KIND_SELECTED_TEXT":    4,
+		"CAPTURE_KIND_CHECKED":          5,
+		"CAPTURE_KIND_ATTRIBUTE":        6,
+		"CAPTURE_KIND_BOUNDING_BOX":     7,
+	}
+)
+
+func (x CaptureKind) Enum() *CaptureKind {
+	p := new(CaptureKind)
+	*p = x
+	return p
+}
+
+func (x CaptureKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CaptureKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_core_v1_context_proto_enumTypes[0].Descriptor()
+}
+
+func (CaptureKind) Type() protoreflect.EnumType {
+	return &file_core_v1_context_proto_enumTypes[0]
+}
+
+func (x CaptureKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CaptureKind.Descriptor instead.
+func (CaptureKind) EnumDescriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{0}
+}
+
 type ContextSessionCommand struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	SurfaceSessionId string                 `protobuf:"bytes,1,opt,name=surface_session_id,json=surfaceSessionId,proto3" json:"surface_session_id,omitempty"`
@@ -51,6 +116,7 @@ type ContextSessionCommand struct {
 	//	*ContextSessionCommand_SetMobileFileChooserFiles
 	//	*ContextSessionCommand_SaveMobileDownload
 	//	*ContextSessionCommand_ResolveFrame
+	//	*ContextSessionCommand_Capture
 	Command       isContextSessionCommand_Command `protobuf_oneof:"command"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -323,6 +389,15 @@ func (x *ContextSessionCommand) GetResolveFrame() *ResolveFrameCommand {
 	return nil
 }
 
+func (x *ContextSessionCommand) GetCapture() *CaptureCommand {
+	if x != nil {
+		if x, ok := x.Command.(*ContextSessionCommand_Capture); ok {
+			return x.Capture
+		}
+	}
+	return nil
+}
+
 type isContextSessionCommand_Command interface {
 	isContextSessionCommand_Command()
 }
@@ -423,6 +498,10 @@ type ContextSessionCommand_ResolveFrame struct {
 	ResolveFrame *ResolveFrameCommand `protobuf:"bytes,26,opt,name=resolve_frame,json=resolveFrame,proto3,oneof"`
 }
 
+type ContextSessionCommand_Capture struct {
+	Capture *CaptureCommand `protobuf:"bytes,27,opt,name=capture,proto3,oneof"`
+}
+
 func (*ContextSessionCommand_Ping) isContextSessionCommand_Command() {}
 
 func (*ContextSessionCommand_Close) isContextSessionCommand_Command() {}
@@ -470,6 +549,8 @@ func (*ContextSessionCommand_SetMobileFileChooserFiles) isContextSessionCommand_
 func (*ContextSessionCommand_SaveMobileDownload) isContextSessionCommand_Command() {}
 
 func (*ContextSessionCommand_ResolveFrame) isContextSessionCommand_Command() {}
+
+func (*ContextSessionCommand_Capture) isContextSessionCommand_Command() {}
 
 type ContextSessionPingCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -583,6 +664,7 @@ type ContextSessionEvent struct {
 	//	*ContextSessionEvent_MobileFileChooserFilesSet
 	//	*ContextSessionEvent_MobileDownloadSaved
 	//	*ContextSessionEvent_FrameResolved
+	//	*ContextSessionEvent_CaptureResolved
 	Event         isContextSessionEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -875,6 +957,15 @@ func (x *ContextSessionEvent) GetFrameResolved() *FrameResolvedEvent {
 	return nil
 }
 
+func (x *ContextSessionEvent) GetCaptureResolved() *CaptureResolvedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*ContextSessionEvent_CaptureResolved); ok {
+			return x.CaptureResolved
+		}
+	}
+	return nil
+}
+
 type isContextSessionEvent_Event interface {
 	isContextSessionEvent_Event()
 }
@@ -987,6 +1078,10 @@ type ContextSessionEvent_FrameResolved struct {
 	FrameResolved *FrameResolvedEvent `protobuf:"bytes,28,opt,name=frame_resolved,json=frameResolved,proto3,oneof"`
 }
 
+type ContextSessionEvent_CaptureResolved struct {
+	CaptureResolved *CaptureResolvedEvent `protobuf:"bytes,29,opt,name=capture_resolved,json=captureResolved,proto3,oneof"`
+}
+
 func (*ContextSessionEvent_Attached) isContextSessionEvent_Event() {}
 
 func (*ContextSessionEvent_Pong) isContextSessionEvent_Event() {}
@@ -1040,6 +1135,8 @@ func (*ContextSessionEvent_MobileFileChooserFilesSet) isContextSessionEvent_Even
 func (*ContextSessionEvent_MobileDownloadSaved) isContextSessionEvent_Event() {}
 
 func (*ContextSessionEvent_FrameResolved) isContextSessionEvent_Event() {}
+
+func (*ContextSessionEvent_CaptureResolved) isContextSessionEvent_Event() {}
 
 type ContextSessionAttachedEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -3397,11 +3494,277 @@ func (x *AccessibilitySnapshotCapturedEvent) GetFormat() string {
 	return ""
 }
 
+type CaptureCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          CaptureKind            `protobuf:"varint,1,opt,name=kind,proto3,enum=allwright.engine.v1.CaptureKind" json:"kind,omitempty"`
+	CssSelector   string                 `protobuf:"bytes,2,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
+	AttributeName string                 `protobuf:"bytes,3,opt,name=attribute_name,json=attributeName,proto3" json:"attribute_name,omitempty"`
+	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,4,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CaptureCommand) Reset() {
+	*x = CaptureCommand{}
+	mi := &file_core_v1_context_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CaptureCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CaptureCommand) ProtoMessage() {}
+
+func (x *CaptureCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CaptureCommand.ProtoReflect.Descriptor instead.
+func (*CaptureCommand) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *CaptureCommand) GetKind() CaptureKind {
+	if x != nil {
+		return x.Kind
+	}
+	return CaptureKind_CAPTURE_KIND_UNSPECIFIED
+}
+
+func (x *CaptureCommand) GetCssSelector() string {
+	if x != nil {
+		return x.CssSelector
+	}
+	return ""
+}
+
+func (x *CaptureCommand) GetAttributeName() string {
+	if x != nil {
+		return x.AttributeName
+	}
+	return ""
+}
+
+func (x *CaptureCommand) GetRetryOptions() *CommandRetryOptions {
+	if x != nil {
+		return x.RetryOptions
+	}
+	return nil
+}
+
+type CapturedOption struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         string                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
+	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	Index         uint32                 `protobuf:"varint,3,opt,name=index,proto3" json:"index,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CapturedOption) Reset() {
+	*x = CapturedOption{}
+	mi := &file_core_v1_context_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CapturedOption) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CapturedOption) ProtoMessage() {}
+
+func (x *CapturedOption) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CapturedOption.ProtoReflect.Descriptor instead.
+func (*CapturedOption) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *CapturedOption) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *CapturedOption) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *CapturedOption) GetIndex() uint32 {
+	if x != nil {
+		return x.Index
+	}
+	return 0
+}
+
+type BoundingBox struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	X             float64                `protobuf:"fixed64,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y             float64                `protobuf:"fixed64,2,opt,name=y,proto3" json:"y,omitempty"`
+	Width         float64                `protobuf:"fixed64,3,opt,name=width,proto3" json:"width,omitempty"`
+	Height        float64                `protobuf:"fixed64,4,opt,name=height,proto3" json:"height,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BoundingBox) Reset() {
+	*x = BoundingBox{}
+	mi := &file_core_v1_context_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BoundingBox) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BoundingBox) ProtoMessage() {}
+
+func (x *BoundingBox) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BoundingBox.ProtoReflect.Descriptor instead.
+func (*BoundingBox) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *BoundingBox) GetX() float64 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *BoundingBox) GetY() float64 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+func (x *BoundingBox) GetWidth() float64 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *BoundingBox) GetHeight() float64 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+type CaptureResolvedEvent struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Absent for a missing attribute or unsupported text selection.
+	Value           *string           `protobuf:"bytes,1,opt,name=value,proto3,oneof" json:"value,omitempty"`
+	Checked         *bool             `protobuf:"varint,2,opt,name=checked,proto3,oneof" json:"checked,omitempty"`
+	SelectedOptions []*CapturedOption `protobuf:"bytes,3,rep,name=selected_options,json=selectedOptions,proto3" json:"selected_options,omitempty"`
+	// Viewport coordinates in CSS pixels, absent for an element without a visible box.
+	BoundingBox   *BoundingBox `protobuf:"bytes,4,opt,name=bounding_box,json=boundingBox,proto3,oneof" json:"bounding_box,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CaptureResolvedEvent) Reset() {
+	*x = CaptureResolvedEvent{}
+	mi := &file_core_v1_context_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CaptureResolvedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CaptureResolvedEvent) ProtoMessage() {}
+
+func (x *CaptureResolvedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_core_v1_context_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CaptureResolvedEvent.ProtoReflect.Descriptor instead.
+func (*CaptureResolvedEvent) Descriptor() ([]byte, []int) {
+	return file_core_v1_context_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *CaptureResolvedEvent) GetValue() string {
+	if x != nil && x.Value != nil {
+		return *x.Value
+	}
+	return ""
+}
+
+func (x *CaptureResolvedEvent) GetChecked() bool {
+	if x != nil && x.Checked != nil {
+		return *x.Checked
+	}
+	return false
+}
+
+func (x *CaptureResolvedEvent) GetSelectedOptions() []*CapturedOption {
+	if x != nil {
+		return x.SelectedOptions
+	}
+	return nil
+}
+
+func (x *CaptureResolvedEvent) GetBoundingBox() *BoundingBox {
+	if x != nil {
+		return x.BoundingBox
+	}
+	return nil
+}
+
 var File_core_v1_context_proto protoreflect.FileDescriptor
 
 const file_core_v1_context_proto_rawDesc = "" +
 	"\n" +
-	"\x15core/v1/context.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x1fsurfaces/mobile/v1/mobile.proto\x1a\x19surfaces/web/v1/web.proto\"\x83\x11\n" +
+	"\x15core/v1/context.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x1fsurfaces/mobile/v1/mobile.proto\x1a\x19surfaces/web/v1/web.proto\"\xc4\x11\n" +
 	"\x15ContextSessionCommand\x12,\n" +
 	"\x12surface_session_id\x18\x01 \x01(\tR\x10surfaceSessionId\x12,\n" +
 	"\x12context_session_id\x18\x02 \x01(\tR\x10contextSessionId\x12D\n" +
@@ -3431,11 +3794,12 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\x0fread_file_chunk\x18\x17 \x01(\v2).allwright.engine.v1.ReadFileChunkCommandH\x00R\rreadFileChunk\x12y\n" +
 	"\x1dset_mobile_file_chooser_files\x18\x18 \x01(\v25.allwright.engine.v1.SetMobileFileChooserFilesCommandH\x00R\x19setMobileFileChooserFiles\x12b\n" +
 	"\x14save_mobile_download\x18\x19 \x01(\v2..allwright.engine.v1.SaveMobileDownloadCommandH\x00R\x12saveMobileDownload\x12O\n" +
-	"\rresolve_frame\x18\x1a \x01(\v2(.allwright.engine.v1.ResolveFrameCommandH\x00R\fresolveFrameB\t\n" +
+	"\rresolve_frame\x18\x1a \x01(\v2(.allwright.engine.v1.ResolveFrameCommandH\x00R\fresolveFrame\x12?\n" +
+	"\acapture\x18\x1b \x01(\v2#.allwright.engine.v1.CaptureCommandH\x00R\acaptureB\t\n" +
 	"\acommand\"5\n" +
 	"\x19ContextSessionPingCommand\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"\x1c\n" +
-	"\x1aCloseContextSessionCommand\"\xb0\x13\n" +
+	"\x1aCloseContextSessionCommand\"\x88\x14\n" +
 	"\x13ContextSessionEvent\x12,\n" +
 	"\x12context_session_id\x18\x01 \x01(\tR\x10contextSessionId\x12N\n" +
 	"\battached\x18\x02 \x01(\v20.allwright.engine.v1.ContextSessionAttachedEventH\x00R\battached\x12B\n" +
@@ -3467,7 +3831,8 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"file_chunk\x18\x19 \x01(\v2#.allwright.engine.v1.FileChunkEventH\x00R\tfileChunk\x12w\n" +
 	"\x1dmobile_file_chooser_files_set\x18\x1a \x01(\v23.allwright.engine.v1.MobileFileChooserFilesSetEventH\x00R\x19mobileFileChooserFilesSet\x12c\n" +
 	"\x15mobile_download_saved\x18\x1b \x01(\v2-.allwright.engine.v1.MobileDownloadSavedEventH\x00R\x13mobileDownloadSaved\x12P\n" +
-	"\x0eframe_resolved\x18\x1c \x01(\v2'.allwright.engine.v1.FrameResolvedEventH\x00R\rframeResolvedB\a\n" +
+	"\x0eframe_resolved\x18\x1c \x01(\v2'.allwright.engine.v1.FrameResolvedEventH\x00R\rframeResolved\x12V\n" +
+	"\x10capture_resolved\x18\x1d \x01(\v2).allwright.engine.v1.CaptureResolvedEventH\x00R\x0fcaptureResolvedB\a\n" +
 	"\x05event\"1\n" +
 	"\x1bContextSessionAttachedEvent\x12\x12\n" +
 	"\x04note\x18\x01 \x01(\tR\x04note\"3\n" +
@@ -3637,7 +4002,40 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\x0e_retry_options\"X\n" +
 	"\"AccessibilitySnapshotCapturedEvent\x12\x1a\n" +
 	"\bsnapshot\x18\x01 \x01(\tR\bsnapshot\x12\x16\n" +
-	"\x06format\x18\x02 \x01(\tR\x06formatBK\n" +
+	"\x06format\x18\x02 \x01(\tR\x06format\"\xf6\x01\n" +
+	"\x0eCaptureCommand\x124\n" +
+	"\x04kind\x18\x01 \x01(\x0e2 .allwright.engine.v1.CaptureKindR\x04kind\x12!\n" +
+	"\fcss_selector\x18\x02 \x01(\tR\vcssSelector\x12%\n" +
+	"\x0eattribute_name\x18\x03 \x01(\tR\rattributeName\x12R\n" +
+	"\rretry_options\x18\x04 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
+	"\x0e_retry_options\"R\n" +
+	"\x0eCapturedOption\x12\x14\n" +
+	"\x05value\x18\x01 \x01(\tR\x05value\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12\x14\n" +
+	"\x05index\x18\x03 \x01(\rR\x05index\"W\n" +
+	"\vBoundingBox\x12\f\n" +
+	"\x01x\x18\x01 \x01(\x01R\x01x\x12\f\n" +
+	"\x01y\x18\x02 \x01(\x01R\x01y\x12\x14\n" +
+	"\x05width\x18\x03 \x01(\x01R\x05width\x12\x16\n" +
+	"\x06height\x18\x04 \x01(\x01R\x06height\"\x91\x02\n" +
+	"\x14CaptureResolvedEvent\x12\x19\n" +
+	"\x05value\x18\x01 \x01(\tH\x00R\x05value\x88\x01\x01\x12\x1d\n" +
+	"\achecked\x18\x02 \x01(\bH\x01R\achecked\x88\x01\x01\x12N\n" +
+	"\x10selected_options\x18\x03 \x03(\v2#.allwright.engine.v1.CapturedOptionR\x0fselectedOptions\x12H\n" +
+	"\fbounding_box\x18\x04 \x01(\v2 .allwright.engine.v1.BoundingBoxH\x02R\vboundingBox\x88\x01\x01B\b\n" +
+	"\x06_valueB\n" +
+	"\n" +
+	"\b_checkedB\x0f\n" +
+	"\r_bounding_box*\xf7\x01\n" +
+	"\vCaptureKind\x12\x1c\n" +
+	"\x18CAPTURE_KIND_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10CAPTURE_KIND_URL\x10\x01\x12\x1c\n" +
+	"\x18CAPTURE_KIND_INPUT_VALUE\x10\x02\x12!\n" +
+	"\x1dCAPTURE_KIND_SELECTED_OPTIONS\x10\x03\x12\x1e\n" +
+	"\x1aCAPTURE_KIND_SELECTED_TEXT\x10\x04\x12\x18\n" +
+	"\x14CAPTURE_KIND_CHECKED\x10\x05\x12\x1a\n" +
+	"\x16CAPTURE_KIND_ATTRIBUTE\x10\x06\x12\x1d\n" +
+	"\x19CAPTURE_KIND_BOUNDING_BOX\x10\aBK\n" +
 	"\x17dev.allwright.engine.v1P\x01Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
 
 var (
@@ -3652,154 +4050,166 @@ func file_core_v1_context_proto_rawDescGZIP() []byte {
 	return file_core_v1_context_proto_rawDescData
 }
 
-var file_core_v1_context_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
+var file_core_v1_context_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_core_v1_context_proto_msgTypes = make([]protoimpl.MessageInfo, 47)
 var file_core_v1_context_proto_goTypes = []any{
-	(*ContextSessionCommand)(nil),              // 0: allwright.engine.v1.ContextSessionCommand
-	(*ContextSessionPingCommand)(nil),          // 1: allwright.engine.v1.ContextSessionPingCommand
-	(*CloseContextSessionCommand)(nil),         // 2: allwright.engine.v1.CloseContextSessionCommand
-	(*ContextSessionEvent)(nil),                // 3: allwright.engine.v1.ContextSessionEvent
-	(*ContextSessionAttachedEvent)(nil),        // 4: allwright.engine.v1.ContextSessionAttachedEvent
-	(*ContextSessionPongEvent)(nil),            // 5: allwright.engine.v1.ContextSessionPongEvent
-	(*ContextSessionClosedEvent)(nil),          // 6: allwright.engine.v1.ContextSessionClosedEvent
-	(*ContextSessionErrorEvent)(nil),           // 7: allwright.engine.v1.ContextSessionErrorEvent
-	(*RegisterHookCommand)(nil),                // 8: allwright.engine.v1.RegisterHookCommand
-	(*WaitForHookCommand)(nil),                 // 9: allwright.engine.v1.WaitForHookCommand
-	(*HookRegisteredEvent)(nil),                // 10: allwright.engine.v1.HookRegisteredEvent
-	(*HookCompletedEvent)(nil),                 // 11: allwright.engine.v1.HookCompletedEvent
-	(*UploadFileChunkCommand)(nil),             // 12: allwright.engine.v1.UploadFileChunkCommand
-	(*FileUploadedEvent)(nil),                  // 13: allwright.engine.v1.FileUploadedEvent
-	(*ReadFileChunkCommand)(nil),               // 14: allwright.engine.v1.ReadFileChunkCommand
-	(*FileChunkEvent)(nil),                     // 15: allwright.engine.v1.FileChunkEvent
-	(*NavigatePageCommand)(nil),                // 16: allwright.engine.v1.NavigatePageCommand
-	(*ClickElementCommand)(nil),                // 17: allwright.engine.v1.ClickElementCommand
-	(*CountElementsCommand)(nil),               // 18: allwright.engine.v1.CountElementsCommand
-	(*HighlightElementsCommand)(nil),           // 19: allwright.engine.v1.HighlightElementsCommand
-	(*FocusElementCommand)(nil),                // 20: allwright.engine.v1.FocusElementCommand
-	(*FillElementCommand)(nil),                 // 21: allwright.engine.v1.FillElementCommand
-	(*HoverElementCommand)(nil),                // 22: allwright.engine.v1.HoverElementCommand
-	(*PressKeyCommand)(nil),                    // 23: allwright.engine.v1.PressKeyCommand
-	(*GetTextContentCommand)(nil),              // 24: allwright.engine.v1.GetTextContentCommand
-	(*GetInnerTextCommand)(nil),                // 25: allwright.engine.v1.GetInnerTextCommand
-	(*WaitForSelectorCommand)(nil),             // 26: allwright.engine.v1.WaitForSelectorCommand
-	(*ScreenshotCommand)(nil),                  // 27: allwright.engine.v1.ScreenshotCommand
-	(*PageNavigatedEvent)(nil),                 // 28: allwright.engine.v1.PageNavigatedEvent
-	(*ChromiumBidiInjectionEvent)(nil),         // 29: allwright.engine.v1.ChromiumBidiInjectionEvent
-	(*ElementClickedEvent)(nil),                // 30: allwright.engine.v1.ElementClickedEvent
-	(*ElementCountedEvent)(nil),                // 31: allwright.engine.v1.ElementCountedEvent
-	(*ElementsHighlightedEvent)(nil),           // 32: allwright.engine.v1.ElementsHighlightedEvent
-	(*ElementFocusedEvent)(nil),                // 33: allwright.engine.v1.ElementFocusedEvent
-	(*ElementFilledEvent)(nil),                 // 34: allwright.engine.v1.ElementFilledEvent
-	(*ElementHoveredEvent)(nil),                // 35: allwright.engine.v1.ElementHoveredEvent
-	(*KeyPressedEvent)(nil),                    // 36: allwright.engine.v1.KeyPressedEvent
-	(*TextContentResolvedEvent)(nil),           // 37: allwright.engine.v1.TextContentResolvedEvent
-	(*InnerTextResolvedEvent)(nil),             // 38: allwright.engine.v1.InnerTextResolvedEvent
-	(*SelectorWaitSatisfiedEvent)(nil),         // 39: allwright.engine.v1.SelectorWaitSatisfiedEvent
-	(*ScreenshotCapturedEvent)(nil),            // 40: allwright.engine.v1.ScreenshotCapturedEvent
-	(*AccessibilitySnapshotCommand)(nil),       // 41: allwright.engine.v1.AccessibilitySnapshotCommand
-	(*AccessibilitySnapshotCapturedEvent)(nil), // 42: allwright.engine.v1.AccessibilitySnapshotCapturedEvent
-	(*SetFileChooserFilesCommand)(nil),         // 43: allwright.engine.v1.SetFileChooserFilesCommand
-	(*SaveDownloadCommand)(nil),                // 44: allwright.engine.v1.SaveDownloadCommand
-	(*SetMobileFileChooserFilesCommand)(nil),   // 45: allwright.engine.v1.SetMobileFileChooserFilesCommand
-	(*SaveMobileDownloadCommand)(nil),          // 46: allwright.engine.v1.SaveMobileDownloadCommand
-	(*ResolveFrameCommand)(nil),                // 47: allwright.engine.v1.ResolveFrameCommand
-	(*FileChooserFilesSetEvent)(nil),           // 48: allwright.engine.v1.FileChooserFilesSetEvent
-	(*DownloadSavedEvent)(nil),                 // 49: allwright.engine.v1.DownloadSavedEvent
-	(*MobileFileChooserFilesSetEvent)(nil),     // 50: allwright.engine.v1.MobileFileChooserFilesSetEvent
-	(*MobileDownloadSavedEvent)(nil),           // 51: allwright.engine.v1.MobileDownloadSavedEvent
-	(*FrameResolvedEvent)(nil),                 // 52: allwright.engine.v1.FrameResolvedEvent
-	(*RegisterNewPageHook)(nil),                // 53: allwright.engine.v1.RegisterNewPageHook
-	(*RegisterFileChooserHook)(nil),            // 54: allwright.engine.v1.RegisterFileChooserHook
-	(*RegisterDownloadHook)(nil),               // 55: allwright.engine.v1.RegisterDownloadHook
-	(*RegisterMobileFileChooserHook)(nil),      // 56: allwright.engine.v1.RegisterMobileFileChooserHook
-	(*RegisterMobileDownloadHook)(nil),         // 57: allwright.engine.v1.RegisterMobileDownloadHook
-	(*CommandRetryOptions)(nil),                // 58: allwright.engine.v1.CommandRetryOptions
-	(*NewPageHookResult)(nil),                  // 59: allwright.engine.v1.NewPageHookResult
-	(*FileChooserHookResult)(nil),              // 60: allwright.engine.v1.FileChooserHookResult
-	(*DownloadHookResult)(nil),                 // 61: allwright.engine.v1.DownloadHookResult
-	(*MobileFileChooserHookResult)(nil),        // 62: allwright.engine.v1.MobileFileChooserHookResult
-	(*MobileDownloadHookResult)(nil),           // 63: allwright.engine.v1.MobileDownloadHookResult
+	(CaptureKind)(0),                           // 0: allwright.engine.v1.CaptureKind
+	(*ContextSessionCommand)(nil),              // 1: allwright.engine.v1.ContextSessionCommand
+	(*ContextSessionPingCommand)(nil),          // 2: allwright.engine.v1.ContextSessionPingCommand
+	(*CloseContextSessionCommand)(nil),         // 3: allwright.engine.v1.CloseContextSessionCommand
+	(*ContextSessionEvent)(nil),                // 4: allwright.engine.v1.ContextSessionEvent
+	(*ContextSessionAttachedEvent)(nil),        // 5: allwright.engine.v1.ContextSessionAttachedEvent
+	(*ContextSessionPongEvent)(nil),            // 6: allwright.engine.v1.ContextSessionPongEvent
+	(*ContextSessionClosedEvent)(nil),          // 7: allwright.engine.v1.ContextSessionClosedEvent
+	(*ContextSessionErrorEvent)(nil),           // 8: allwright.engine.v1.ContextSessionErrorEvent
+	(*RegisterHookCommand)(nil),                // 9: allwright.engine.v1.RegisterHookCommand
+	(*WaitForHookCommand)(nil),                 // 10: allwright.engine.v1.WaitForHookCommand
+	(*HookRegisteredEvent)(nil),                // 11: allwright.engine.v1.HookRegisteredEvent
+	(*HookCompletedEvent)(nil),                 // 12: allwright.engine.v1.HookCompletedEvent
+	(*UploadFileChunkCommand)(nil),             // 13: allwright.engine.v1.UploadFileChunkCommand
+	(*FileUploadedEvent)(nil),                  // 14: allwright.engine.v1.FileUploadedEvent
+	(*ReadFileChunkCommand)(nil),               // 15: allwright.engine.v1.ReadFileChunkCommand
+	(*FileChunkEvent)(nil),                     // 16: allwright.engine.v1.FileChunkEvent
+	(*NavigatePageCommand)(nil),                // 17: allwright.engine.v1.NavigatePageCommand
+	(*ClickElementCommand)(nil),                // 18: allwright.engine.v1.ClickElementCommand
+	(*CountElementsCommand)(nil),               // 19: allwright.engine.v1.CountElementsCommand
+	(*HighlightElementsCommand)(nil),           // 20: allwright.engine.v1.HighlightElementsCommand
+	(*FocusElementCommand)(nil),                // 21: allwright.engine.v1.FocusElementCommand
+	(*FillElementCommand)(nil),                 // 22: allwright.engine.v1.FillElementCommand
+	(*HoverElementCommand)(nil),                // 23: allwright.engine.v1.HoverElementCommand
+	(*PressKeyCommand)(nil),                    // 24: allwright.engine.v1.PressKeyCommand
+	(*GetTextContentCommand)(nil),              // 25: allwright.engine.v1.GetTextContentCommand
+	(*GetInnerTextCommand)(nil),                // 26: allwright.engine.v1.GetInnerTextCommand
+	(*WaitForSelectorCommand)(nil),             // 27: allwright.engine.v1.WaitForSelectorCommand
+	(*ScreenshotCommand)(nil),                  // 28: allwright.engine.v1.ScreenshotCommand
+	(*PageNavigatedEvent)(nil),                 // 29: allwright.engine.v1.PageNavigatedEvent
+	(*ChromiumBidiInjectionEvent)(nil),         // 30: allwright.engine.v1.ChromiumBidiInjectionEvent
+	(*ElementClickedEvent)(nil),                // 31: allwright.engine.v1.ElementClickedEvent
+	(*ElementCountedEvent)(nil),                // 32: allwright.engine.v1.ElementCountedEvent
+	(*ElementsHighlightedEvent)(nil),           // 33: allwright.engine.v1.ElementsHighlightedEvent
+	(*ElementFocusedEvent)(nil),                // 34: allwright.engine.v1.ElementFocusedEvent
+	(*ElementFilledEvent)(nil),                 // 35: allwright.engine.v1.ElementFilledEvent
+	(*ElementHoveredEvent)(nil),                // 36: allwright.engine.v1.ElementHoveredEvent
+	(*KeyPressedEvent)(nil),                    // 37: allwright.engine.v1.KeyPressedEvent
+	(*TextContentResolvedEvent)(nil),           // 38: allwright.engine.v1.TextContentResolvedEvent
+	(*InnerTextResolvedEvent)(nil),             // 39: allwright.engine.v1.InnerTextResolvedEvent
+	(*SelectorWaitSatisfiedEvent)(nil),         // 40: allwright.engine.v1.SelectorWaitSatisfiedEvent
+	(*ScreenshotCapturedEvent)(nil),            // 41: allwright.engine.v1.ScreenshotCapturedEvent
+	(*AccessibilitySnapshotCommand)(nil),       // 42: allwright.engine.v1.AccessibilitySnapshotCommand
+	(*AccessibilitySnapshotCapturedEvent)(nil), // 43: allwright.engine.v1.AccessibilitySnapshotCapturedEvent
+	(*CaptureCommand)(nil),                     // 44: allwright.engine.v1.CaptureCommand
+	(*CapturedOption)(nil),                     // 45: allwright.engine.v1.CapturedOption
+	(*BoundingBox)(nil),                        // 46: allwright.engine.v1.BoundingBox
+	(*CaptureResolvedEvent)(nil),               // 47: allwright.engine.v1.CaptureResolvedEvent
+	(*SetFileChooserFilesCommand)(nil),         // 48: allwright.engine.v1.SetFileChooserFilesCommand
+	(*SaveDownloadCommand)(nil),                // 49: allwright.engine.v1.SaveDownloadCommand
+	(*SetMobileFileChooserFilesCommand)(nil),   // 50: allwright.engine.v1.SetMobileFileChooserFilesCommand
+	(*SaveMobileDownloadCommand)(nil),          // 51: allwright.engine.v1.SaveMobileDownloadCommand
+	(*ResolveFrameCommand)(nil),                // 52: allwright.engine.v1.ResolveFrameCommand
+	(*FileChooserFilesSetEvent)(nil),           // 53: allwright.engine.v1.FileChooserFilesSetEvent
+	(*DownloadSavedEvent)(nil),                 // 54: allwright.engine.v1.DownloadSavedEvent
+	(*MobileFileChooserFilesSetEvent)(nil),     // 55: allwright.engine.v1.MobileFileChooserFilesSetEvent
+	(*MobileDownloadSavedEvent)(nil),           // 56: allwright.engine.v1.MobileDownloadSavedEvent
+	(*FrameResolvedEvent)(nil),                 // 57: allwright.engine.v1.FrameResolvedEvent
+	(*RegisterNewPageHook)(nil),                // 58: allwright.engine.v1.RegisterNewPageHook
+	(*RegisterFileChooserHook)(nil),            // 59: allwright.engine.v1.RegisterFileChooserHook
+	(*RegisterDownloadHook)(nil),               // 60: allwright.engine.v1.RegisterDownloadHook
+	(*RegisterMobileFileChooserHook)(nil),      // 61: allwright.engine.v1.RegisterMobileFileChooserHook
+	(*RegisterMobileDownloadHook)(nil),         // 62: allwright.engine.v1.RegisterMobileDownloadHook
+	(*CommandRetryOptions)(nil),                // 63: allwright.engine.v1.CommandRetryOptions
+	(*NewPageHookResult)(nil),                  // 64: allwright.engine.v1.NewPageHookResult
+	(*FileChooserHookResult)(nil),              // 65: allwright.engine.v1.FileChooserHookResult
+	(*DownloadHookResult)(nil),                 // 66: allwright.engine.v1.DownloadHookResult
+	(*MobileFileChooserHookResult)(nil),        // 67: allwright.engine.v1.MobileFileChooserHookResult
+	(*MobileDownloadHookResult)(nil),           // 68: allwright.engine.v1.MobileDownloadHookResult
 }
 var file_core_v1_context_proto_depIdxs = []int32{
-	1,  // 0: allwright.engine.v1.ContextSessionCommand.ping:type_name -> allwright.engine.v1.ContextSessionPingCommand
-	2,  // 1: allwright.engine.v1.ContextSessionCommand.close:type_name -> allwright.engine.v1.CloseContextSessionCommand
-	16, // 2: allwright.engine.v1.ContextSessionCommand.navigate:type_name -> allwright.engine.v1.NavigatePageCommand
-	17, // 3: allwright.engine.v1.ContextSessionCommand.click_element:type_name -> allwright.engine.v1.ClickElementCommand
-	18, // 4: allwright.engine.v1.ContextSessionCommand.count_elements:type_name -> allwright.engine.v1.CountElementsCommand
-	19, // 5: allwright.engine.v1.ContextSessionCommand.highlight_elements:type_name -> allwright.engine.v1.HighlightElementsCommand
-	20, // 6: allwright.engine.v1.ContextSessionCommand.focus_element:type_name -> allwright.engine.v1.FocusElementCommand
-	21, // 7: allwright.engine.v1.ContextSessionCommand.fill_element:type_name -> allwright.engine.v1.FillElementCommand
-	22, // 8: allwright.engine.v1.ContextSessionCommand.hover_element:type_name -> allwright.engine.v1.HoverElementCommand
-	23, // 9: allwright.engine.v1.ContextSessionCommand.press_key:type_name -> allwright.engine.v1.PressKeyCommand
-	24, // 10: allwright.engine.v1.ContextSessionCommand.get_text_content:type_name -> allwright.engine.v1.GetTextContentCommand
-	25, // 11: allwright.engine.v1.ContextSessionCommand.get_inner_text:type_name -> allwright.engine.v1.GetInnerTextCommand
-	26, // 12: allwright.engine.v1.ContextSessionCommand.wait_for_selector:type_name -> allwright.engine.v1.WaitForSelectorCommand
-	27, // 13: allwright.engine.v1.ContextSessionCommand.screenshot:type_name -> allwright.engine.v1.ScreenshotCommand
-	41, // 14: allwright.engine.v1.ContextSessionCommand.accessibility_snapshot:type_name -> allwright.engine.v1.AccessibilitySnapshotCommand
-	8,  // 15: allwright.engine.v1.ContextSessionCommand.register_hook:type_name -> allwright.engine.v1.RegisterHookCommand
-	9,  // 16: allwright.engine.v1.ContextSessionCommand.wait_for_hook:type_name -> allwright.engine.v1.WaitForHookCommand
-	43, // 17: allwright.engine.v1.ContextSessionCommand.set_file_chooser_files:type_name -> allwright.engine.v1.SetFileChooserFilesCommand
-	44, // 18: allwright.engine.v1.ContextSessionCommand.save_download:type_name -> allwright.engine.v1.SaveDownloadCommand
-	12, // 19: allwright.engine.v1.ContextSessionCommand.upload_file_chunk:type_name -> allwright.engine.v1.UploadFileChunkCommand
-	14, // 20: allwright.engine.v1.ContextSessionCommand.read_file_chunk:type_name -> allwright.engine.v1.ReadFileChunkCommand
-	45, // 21: allwright.engine.v1.ContextSessionCommand.set_mobile_file_chooser_files:type_name -> allwright.engine.v1.SetMobileFileChooserFilesCommand
-	46, // 22: allwright.engine.v1.ContextSessionCommand.save_mobile_download:type_name -> allwright.engine.v1.SaveMobileDownloadCommand
-	47, // 23: allwright.engine.v1.ContextSessionCommand.resolve_frame:type_name -> allwright.engine.v1.ResolveFrameCommand
-	4,  // 24: allwright.engine.v1.ContextSessionEvent.attached:type_name -> allwright.engine.v1.ContextSessionAttachedEvent
-	5,  // 25: allwright.engine.v1.ContextSessionEvent.pong:type_name -> allwright.engine.v1.ContextSessionPongEvent
-	6,  // 26: allwright.engine.v1.ContextSessionEvent.closed:type_name -> allwright.engine.v1.ContextSessionClosedEvent
-	7,  // 27: allwright.engine.v1.ContextSessionEvent.error:type_name -> allwright.engine.v1.ContextSessionErrorEvent
-	28, // 28: allwright.engine.v1.ContextSessionEvent.navigated:type_name -> allwright.engine.v1.PageNavigatedEvent
-	29, // 29: allwright.engine.v1.ContextSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
-	30, // 30: allwright.engine.v1.ContextSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
-	31, // 31: allwright.engine.v1.ContextSessionEvent.element_counted:type_name -> allwright.engine.v1.ElementCountedEvent
-	32, // 32: allwright.engine.v1.ContextSessionEvent.elements_highlighted:type_name -> allwright.engine.v1.ElementsHighlightedEvent
-	33, // 33: allwright.engine.v1.ContextSessionEvent.element_focused:type_name -> allwright.engine.v1.ElementFocusedEvent
-	34, // 34: allwright.engine.v1.ContextSessionEvent.element_filled:type_name -> allwright.engine.v1.ElementFilledEvent
-	35, // 35: allwright.engine.v1.ContextSessionEvent.element_hovered:type_name -> allwright.engine.v1.ElementHoveredEvent
-	36, // 36: allwright.engine.v1.ContextSessionEvent.key_pressed:type_name -> allwright.engine.v1.KeyPressedEvent
-	37, // 37: allwright.engine.v1.ContextSessionEvent.text_content_resolved:type_name -> allwright.engine.v1.TextContentResolvedEvent
-	38, // 38: allwright.engine.v1.ContextSessionEvent.inner_text_resolved:type_name -> allwright.engine.v1.InnerTextResolvedEvent
-	39, // 39: allwright.engine.v1.ContextSessionEvent.selector_wait_satisfied:type_name -> allwright.engine.v1.SelectorWaitSatisfiedEvent
-	40, // 40: allwright.engine.v1.ContextSessionEvent.screenshot_captured:type_name -> allwright.engine.v1.ScreenshotCapturedEvent
-	42, // 41: allwright.engine.v1.ContextSessionEvent.accessibility_snapshot_captured:type_name -> allwright.engine.v1.AccessibilitySnapshotCapturedEvent
-	10, // 42: allwright.engine.v1.ContextSessionEvent.hook_registered:type_name -> allwright.engine.v1.HookRegisteredEvent
-	11, // 43: allwright.engine.v1.ContextSessionEvent.hook_completed:type_name -> allwright.engine.v1.HookCompletedEvent
-	48, // 44: allwright.engine.v1.ContextSessionEvent.file_chooser_files_set:type_name -> allwright.engine.v1.FileChooserFilesSetEvent
-	49, // 45: allwright.engine.v1.ContextSessionEvent.download_saved:type_name -> allwright.engine.v1.DownloadSavedEvent
-	13, // 46: allwright.engine.v1.ContextSessionEvent.file_uploaded:type_name -> allwright.engine.v1.FileUploadedEvent
-	15, // 47: allwright.engine.v1.ContextSessionEvent.file_chunk:type_name -> allwright.engine.v1.FileChunkEvent
-	50, // 48: allwright.engine.v1.ContextSessionEvent.mobile_file_chooser_files_set:type_name -> allwright.engine.v1.MobileFileChooserFilesSetEvent
-	51, // 49: allwright.engine.v1.ContextSessionEvent.mobile_download_saved:type_name -> allwright.engine.v1.MobileDownloadSavedEvent
-	52, // 50: allwright.engine.v1.ContextSessionEvent.frame_resolved:type_name -> allwright.engine.v1.FrameResolvedEvent
-	53, // 51: allwright.engine.v1.RegisterHookCommand.new_page:type_name -> allwright.engine.v1.RegisterNewPageHook
-	54, // 52: allwright.engine.v1.RegisterHookCommand.file_chooser:type_name -> allwright.engine.v1.RegisterFileChooserHook
-	55, // 53: allwright.engine.v1.RegisterHookCommand.download:type_name -> allwright.engine.v1.RegisterDownloadHook
-	56, // 54: allwright.engine.v1.RegisterHookCommand.mobile_file_chooser:type_name -> allwright.engine.v1.RegisterMobileFileChooserHook
-	57, // 55: allwright.engine.v1.RegisterHookCommand.mobile_download:type_name -> allwright.engine.v1.RegisterMobileDownloadHook
-	58, // 56: allwright.engine.v1.WaitForHookCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	59, // 57: allwright.engine.v1.HookCompletedEvent.new_page:type_name -> allwright.engine.v1.NewPageHookResult
-	60, // 58: allwright.engine.v1.HookCompletedEvent.file_chooser:type_name -> allwright.engine.v1.FileChooserHookResult
-	61, // 59: allwright.engine.v1.HookCompletedEvent.download:type_name -> allwright.engine.v1.DownloadHookResult
-	62, // 60: allwright.engine.v1.HookCompletedEvent.mobile_file_chooser:type_name -> allwright.engine.v1.MobileFileChooserHookResult
-	63, // 61: allwright.engine.v1.HookCompletedEvent.mobile_download:type_name -> allwright.engine.v1.MobileDownloadHookResult
-	58, // 62: allwright.engine.v1.NavigatePageCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	58, // 63: allwright.engine.v1.ClickElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	58, // 64: allwright.engine.v1.CountElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	58, // 65: allwright.engine.v1.HighlightElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	58, // 66: allwright.engine.v1.FocusElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	58, // 67: allwright.engine.v1.FillElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	58, // 68: allwright.engine.v1.HoverElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	58, // 69: allwright.engine.v1.PressKeyCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	58, // 70: allwright.engine.v1.GetTextContentCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	58, // 71: allwright.engine.v1.GetInnerTextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	58, // 72: allwright.engine.v1.WaitForSelectorCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	58, // 73: allwright.engine.v1.ScreenshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	58, // 74: allwright.engine.v1.AccessibilitySnapshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	75, // [75:75] is the sub-list for method output_type
-	75, // [75:75] is the sub-list for method input_type
-	75, // [75:75] is the sub-list for extension type_name
-	75, // [75:75] is the sub-list for extension extendee
-	0,  // [0:75] is the sub-list for field type_name
+	2,  // 0: allwright.engine.v1.ContextSessionCommand.ping:type_name -> allwright.engine.v1.ContextSessionPingCommand
+	3,  // 1: allwright.engine.v1.ContextSessionCommand.close:type_name -> allwright.engine.v1.CloseContextSessionCommand
+	17, // 2: allwright.engine.v1.ContextSessionCommand.navigate:type_name -> allwright.engine.v1.NavigatePageCommand
+	18, // 3: allwright.engine.v1.ContextSessionCommand.click_element:type_name -> allwright.engine.v1.ClickElementCommand
+	19, // 4: allwright.engine.v1.ContextSessionCommand.count_elements:type_name -> allwright.engine.v1.CountElementsCommand
+	20, // 5: allwright.engine.v1.ContextSessionCommand.highlight_elements:type_name -> allwright.engine.v1.HighlightElementsCommand
+	21, // 6: allwright.engine.v1.ContextSessionCommand.focus_element:type_name -> allwright.engine.v1.FocusElementCommand
+	22, // 7: allwright.engine.v1.ContextSessionCommand.fill_element:type_name -> allwright.engine.v1.FillElementCommand
+	23, // 8: allwright.engine.v1.ContextSessionCommand.hover_element:type_name -> allwright.engine.v1.HoverElementCommand
+	24, // 9: allwright.engine.v1.ContextSessionCommand.press_key:type_name -> allwright.engine.v1.PressKeyCommand
+	25, // 10: allwright.engine.v1.ContextSessionCommand.get_text_content:type_name -> allwright.engine.v1.GetTextContentCommand
+	26, // 11: allwright.engine.v1.ContextSessionCommand.get_inner_text:type_name -> allwright.engine.v1.GetInnerTextCommand
+	27, // 12: allwright.engine.v1.ContextSessionCommand.wait_for_selector:type_name -> allwright.engine.v1.WaitForSelectorCommand
+	28, // 13: allwright.engine.v1.ContextSessionCommand.screenshot:type_name -> allwright.engine.v1.ScreenshotCommand
+	42, // 14: allwright.engine.v1.ContextSessionCommand.accessibility_snapshot:type_name -> allwright.engine.v1.AccessibilitySnapshotCommand
+	9,  // 15: allwright.engine.v1.ContextSessionCommand.register_hook:type_name -> allwright.engine.v1.RegisterHookCommand
+	10, // 16: allwright.engine.v1.ContextSessionCommand.wait_for_hook:type_name -> allwright.engine.v1.WaitForHookCommand
+	48, // 17: allwright.engine.v1.ContextSessionCommand.set_file_chooser_files:type_name -> allwright.engine.v1.SetFileChooserFilesCommand
+	49, // 18: allwright.engine.v1.ContextSessionCommand.save_download:type_name -> allwright.engine.v1.SaveDownloadCommand
+	13, // 19: allwright.engine.v1.ContextSessionCommand.upload_file_chunk:type_name -> allwright.engine.v1.UploadFileChunkCommand
+	15, // 20: allwright.engine.v1.ContextSessionCommand.read_file_chunk:type_name -> allwright.engine.v1.ReadFileChunkCommand
+	50, // 21: allwright.engine.v1.ContextSessionCommand.set_mobile_file_chooser_files:type_name -> allwright.engine.v1.SetMobileFileChooserFilesCommand
+	51, // 22: allwright.engine.v1.ContextSessionCommand.save_mobile_download:type_name -> allwright.engine.v1.SaveMobileDownloadCommand
+	52, // 23: allwright.engine.v1.ContextSessionCommand.resolve_frame:type_name -> allwright.engine.v1.ResolveFrameCommand
+	44, // 24: allwright.engine.v1.ContextSessionCommand.capture:type_name -> allwright.engine.v1.CaptureCommand
+	5,  // 25: allwright.engine.v1.ContextSessionEvent.attached:type_name -> allwright.engine.v1.ContextSessionAttachedEvent
+	6,  // 26: allwright.engine.v1.ContextSessionEvent.pong:type_name -> allwright.engine.v1.ContextSessionPongEvent
+	7,  // 27: allwright.engine.v1.ContextSessionEvent.closed:type_name -> allwright.engine.v1.ContextSessionClosedEvent
+	8,  // 28: allwright.engine.v1.ContextSessionEvent.error:type_name -> allwright.engine.v1.ContextSessionErrorEvent
+	29, // 29: allwright.engine.v1.ContextSessionEvent.navigated:type_name -> allwright.engine.v1.PageNavigatedEvent
+	30, // 30: allwright.engine.v1.ContextSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
+	31, // 31: allwright.engine.v1.ContextSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
+	32, // 32: allwright.engine.v1.ContextSessionEvent.element_counted:type_name -> allwright.engine.v1.ElementCountedEvent
+	33, // 33: allwright.engine.v1.ContextSessionEvent.elements_highlighted:type_name -> allwright.engine.v1.ElementsHighlightedEvent
+	34, // 34: allwright.engine.v1.ContextSessionEvent.element_focused:type_name -> allwright.engine.v1.ElementFocusedEvent
+	35, // 35: allwright.engine.v1.ContextSessionEvent.element_filled:type_name -> allwright.engine.v1.ElementFilledEvent
+	36, // 36: allwright.engine.v1.ContextSessionEvent.element_hovered:type_name -> allwright.engine.v1.ElementHoveredEvent
+	37, // 37: allwright.engine.v1.ContextSessionEvent.key_pressed:type_name -> allwright.engine.v1.KeyPressedEvent
+	38, // 38: allwright.engine.v1.ContextSessionEvent.text_content_resolved:type_name -> allwright.engine.v1.TextContentResolvedEvent
+	39, // 39: allwright.engine.v1.ContextSessionEvent.inner_text_resolved:type_name -> allwright.engine.v1.InnerTextResolvedEvent
+	40, // 40: allwright.engine.v1.ContextSessionEvent.selector_wait_satisfied:type_name -> allwright.engine.v1.SelectorWaitSatisfiedEvent
+	41, // 41: allwright.engine.v1.ContextSessionEvent.screenshot_captured:type_name -> allwright.engine.v1.ScreenshotCapturedEvent
+	43, // 42: allwright.engine.v1.ContextSessionEvent.accessibility_snapshot_captured:type_name -> allwright.engine.v1.AccessibilitySnapshotCapturedEvent
+	11, // 43: allwright.engine.v1.ContextSessionEvent.hook_registered:type_name -> allwright.engine.v1.HookRegisteredEvent
+	12, // 44: allwright.engine.v1.ContextSessionEvent.hook_completed:type_name -> allwright.engine.v1.HookCompletedEvent
+	53, // 45: allwright.engine.v1.ContextSessionEvent.file_chooser_files_set:type_name -> allwright.engine.v1.FileChooserFilesSetEvent
+	54, // 46: allwright.engine.v1.ContextSessionEvent.download_saved:type_name -> allwright.engine.v1.DownloadSavedEvent
+	14, // 47: allwright.engine.v1.ContextSessionEvent.file_uploaded:type_name -> allwright.engine.v1.FileUploadedEvent
+	16, // 48: allwright.engine.v1.ContextSessionEvent.file_chunk:type_name -> allwright.engine.v1.FileChunkEvent
+	55, // 49: allwright.engine.v1.ContextSessionEvent.mobile_file_chooser_files_set:type_name -> allwright.engine.v1.MobileFileChooserFilesSetEvent
+	56, // 50: allwright.engine.v1.ContextSessionEvent.mobile_download_saved:type_name -> allwright.engine.v1.MobileDownloadSavedEvent
+	57, // 51: allwright.engine.v1.ContextSessionEvent.frame_resolved:type_name -> allwright.engine.v1.FrameResolvedEvent
+	47, // 52: allwright.engine.v1.ContextSessionEvent.capture_resolved:type_name -> allwright.engine.v1.CaptureResolvedEvent
+	58, // 53: allwright.engine.v1.RegisterHookCommand.new_page:type_name -> allwright.engine.v1.RegisterNewPageHook
+	59, // 54: allwright.engine.v1.RegisterHookCommand.file_chooser:type_name -> allwright.engine.v1.RegisterFileChooserHook
+	60, // 55: allwright.engine.v1.RegisterHookCommand.download:type_name -> allwright.engine.v1.RegisterDownloadHook
+	61, // 56: allwright.engine.v1.RegisterHookCommand.mobile_file_chooser:type_name -> allwright.engine.v1.RegisterMobileFileChooserHook
+	62, // 57: allwright.engine.v1.RegisterHookCommand.mobile_download:type_name -> allwright.engine.v1.RegisterMobileDownloadHook
+	63, // 58: allwright.engine.v1.WaitForHookCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	64, // 59: allwright.engine.v1.HookCompletedEvent.new_page:type_name -> allwright.engine.v1.NewPageHookResult
+	65, // 60: allwright.engine.v1.HookCompletedEvent.file_chooser:type_name -> allwright.engine.v1.FileChooserHookResult
+	66, // 61: allwright.engine.v1.HookCompletedEvent.download:type_name -> allwright.engine.v1.DownloadHookResult
+	67, // 62: allwright.engine.v1.HookCompletedEvent.mobile_file_chooser:type_name -> allwright.engine.v1.MobileFileChooserHookResult
+	68, // 63: allwright.engine.v1.HookCompletedEvent.mobile_download:type_name -> allwright.engine.v1.MobileDownloadHookResult
+	63, // 64: allwright.engine.v1.NavigatePageCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	63, // 65: allwright.engine.v1.ClickElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	63, // 66: allwright.engine.v1.CountElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	63, // 67: allwright.engine.v1.HighlightElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	63, // 68: allwright.engine.v1.FocusElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	63, // 69: allwright.engine.v1.FillElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	63, // 70: allwright.engine.v1.HoverElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	63, // 71: allwright.engine.v1.PressKeyCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	63, // 72: allwright.engine.v1.GetTextContentCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	63, // 73: allwright.engine.v1.GetInnerTextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	63, // 74: allwright.engine.v1.WaitForSelectorCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	63, // 75: allwright.engine.v1.ScreenshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	63, // 76: allwright.engine.v1.AccessibilitySnapshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	0,  // 77: allwright.engine.v1.CaptureCommand.kind:type_name -> allwright.engine.v1.CaptureKind
+	63, // 78: allwright.engine.v1.CaptureCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	45, // 79: allwright.engine.v1.CaptureResolvedEvent.selected_options:type_name -> allwright.engine.v1.CapturedOption
+	46, // 80: allwright.engine.v1.CaptureResolvedEvent.bounding_box:type_name -> allwright.engine.v1.BoundingBox
+	81, // [81:81] is the sub-list for method output_type
+	81, // [81:81] is the sub-list for method input_type
+	81, // [81:81] is the sub-list for extension type_name
+	81, // [81:81] is the sub-list for extension extendee
+	0,  // [0:81] is the sub-list for field type_name
 }
 
 func init() { file_core_v1_context_proto_init() }
@@ -3835,6 +4245,7 @@ func file_core_v1_context_proto_init() {
 		(*ContextSessionCommand_SetMobileFileChooserFiles)(nil),
 		(*ContextSessionCommand_SaveMobileDownload)(nil),
 		(*ContextSessionCommand_ResolveFrame)(nil),
+		(*ContextSessionCommand_Capture)(nil),
 	}
 	file_core_v1_context_proto_msgTypes[3].OneofWrappers = []any{
 		(*ContextSessionEvent_Attached)(nil),
@@ -3864,6 +4275,7 @@ func file_core_v1_context_proto_init() {
 		(*ContextSessionEvent_MobileFileChooserFilesSet)(nil),
 		(*ContextSessionEvent_MobileDownloadSaved)(nil),
 		(*ContextSessionEvent_FrameResolved)(nil),
+		(*ContextSessionEvent_CaptureResolved)(nil),
 	}
 	file_core_v1_context_proto_msgTypes[8].OneofWrappers = []any{
 		(*RegisterHookCommand_NewPage)(nil),
@@ -3893,18 +4305,21 @@ func file_core_v1_context_proto_init() {
 	file_core_v1_context_proto_msgTypes[26].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[27].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[41].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[43].OneofWrappers = []any{}
+	file_core_v1_context_proto_msgTypes[46].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_core_v1_context_proto_rawDesc), len(file_core_v1_context_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   43,
+			NumEnums:      1,
+			NumMessages:   47,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_core_v1_context_proto_goTypes,
 		DependencyIndexes: file_core_v1_context_proto_depIdxs,
+		EnumInfos:         file_core_v1_context_proto_enumTypes,
 		MessageInfos:      file_core_v1_context_proto_msgTypes,
 	}.Build()
 	File_core_v1_context_proto = out.File

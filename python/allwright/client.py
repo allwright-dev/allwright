@@ -18,6 +18,7 @@ from ._page import Page
 from ._proto import engine_pb2
 from ._runtime import launch_browser_with_kind, ping, set_server_addr, shutdown
 from ._types import (
+    CapturedOption, BoundingBox,
     AllwrightConfig,
     ClickResult,
     CommandOptions,

@@ -95,3 +95,20 @@ resolving its browsing context, and waiting for a fully loaded document with 200
 without DOM mutations. The default is 10 seconds. Closing the frame page releases
 its session; it does not remove the iframe or close the parent tab. Resolve a new
 frame page after the iframe is replaced.
+
+### Read page and element state
+
+```ts
+const url = await page.url();
+const value = await page.locator('input, textarea').inputValue();
+const options = await page.locator('select').selectedOptions(); // [{ value, label, index }]
+const selectedText = await page.locator('textarea').selectedText();
+const checked = await page.locator('input[type=checkbox]').isChecked();
+const text = await page.locator('h1').innerText(); // { selector, text, note }
+const attribute = await page.locator('a').getAttribute('href');
+const box = await page.locator('button').boundingBox(); // { x, y, width, height }
+```
+
+Element reads also have page methods such as `page.inputValue(selector, options)` and accept `timeoutMs`. Reads use the first locator match and work in frame pages. `inputValue` reads the live property of an input, textarea, or select. `selectedOptions` supports native selects (including multiple selections) and ARIA combobox/listbox options marked `aria-selected="true"`. `selectedText` returns the textbox's selected substring, an empty string for a caret, or `null` for input types without selection support. `isChecked` supports native checkbox/radio and ARIA checked controls; ARIA mixed state returns false.
+
+Missing attributes return `null` (an empty attribute remains `""`). Bounding boxes use CSS pixels relative to the page/frame viewport and return `null` for hidden or zero-area elements. Missing elements and incompatible control types raise errors. Use `textContent()` for raw text or `innerText()` for rendered text.

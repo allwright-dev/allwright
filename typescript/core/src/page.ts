@@ -7,6 +7,7 @@ import { formatActionError } from "./errors.js";
 import { normalizeSelectorForTransport } from "./selectors.js";
 import { createPageHandle } from "./runtime.js";
 import type {
+  BoundingBox, CapturedOption, CaptureResult,
   AccessibilitySnapshotOptions,
   ClickResult,
   CommandOptions,
@@ -543,6 +544,48 @@ export class PageImpl extends WebLocatorBuilders implements Page {
         throw new Error(`page session ${this.sessionId} closed while waiting for press result`);
       }
     }
+  }
+
+  async #capture(kind: string, selector: string, attributeName: string, options: CommandOptions): Promise<CaptureResult> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({ surfaceSessionId: this.browserSessionId, contextSessionId: this.sessionId,
+      capture: { kind, cssSelector: selector ? normalizeSelectorForTransport(selector) : "", attributeName,
+        retryOptions: options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : undefined } });
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.captureResolved) return event.captureResolved;
+      if (event.error) throw formatActionError("capture", event.error.message ?? "capture failed", selector);
+      if (event.closed) { handle.closed = true; throw new Error("page session closed while capturing"); }
+    }
+  }
+  async url(options: CommandOptions = {}): Promise<string> {
+    const r = await this.#capture("CAPTURE_KIND_URL", "", "", options);
+    return r.value ?? "";
+  }
+  async inputValue(selector: string, options: CommandOptions = {}): Promise<string> {
+    const r = await this.#capture("CAPTURE_KIND_INPUT_VALUE", selector, "", options);
+    return r.value ?? "";
+  }
+  async selectedOptions(selector: string, options: CommandOptions = {}): Promise<CapturedOption[]> {
+    const r = await this.#capture("CAPTURE_KIND_SELECTED_OPTIONS", selector, "", options);
+    return r.selectedOptions ?? [];
+  }
+  async selectedText(selector: string, options: CommandOptions = {}): Promise<string | null> {
+    const r = await this.#capture("CAPTURE_KIND_SELECTED_TEXT", selector, "", options);
+    return r.value ?? null;
+  }
+  async isChecked(selector: string, options: CommandOptions = {}): Promise<boolean> {
+    const r = await this.#capture("CAPTURE_KIND_CHECKED", selector, "", options);
+    return r.checked ?? false;
+  }
+  async getAttribute(selector: string, name: string, options: CommandOptions = {}): Promise<string | null> {
+    const r = await this.#capture("CAPTURE_KIND_ATTRIBUTE", selector, name, options);
+    return r.value ?? null;
+  }
+  async boundingBox(selector: string, options: CommandOptions = {}): Promise<BoundingBox | null> {
+    const r = await this.#capture("CAPTURE_KIND_BOUNDING_BOX", selector, "", options);
+    return r.boundingBox ?? null;
   }
 
   async textContent(selector: string, options: CommandOptions = {}): Promise<TextResult> {

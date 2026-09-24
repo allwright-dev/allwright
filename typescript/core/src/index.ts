@@ -30,6 +30,7 @@ import type {
 
 export { findConfigFile, loadConfigFile, resolveConfig, setServerAddr, shutdown };
 export type {
+  CapturedOption, BoundingBox,
   AccessibilitySnapshotOptions,
   AllwrightConfig,
   Browser,

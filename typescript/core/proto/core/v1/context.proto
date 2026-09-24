@@ -38,6 +38,7 @@ message ContextSessionCommand {
     SetMobileFileChooserFilesCommand set_mobile_file_chooser_files = 24;
     SaveMobileDownloadCommand save_mobile_download = 25;
     ResolveFrameCommand resolve_frame = 26;
+    CaptureCommand capture = 27;
   }
 }
 
@@ -78,6 +79,7 @@ message ContextSessionEvent {
     MobileFileChooserFilesSetEvent mobile_file_chooser_files_set = 26;
     MobileDownloadSavedEvent mobile_download_saved = 27;
     FrameResolvedEvent frame_resolved = 28;
+    CaptureResolvedEvent capture_resolved = 29;
   }
 }
 
@@ -310,4 +312,41 @@ message AccessibilitySnapshotCommand {
 message AccessibilitySnapshotCapturedEvent {
   string snapshot = 1;
   string format = 2;
+}
+
+// Read-only web inspection. Element reads use the first locator match.
+enum CaptureKind {
+  CAPTURE_KIND_UNSPECIFIED = 0;
+  CAPTURE_KIND_URL = 1;
+  CAPTURE_KIND_INPUT_VALUE = 2;
+  CAPTURE_KIND_SELECTED_OPTIONS = 3;
+  CAPTURE_KIND_SELECTED_TEXT = 4;
+  CAPTURE_KIND_CHECKED = 5;
+  CAPTURE_KIND_ATTRIBUTE = 6;
+  CAPTURE_KIND_BOUNDING_BOX = 7;
+}
+message CaptureCommand {
+  CaptureKind kind = 1;
+  string css_selector = 2;
+  string attribute_name = 3;
+  optional CommandRetryOptions retry_options = 4;
+}
+message CapturedOption {
+  string value = 1;
+  string label = 2;
+  uint32 index = 3;
+}
+message BoundingBox {
+  double x = 1;
+  double y = 2;
+  double width = 3;
+  double height = 4;
+}
+message CaptureResolvedEvent {
+  // Absent for a missing attribute or unsupported text selection.
+  optional string value = 1;
+  optional bool checked = 2;
+  repeated CapturedOption selected_options = 3;
+  // Viewport coordinates in CSS pixels, absent for an element without a visible box.
+  optional BoundingBox bounding_box = 4;
 }

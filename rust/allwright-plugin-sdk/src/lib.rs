@@ -321,6 +321,13 @@ pub enum PluginCommand {
         key: String,
         text: Option<String>,
     },
+    Capture {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        kind: String,
+        css_selector: String,
+        attribute_name: String,
+    },
     GetTextContent {
         browser_session: BrowserSessionHandle,
         page_session: PageSessionHandle,
@@ -381,7 +388,7 @@ pub enum PluginCommand {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum PluginResult {
     LaunchBrowser(BrowserLaunchInfo),
@@ -400,6 +407,7 @@ pub enum PluginResult {
     FillElement(FillInfo),
     HoverElement(HoverInfo),
     PressKey(PressKeyInfo),
+    Capture(CaptureInfo),
     GetTextContent(TextInfo),
     GetInnerText(TextInfo),
     WaitForSelector(WaitForSelectorInfo),
@@ -418,7 +426,7 @@ pub enum PluginResult {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PluginEnvelope {
     pub ok: bool,
     pub result: Option<PluginResult>,
@@ -491,4 +499,25 @@ mod tests {
             envelope
         );
     }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct CaptureInfo {
+    pub value: Option<String>,
+    pub checked: Option<bool>,
+    pub selected_options: Vec<CapturedOption>,
+    pub bounding_box: Option<BoundingBox>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CapturedOption {
+    pub value: String,
+    pub label: String,
+    pub index: u32,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BoundingBox {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
 }

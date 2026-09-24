@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from ._selectors import chain_selector_for_transport
 from ._types import (
+    CapturedOption, BoundingBox,
     ClickResult,
     CommandOptions,
     CountResult,
@@ -85,6 +86,24 @@ class Locator(WebLocators):
 
     def press(self, key: str, options: PressOptions | None = None) -> PressResult:
         return self.page.press(self.selector, key, options)
+
+    def input_value(self, options: CommandOptions | None = None) -> str:
+        return self.page.input_value(self.selector, options)
+
+    def selected_options(self, options: CommandOptions | None = None) -> list[CapturedOption]:
+        return self.page.selected_options(self.selector, options)
+
+    def selected_text(self, options: CommandOptions | None = None) -> str | None:
+        return self.page.selected_text(self.selector, options)
+
+    def is_checked(self, options: CommandOptions | None = None) -> bool:
+        return self.page.is_checked(self.selector, options)
+
+    def get_attribute(self, name: str, options: CommandOptions | None = None) -> str | None:
+        return self.page.get_attribute(self.selector, name, options)
+
+    def bounding_box(self, options: CommandOptions | None = None) -> BoundingBox | None:
+        return self.page.bounding_box(self.selector, options)
 
     def text_content(self, options: CommandOptions | None = None) -> TextResult:
         return self.page.text_content(self.selector, options)

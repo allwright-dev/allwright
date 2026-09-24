@@ -14,6 +14,7 @@ from ._proto import engine_pb2
 from ._selectors import normalize_selector_for_transport
 from ._transport import RuntimeClient, StreamHandle
 from ._types import (
+    CapturedOption, BoundingBox,
     AllwrightError,
     ClickResult,
     CommandOptions,
@@ -617,6 +618,53 @@ class Page(WebLocators):
                         raise AllwrightError(
                             f"page session error while pressing key: {event.error.message}"
                         )
+
+    def _capture(self, kind: str, selector: str, attribute_name: str, options: CommandOptions | None):
+        from ._runtime import retry_options
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self.surface_session_id, context_session_id=self.session_id,
+                capture=engine_pb2.CaptureCommand(kind=getattr(engine_pb2, "CAPTURE_KIND_" + kind),
+                    css_selector=normalize_selector_for_transport(selector) if selector else "",
+                    attribute_name=attribute_name, retry_options=retry_options((options or CommandOptions()).timeout_ms))))
+            while True:
+                event = handle.recv("receive capture result")
+                match event.WhichOneof("event"):
+                    case "capture_resolved": return event.capture_resolved
+                    case "error": raise AllwrightError(event.error.message)
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError("page session closed while capturing")
+
+    def url(self, options: CommandOptions | None = None) -> str:
+        r = self._capture("URL", "", "", options)
+        return r.value
+
+    def input_value(self, selector: str, options: CommandOptions | None = None) -> str:
+        r = self._capture("INPUT_VALUE", selector, "", options)
+        return r.value
+
+    def selected_options(self, selector: str, options: CommandOptions | None = None) -> list[CapturedOption]:
+        r = self._capture("SELECTED_OPTIONS", selector, "", options)
+        return [CapturedOption(o.value, o.label, o.index) for o in r.selected_options]
+
+    def selected_text(self, selector: str, options: CommandOptions | None = None) -> str | None:
+        r = self._capture("SELECTED_TEXT", selector, "", options)
+        return r.value if r.HasField("value") else None
+
+    def is_checked(self, selector: str, options: CommandOptions | None = None) -> bool:
+        r = self._capture("CHECKED", selector, "", options)
+        return r.checked
+
+    def get_attribute(self, selector: str, name: str, options: CommandOptions | None = None) -> str | None:
+        r = self._capture("ATTRIBUTE", selector, name, options)
+        return r.value if r.HasField("value") else None
+
+    def bounding_box(self, selector: str, options: CommandOptions | None = None) -> BoundingBox | None:
+        r = self._capture("BOUNDING_BOX", selector, "", options)
+        return BoundingBox(r.bounding_box.x, r.bounding_box.y, r.bounding_box.width, r.bounding_box.height) if r.HasField("bounding_box") else None
 
     def text_content(self, selector: str, options: CommandOptions | None = None) -> TextResult:
         return self._read_text(selector, options or CommandOptions(), text_content=True)

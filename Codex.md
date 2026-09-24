@@ -353,3 +353,17 @@ xtask/
 - Web locator `Frame()` (TypeScript alias of `frame`, Go `Frame`, Rust/Java/Python `frame`) resolves a child browsing context to a normal page session through `ResolveFrameCommand`. Command timeout covers resolution and readiness (document complete plus 200 ms without DOM mutations).
 - Frame resolution and readiness live in `rust/allwright-surface-web/src/frames.rs`, using only BiDi commands via the existing Chromium mapper / native Firefox connection. Core registers the returned page session; closing it releases the session without closing its parent tab. Explicit stale Chromium context IDs must fail rather than falling back to another context.
 - Hidden Chromium BiDi mapper targets retain their creating CDP connection until browser shutdown; do not tie mapper lifetime to an individual command connection or re-expose its CDP binding on every command.
+
+## Web State Capture
+
+- All five clients and lazy Vitest pages/locators expose URL, input value, selected options, selected textbox text, checked state, attribute, and bounding-box reads. Existing `textContent` / `innerText` remain the text APIs.
+- `CaptureCommand` / `CaptureResolvedEvent` carry typed inspection results; core delegates to `PluginCommand::Capture`. Web semantics live in `rust/allwright-surface-web/src/capture.js` and execute through BiDi on Chromium and Firefox. There is no arbitrary script API in the client.
+- Element captures read the first match and honor command retries. Missing elements fail; missing attributes and unsupported textbox selection return absent values. Native selects return all selected options; ARIA combobox/listbox reads use `aria-selected` options in their descendants or referenced controls. `isChecked` is false for ARIA mixed state. Bounding boxes are CSS pixels relative to the selected page/frame viewport, absent for hidden or zero-area elements.
+- `typescript/vitest/tests/capture.spec.ts` tests the full client/engine/plugin path with `ALLWRIGHT_TEST_BROWSER=chromium|firefox`.
+
+## Retrying State Assertions
+
+- Vitest web expectations now include `toHaveURL` (exact string or regex), `toHaveValue`, `toHaveSelectedOptions`, `toHaveSelectedText`, `toBeChecked`, `toHaveAttribute`, and `toHaveBoundingBox`. All support immutable `.not` / `.not()` and share the polling helper with text/count/visibility assertions. Element assertions have both page-selector and locator forms.
+- `expectations.ts` keeps mobile matcher types separate so unsupported web state reads are not advertised on Android. Selected options accept ordered value strings/regexes or partial option objects; boxes accept partial exact coordinates or null. Regexes are cloned per observation, preserving caller state.
+- Positive assertion timeouts bound in-flight reads as well as command timeout hints. A polling interval longer than the remaining budget waits to the deadline before reporting the last failure. Zero timeout makes one observation. Already captured scalar/object values use ordinary Vitest assertions, not browser polling.
+- `capture-expectations.spec.ts` checks polling, deadlines, hung reads, configured defaults, negation, nulls, and matcher delegation; `capture.spec.ts` also checks asynchronous browser mutations through the actual engine and lazy fixtures on both Chromium and Firefox.

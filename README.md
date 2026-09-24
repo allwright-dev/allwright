@@ -253,6 +253,20 @@ Hook registration and waiting are generic engine operations. New-page,
 file-chooser, and download hook types/results remain owned by their surface;
 future dialog hooks can use the same lifecycle without adding per-event methods.
 
+Iframes resolve to normal pages, including nested and cross-origin frames:
+
+```ts
+const frame = await page.locator("#checkout-frame").frame({ timeoutMs: 10_000 });
+await frame.locator("input[name=email]").fill("buyer@example.com");
+const nested = await frame.locator("iframe").frame();
+```
+
+Resolution waits for exactly one matching iframe whose document is complete and
+has gone 200 ms without DOM mutations (default timeout 10 seconds). Closing a
+frame page releases its session without closing the parent tab. Go spells it
+`locator.Frame(ctx, ...)`, Rust `locator.frame().await?`, and Java/Python
+`locator.frame(options)`.
+
 ## Client Experience
 
 allwright is designed around high-level browser objects rather than asking application code to manage raw gRPC connections.
@@ -603,3 +617,5 @@ await app.locator(`ref=${node["aria-ref"]}`).click();
 ```
 
 Android uses a session-scoped cache of absolute XPath references without modifying the app or source XML. References expire and fail as stale when a fresh hierarchy differs; capture a new AI snapshot after screen changes. See the [Android snapshot contract](rust/allwright-surface-mobile-android/README.md#accessibility-snapshots) for modes and native limitations. iOS is not implemented.
+
+Web pages and locators also support reading the current URL, live input values, selected dropdown options and textbox text, checkbox/radio checked state, attributes, and bounding boxes. See the [state capture examples](typescript/core/README.md#read-page-and-element-state).

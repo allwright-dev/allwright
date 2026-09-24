@@ -9,6 +9,19 @@ public final class Locator implements WebLocators {
         this.selector = selector;
     }
 
+    public String inputValue() { return inputValue(new CommandOptions()); }
+    public String inputValue(CommandOptions options) { return page.inputValue(selector, options); }
+    public java.util.List<CapturedOption> selectedOptions() { return selectedOptions(new CommandOptions()); }
+    public java.util.List<CapturedOption> selectedOptions(CommandOptions options) { return page.selectedOptions(selector, options); }
+    public String selectedText() { return selectedText(new CommandOptions()); }
+    public String selectedText(CommandOptions options) { return page.selectedText(selector, options); }
+    public boolean isChecked() { return isChecked(new CommandOptions()); }
+    public boolean isChecked(CommandOptions options) { return page.isChecked(selector, options); }
+    public String getAttribute(String name) { return getAttribute(name, new CommandOptions()); }
+    public String getAttribute(String name, CommandOptions options) { return page.getAttribute(selector, name, options); }
+    public BoundingBox boundingBox() { return boundingBox(new CommandOptions()); }
+    public BoundingBox boundingBox(CommandOptions options) { return page.boundingBox(selector, options); }
+
     public Page frame() { return frame(new CommandOptions()); }
     public Page frame(CommandOptions options) { return page.frame(selector, options); }
 
