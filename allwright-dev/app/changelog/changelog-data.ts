@@ -15,6 +15,17 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "v0.1.14",
+    date: "2026-09-24",
+    title: "Read page and element state",
+    highlights: [
+      "Web pages and locators can now read state directly across all five clients: the current URL, an input's live value, selected options and selected text, checkbox/radio checked state, attributes, and bounding boxes. Each read uses the first match, accepts a per-call timeout, and works inside frame pages too.",
+      "The reads handle ARIA controls as well as native ones: selectedOptions covers native selects (including multiple selection) and ARIA listbox/combobox options marked aria-selected, and isChecked covers native and ARIA checkboxes and radios. Missing attributes and unsupported text selections return null rather than an empty string, and hidden or zero-area elements have no bounding box.",
+      "@allwright.dev/vitest adds retrying, negatable web matchers built on these reads: toHaveURL, toHaveValue, toHaveSelectedOptions, toHaveSelectedText, toBeChecked, toHaveAttribute, and toHaveBoundingBox. Each element matcher also has a page form that takes a selector first.",
+      "Every page, app, and locator expectation now fits each read inside its remaining assertion budget, and timeoutMs: 0 makes exactly one observation. Android keeps its text, count, and visibility matchers; the new state matchers are web-only.",
+    ],
+  },
+  {
     version: "v0.1.13",
     date: "2026-09-23",
     title: "Iframes as pages",

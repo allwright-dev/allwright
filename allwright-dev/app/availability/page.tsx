@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { languages, surfaceStatus } from "../availability-data";
-import { GITHUB_URL, SITE_NAME } from "../brand";
+import { SITE_NAME } from "../brand";
 import { StatusPill } from "../status-pill";
 
 const description =
@@ -77,6 +77,7 @@ const androidAvailable = [
   "Capture screenshots, including a full-page scroll-and-stitch capture",
   "Register typed file-chooser and public-download hooks with files streamed to and from the test machine",
   "Text, partial-text, resource id, class name, XPath, and state-based (e.g. clickable) selectors",
+  "Retrying text, count, and visibility assertions, including negation (via @allwright.dev/vitest)",
 ];
 
 const androidNotYetAvailable = [
@@ -105,15 +106,15 @@ export default function Availability() {
           What&apos;s real today, what isn&apos;t yet.
         </h1>
         <p className="mt-5 text-[clamp(1rem,1.6vw,1.15rem)] leading-8 text-[var(--muted)]">
-          allwright is being built in public, and &ldquo;available&rdquo;
-          should mean something specific: real and working, not finished.
-          Web automation runs today against real Chromium and Firefox
-          browsers, and Android automation runs today over adb — both
-          through a small, minimal set of actions, nowhere near full test
-          coverage yet. This page is the detailed, continuously updated
-          picture behind the status pills you see elsewhere on the site —
-          surface by surface, capability by capability, and language by
-          language.
+          &ldquo;Available&rdquo; should mean something specific: installed,
+          working, and ready for your test suite. Web automation runs today
+          against real Chromium and Firefox browsers, and Android automation
+          runs today over adb — each with the actions, locators, and retrying
+          assertions everyday tests rely on. This page is the detailed,
+          continuously updated picture behind the status pills you see
+          elsewhere on the site — surface by surface, capability by
+          capability, and language by language, including what&apos;s still
+          missing.
         </p>
       </section>
 
@@ -151,12 +152,11 @@ export default function Availability() {
             Web, capability by capability
           </h2>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
-            &ldquo;Available now&rdquo; means the web plugin is real,
-            installable, and the actions below genuinely work against
-            Chromium and Firefox &mdash; not that web automation is done.
-            This is a small, deliberately minimal core action set today, and
-            on its own it is not yet enough to cover a real web test suite.
-            The list on the right is what&apos;s still missing before it is.
+            &ldquo;Available now&rdquo; means the web plugin is installable
+            and everything below works against Chromium and Firefox today
+            &mdash; enough to cover the core of a real web test suite. The
+            list on the right is what hasn&apos;t landed yet, so you can check
+            whether your suite depends on any of it.
           </p>
         </div>
         <div className="mt-8 grid gap-6 sm:grid-cols-2">
@@ -210,9 +210,9 @@ export default function Availability() {
           <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
             &ldquo;Available now&rdquo; means the mobile-android plugin is
             real, installable, and drives a genuine app over adb — no Appium,
-            no separate driver server. It&apos;s an even smaller, newer
-            action set than web today, so plan early Android tests around
-            actions more than deep assertions.
+            no separate driver server. It covers the core actions, reads,
+            hooks, and text, count, and visibility assertions; the richer
+            web-only state matchers aren&apos;t on Android yet.
           </p>
         </div>
         <div className="mt-8 grid gap-6 sm:grid-cols-2">
@@ -324,26 +324,24 @@ export default function Availability() {
         className="mx-auto mt-14 flex w-full flex-col items-center gap-4 rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-8 text-center backdrop-blur-xl sm:mt-16"
       >
         <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
-          This page changes as allwright ships
+          Ready to try it?
         </h2>
         <p className="max-w-[46ch] text-sm leading-6 text-[var(--muted)]">
-          Follow the repository to see new capabilities and surfaces land in
-          real time, or head back to see how the plugin model fits together.
+          Scaffold a project and run your first test in a minute. The
+          changelog tracks each new capability as it lands.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noreferrer"
+          <Link
+            href="/quickstart"
             className="inline-flex items-center rounded-full bg-[linear-gradient(120deg,var(--accent),var(--accent-2))] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_var(--accent-soft)] transition hover:-translate-y-0.5"
           >
-            Star on GitHub
-          </a>
+            Get started
+          </Link>
           <Link
-            href="/how-it-works"
+            href="/changelog"
             className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--card)] px-6 py-3 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:border-[var(--accent-2)]"
           >
-            See how it works
+            Read the changelog
           </Link>
         </div>
       </section>

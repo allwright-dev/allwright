@@ -491,27 +491,27 @@ export default function HowItWorks() {
         className="mx-auto mt-14 flex w-full flex-col items-center gap-4 rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-8 text-center backdrop-blur-xl sm:mt-16"
       >
         <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
-          Follow along as it ships
+          Try it in your own project
         </h2>
         <p className="max-w-[46ch] text-sm leading-6 text-[var(--muted)]">
-          allwright is building in public. Star the repo to track progress,
-          or head back home for the quick pitch.
+          Web and Android are ready today. Scaffold a project with one
+          command and run your first test against a real browser.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/quickstart"
+            className="inline-flex items-center rounded-full bg-[linear-gradient(120deg,var(--accent),var(--accent-2))] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_var(--accent-soft)] transition hover:-translate-y-0.5"
+          >
+            Get started
+          </Link>
           <a
             href={GITHUB_URL}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center rounded-full bg-[linear-gradient(120deg,var(--accent),var(--accent-2))] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_var(--accent-soft)] transition hover:-translate-y-0.5"
+            className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--card)] px-6 py-3 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:border-[var(--accent-2)]"
           >
             Star on GitHub
           </a>
-          <Link
-            href="/"
-            className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--card)] px-6 py-3 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:border-[var(--accent-2)]"
-          >
-            Back to home
-          </Link>
         </div>
       </section>
     </div>

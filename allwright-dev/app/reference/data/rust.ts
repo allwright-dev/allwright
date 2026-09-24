@@ -127,6 +127,36 @@ export const rustReference: LanguageReference = {
           example: "page.text_content(selector).await?;",
         },
         {
+          name: "url",
+          kind: "method",
+          signature: "pub async fn url(&self) -> Result<String>\npub async fn url_with_options(&self, options: CommandOptions) -> Result<String>",
+          description: "Reads the page's current URL — for a frame page, the frame document's URL.",
+          since: "v0.1.14",
+          example: "let current = page.url().await?;",
+        },
+        {
+          name: "input_value / is_checked / get_attribute",
+          kind: "method",
+          signature: "pub async fn input_value(&self, selector: impl Into<String>) -> Result<String>\npub async fn is_checked(&self, selector: impl Into<String>) -> Result<bool>\npub async fn get_attribute(&self, selector: impl Into<String>, name: impl Into<String>) -> Result<Option<String>>",
+          description: 'Read the first match\'s state: the live value of an input, textarea, or select; the checked state of a native or ARIA checkbox/radio (ARIA mixed reads as false); or an attribute — None when it\'s missing, Some("") when it\'s present but empty. Each has a _with_options variant; a missing element or an incompatible control returns Err.',
+          since: "v0.1.14",
+          example: 'let value = page.locator("input[name=email]").input_value().await?;\nlet checked = page.locator("input[type=checkbox]").is_checked().await?;\nlet href = page.locator("a").get_attribute("href").await?;',
+        },
+        {
+          name: "selected_options / selected_text",
+          kind: "method",
+          signature: "pub async fn selected_options(&self, selector: impl Into<String>) -> Result<Vec<CapturedOption>>\npub async fn selected_text(&self, selector: impl Into<String>) -> Result<Option<String>>\n\npub struct CapturedOption { pub value: String, pub label: String, pub index: u32 }",
+          description: 'selected_options reads a native select (including multiple selection) or an ARIA listbox/combobox\'s aria-selected="true" options. selected_text reads the textbox\'s selected substring — Some("") for a bare caret, None for input types that don\'t support selection.',
+          since: "v0.1.14",
+        },
+        {
+          name: "bounding_box",
+          kind: "method",
+          signature: "pub async fn bounding_box(&self, selector: impl Into<String>) -> Result<Option<BoundingBox>>\n\npub struct BoundingBox { pub x: f64, pub y: f64, pub width: f64, pub height: f64 }",
+          description: "Reads the first match's box in CSS pixels, relative to the page or frame viewport. Returns None for a hidden or zero-area element.",
+          since: "v0.1.14",
+        },
+        {
           name: "wait_for_selector",
           kind: "method",
           signature: "pub async fn wait_for_selector_with_options(&self, css_selector: impl Into<String>, options: WaitForSelectorOptions) -> Result<WaitForSelectorResult>",
@@ -175,7 +205,7 @@ export const rustReference: LanguageReference = {
       slug: "locator",
       title: "Locator",
       description:
-        "Locator mirrors Page's action/query methods (click, fill, hover, press, focus, count, text_content, inner_text, wait_for), each delegating to self.page().<method>(self.selector()). What's below is what a Locator adds: building one semantically instead of by raw CSS, and narrowing it once built.",
+        "Locator mirrors Page's action/query methods (click, fill, hover, press, focus, count, text_content, inner_text, input_value, selected_options, selected_text, is_checked, get_attribute, bounding_box, wait_for), each delegating to self.page().<method>(self.selector()). What's below is what a Locator adds: building one semantically instead of by raw CSS, and narrowing it once built.",
       members: [
         {
           name: "get_by_role",

@@ -130,6 +130,36 @@ export const javaReference: LanguageReference = {
           since: "v0.0.14",
         },
         {
+          name: "url",
+          kind: "method",
+          signature: "public synchronized String url()\npublic synchronized String url(CommandOptions options)",
+          description: "Reads the page's current URL — for a frame page, the frame document's URL.",
+          since: "v0.1.14",
+          example: "String current = page.url();",
+        },
+        {
+          name: "inputValue / isChecked / getAttribute",
+          kind: "method",
+          signature: "public synchronized String inputValue(String selector)\npublic synchronized boolean isChecked(String selector)\npublic synchronized String getAttribute(String selector, String name)",
+          description: 'Read the first match\'s state: the live value of an input, textarea, or select; the checked state of a native or ARIA checkbox/radio (ARIA mixed reads as false); or an attribute — null when it\'s missing, "" when it\'s present but empty. Each has a CommandOptions overload; a missing element or an incompatible control throws AllwrightException.',
+          since: "v0.1.14",
+          example: 'String value = page.locator("input[name=email]").inputValue();\nboolean checked = page.locator("input[type=checkbox]").isChecked();\nString href = page.locator("a").getAttribute("href");',
+        },
+        {
+          name: "selectedOptions / selectedText",
+          kind: "method",
+          signature: "public synchronized List<CapturedOption> selectedOptions(String selector)\npublic synchronized String selectedText(String selector)\n\npublic record CapturedOption(String value, String label, int index) {}",
+          description: 'selectedOptions reads a native select (including multiple selection) or an ARIA listbox/combobox\'s aria-selected="true" options. selectedText reads the textbox\'s selected substring — "" for a bare caret, null for input types that don\'t support selection.',
+          since: "v0.1.14",
+        },
+        {
+          name: "boundingBox",
+          kind: "method",
+          signature: "public synchronized BoundingBox boundingBox(String selector)\n\npublic record BoundingBox(double x, double y, double width, double height) {}",
+          description: "Reads the first match's box in CSS pixels, relative to the page or frame viewport. Returns null for a hidden or zero-area element.",
+          since: "v0.1.14",
+        },
+        {
           name: "waitForSelector",
           kind: "method",
           signature: "public synchronized WaitForSelectorResult waitForSelector(String selector)\npublic synchronized WaitForSelectorResult waitForSelector(String selector, WaitForSelectorOptions options)",
@@ -178,7 +208,7 @@ export const javaReference: LanguageReference = {
       slug: "locator",
       title: "Locator",
       description:
-        "Every action and query method on Page (click, fill, hover, press, focus, highlight, count, textContent, innerText, waitFor) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds: building one via the WebLocators interface, and narrowing it once built.",
+        "Every action and query method on Page (click, fill, hover, press, focus, highlight, count, textContent, innerText, inputValue, selectedOptions, selectedText, isChecked, getAttribute, boundingBox, waitFor) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds: building one via the WebLocators interface, and narrowing it once built.",
       members: [
         {
           name: "getByRole",

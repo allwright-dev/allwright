@@ -133,6 +133,36 @@ export const pythonReference: LanguageReference = {
           example: 'heading = page.text_content(HEADING_SELECTOR)\nheading.text',
         },
         {
+          name: "url",
+          kind: "method",
+          signature: "def url(self, options: CommandOptions | None = None) -> str",
+          description: "Reads the page's current URL — for a frame page, the frame document's URL.",
+          since: "v0.1.14",
+          example: "current = page.url()",
+        },
+        {
+          name: "input_value / is_checked / get_attribute",
+          kind: "method",
+          signature: "def input_value(self, selector: str, options: CommandOptions | None = None) -> str\ndef is_checked(self, selector: str, options: CommandOptions | None = None) -> bool\ndef get_attribute(self, selector: str, name: str, options: CommandOptions | None = None) -> str | None",
+          description: 'Read the first match\'s state: the live value of an input, textarea, or select; the checked state of a native or ARIA checkbox/radio (ARIA mixed reads as False); or an attribute — None when it\'s missing, "" when it\'s present but empty. A missing element or an incompatible control raises AllwrightError.',
+          since: "v0.1.14",
+          example: 'value = page.locator("input[name=email]").input_value()\nchecked = page.locator("input[type=checkbox]").is_checked()\nhref = page.locator("a").get_attribute("href")',
+        },
+        {
+          name: "selected_options / selected_text",
+          kind: "method",
+          signature: "def selected_options(self, selector: str, options: CommandOptions | None = None) -> list[CapturedOption]\ndef selected_text(self, selector: str, options: CommandOptions | None = None) -> str | None\n\n@dataclass\nclass CapturedOption:\n    value: str\n    label: str\n    index: int",
+          description: 'selected_options reads a native select (including multiple selection) or an ARIA listbox/combobox\'s aria-selected="true" options. selected_text reads the textbox\'s selected substring — "" for a bare caret, None for input types that don\'t support selection.',
+          since: "v0.1.14",
+        },
+        {
+          name: "bounding_box",
+          kind: "method",
+          signature: "def bounding_box(self, selector: str, options: CommandOptions | None = None) -> BoundingBox | None\n\n@dataclass\nclass BoundingBox:\n    x: float\n    y: float\n    width: float\n    height: float",
+          description: "Reads the first match's box in CSS pixels, relative to the page or frame viewport. Returns None for a hidden or zero-area element.",
+          since: "v0.1.14",
+        },
+        {
           name: "wait_for_selector",
           kind: "method",
           signature: "def wait_for_selector(self, selector: str, options: WaitForSelectorOptions | None = None) -> WaitForSelectorResult",
@@ -182,7 +212,7 @@ export const pythonReference: LanguageReference = {
       slug: "locator",
       title: "Locator",
       description:
-        "Every action and query method on Page (click, fill, hover, press, focus, highlight, count, text_content, inner_text, wait_for) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds: building one semantically instead of by raw selector, and narrowing it once built.",
+        "Every action and query method on Page (click, fill, hover, press, focus, highlight, count, text_content, inner_text, input_value, selected_options, selected_text, is_checked, get_attribute, bounding_box, wait_for) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds: building one semantically instead of by raw selector, and narrowing it once built.",
       members: [
         {
           name: "get_by_role",

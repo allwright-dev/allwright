@@ -1,12 +1,13 @@
 import Link from "next/link";
 
 import { GITHUB_URL, LogoMark, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "./brand";
+import { changelog } from "./changelog/changelog-data";
 import { StatusPill } from "./status-pill";
 
 const surfaces = [
   {
     label: "Web",
-    description: "A small, working set of core browser actions today — not yet the full coverage real test suites need.",
+    description: "Chromium and Firefox with semantic locators, iframes, uploads, downloads, state reads, and retrying assertions — ready for real test suites.",
     status: "Available now",
     position: { left: "6%", top: "10%" },
     icon: (
@@ -18,7 +19,7 @@ const surfaces = [
   },
   {
     label: "Mobile",
-    description: "Android is real today over adb — tap, fill, and read a live app. iOS isn't wired up yet.",
+    description: "Android runs today over adb — tap, fill, read, and assert against a live app. iOS isn't wired up yet.",
     status: "Android available",
     position: { left: "94%", top: "10%" },
     icon: (
@@ -99,7 +100,7 @@ export default function Home() {
       <section className="relative mx-auto mt-10 grid w-full place-items-center text-center sm:mt-16">
         <p className="animate-rise mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-1.5 font-mono text-[0.78rem] uppercase tracking-[0.14em] text-[var(--accent-2)]">
           <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
-          Building in public — coming soon
+          {changelog[0].version} — ready to try today
         </p>
 
         <h1 className="animate-rise max-w-[18ch] text-[clamp(2.6rem,7vw,5.6rem)] leading-[1.02] font-semibold tracking-[-0.04em] text-[var(--ink)]">
@@ -121,14 +122,12 @@ export default function Home() {
         </p>
 
         <div className="animate-rise-delay mt-9 flex flex-wrap items-center justify-center gap-3">
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noreferrer"
+          <Link
+            href="/quickstart"
             className="inline-flex items-center rounded-full bg-[linear-gradient(120deg,var(--accent),var(--accent-2))] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_var(--accent-soft)] transition hover:-translate-y-0.5"
           >
-            Follow the project
-          </a>
+            Get started
+          </Link>
           <Link
             href="/how-it-works"
             className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--card)] px-6 py-3 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:border-[var(--accent-2)]"
@@ -240,8 +239,8 @@ export default function Home() {
           ))}
         </div>
         <p className="mx-auto mt-6 max-w-[52ch] text-center text-sm leading-6 text-[var(--muted)]">
-          &ldquo;Available now&rdquo; means real and installable today, not
-          feature-complete.{" "}
+          &ldquo;Available now&rdquo; means installable today and ready to
+          use in your test suite.{" "}
           <Link href="/availability" className="font-medium text-[var(--accent-2)] hover:underline">
             See the detailed breakdown →
           </Link>
@@ -274,24 +273,24 @@ export default function Home() {
         className="relative mx-auto mt-14 flex w-full flex-col items-center gap-4 rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-8 text-center backdrop-blur-xl sm:mt-16"
       >
         <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
-          Curious how the plugin model actually works?
+          Write your first test in a minute
         </h2>
         <p className="max-w-[46ch] text-sm leading-6 text-[var(--muted)]">
-          See the client languages allwright speaks today and exactly which
-          plugins are installable now versus still on the way.
+          One command scaffolds a config, a starter test, and dependencies.
+          Or see how the plugin model fits together first.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Link
-            href="/how-it-works"
+            href="/quickstart"
             className="inline-flex items-center rounded-full bg-[linear-gradient(120deg,var(--accent),var(--accent-2))] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_var(--accent-soft)] transition hover:-translate-y-0.5"
           >
-            See how it works
+            Open the quickstart
           </Link>
           <Link
-            href="/availability"
+            href="/how-it-works"
             className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--card)] px-6 py-3 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:border-[var(--accent-2)]"
           >
-            Full availability breakdown
+            See how it works
           </Link>
         </div>
       </section>

@@ -127,6 +127,36 @@ export const goReference: LanguageReference = {
           example: 'heading, err := page.TextContent(ctx, "h1")',
         },
         {
+          name: "URL",
+          kind: "method",
+          signature: "func (t *Tab) URL(ctx context.Context, options ...CommandOptions) (string, error)",
+          description: "Reads the page's current URL — for a frame page, the frame document's URL.",
+          since: "v0.1.14",
+          example: "current, err := page.URL(ctx)",
+        },
+        {
+          name: "InputValue / IsChecked / GetAttribute",
+          kind: "method",
+          signature: "func (t *Tab) InputValue(ctx context.Context, selector string, options ...CommandOptions) (string, error)\nfunc (t *Tab) IsChecked(ctx context.Context, selector string, options ...CommandOptions) (bool, error)\nfunc (t *Tab) GetAttribute(ctx context.Context, selector string, name string, options ...CommandOptions) (*string, error)",
+          description: 'Read the first match\'s state: the live value of an input, textarea, or select; the checked state of a native or ARIA checkbox/radio (ARIA mixed reads as false); or an attribute — nil with no error when it\'s missing, a pointer to "" when it\'s present but empty. A missing element or an incompatible control returns an error.',
+          since: "v0.1.14",
+          example: 'value, err := page.Locator("input[name=email]").InputValue(ctx)\nchecked, err := page.Locator("input[type=checkbox]").IsChecked(ctx)\nhref, err := page.Locator("a").GetAttribute(ctx, "href")',
+        },
+        {
+          name: "SelectedOptions / SelectedText",
+          kind: "method",
+          signature: "func (t *Tab) SelectedOptions(ctx context.Context, selector string, options ...CommandOptions) ([]CapturedOption, error)\nfunc (t *Tab) SelectedText(ctx context.Context, selector string, options ...CommandOptions) (*string, error)\n\ntype CapturedOption struct { Value string; Label string; Index uint32 }",
+          description: 'SelectedOptions reads a native select (including multiple selection) or an ARIA listbox/combobox\'s aria-selected="true" options. SelectedText reads the textbox\'s selected substring — a pointer to "" for a bare caret, nil for input types that don\'t support selection.',
+          since: "v0.1.14",
+        },
+        {
+          name: "BoundingBox",
+          kind: "method",
+          signature: "func (t *Tab) BoundingBox(ctx context.Context, selector string, options ...CommandOptions) (*BoundingBox, error)\n\ntype BoundingBox struct { X, Y, Width, Height float64 }",
+          description: "Reads the first match's box in CSS pixels, relative to the page or frame viewport. Returns nil with no error for a hidden or zero-area element.",
+          since: "v0.1.14",
+        },
+        {
           name: "WaitForSelector",
           kind: "method",
           signature: "func (t *Tab) WaitForSelector(ctx context.Context, cssSelector string, options ...WaitForSelectorOptions) (*WaitForSelectorResult, error)",
@@ -168,7 +198,7 @@ export const goReference: LanguageReference = {
       slug: "locator",
       title: "Locator",
       description:
-        "Every action and query method on Page (Click, Fill, Hover, Press, Focus, Highlight, Count, TextContent, InnerText, WaitFor) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds on top: building one semantically instead of by raw selector, and narrowing it once built.",
+        "Every action and query method on Page (Click, Fill, Hover, Press, Focus, Highlight, Count, TextContent, InnerText, InputValue, SelectedOptions, SelectedText, IsChecked, GetAttribute, BoundingBox, WaitFor) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds on top: building one semantically instead of by raw selector, and narrowing it once built.",
       members: [
         {
           name: "GetByRole",

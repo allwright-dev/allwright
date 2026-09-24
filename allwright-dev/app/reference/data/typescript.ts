@@ -132,6 +132,38 @@ export const typescriptReference: LanguageReference = {
           since: "v0.0.14",
         },
         {
+          name: "url",
+          kind: "method",
+          signature: "url(options?: CommandOptions): Promise<string>",
+          description: "Reads the page's current URL — for a frame page, the frame document's URL.",
+          since: "v0.1.14",
+          example: "const url = await page.url();",
+        },
+        {
+          name: "inputValue / isChecked / getAttribute",
+          kind: "method",
+          signature: "inputValue(selector: string, options?: CommandOptions): Promise<string>\nisChecked(selector: string, options?: CommandOptions): Promise<boolean>\ngetAttribute(selector: string, name: string, options?: CommandOptions): Promise<string | null>",
+          description: 'Read the first match\'s state: the live value of an input, textarea, or select; the checked state of a native or ARIA checkbox/radio (ARIA mixed reads as false); or an attribute — null when it\'s missing, "" when it\'s present but empty. A missing element or an incompatible control raises an error.',
+          since: "v0.1.14",
+          example: "const value = await page.locator('input[name=email]').inputValue();\nconst checked = await page.locator('input[type=checkbox]').isChecked();\nconst href = await page.locator('a').getAttribute('href');",
+        },
+        {
+          name: "selectedOptions / selectedText",
+          kind: "method",
+          signature: "selectedOptions(selector: string, options?: CommandOptions): Promise<CapturedOption[]>\nselectedText(selector: string, options?: CommandOptions): Promise<string | null>\n\ninterface CapturedOption { value: string; label: string; index: number }",
+          description: 'selectedOptions reads a native select (including multiple selection) or an ARIA listbox/combobox\'s aria-selected="true" options. selectedText reads the textbox\'s selected substring — "" for a bare caret, null for input types that don\'t support selection.',
+          since: "v0.1.14",
+          example: "const [first] = await page.locator('select').selectedOptions(); // { value, label, index }",
+        },
+        {
+          name: "boundingBox",
+          kind: "method",
+          signature: "boundingBox(selector: string, options?: CommandOptions): Promise<BoundingBox | null>\n\ninterface BoundingBox { x: number; y: number; width: number; height: number }",
+          description: "Reads the first match's box in CSS pixels, relative to the page or frame viewport. Returns null for a hidden or zero-area element.",
+          since: "v0.1.14",
+          example: "const box = await page.locator('button').boundingBox();",
+        },
+        {
           name: "waitForSelector",
           kind: "method",
           signature: "waitForSelector(selector: string, options?: WaitForSelectorOptions): Promise<WaitForSelectorResult>",
@@ -180,7 +212,7 @@ export const typescriptReference: LanguageReference = {
       slug: "locator",
       title: "Locator",
       description:
-        "Every action and query method on Page (click, fill, hover, press, focus, highlight, count, textContent, innerText, waitFor) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds: building one semantically instead of by raw selector, and narrowing it once built.",
+        "Every action and query method on Page (click, fill, hover, press, focus, highlight, count, textContent, innerText, inputValue, selectedOptions, selectedText, isChecked, getAttribute, boundingBox, waitFor) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds: building one semantically instead of by raw selector, and narrowing it once built.",
       members: [
         {
           name: "getByRole",
@@ -418,8 +450,16 @@ export const typescriptReference: LanguageReference = {
           name: "expect",
           kind: "function",
           signature: "expect(actual: Page | MobileAndroidApp): PageExpectMatchers\nexpect(actual: Locator | MobileAndroidLocator): LocatorExpectMatchers",
-          description: "Vitest's expect, augmented: called with a Page/Locator (web or Android) it returns retrying matchers — toHaveText, toContainText, toHaveCount, toBeVisible — instead of the plain-value assertions it returns for anything else.",
+          description: "Vitest's expect, augmented: called with a Page/Locator (web or Android) it returns retrying matchers — toHaveText, toContainText, toHaveCount, toBeVisible, plus the web-only state matchers below — instead of the plain-value assertions it returns for anything else.",
           since: "v0.0.24",
+        },
+        {
+          name: "State matchers",
+          kind: "method",
+          signature: "toHaveURL(expected: string | RegExp, options?)\ntoHaveValue(expected: string | RegExp, options?)\ntoHaveSelectedOptions(expected: SelectedOptionExpectation[], options?)\ntoHaveSelectedText(expected: string | RegExp | null, options?)\ntoBeChecked(options?)\ntoHaveAttribute(name: string, expected: string | RegExp | null, options?)\ntoHaveBoundingBox(expected: Partial<BoundingBox> | null, options?)",
+          description: "Web-only retrying matchers that re-read state on every attempt (default 5 s timeout, 100 ms interval; timeoutMs: 0 observes once). A string URL must match exactly; null asserts a missing attribute or unsupported selection; selected options match in order by value, regex, or { value, label, index }; a box compares only the fields you supply. Each element matcher also has a page form taking a selector first, e.g. expect(page).toHaveValue('#name', 'Alice').",
+          since: "v0.1.14",
+          example: "await expect(page).toHaveURL(/\\/dashboard(?:\\?|$)/);\nawait expect(page.locator('select')).toHaveSelectedOptions([{ value: 'a', label: /Alpha/ }]);\nawait expect(page.locator('a')).toHaveAttribute('href', /dashboard/);\nawait expect(page.locator('input[type=radio]')).not().toBeChecked();",
         },
         {
           name: "Negated assertions",

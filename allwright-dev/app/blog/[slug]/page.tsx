@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { compileMDX } from "next-mdx-remote/rsc";
 
-import { GITHUB_URL, SITE_NAME, SITE_URL } from "../../brand";
+import { SITE_NAME, SITE_URL } from "../../brand";
 import { formatPostDate, getAllPosts, getPostBySlug } from "../blog-data";
 import { HeroImage } from "../hero-image";
 import { blogMdxComponents } from "../mdx-components";
@@ -137,18 +137,16 @@ export default async function BlogPostPage({
           Try it in your own project
         </h2>
         <p className="max-w-[46ch] text-sm leading-6 text-[var(--muted)]">
-          allwright is building in public. Star the repo to track progress,
-          or keep reading the rest of the blog.
+          Scaffold a project with one command and run your first test, or
+          keep reading the rest of the blog.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noreferrer"
+          <Link
+            href="/quickstart"
             className="inline-flex items-center rounded-full bg-[linear-gradient(120deg,var(--accent),var(--accent-2))] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_var(--accent-soft)] transition hover:-translate-y-0.5"
           >
-            Star on GitHub
-          </a>
+            Get started
+          </Link>
           <Link
             href="/blog"
             className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--card)] px-6 py-3 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:border-[var(--accent-2)]"

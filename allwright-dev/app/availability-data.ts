@@ -41,12 +41,12 @@ export const languages = [
 export const surfaceStatus = [
   {
     label: "Web",
-    detail: "Chromium and Firefox both work, but only a small core action set — not yet full web test coverage.",
+    detail: "Chromium and Firefox, with the actions, locators, state reads, and retrying assertions everyday web tests need.",
     status: "Available now" as const,
   },
   {
     label: "Mobile",
-    detail: "Android runs today over adb — tap, fill, read, screenshot, and capture native accessibility trees. iOS isn't wired up yet.",
+    detail: "Android runs today over adb — tap, fill, read, screenshot, assert, and capture native accessibility trees. iOS isn't wired up yet.",
     status: "Android available" as const,
   },
   { label: "Desktop", detail: "macOS, Windows, and Linux applications.", status: "Not yet available" as const },
