@@ -19,6 +19,7 @@ import type {
   LaunchOptions,
   MobileSurfaceNamespace,
   Page,
+  Dialog,
   FileChooser,
   Download,
   HookType,
@@ -39,6 +40,7 @@ export type {
   BrowserType,
   Hook,
   HookType,
+  Dialog,
   FileChooser,
   Download,
   ClickResult,
@@ -75,6 +77,7 @@ export type {
 export const chromium: BrowserType = new BrowserTypeImpl("chromium");
 export const firefox: BrowserType = new BrowserTypeImpl("firefox");
 export const hooks = {
+  dialog: Object.freeze({ name: "dialog" }) as HookType<Dialog>,
   newPage: Object.freeze({ name: "newPage" }) as HookType<Page>,
   fileChooser: Object.freeze({ name: "fileChooser" }) as HookType<FileChooser>,
   download: Object.freeze({ name: "download" }) as HookType<Download>,

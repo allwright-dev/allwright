@@ -34,6 +34,7 @@ const webAvailable = [
   "Register a typed hook before an action and wait for the new tab that action opens",
   "Register a typed file-chooser hook and upload one or multiple local files",
   "Register a typed download hook and save the completed download to a local path",
+  "Handle JavaScript alerts, confirms, and prompts with typed hooks — accept, dismiss, or enter prompt text",
   "Navigate to a URL",
   "Click an element",
   "Type into a field",
@@ -53,7 +54,6 @@ const webAvailable = [
 ];
 
 const webNotYetAvailable = [
-  "Browser dialogs (alerts, confirms, prompts)",
   "Network mocking or request interception",
   "Cookies and saved session state",
   "Geolocation and other device permissions",

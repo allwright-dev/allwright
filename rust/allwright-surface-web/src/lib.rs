@@ -1,5 +1,6 @@
 mod capture;
 pub use capture::capture;
+mod dialogs;
 mod frames;
 pub use frames::resolve_frame;
 mod accessibility;
@@ -85,7 +86,7 @@ const CHROMIUM_BIDI_MAPPER_BUNDLE: &str =
     include_str!("../third_party/chromium-bidi/17.0.2/mapperTab.js");
 
 fn suppressed_file_dialog_behavior() -> Value {
-    json!({ "file": "dismiss" })
+    json!({ "file": "dismiss", "alert": "ignore", "confirm": "ignore", "prompt": "ignore" })
 }
 
 struct FirefoxSessionState {
@@ -223,6 +224,7 @@ pub async fn open_chrome_tab(cdp_websocket_url: &str) -> Result<ChromeTabInfo, S
 
 pub fn close_browser_process(process_id: u32) -> Result<(), String> {
     block_on_plugin_future(async {
+        dialogs::close_browser(process_id).await;
         let registry = firefox_session_registry();
         let mut sessions = registry.lock().await;
         sessions.retain(|_, state| state.process_id != process_id);
@@ -235,7 +237,7 @@ pub fn launch_browser(
     browser_kind: BrowserKind,
     browser_binary: Option<&str>,
 ) -> Result<BrowserLaunchInfo, String> {
-    match browser_kind {
+    let result = match browser_kind {
         BrowserKind::Chromium => {
             let launch = open_chrome_window(browser_binary)?;
             let (initial_page, mapper) = block_on_plugin_future(async {
@@ -266,7 +268,12 @@ pub fn launch_browser(
             })
         }
         BrowserKind::Firefox => launch_firefox_with_bidi(browser_binary),
-    }
+    }?;
+    block_on_plugin_future(async {
+        dialogs::track_browser(&result).await;
+        Ok::<(), String>(())
+    })?;
+    Ok(result)
 }
 
 pub async fn open_page(browser_session: &BrowserSessionHandle) -> Result<PageInfo, String> {
@@ -413,6 +420,9 @@ pub async fn register_hook(
     page_session: &PageSessionHandle,
     hook_type: HookType,
 ) -> Result<HookRegistration, String> {
+    if hook_type == HookType::Dialog {
+        return dialogs::register(browser_session, page_session).await;
+    }
     let mapper_target_id = match page_session {
         PageSessionHandle::Chromium {
             mapper_target_id, ..
@@ -432,6 +442,7 @@ pub async fn register_hook(
         _ => return Err("page session does not belong to the hook browser backend".to_string()),
     };
     let state = match hook_type {
+        HookType::Dialog => unreachable!(),
         HookType::NewPage => json!({
             "hook_type": "new_page",
             "source_page_id": source_page_id,
@@ -634,6 +645,7 @@ pub async fn poll_hook(
     let state: Value = serde_json::from_str(&registration.opaque_state)
         .map_err(|error| format!("failed to decode web hook state: {error}"))?;
     match state.get("hook_type").and_then(Value::as_str) {
+        Some("dialog") => dialogs::poll(browser_session, &state).await,
         Some("new_page") => poll_new_page_hook(browser_session, &state).await,
         Some("file_chooser") => poll_file_chooser_hook(browser_session, &state).await,
         Some("download") => poll_download_hook(browser_session, &state).await,
@@ -1137,6 +1149,7 @@ pub async fn close_page(
     browser_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
 ) -> Result<(), String> {
+    dialogs::close_page(browser_session, page_session).await;
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
@@ -1624,6 +1637,36 @@ pub async fn highlight_elements(
     }
 }
 
+fn focus_element_expression(selector: &str) -> Result<(String, String), String> {
+    let selector_literal = json_string_literal(selector, "focus selector")?;
+    let segments = selector_segments_literal("focus_element", selector)?;
+    let kind = selector_chain_kind_label("focus_element", selector)?;
+    let query_all = selector_chain_query_all_js();
+    let requirements = discovery_requirements_literal(DiscoveryRequirements {
+        require_match: true,
+        require_visible: true,
+        focus_first_match: true,
+        require_focus: true,
+        ..DiscoveryRequirements::default()
+    });
+    Ok((
+        format!(
+            "(() => {{
+            const selector = {selector_literal};
+            const selectorSegments = {segments};
+            const selectorChainQueryAll = () => {query_all};
+            const elements = {query_all};
+            const requirements = {requirements};
+            {}
+            const element = elements[0] ?? null;
+            allwrightPrepareElement(element, selector, '{kind}', requirements);
+        }})()",
+            actionability_helpers_js(),
+        ),
+        kind,
+    ))
+}
+
 pub async fn focus_element(
     browser_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
@@ -1638,28 +1681,17 @@ pub async fn focus_element(
                 ..
             },
         ) => {
-            let parsed = parse_selector("focus_element", css_selector)?;
-            discover_elements_via_bidi(
+            let (expression, kind) = focus_element_expression(css_selector)?;
+            chromium_bidi_evaluate_void(
                 cdp_websocket_url,
                 mapper_target_id.as_deref(),
                 browsing_context_id.as_deref(),
-                css_selector,
-                DiscoveryRequirements {
-                    require_match: true,
-                    require_visible: true,
-                    focus_first_match: true,
-                    require_focus: true,
-                    ..DiscoveryRequirements::default()
-                },
+                &expression,
             )
             .await?;
             Ok(FocusInfo {
                 css_selector: css_selector.to_string(),
-                note: format!(
-                    "focused element matching {} {}",
-                    selector_kind_label(parsed.kind),
-                    parsed.value
-                ),
+                note: format!("focused element matching {kind}: {css_selector}"),
             })
         }
         (
@@ -1668,44 +1700,16 @@ pub async fn focus_element(
                 browsing_context_id,
             },
         ) => {
-            let parsed = parse_selector("focus_element", css_selector)?;
+            let (expression, kind) = focus_element_expression(css_selector)?;
             let mut sessions = firefox_session_guard(connection_id).await?;
             let bidi = &mut sessions
                 .get_mut(connection_id)
                 .expect("Firefox session guard validated connection id")
                 .connection;
-            let query_first_js = selector_query_first_js(parsed.kind);
-            firefox_evaluate_void(
-                bidi,
-                browsing_context_id,
-                &format!(
-                    "(() => {{
-                        const selector = {};
-                        const requirements = {};
-                        {}
-                        const element = {query_first_js};
-                        allwrightPrepareElement(element, selector, '{}', requirements);
-                    }})()",
-                    json_string_literal(&parsed.value, "focus selector")?,
-                    discovery_requirements_literal(DiscoveryRequirements {
-                        require_match: true,
-                        require_visible: true,
-                        focus_first_match: true,
-                        require_focus: true,
-                        ..DiscoveryRequirements::default()
-                    }),
-                    actionability_helpers_js(),
-                    selector_kind_label(parsed.kind),
-                ),
-            )
-            .await?;
+            firefox_evaluate_void(bidi, browsing_context_id, &expression).await?;
             Ok(FocusInfo {
                 css_selector: css_selector.to_string(),
-                note: format!(
-                    "focused element matching {} {}",
-                    selector_kind_label(parsed.kind),
-                    parsed.value
-                ),
+                note: format!("focused element matching {kind}: {css_selector}"),
             })
         }
         _ => Err("browser/page backend mismatch while focusing element".to_string()),
@@ -2546,14 +2550,24 @@ async fn chromium_bidi_evaluate_void(
     existing_context_id: Option<&str>,
     expression: &str,
 ) -> Result<(), String> {
-    chromium_bidi_evaluate_json(
+    let (mut cdp, mapper, context) = chromium_bidi_session(
         cdp_websocket_url,
         existing_mapper_target_id,
         existing_context_id,
-        &format!("JSON.stringify((() => {{ {expression}; return null; }})())"),
     )
-    .await
-    .map(|_| ())
+    .await?;
+    let response = cdp
+        .send_bidi_command_with_dialogs(
+            &mapper.mapper_session_id,
+            &json!({
+                "id": 2, "method": "script.evaluate", "params": {
+                    "expression": expression, "target": {"context": context}, "awaitPromise": true,
+                },
+            }),
+            true,
+        )
+        .await?;
+    check_script_action_result(&response)
 }
 
 async fn chromium_bidi_evaluate_u32(
@@ -3524,13 +3538,22 @@ async fn firefox_evaluate_void(
     browsing_context_id: &str,
     expression: &str,
 ) -> Result<(), String> {
-    firefox_evaluate_json(
-        bidi,
-        browsing_context_id,
-        &format!("JSON.stringify((() => {{ {expression}; return null; }})())"),
-    )
-    .await
-    .map(|_| ())
+    let response = bidi.send_command_with_dialogs("script.evaluate", json!({
+        "expression": expression, "target": {"context": browsing_context_id}, "awaitPromise": true,
+    }), true).await?;
+    check_script_action_result(&response)
+}
+
+fn check_script_action_result(response: &Value) -> Result<(), String> {
+    if json_string(response, "/result/type")? != "success" {
+        return Err(format!(
+            "BiDi script action failed: {}",
+            response
+                .pointer("/result/exceptionDetails")
+                .unwrap_or(&Value::Null)
+        ));
+    }
+    Ok(())
 }
 
 async fn firefox_evaluate_u32(
@@ -3854,13 +3877,17 @@ impl CdpConnection {
         // Chromium destroys hidden targets when their creating CDP connection closes.
         // Keep that connection alive for the mapper's lifetime, independently of commands.
         let mut owner = CdpConnection::connect(&self.websocket_url).await?;
-        let created = owner.send_command("Target.createTarget", json!({
-            "url": "about:blank#MAPPER_TARGET", "hidden": true, "background": true,
-        }), None).await?;
+        let created = owner
+            .send_command(
+                "Target.createTarget",
+                json!({
+                    "url": "about:blank#MAPPER_TARGET", "hidden": true, "background": true,
+                }),
+                None,
+            )
+            .await?;
         let target = required_string(&created, "/targetId")?;
-        tokio::spawn(async move {
-            while owner.next_json_message().await.is_ok() {}
-        });
+        tokio::spawn(async move { while owner.next_json_message().await.is_ok() {} });
         Ok(target)
     }
 
@@ -3903,6 +3930,16 @@ impl CdpConnection {
         &mut self,
         mapper_session_id: &str,
         command: &Value,
+    ) -> Result<Value, String> {
+        self.send_bidi_command_with_dialogs(mapper_session_id, command, false)
+            .await
+    }
+
+    async fn send_bidi_command_with_dialogs(
+        &mut self,
+        mapper_session_id: &str,
+        command: &Value,
+        script_action: bool,
     ) -> Result<Value, String> {
         let command_id = command
             .get("id")
@@ -3966,8 +4003,15 @@ impl CdpConnection {
             let response = serde_json::from_str::<Value>(payload)
                 .map_err(|error| format!("failed to parse BiDi mapper response JSON: {error}"))?;
             if response.get("id").and_then(Value::as_u64) != Some(command_id) {
+                // Input dispatch can remain pending while a modal prompt is open.
+                // Yield at that boundary so the sequential context stream can handle it.
+                let interrupted =
+                    dialogs::interrupted_action_result(command, &response, script_action);
                 if response.get("method").is_some() {
                     self.pending_bidi_events.push_back(response);
+                }
+                if let Some(result) = interrupted {
+                    return Ok(result);
                 }
                 continue;
             }
@@ -4000,11 +4044,23 @@ impl CdpConnection {
         mapper_session_id: &str,
         method: &str,
     ) -> Result<Option<Value>, String> {
-        if let Some(index) = self
-            .pending_bidi_events
-            .iter()
-            .position(|event| event.get("method").and_then(Value::as_str) == Some(method))
-        {
+        self.poll_bidi_event_for_context(mapper_session_id, method, None)
+            .await
+    }
+
+    async fn poll_bidi_event_for_context(
+        &mut self,
+        mapper_session_id: &str,
+        method: &str,
+        context: Option<&str>,
+    ) -> Result<Option<Value>, String> {
+        let matches = |event: &Value| {
+            event.get("method").and_then(Value::as_str) == Some(method)
+                && context.is_none_or(|id| {
+                    event.pointer("/params/context").and_then(Value::as_str) == Some(id)
+                })
+        };
+        if let Some(index) = self.pending_bidi_events.iter().position(matches) {
             return Ok(self.pending_bidi_events.remove(index));
         }
 
@@ -4024,7 +4080,7 @@ impl CdpConnection {
             .ok_or_else(|| "Runtime.bindingCalled payload is missing".to_string())?;
         let event = serde_json::from_str::<Value>(payload)
             .map_err(|error| format!("failed to parse BiDi mapper event JSON: {error}"))?;
-        if event.get("method").and_then(Value::as_str) == Some(method) {
+        if matches(&event) {
             Ok(Some(event))
         } else {
             if event.get("method").is_some() {
@@ -4177,20 +4233,46 @@ impl BidiConnection {
     }
 
     async fn send_command(&mut self, method: &str, params: Value) -> Result<Value, String> {
-        if let Some(context) = params.pointer("/target/context").or_else(|| params.get("context")).and_then(Value::as_str) {
+        self.send_command_with_dialogs(method, params, false).await
+    }
+
+    async fn send_command_with_dialogs(
+        &mut self,
+        method: &str,
+        params: Value,
+        script_action: bool,
+    ) -> Result<Value, String> {
+        if let Some(context) = params
+            .pointer("/target/context")
+            .or_else(|| params.get("context"))
+            .and_then(Value::as_str)
+        {
             if self.frame_contexts.contains(context) {
                 // Firefox can retain script realms in the back/forward cache after a
                 // frame leaves the active document. Only active tree members are pages.
-                let tree = self.send_command_raw("browsingContext.getTree", json!({})).await?;
+                let tree = self
+                    .send_command_raw("browsingContext.getTree", json!({}))
+                    .await?;
                 if !frames::tree_contains_context(&tree, context) {
                     return Err(format!("frame browsing context {context} is detached"));
                 }
             }
         }
-        self.send_command_raw(method, params).await
+        self.send_command_raw_with_dialogs(method, params, script_action)
+            .await
     }
 
     async fn send_command_raw(&mut self, method: &str, params: Value) -> Result<Value, String> {
+        self.send_command_raw_with_dialogs(method, params, false)
+            .await
+    }
+
+    async fn send_command_raw_with_dialogs(
+        &mut self,
+        method: &str,
+        params: Value,
+        script_action: bool,
+    ) -> Result<Value, String> {
         let id = self.next_id;
         self.next_id += 1;
         let payload = json!({
@@ -4206,7 +4288,14 @@ impl BidiConnection {
         loop {
             let message = self.next_json_message().await?;
             if message.get("id").and_then(Value::as_u64) != Some(id) {
-                self.pending_events.push_back(message);
+                let interrupted =
+                    dialogs::interrupted_action_result(&payload, &message, script_action);
+                if message.get("method").is_some() {
+                    self.pending_events.push_back(message);
+                }
+                if let Some(result) = interrupted {
+                    return Ok(result);
+                }
                 continue;
             }
 
@@ -4225,17 +4314,25 @@ impl BidiConnection {
     }
 
     async fn poll_event(&mut self, method: &str) -> Result<Option<Value>, String> {
-        if let Some(index) = self
-            .pending_events
-            .iter()
-            .position(|event| event.get("method").and_then(Value::as_str) == Some(method))
-        {
+        self.poll_event_for_context(method, None).await
+    }
+
+    async fn poll_event_for_context(
+        &mut self,
+        method: &str,
+        context: Option<&str>,
+    ) -> Result<Option<Value>, String> {
+        let matches = |event: &Value| {
+            event.get("method").and_then(Value::as_str) == Some(method)
+                && context.is_none_or(|id| {
+                    event.pointer("/params/context").and_then(Value::as_str) == Some(id)
+                })
+        };
+        if let Some(index) = self.pending_events.iter().position(matches) {
             return Ok(self.pending_events.remove(index));
         }
         match timeout(Duration::from_millis(10), self.next_json_message()).await {
-            Ok(Ok(event)) if event.get("method").and_then(Value::as_str) == Some(method) => {
-                Ok(Some(event))
-            }
+            Ok(Ok(event)) if matches(&event) => Ok(Some(event)),
             Ok(Ok(event)) => {
                 self.pending_events.push_back(event);
                 Ok(None)
@@ -4509,10 +4606,19 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
         } => {
             launch_browser(browser_kind, browser_binary.as_deref()).map(PluginResult::LaunchBrowser)
         }
-        PluginCommand::ResolveFrame { browser_session, page_session, css_selector, timeout_ms } => block_on_plugin_future(async move {
-            timeout(Duration::from_millis(timeout_ms), resolve_frame(&browser_session, &page_session, &css_selector))
-                .await.map_err(|_| "timed out waiting for frame to load and become stable".to_string())?
-                .map(PluginResult::ResolveFrame)
+        PluginCommand::ResolveFrame {
+            browser_session,
+            page_session,
+            css_selector,
+            timeout_ms,
+        } => block_on_plugin_future(async move {
+            timeout(
+                Duration::from_millis(timeout_ms),
+                resolve_frame(&browser_session, &page_session, &css_selector),
+            )
+            .await
+            .map_err(|_| "timed out waiting for frame to load and become stable".to_string())?
+            .map(PluginResult::ResolveFrame)
         }),
         PluginCommand::OpenPage { browser_session } => block_on_plugin_future(async move {
             open_page(&browser_session)
@@ -4527,6 +4633,23 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             register_hook(&browser_session, &page_session, hook_type)
                 .await
                 .map(PluginResult::RegisterHook)
+        }),
+        PluginCommand::HandleDialog {
+            browser_session,
+            page_session,
+            dialog_id,
+            accept,
+            prompt_text,
+        } => block_on_plugin_future(async move {
+            dialogs::handle(
+                &browser_session,
+                &page_session,
+                &dialog_id,
+                accept,
+                prompt_text,
+            )
+            .await?;
+            Ok(PluginResult::HandleDialog)
         }),
         PluginCommand::PollHook {
             browser_session,

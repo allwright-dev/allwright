@@ -514,6 +514,31 @@ pub async fn poll_hook(
     }
 }
 
+pub async fn handle_dialog(
+    surface_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    dialog_id: String,
+    accept: bool,
+    prompt_text: Option<String>,
+) -> Result<(), String> {
+    let command = PluginCommand::HandleDialog {
+        browser_session: surface_session.clone(),
+        page_session: page_session.clone(),
+        dialog_id,
+        accept,
+        prompt_text,
+    };
+    // The plugin ABI is synchronous. Keep it off the async task so the engine's
+    // dialog deadline remains pollable; dropping the join handle never replays it.
+    match tokio::task::spawn_blocking(move || invoke_web(command))
+        .await
+        .map_err(|error| error.to_string())??
+    {
+        PluginResult::HandleDialog => Ok(()),
+        _ => Err("web plugin returned an unexpected response for HandleDialog".into()),
+    }
+}
+
 pub async fn set_file_chooser_files(
     surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
@@ -1000,7 +1025,8 @@ pub async fn resolve_frame(
     };
     // Keep the engine deadline pollable while the synchronous plugin ABI executes.
     match tokio::task::spawn_blocking(move || invoke_web(command))
-        .await.map_err(|error| error.to_string())??
+        .await
+        .map_err(|error| error.to_string())??
     {
         PluginResult::ResolveFrame(page) => Ok(page),
         _ => Err("web plugin returned an unexpected response for ResolveFrame".to_string()),

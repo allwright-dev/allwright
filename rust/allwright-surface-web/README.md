@@ -8,6 +8,27 @@ This is a hard rule for all future web-plugin development: Chromium web element 
 
 CDP is permitted only for Chromium browser and tab lifecycle, bootstrapping the Chromium BiDi mapper, and transporting commands to that mapper. It must not be used to inspect the DOM or dispatch user input in a normal web automation path.
 
+## JavaScript dialogs
+
+Register `page.registerHook(hooks.dialog)` before clicking an alert/confirm/prompt
+trigger, then call `hook.wait()` and `dialog.accept()`, `dialog.accept("text")`,
+or `dialog.dismiss()`. Results expose `type`, `message`, and `defaultValue`.
+Omitted text preserves the default; empty text clears it. Only prompts accept text.
+One pending hook/dialog per page is supported; hooks are one-shot and handling
+is never retried. The page-scoped subscription stays alive between hooks so
+synchronous consecutive dialogs are buffered instead of lost. Page/browser
+cleanup drains consecutive prompts before releasing that subscription. Waiting, accept, and dismiss support command timeout options; registration does
+not because cancelling subscription setup can orphan browser state. Dialogs left unhandled remain open and block page work.
+
+`src/dialogs.rs` subscribes and handles through BiDi on both browsers. Input
+commands yield when their context opens a prompt, allowing the sequential hook
+flow to handle it. This includes script-backed press, fill, focus, and Firefox
+hover actions, not just pointer dispatch. Query/read scripts never use this
+interruption behavior. Focus keeps the normal semantic/chained selector resolver. This does not cover navigation-triggered/before-unload dialogs.
+Run the public transport regression with `ALLWRIGHT_TEST_BROWSER=chromium` or
+`firefox` and `bunx vitest run typescript/vitest/tests/dialogs.spec.ts` after
+building/installing the local engine and plugin.
+
 ## Accessibility snapshots
 
 `page.accessibilitySnapshot({ format: "json" | "yaml" })` returns a serialized

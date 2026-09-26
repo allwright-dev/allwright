@@ -251,14 +251,33 @@ where
     }
 }
 
-async fn resolve_frame_before_deadline<T, F, Fut>(policy: RetryPolicy, operation: F) -> Result<T, String>
+async fn resolve_frame_before_deadline<T, F, Fut>(
+    policy: RetryPolicy,
+    operation: F,
+) -> Result<T, String>
 where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = Result<T, String>>,
 {
     tokio::time::timeout(policy.timeout, retry_with_timeout(policy, operation))
         .await
-        .unwrap_or_else(|_| Err("timed out waiting for frame to load and become stable".to_string()))
+        .unwrap_or_else(
+            |_| Err("timed out waiting for frame to load and become stable".to_string()),
+        )
+}
+
+async fn hook_operation_before_deadline<T>(
+    options: Option<&CommandRetryOptions>,
+    name: &str,
+    operation: impl std::future::Future<Output = Result<T, String>>,
+) -> Result<T, String> {
+    tokio::time::timeout(command_retry_policy(options).timeout, operation)
+        .await
+        .unwrap_or_else(|_| {
+            Err(format!(
+                "timed out {name}; operation may still complete, do not retry blindly"
+            ))
+        })
 }
 
 fn next_surface_session_id() -> String {
@@ -1036,29 +1055,55 @@ async fn handle_tab_command(
             let started = Instant::now();
             let result = resolve_frame_before_deadline(policy, || async {
                 match (&surface_session, &page_session) {
-                    (EngineBrowserSessionHandle::Web(browser), EnginePageSessionHandle::Web(page)) =>
-                        web_lib::resolve_frame(browser, page, &command.css_selector,
-                            policy.timeout.saturating_sub(started.elapsed()).as_millis() as u64).await,
+                    (
+                        EngineBrowserSessionHandle::Web(browser),
+                        EnginePageSessionHandle::Web(page),
+                    ) => {
+                        web_lib::resolve_frame(
+                            browser,
+                            page,
+                            &command.css_selector,
+                            policy.timeout.saturating_sub(started.elapsed()).as_millis() as u64,
+                        )
+                        .await
+                    }
                     _ => Err("frames are only supported on web pages".to_string()),
                 }
-            }).await;
+            })
+            .await;
             let event = match result {
                 Ok(page) => {
                     let id = next_context_session_id();
                     let mut state = state.lock().await;
                     state.frame_sessions.insert(id.clone());
-                    state.tab_sessions.insert(id.clone(), TabSessionState {
-                        surface_session_id: surface_session_id.clone(),
-                        page_session: EnginePageSessionHandle::Web(page.page_session), current_url: None,
-                    });
-                    ContextEvent::FrameResolved(proto::FrameResolvedEvent { context_session_id: id })
+                    state.tab_sessions.insert(
+                        id.clone(),
+                        TabSessionState {
+                            surface_session_id: surface_session_id.clone(),
+                            page_session: EnginePageSessionHandle::Web(page.page_session),
+                            current_url: None,
+                        },
+                    );
+                    ContextEvent::FrameResolved(proto::FrameResolvedEvent {
+                        context_session_id: id,
+                    })
                 }
                 Err(message) => ContextEvent::Error(ContextSessionErrorEvent { message }),
             };
-            Ok(TabCommandOutcome { events: vec![tab_event(&context_session_id, event)], should_close: false })
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(&context_session_id, event)],
+                should_close: false,
+            })
         }
         Some(ContextCommand::RegisterHook(RegisterHookCommand { hook })) => {
             let registration = match (hook, &surface_session, &page_session) {
+                (
+                    Some(RegisterHook::Dialog(_)),
+                    EngineBrowserSessionHandle::Web(browser),
+                    EnginePageSessionHandle::Web(page),
+                ) => web_lib::register_hook(browser, page, PluginHookType::Dialog)
+                    .await
+                    .map(EngineHookRegistration::Web),
                 (
                     Some(RegisterHook::NewPage(_)),
                     EngineBrowserSessionHandle::Web(browser),
@@ -1277,6 +1322,26 @@ async fn handle_tab_command(
                         should_close: false,
                     })
                 }
+                Ok(HookResult::Dialog(dialog)) => {
+                    state.lock().await.hooks.remove(&hook_id);
+                    Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::HookCompleted(HookCompletedEvent {
+                                hook_id,
+                                result: Some(HookCompletionResult::Dialog(
+                                    proto::DialogHookResult {
+                                        dialog_id: dialog.dialog_id,
+                                        r#type: dialog.kind,
+                                        message: dialog.message,
+                                        default_value: dialog.default_value,
+                                    },
+                                )),
+                            }),
+                        )],
+                        should_close: false,
+                    })
+                }
                 Ok(HookResult::Download(download)) => {
                     state.lock().await.hooks.remove(&hook_id);
                     Ok(TabCommandOutcome {
@@ -1303,6 +1368,35 @@ async fn handle_tab_command(
                     should_close: false,
                 }),
             }
+        }
+        Some(ContextCommand::HandleDialog(command)) => {
+            let result = match (&surface_session, &page_session) {
+                (EngineBrowserSessionHandle::Web(browser), EnginePageSessionHandle::Web(page)) => {
+                    hook_operation_before_deadline(
+                        command.retry_options.as_ref(),
+                        "handling dialog",
+                        web_lib::handle_dialog(
+                            browser,
+                            page,
+                            command.dialog_id.clone(),
+                            command.accept,
+                            command.prompt_text,
+                        ),
+                    )
+                    .await
+                }
+                _ => Err("dialogs require a web page session".into()),
+            };
+            let event = match result {
+                Ok(()) => ContextEvent::DialogHandled(proto::DialogHandledEvent {
+                    dialog_id: command.dialog_id,
+                }),
+                Err(message) => ContextEvent::Error(ContextSessionErrorEvent { message }),
+            };
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(&context_session_id, event)],
+                should_close: false,
+            })
         }
         Some(ContextCommand::SetFileChooserFiles(SetFileChooserFilesCommand {
             file_chooser_id,
@@ -1626,8 +1720,15 @@ async fn handle_tab_command(
                     EngineBrowserSessionHandle::Web(surface_session),
                     EnginePageSessionHandle::Web(page_session),
                 ) => {
-                    if !state.lock().await.frame_sessions.remove(&context_session_id) {
-                        web_lib::close_page(surface_session, page_session).await.map_err(Status::internal)?;
+                    if !state
+                        .lock()
+                        .await
+                        .frame_sessions
+                        .remove(&context_session_id)
+                    {
+                        web_lib::close_page(surface_session, page_session)
+                            .await
+                            .map_err(Status::internal)?;
                     }
                 }
                 (
@@ -2529,7 +2630,8 @@ impl EngineService for EngineGrpcService {
             state
                 .tab_sessions
                 .retain(|_, context_session| context_session.surface_session_id != session_id);
-            let live_contexts: std::collections::HashSet<_> = state.tab_sessions.keys().cloned().collect();
+            let live_contexts: std::collections::HashSet<_> =
+                state.tab_sessions.keys().cloned().collect();
             state.frame_sessions.retain(|id| live_contexts.contains(id));
             state
                 .hooks
@@ -2657,21 +2759,58 @@ mod tests {
 
     #[tokio::test]
     async fn frame_deadline_covers_in_flight_resolution_and_retries() {
-        let policy = RetryPolicy { timeout: Duration::from_millis(30), retry_interval: Duration::from_millis(1) };
+        let policy = RetryPolicy {
+            timeout: Duration::from_millis(30),
+            retry_interval: Duration::from_millis(1),
+        };
         let start = Instant::now();
         let result = resolve_frame_before_deadline(policy, || async {
             sleep(Duration::from_secs(5)).await;
             Ok(())
-        }).await;
+        })
+        .await;
         assert!(result.unwrap_err().contains("timed out"));
         assert!(start.elapsed() < Duration::from_secs(1));
         let mut attempts = 0;
         let result = resolve_frame_before_deadline(policy, || {
             attempts += 1;
-            std::future::ready(if attempts == 2 { Ok(()) } else { Err("not ready".into()) })
-        }).await;
+            std::future::ready(if attempts == 2 {
+                Ok(())
+            } else {
+                Err("not ready".into())
+            })
+        })
+        .await;
         assert!(result.is_ok());
         assert_eq!(attempts, 2);
+    }
+
+    #[tokio::test]
+    async fn hook_deadlines_bound_single_attempts() {
+        let options = CommandRetryOptions {
+            timeout_ms: Some(10),
+            retry_interval_ms: None,
+        };
+        let mut attempts = 0;
+        let error = hook_operation_before_deadline(Some(&options), "handling dialog", async {
+            attempts += 1;
+            std::future::pending::<Result<(), String>>().await
+        })
+        .await
+        .unwrap_err();
+        assert!(error.contains("timed out handling dialog"));
+        assert_eq!(attempts, 1);
+        let failure = hook_operation_before_deadline(Some(&options), "handling dialog", async {
+            Err::<(), _>("unsupported dialog".to_string())
+        })
+        .await;
+        assert_eq!(failure.unwrap_err(), "unsupported dialog");
+        assert_eq!(
+            hook_operation_before_deadline(None, "handling dialog", async { Ok(42) })
+                .await
+                .unwrap(),
+            42
+        );
     }
 
     #[tokio::test]
@@ -2683,10 +2822,16 @@ mod tests {
             state.tab_sessions.insert("frame-1".into(), parent);
             state.frame_sessions.insert("frame-1".into());
         }
-        let outcome = handle_tab_command(state.clone(), ContextSessionCommand {
-            surface_session_id: "surface-1".into(), context_session_id: "frame-1".into(),
-            command: Some(ContextCommand::Close(CloseContextSessionCommand {})),
-        }).await.unwrap();
+        let outcome = handle_tab_command(
+            state.clone(),
+            ContextSessionCommand {
+                surface_session_id: "surface-1".into(),
+                context_session_id: "frame-1".into(),
+                command: Some(ContextCommand::Close(CloseContextSessionCommand {})),
+            },
+        )
+        .await
+        .unwrap();
         assert!(outcome.should_close);
         let state = state.lock().await;
         assert!(state.tab_sessions.contains_key("context-1"));

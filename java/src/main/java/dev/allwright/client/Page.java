@@ -103,11 +103,14 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
         ensureOpen();
         if (type == null || !("new_page".equals(type.name())
                 || "file_chooser".equals(type.name())
+                || "dialog".equals(type.name())
                 || "download".equals(type.name()))) {
             throw new AllwrightException("unsupported hook type");
         }
         RegisterHookCommand.Builder register = RegisterHookCommand.newBuilder();
-        if ("new_page".equals(type.name())) {
+        if ("dialog".equals(type.name())) {
+            register.setDialog(dev.allwright.engine.v1.RegisterDialogHook.getDefaultInstance());
+        } else if ("new_page".equals(type.name())) {
             register.setNewPage(RegisterNewPageHook.newBuilder().build());
         } else if ("file_chooser".equals(type.name())) {
             register.setFileChooser(RegisterFileChooserHook.newBuilder().build());
@@ -157,6 +160,27 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
                 }
                 case ERROR -> throw new AllwrightException(
                         "page session error while waiting for hook: " + event.getError().getMessage());
+                default -> { }
+            }
+        }
+    }
+
+    synchronized void handleDialog(String id, boolean accept, String promptText, CommandOptions options) {
+        var handle = ensureStream();
+        ensureOpen();
+        var command = dev.allwright.engine.v1.HandleDialogCommand.newBuilder().setDialogId(id).setAccept(accept);
+        if (promptText != null) command.setPromptText(promptText);
+        if (options != null && CommandSupport.hasTimeout(options.timeoutMs())) {
+            command.setRetryOptions(CommandSupport.commandRetryOptions(options.timeoutMs()));
+        }
+        handle.send(ContextSessionCommand.newBuilder().setSurfaceSessionId(browserSessionId)
+                .setContextSessionId(sessionId).setHandleDialog(command).build());
+        while (true) {
+            var event = handle.recv("handle dialog");
+            switch (event.getEventCase()) {
+                case DIALOG_HANDLED -> { if (id.equals(event.getDialogHandled().getDialogId())) return; }
+                case ERROR -> throw new AllwrightException(event.getError().getMessage());
+                case CLOSED -> { closed = true; throw new AllwrightException("page closed while handling dialog"); }
                 default -> { }
             }
         }

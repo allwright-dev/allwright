@@ -135,6 +135,16 @@ export interface Hook<T> {
   wait(options?: CommandOptions): Promise<T>;
 }
 
+export interface Dialog {
+  readonly id: string;
+  readonly page: Page;
+  readonly type: string;
+  readonly message: string;
+  readonly defaultValue: string;
+  accept(promptText?: string, options?: CommandOptions): Promise<void>;
+  dismiss(options?: CommandOptions): Promise<void>;
+}
+
 export interface FileChooser {
   readonly id: string;
   readonly page: Page | MobileAndroidApp;
@@ -468,8 +478,10 @@ export interface ContextSessionEvent {
   hookRegistered?: {
     hookId?: string;
   };
+  dialogHandled?: { dialogId?: string };
   hookCompleted?: {
     hookId?: string;
+    dialog?: { dialogId?: string; type?: string; message?: string; defaultValue?: string };
     newPage?: {
       contextSessionId?: string;
       note?: string;
@@ -610,10 +622,17 @@ export interface OpenContextRequest {
   };
 }
 
+export interface HandleDialogRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
+  handleDialog: { dialogId: string; accept: boolean; promptText?: string; retryOptions?: { timeoutMs?: number } };
+}
+
 export interface RegisterHookRequest {
   surfaceSessionId: string;
   contextSessionId: string;
   registerHook: {
+    dialog?: Record<string, never>;
     newPage?: Record<string, never>;
     fileChooser?: Record<string, never>;
     download?: Record<string, never>;
@@ -895,6 +914,7 @@ export type ContextSessionRequest =
   | ContextPingRequest
   | RegisterHookRequest
   | WaitForHookRequest
+  | HandleDialogRequest
   | SetFileChooserFilesRequest
   | SaveDownloadRequest
   | UploadFileChunkRequest

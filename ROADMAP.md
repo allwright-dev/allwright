@@ -70,13 +70,14 @@ Add positive and negative forms where Playwright supports them:
 - [ ] Accessible description — `toHaveAccessibleDescription()`.
 - [ ] Accessible error message — `toHaveAccessibleErrorMessage()`.
 - [ ] Accessible name — `toHaveAccessibleName()`.
-- [ ] Attribute value — `toHaveAttribute()`.
+- [x] Attribute value — `toHaveAttribute()` (v0.1.14).
 - [ ] Exact class value/list — `toHaveClass()`.
 - [ ] Computed CSS property — `toHaveCSS()`.
 - [ ] DOM id — `toHaveId()`.
 - [ ] JavaScript property — `toHaveJSProperty()`.
 - [ ] ARIA role — `toHaveRole()`.
-- [ ] Multiple selected values — `toHaveValues()`.
+- [x] Multiple selected values — `toHaveValues()` (shipped as
+  `toHaveSelectedOptions()` in v0.1.14).
 - [ ] ARIA snapshot — `toMatchAriaSnapshot()`.
 
 ### Partial parity to finish while adding commands

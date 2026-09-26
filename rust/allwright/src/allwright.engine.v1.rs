@@ -240,6 +240,37 @@ pub struct ChromeLaunchedEvent {
     #[prost(string, tag = "5")]
     pub initial_page_session_id: ::prost::alloc::string::String,
 }
+/// Register before the triggering action; wait returns a pending JavaScript dialog.
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct RegisterDialogHook {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DialogHookResult {
+    #[prost(string, tag = "1")]
+    pub dialog_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub r#type: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub message: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub default_value: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct HandleDialogCommand {
+    #[prost(string, tag = "1")]
+    pub dialog_id: ::prost::alloc::string::String,
+    #[prost(bool, tag = "2")]
+    pub accept: bool,
+    #[prost(string, optional, tag = "3")]
+    pub prompt_text: ::core::option::Option<::prost::alloc::string::String>,
+    /// A single-attempt deadline, not a retry request.
+    #[prost(message, optional, tag = "4")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DialogHandledEvent {
+    #[prost(string, tag = "1")]
+    pub dialog_id: ::prost::alloc::string::String,
+}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct RegisterNewPageHook {}
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -449,7 +480,7 @@ pub struct ContextSessionCommand {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_command::Command",
-        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27"
+        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28"
     )]
     pub command: ::core::option::Option<context_session_command::Command>,
 }
@@ -507,6 +538,8 @@ pub mod context_session_command {
         ResolveFrame(super::ResolveFrameCommand),
         #[prost(message, tag = "27")]
         Capture(super::CaptureCommand),
+        #[prost(message, tag = "28")]
+        HandleDialog(super::HandleDialogCommand),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -522,7 +555,7 @@ pub struct ContextSessionEvent {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_event::Event",
-        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29"
+        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30"
     )]
     pub event: ::core::option::Option<context_session_event::Event>,
 }
@@ -586,6 +619,8 @@ pub mod context_session_event {
         FrameResolved(super::FrameResolvedEvent),
         #[prost(message, tag = "29")]
         CaptureResolved(super::CaptureResolvedEvent),
+        #[prost(message, tag = "30")]
+        DialogHandled(super::DialogHandledEvent),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -610,7 +645,7 @@ pub struct ContextSessionErrorEvent {
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct RegisterHookCommand {
-    #[prost(oneof = "register_hook_command::Hook", tags = "1, 2, 3, 4, 5")]
+    #[prost(oneof = "register_hook_command::Hook", tags = "1, 2, 3, 4, 5, 6")]
     pub hook: ::core::option::Option<register_hook_command::Hook>,
 }
 /// Nested message and enum types in `RegisterHookCommand`.
@@ -627,6 +662,8 @@ pub mod register_hook_command {
         MobileFileChooser(super::RegisterMobileFileChooserHook),
         #[prost(message, tag = "5")]
         MobileDownload(super::RegisterMobileDownloadHook),
+        #[prost(message, tag = "6")]
+        Dialog(super::RegisterDialogHook),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -645,7 +682,7 @@ pub struct HookRegisteredEvent {
 pub struct HookCompletedEvent {
     #[prost(string, tag = "1")]
     pub hook_id: ::prost::alloc::string::String,
-    #[prost(oneof = "hook_completed_event::Result", tags = "2, 3, 4, 5, 6")]
+    #[prost(oneof = "hook_completed_event::Result", tags = "2, 3, 4, 5, 6, 7")]
     pub result: ::core::option::Option<hook_completed_event::Result>,
 }
 /// Nested message and enum types in `HookCompletedEvent`.
@@ -662,6 +699,8 @@ pub mod hook_completed_event {
         MobileFileChooser(super::MobileFileChooserHookResult),
         #[prost(message, tag = "6")]
         MobileDownload(super::MobileDownloadHookResult),
+        #[prost(message, tag = "7")]
+        Dialog(super::DialogHookResult),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

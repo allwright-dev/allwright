@@ -1,6 +1,13 @@
 package dev.allwright.client;
 
 public final class Hooks {
+    public static final HookType<Dialog> DIALOG = new HookType<>("dialog", (page, event) -> {
+        if (!event.hasDialog() || event.getDialog().getDialogId().isBlank()) {
+            throw new AllwrightException("dialog hook completed with an invalid result");
+        }
+        var d = event.getDialog();
+        return new Dialog((Page) page, d.getDialogId(), d.getType(), d.getMessage(), d.getDefaultValue());
+    });
     public static final HookType<Page> NEW_PAGE = new HookType<>("new_page", (page, event) -> {
         if (!event.hasNewPage() || event.getNewPage().getContextSessionId().isBlank()) {
             throw new AllwrightException("new page hook completed with an invalid result");

@@ -25,6 +25,18 @@ class Hook(Generic[T]):
         return self._page._wait_for_hook(self.id, self.type, options)
 
 
+class Dialog:
+    def __init__(self, page: Page, dialog_id: str, kind: str, message: str, default_value: str) -> None:
+        self.page, self.id, self.type = page, dialog_id, kind
+        self.message, self.default_value = message, default_value
+
+    def accept(self, prompt_text: str | None = None, options: CommandOptions | None = None) -> None:
+        self.page._handle_dialog(self.id, True, prompt_text, options)
+
+    def dismiss(self, options: CommandOptions | None = None) -> None:
+        self.page._handle_dialog(self.id, False, None, options)
+
+
 class FileChooser:
     def __init__(self, page: Page, file_chooser_id: str, is_multiple: bool) -> None:
         self.page = page
@@ -64,11 +76,13 @@ class Download:
 
 
 class _Hooks:
+    dialog: HookType[Dialog]
     new_page: HookType[Page]
     file_chooser: HookType[FileChooser]
     download: HookType[Download]
 
     def __init__(self) -> None:
+        self.dialog = HookType("dialog")
         self.new_page = HookType("new_page")
         self.file_chooser = HookType("file_chooser")
         self.download = HookType("download")

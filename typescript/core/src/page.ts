@@ -15,6 +15,7 @@ import type {
   ElementResult,
   FillResult,
   FileChooser,
+  Dialog,
   Download,
   HighlightOptions,
   HighlightResult,
@@ -71,7 +72,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
   }
 
   async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
-    if (type.name !== "newPage" && type.name !== "fileChooser" && type.name !== "download") {
+    if (type.name !== "dialog" && type.name !== "newPage" && type.name !== "fileChooser" && type.name !== "download") {
       throw formatActionError("register hook", `unsupported hook type: ${type.name}`);
     }
     const handle = await this.#getHandle();
@@ -79,11 +80,8 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     handle.stream.write({
       surfaceSessionId: this.browserSessionId,
       contextSessionId: this.sessionId,
-      registerHook: type.name === "newPage"
-        ? { newPage: {} }
-        : type.name === "fileChooser"
-          ? { fileChooser: {} }
-          : { download: {} },
+      registerHook: type.name === "dialog" ? { dialog: {} } : type.name === "newPage"
+        ? { newPage: {} } : type.name === "fileChooser" ? { fileChooser: {} } : { download: {} },
     });
 
     while (true) {
@@ -110,13 +108,22 @@ export class PageImpl extends WebLocatorBuilders implements Page {
       contextSessionId: this.sessionId,
       waitForHook: {
         hookId,
-        retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
+        retryOptions: options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });
 
     while (true) {
       const event = await handle.queue.next();
       if (event.hookCompleted?.hookId === hookId) {
+        if (type.name === "dialog" && event.hookCompleted.dialog?.dialogId) {
+          const result = event.hookCompleted.dialog;
+          const id = result.dialogId!;
+          return {
+            id, page: this, type: result.type ?? "", message: result.message ?? "", defaultValue: result.defaultValue ?? "",
+            accept: (promptText?: string, options: CommandOptions = {}) => this.#handleDialog(id, true, promptText, options),
+            dismiss: (options: CommandOptions = {}) => this.#handleDialog(id, false, undefined, options),
+          } satisfies Dialog as T;
+        }
         if (type.name === "newPage" && event.hookCompleted.newPage?.contextSessionId) {
           return this.#createPage(event.hookCompleted.newPage.contextSessionId) as T;
         }
@@ -140,6 +147,21 @@ export class PageImpl extends WebLocatorBuilders implements Page {
       if (event.error?.message) {
         throw formatActionError(`wait for ${type.name} hook`, event.error.message);
       }
+    }
+  }
+
+  async #handleDialog(dialogId: string, accept: boolean, promptText: string | undefined, options: CommandOptions): Promise<void> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({ surfaceSessionId: this.browserSessionId, contextSessionId: this.sessionId,
+      handleDialog: { dialogId, accept, promptText,
+        ...(options.timeoutMs !== undefined ? { retryOptions: { timeoutMs: options.timeoutMs } } : {}),
+      } });
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.dialogHandled?.dialogId === dialogId) return;
+      if (event.error?.message) throw formatActionError("handle dialog", event.error.message);
+      if (event.closed) { handle.closed = true; throw new Error("page closed while handling dialog"); }
     }
   }
 

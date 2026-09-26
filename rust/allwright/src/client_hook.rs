@@ -40,6 +40,102 @@ mod private {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
+pub struct DialogHook;
+pub const DIALOG: DialogHook = DialogHook;
+impl HookType for DialogHook {
+    type Output = Dialog;
+}
+impl private::Sealed for DialogHook {
+    fn name() -> &'static str {
+        "dialog"
+    }
+    fn decode(page: &Tab, result: HookCompletionResult) -> Result<Dialog> {
+        let HookCompletionResult::Dialog(d) = result else {
+            return Err(Error::new("invalid dialog hook result"));
+        };
+        Ok(Dialog {
+            page: page.clone(),
+            id: d.dialog_id,
+            kind: d.r#type,
+            message: d.message,
+            default_value: d.default_value,
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct Dialog {
+    page: Tab,
+    pub id: String,
+    pub kind: String,
+    pub message: String,
+    pub default_value: String,
+}
+impl Dialog {
+    pub fn page(&self) -> &Tab {
+        &self.page
+    }
+    pub async fn accept(&self, prompt_text: Option<&str>) -> Result<()> {
+        self.accept_with_options(prompt_text, CommandOptions::default())
+            .await
+    }
+    pub async fn dismiss(&self) -> Result<()> {
+        self.dismiss_with_options(CommandOptions::default()).await
+    }
+    pub async fn accept_with_options(
+        &self,
+        prompt_text: Option<&str>,
+        options: CommandOptions,
+    ) -> Result<()> {
+        self.handle(true, prompt_text, options).await
+    }
+    pub async fn dismiss_with_options(&self, options: CommandOptions) -> Result<()> {
+        self.handle(false, None, options).await
+    }
+    async fn handle(
+        &self,
+        accept: bool,
+        prompt_text: Option<&str>,
+        options: CommandOptions,
+    ) -> Result<()> {
+        let mut state = self.page.inner.state.lock().await;
+        let handle = self.page.ensure_handle(&mut state).await?;
+        ensure_tab_open(handle, &self.page.inner.session_id)?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.page.inner.surface_session_id.clone(),
+                context_session_id: self.page.inner.session_id.clone(),
+                command: Some(ContextCommand::HandleDialog(
+                    crate::proto::HandleDialogCommand {
+                        dialog_id: self.id.clone(),
+                        accept,
+                        prompt_text: prompt_text.map(str::to_owned),
+                        retry_options: command_retry_options(options.timeout_ms),
+                    },
+                )),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send HandleDialogCommand"))?;
+        loop {
+            let event = handle
+                .events
+                .message()
+                .await?
+                .ok_or_else(|| Error::new("page closed while handling dialog"))?;
+            match event.event {
+                Some(ContextEvent::DialogHandled(d)) if d.dialog_id == self.id => return Ok(()),
+                Some(ContextEvent::Error(e)) => return Err(Error::new(e.message)),
+                Some(ContextEvent::Closed(_)) => {
+                    return Err(Error::new("page closed while handling dialog"));
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
 pub struct NewPage;
 
 pub const NEW_PAGE: NewPage = NewPage;
@@ -462,6 +558,7 @@ impl Tab {
                 command: Some(ContextCommand::RegisterHook(RegisterHookCommand {
                     hook: match T::name() {
                         "new_page" => Some(RegisterHook::NewPage(RegisterNewPageHook {})),
+                        "dialog" => Some(RegisterHook::Dialog(crate::proto::RegisterDialogHook {})),
                         "file_chooser" => {
                             Some(RegisterHook::FileChooser(RegisterFileChooserHook {}))
                         }

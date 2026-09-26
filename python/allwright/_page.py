@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, TypeVar
 
 from ._locator import Locator
-from ._hooks import Download, FileChooser, Hook, HookType
+from ._hooks import Dialog, Download, FileChooser, Hook, HookType
 from ._proto import engine_pb2
 from ._selectors import normalize_selector_for_transport
 from ._transport import RuntimeClient, StreamHandle
@@ -86,13 +86,37 @@ class Page(WebLocators):
                     self._closed = True
                     raise AllwrightError("page closed while resolving frame")
 
+    def _handle_dialog(self, dialog_id: str, accept: bool, prompt_text: str | None = None, options: CommandOptions | None = None) -> None:
+        from ._runtime import retry_options
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            command = engine_pb2.HandleDialogCommand(dialog_id=dialog_id, accept=accept,
+                retry_options=retry_options((options or CommandOptions()).timeout_ms))
+            if prompt_text is not None:
+                command.prompt_text = prompt_text
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self.surface_session_id, context_session_id=self.session_id,
+                handle_dialog=command))
+            while True:
+                event = handle.recv("handle dialog")
+                if event.WhichOneof("event") == "dialog_handled" and event.dialog_handled.dialog_id == dialog_id:
+                    return
+                if event.WhichOneof("event") == "error":
+                    raise AllwrightError(event.error.message)
+                if event.WhichOneof("event") == "closed":
+                    self._closed = True
+                    raise AllwrightError("page closed while handling dialog")
+
     def register_hook(self, hook_type: HookType[T]) -> Hook[T]:
         with self._lock:
             handle = self._ensure_handle()
             self._ensure_open()
-            if hook_type.name not in {"new_page", "file_chooser", "download"}:
+            if hook_type.name not in {"dialog", "new_page", "file_chooser", "download"}:
                 raise AllwrightError(f"unsupported hook type: {hook_type.name}")
-            if hook_type.name == "new_page":
+            if hook_type.name == "dialog":
+                register_hook = engine_pb2.RegisterHookCommand(dialog=engine_pb2.RegisterDialogHook())
+            elif hook_type.name == "new_page":
                 register_hook = engine_pb2.RegisterHookCommand(
                     new_page=engine_pb2.RegisterNewPageHook()
                 )
@@ -158,6 +182,9 @@ class Page(WebLocators):
                                 else Page(self._runtime, self.surface_session_id, session_id)
                             )
                             return page  # type: ignore[return-value]
+                        if hook_type.name == "dialog" and completed.WhichOneof("result") == "dialog":
+                            d = completed.dialog
+                            return Dialog(self, d.dialog_id, d.type, d.message, d.default_value)  # type: ignore[return-value]
                         if hook_type.name == "file_chooser" and completed.WhichOneof("result") == "file_chooser":
                             return FileChooser(
                                 self,

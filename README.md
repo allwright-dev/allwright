@@ -249,9 +249,33 @@ await download.saveAs(`artifacts/${download.suggestedFilename}`);
 Android uploads currently support the system DocumentsUI picker with one file.
 Android downloads observe files created in the device's public Downloads directory.
 
+JavaScript alerts, confirms, and prompts use the same typed hook lifecycle:
+
+```ts
+const dialogHook = await page.registerHook(hooks.dialog);
+await page.click("#ask-name");
+const dialog = await dialogHook.wait({ timeoutMs: 5_000 });
+console.log(dialog.type, dialog.message, dialog.defaultValue);
+await dialog.accept("Ada", { timeoutMs: 5_000 }); // or accept() to keep the default
+// await dialog.dismiss({ timeoutMs: 5_000 });
+```
+
+Register before triggering the dialog. Click, press, fill, focus, and hover
+input actions yield when a dialog opens; handle it before further page actions. Hooks are one-shot and page-scoped; only
+one dialog hook/pending dialog is allowed per page. Waiting and accept/dismiss
+support command timeouts. Registration intentionally does not: cancelling setup
+can orphan a browser subscription. Handling is single-attempt even when a
+timeout is supplied, so it can never be replayed against a later dialog. Explicit
+empty prompt text clears the default. Text is only valid when accepting a prompt. Unhandled
+JavaScript dialogs remain open; always register and handle expected dialogs.
+Navigation-triggered and before-unload dialogs are not covered by this input-action flow.
+
+Other clients expose `hooks.dialog` (Python), `Hooks.DIALOG` (Java),
+`Hooks.Dialog` (Go), and `DIALOG` (Rust). Rust accepts `Option<&str>`; other
+clients accept optional prompt text. Android dialog hooks are not supported.
+
 Hook registration and waiting are generic engine operations. New-page,
-file-chooser, and download hook types/results remain owned by their surface;
-future dialog hooks can use the same lifecycle without adding per-event methods.
+file-chooser, download, and dialog hook types/results remain owned by their surface.
 
 Iframes resolve to normal pages, including nested and cross-origin frames:
 

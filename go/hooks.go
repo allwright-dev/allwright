@@ -468,10 +468,19 @@ func (h *Hook[T]) ID() string {
 }
 
 var Hooks = struct {
+	Dialog      HookType[*Dialog]
 	NewPage     HookType[*Page]
 	FileChooser HookType[*FileChooser]
 	Download    HookType[*Download]
 }{
+	Dialog: HookType[*Dialog]{name: "dialog", decode: func(owner any, completed *enginev1.HookCompletedEvent) (*Dialog, error) {
+		page, ok := owner.(*Page)
+		d := completed.GetDialog()
+		if !ok || d == nil || d.GetDialogId() == "" {
+			return nil, fmt.Errorf("dialog hook completed with an invalid result")
+		}
+		return &Dialog{page: page, id: d.GetDialogId(), kind: d.GetType(), message: d.GetMessage(), defaultValue: d.GetDefaultValue()}, nil
+	}},
 	NewPage: HookType[*Page]{
 		name: "new_page",
 		decode: func(context any, completed *enginev1.HookCompletedEvent) (*Page, error) {
@@ -551,11 +560,13 @@ func RegisterHook[T any](ctx context.Context, owner HookOwner, hookType HookType
 	if page.closed {
 		return nil, fmt.Errorf("page session %s is closed", page.sessionID)
 	}
-	if hookType.name != "new_page" && hookType.name != "file_chooser" && hookType.name != "download" {
+	if hookType.name != "dialog" && hookType.name != "new_page" && hookType.name != "file_chooser" && hookType.name != "download" {
 		return nil, fmt.Errorf("unsupported hook type: %s", hookType.name)
 	}
 	registerHook := &enginev1.RegisterHookCommand{}
-	if hookType.name == "new_page" {
+	if hookType.name == "dialog" {
+		registerHook.Hook = &enginev1.RegisterHookCommand_Dialog{Dialog: &enginev1.RegisterDialogHook{}}
+	} else if hookType.name == "new_page" {
 		registerHook.Hook = &enginev1.RegisterHookCommand_NewPage{NewPage: &enginev1.RegisterNewPageHook{}}
 	} else if hookType.name == "file_chooser" {
 		registerHook.Hook = &enginev1.RegisterHookCommand_FileChooser{FileChooser: &enginev1.RegisterFileChooserHook{}}

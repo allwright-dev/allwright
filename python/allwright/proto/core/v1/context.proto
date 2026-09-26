@@ -39,6 +39,7 @@ message ContextSessionCommand {
     SaveMobileDownloadCommand save_mobile_download = 25;
     ResolveFrameCommand resolve_frame = 26;
     CaptureCommand capture = 27;
+    HandleDialogCommand handle_dialog = 28;
   }
 }
 
@@ -80,6 +81,7 @@ message ContextSessionEvent {
     MobileDownloadSavedEvent mobile_download_saved = 27;
     FrameResolvedEvent frame_resolved = 28;
     CaptureResolvedEvent capture_resolved = 29;
+    DialogHandledEvent dialog_handled = 30;
   }
 }
 
@@ -106,6 +108,7 @@ message RegisterHookCommand {
     RegisterDownloadHook download = 3;
     RegisterMobileFileChooserHook mobile_file_chooser = 4;
     RegisterMobileDownloadHook mobile_download = 5;
+    RegisterDialogHook dialog = 6;
   }
 }
 
@@ -127,6 +130,7 @@ message HookCompletedEvent {
     DownloadHookResult download = 4;
     MobileFileChooserHookResult mobile_file_chooser = 5;
     MobileDownloadHookResult mobile_download = 6;
+    DialogHookResult dialog = 7;
   }
 }
 

@@ -105,6 +105,7 @@ pub struct PageInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum HookType {
+    Dialog,
     NewPage,
     FileChooser,
     Download,
@@ -118,9 +119,18 @@ pub struct HookRegistration {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "hook_type", content = "value", rename_all = "snake_case")]
 pub enum HookResult {
+    Dialog(DialogInfo),
     NewPage(PageInfo),
     FileChooser(FileChooserInfo),
     Download(DownloadInfo),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DialogInfo {
+    pub dialog_id: String,
+    pub kind: String,
+    pub message: String,
+    pub default_value: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -261,6 +271,13 @@ pub enum PluginCommand {
         browser_session: BrowserSessionHandle,
         registration: HookRegistration,
     },
+    HandleDialog {
+        browser_session: BrowserSessionHandle,
+        page_session: PageSessionHandle,
+        dialog_id: String,
+        accept: bool,
+        prompt_text: Option<String>,
+    },
     SetFileChooserFiles {
         browser_session: BrowserSessionHandle,
         page_session: PageSessionHandle,
@@ -396,6 +413,7 @@ pub enum PluginResult {
     OpenPage(PageInfo),
     RegisterHook(HookRegistration),
     PollHook(HookResult),
+    HandleDialog,
     SetFileChooserFiles(FileChooserFilesSetInfo),
     SaveDownload(DownloadSavedInfo),
     ClosePage,
@@ -452,6 +470,25 @@ mod tests {
             error: None,
         };
 
+        let json = serde_json::to_string(&envelope).unwrap();
+        assert_eq!(
+            serde_json::from_str::<PluginEnvelope>(&json).unwrap(),
+            envelope
+        );
+    }
+
+    #[test]
+    fn dialog_hook_envelope_round_trips() {
+        let envelope = PluginEnvelope {
+            ok: true,
+            result: Some(PluginResult::PollHook(HookResult::Dialog(DialogInfo {
+                dialog_id: "dialog-1".into(),
+                kind: "prompt".into(),
+                message: "Name?".into(),
+                default_value: "Ada".into(),
+            }))),
+            error: None,
+        };
         let json = serde_json::to_string(&envelope).unwrap();
         assert_eq!(
             serde_json::from_str::<PluginEnvelope>(&json).unwrap(),

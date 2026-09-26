@@ -40,6 +40,23 @@ message ChromeLaunchedEvent {
   string initial_page_session_id = 5;
 }
 
+// Register before the triggering action; wait returns a pending JavaScript dialog.
+message RegisterDialogHook {}
+message DialogHookResult {
+  string dialog_id = 1;
+  string type = 2;
+  string message = 3;
+  string default_value = 4;
+}
+message HandleDialogCommand {
+  string dialog_id = 1;
+  bool accept = 2;
+  optional string prompt_text = 3;
+  // A single-attempt deadline, not a retry request.
+  optional CommandRetryOptions retry_options = 4;
+}
+message DialogHandledEvent { string dialog_id = 1; }
+
 message RegisterNewPageHook {}
 
 message NewPageHookResult {
