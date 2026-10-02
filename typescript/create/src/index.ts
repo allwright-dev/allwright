@@ -13,12 +13,13 @@ const PACKAGE_VERSION = getPackageVersion();
 const ALLWRIGHT_VERSION = `^${PACKAGE_VERSION}`;
 
 type Language = "ts" | "js";
-type SurfaceId = "web" | "mobile-android";
+type SurfaceId = "web" | "mobile-android" | "mobile-ios";
 type PackageManager = "bun" | "npm" | "pnpm" | "yarn";
 
 const SURFACE_OPTIONS: Array<{ label: string; value: SurfaceId }> = [
   { label: "Web", value: "web" },
   { label: "Mobile Android", value: "mobile-android" },
+  { label: "Mobile iOS", value: "mobile-ios" },
 ];
 
 interface InitOptions {
@@ -121,6 +122,10 @@ function parseArgs(args: string[]): InitOptions {
       case "--mobile-android":
         options.surfaces.push("mobile-android");
         break;
+      case "--mobile-ios":
+      case "--ios":
+        options.surfaces.push("mobile-ios");
+        break;
       case "--both":
         options.surfaces.push("web", "mobile-android");
         break;
@@ -181,7 +186,11 @@ async function selectSurfaces(interactive: boolean): Promise<SurfaceId[]> {
     message: "Which surfaces would you like to test?",
     options: SURFACE_OPTIONS.map((surface) => ({
       ...surface,
-      hint: surface.value === "web" ? "browser automation" : "Android app automation",
+      hint: surface.value === "web"
+        ? "browser automation"
+        : surface.value === "mobile-android"
+          ? "Android app automation"
+          : "iOS Simulator automation",
     })),
     required: true,
   });
@@ -267,7 +276,11 @@ function buildProjectFiles(input: {
   }
 
   if (hasSurface(surfaces, "mobile-android")) {
-    files[`tests/mobile.spec.${extension}`] = mobileSpecContents(language);
+    files[`tests/mobile.spec.${extension}`] = androidSpecContents(language);
+  }
+
+  if (hasSurface(surfaces, "mobile-ios")) {
+    files[`tests/ios.spec.${extension}`] = iosSpecContents(language);
   }
 
   return files;
@@ -353,13 +366,23 @@ function allwrightConfigContents(surfaces: SurfaceId[]): string {
     lines.push("    name: chromium");
   }
 
-  if (hasSurface(surfaces, "mobile-android")) {
+  if (hasSurface(surfaces, "mobile-android") || hasSurface(surfaces, "mobile-ios")) {
     lines.push("");
     lines.push("mobile:");
+  }
+
+  if (hasSurface(surfaces, "mobile-android")) {
     lines.push("  android:");
     lines.push("    app:");
     lines.push("      id: com.example.airticket");
     lines.push('      binary: "https://allwright.dev/Flights-debug.apk"');
+  }
+
+  if (hasSurface(surfaces, "mobile-ios")) {
+    lines.push("  ios:");
+    lines.push("    app:");
+    lines.push("      id: com.sedinqa.Flights");
+    lines.push('      binary: "https://allwright.dev/Flights-simulator.ipa"');
   }
 
   lines.push("");
@@ -391,7 +414,7 @@ test("opens the Form Inputs page", { timeout: 30_000 }, async ({ page }) => {
 `;
 }
 
-function mobileSpecContents(language: Language): string {
+function androidSpecContents(language: Language): string {
   const importLine =
     language === "ts"
       ? 'import { test } from "@allwright.dev/vitest";'
@@ -407,21 +430,45 @@ test("opens the Android demo app and navigates to sign up", { timeout: 180_000 }
 `;
 }
 
+function iosSpecContents(language: Language): string {
+  const importLine =
+    language === "ts"
+      ? 'import { expect, test } from "@allwright.dev/vitest";'
+      : 'import { expect, test } from "@allwright.dev/vitest";';
+
+  return `${importLine}
+
+test("opens the iOS Flights demo app", { timeout: 180_000 }, async ({ iosApp }) => {
+  await iosApp.locator("text=Login").click();
+  await expect(iosApp.locator("text=Welcome back")).toBeVisible();
+});
+`;
+}
+
 function generatedReadmeContents(surfaces: SurfaceId[]): string {
   const nextSteps = [
     "## Next steps",
     "",
     "1. Run `npm install`.",
-    "2. Run `npm test`.",
   ];
+  let step = 2;
 
   if (hasSurface(surfaces, "mobile-android")) {
     nextSteps.push(
-      "3. Start an Android emulator or connect a device with USB debugging enabled.",
-      "4. Confirm it is visible with `adb devices -l`, then run `npm test`.",
-      "5. The first Android run downloads and installs the Airticket demo app configured in `allwright.config.yaml`.",
+      `${step++}. Start an Android emulator or connect a device with USB debugging enabled.`,
+      `${step++}. Confirm it is visible with \`adb devices -l\`.`,
+      `${step++}. The first Android run downloads and installs the Airticket demo app configured in \`allwright.config.yaml\`.`,
     );
   }
+
+  if (hasSurface(surfaces, "mobile-ios")) {
+    nextSteps.push(
+      `${step++}. Start an iOS Simulator.`,
+      `${step++}. The first iOS run downloads and installs the Flights simulator IPA configured in \`allwright.config.yaml\`; no manual app or agent installation is needed.`,
+    );
+  }
+
+  nextSteps.push(`${step}. Run \`npm test\`.`);
 
   return `# allwright project
 
@@ -454,6 +501,9 @@ function parseSurfaceId(input: string): SurfaceId {
   }
   if (normalized === "mobile" || normalized === "mobile-android" || normalized === "android") {
     return "mobile-android";
+  }
+  if (normalized === "mobile-ios" || normalized === "ios") {
+    return "mobile-ios";
   }
   throw new Error(`Unknown surface: ${input}`);
 }
@@ -558,6 +608,9 @@ function printSummary(
   }
   if (hasSurface(surfaces, "mobile-android")) {
     console.log("  adb devices -l");
+  }
+  if (hasSurface(surfaces, "mobile-ios")) {
+    console.log("  xcrun simctl list devices available");
   }
   console.log(`${packageManager === "npm" ? "  npm test" : `  ${packageManager} test`}`);
 }

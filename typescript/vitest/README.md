@@ -119,7 +119,7 @@ mobile:
   ios:
     device: iPhone 17 Pro
     app:
-      binary: https://artifacts.example.test/Flights-simulator.zip
+      binary: https://allwright.dev/Flights-simulator.ipa
 ```
 
 Set `ALLWRIGHT_IOS_AGENT_ENDPOINT` when the agent is not reachable at

@@ -44,12 +44,13 @@ Connect through a high-level client. TypeScript example:
 
    const device = await mobile.ios.connect({ device: "iPhone 17 Pro" });
    const app = await device.launch({
-     appPath: "https://example.test/MyApp-simulator.zip",
+     appPath: "https://allwright.dev/Flights-simulator.ipa",
    });
-   await app.locator("id=sign-in").click();
+   await app.locator("text=Login").click();
    ```
 
-`appPath` accepts a local `.app` directory, a local `.zip`/`.ipa` archive, or
+The public sample IPA contains a universal (`arm64` and `x86_64`) Simulator
+build. `appPath` accepts a local `.app` directory, a local `.zip`/`.ipa` archive, or
 an HTTP(S) archive URL. The plugin downloads and extracts archives, installs the
 app on the selected simulator, reads its bundle identifier, and launches it.
 `appId` is optional when `appPath` is present; when both are present they must

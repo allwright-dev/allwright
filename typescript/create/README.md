@@ -15,7 +15,7 @@ npm create allwright@latest
 The initializer prompts for:
 
 - `TypeScript` or `JavaScript`
-- one or more surfaces such as `Web` and `Mobile Android`
+- one or more surfaces such as `Web`, `Mobile Android`, and `Mobile iOS`
 - an optional target directory
 
 It scaffolds a Node project with `package.json`, Vitest config, shared allwright config, starter tests, and a short README for the generated app.

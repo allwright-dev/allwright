@@ -1,13 +1,13 @@
 import { mobile, shutdown } from "../dist/index.js";
 
 async function main(): Promise<void> {
-  const appPath = process.env.ALLWRIGHT_IOS_APP_PATH;
+  const appPath = process.env.ALLWRIGHT_IOS_APP_PATH ?? "https://allwright.dev/Flights-simulator.ipa";
   const device = await mobile.ios.connect({
     agentEndpoint: process.env.ALLWRIGHT_IOS_AGENT_ENDPOINT ?? "http://127.0.0.1:8100",
   });
   const app = await device.launch({
     appPath,
-    appId: process.env.ALLWRIGHT_IOS_APP_ID ?? (appPath ? undefined : "com.sedinqa.Flights"),
+    appId: process.env.ALLWRIGHT_IOS_APP_ID,
     stopBeforeLaunch: true,
   });
 
