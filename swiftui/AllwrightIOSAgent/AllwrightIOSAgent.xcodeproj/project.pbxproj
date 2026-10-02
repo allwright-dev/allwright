@@ -6,16 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXContainerItemProxy section */
-		282592543042DD6B002C8CF8 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 282592343042DCB4002C8CF8 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 2825923B3042DCB4002C8CF8;
-			remoteInfo = AllwrightIOSAgent;
-		};
-/* End PBXContainerItemProxy section */
-
 /* Begin PBXFileReference section */
 		2825923C3042DCB4002C8CF8 /* AllwrightIOSAgent.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AllwrightIOSAgent.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2825924E3042DD6B002C8CF8 /* AllwrightAgentUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AllwrightAgentUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -106,7 +96,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				282592553042DD6B002C8CF8 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				2825924F3042DD6B002C8CF8 /* AllwrightAgentUITests */,
@@ -133,7 +122,6 @@
 					};
 					2825924D3042DD6B002C8CF8 = {
 						CreatedOnToolsVersion = 26.2;
-						TestTargetID = 2825923B3042DCB4002C8CF8;
 					};
 				};
 			};
@@ -190,14 +178,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXTargetDependency section */
-		282592553042DD6B002C8CF8 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 2825923B3042DCB4002C8CF8 /* AllwrightIOSAgent */;
-			targetProxy = 282592543042DD6B002C8CF8 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		282592453042DCB5002C8CF8 /* Debug */ = {
@@ -396,7 +376,6 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = AllwrightIOSAgent;
 			};
 			name = Debug;
 		};
@@ -415,7 +394,6 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = AllwrightIOSAgent;
 			};
 			name = Release;
 		};

@@ -11,6 +11,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         platform: MobilePlatform::Android,
         device: args.device,
         adb_endpoint: args.adb_endpoint,
+        agent_endpoint: None,
         preserve_app_state: false,
         timeout_ms: Some(10_000),
     })?;

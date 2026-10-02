@@ -22,6 +22,9 @@ import type {
   MobileAndroidLaunchOptions,
   MobileAndroidLocator,
   MobileAndroidApp,
+  MobileIosConnectOptions,
+  MobileIosDevice,
+  MobileIosLaunchOptions,
   MobileSurfaceNamespace,
   PageHandle,
   PressOptions,
@@ -696,6 +699,53 @@ class MobileAndroidDeviceImpl implements MobileAndroidDevice {
   }
 }
 
+class MobileIosDeviceImpl implements MobileIosDevice {
+  #stream: SurfaceSessionStream;
+  #queue: EventQueue<SurfaceSessionEvent>;
+  #closed = false;
+  #currentApp: MobileAndroidApp;
+
+  constructor(
+    readonly sessionId: string,
+    private readonly surfaceSessionId: string,
+    private readonly runtime: RuntimeClient,
+    stream: Awaited<ReturnType<typeof createBrowserSessionHandle>>["stream"],
+    queue: Awaited<ReturnType<typeof createBrowserSessionHandle>>["queue"],
+    initialAppSessionId: string,
+  ) {
+    this.#stream = stream;
+    this.#queue = queue;
+    this.#currentApp = new MobileAndroidAppImpl(runtime, surfaceSessionId, initialAppSessionId);
+  }
+
+  app(): MobileAndroidApp { return this.#currentApp; }
+  initialApp(): MobileAndroidApp { return this.#currentApp; }
+
+  async launch(options: MobileIosLaunchOptions = {}): Promise<MobileAndroidApp> {
+    if (this.#closed) throw new Error(`ios device session ${this.sessionId} is closed`);
+    this.#stream.write({
+      launchApp: {
+        apkPath: options.appPath,
+        appId: options.appId,
+        stopBeforeLaunch: options.stopBeforeLaunch ?? false,
+        retryOptions: retryOptions(options.timeoutMs),
+      },
+    });
+    while (true) {
+      const event = await this.#queue.next();
+      if (event.appLaunched?.appSessionId) {
+        this.#currentApp = new MobileAndroidAppImpl(this.runtime, this.surfaceSessionId, event.appLaunched.appSessionId);
+        return this.#currentApp;
+      }
+      if (event.error?.message) throw new Error(event.error.message);
+      if (event.closed) {
+        this.#closed = true;
+        throw new Error(`ios device session ${this.sessionId} closed while launching app`);
+      }
+    }
+  }
+}
+
 class MobileAndroidSurfaceImpl {
   async connect(options: MobileAndroidConnectOptions = {}): Promise<MobileAndroidDevice> {
     const runtime = await getRuntime();
@@ -729,6 +779,39 @@ class MobileAndroidSurfaceImpl {
   }
 }
 
+class MobileIosSurfaceImpl {
+  async connect(options: MobileIosConnectOptions = {}): Promise<MobileIosDevice> {
+    const runtime = await getRuntime();
+    const { stream, queue } = await createBrowserSessionHandle(runtime);
+    stream.write({
+      connectMobile: {
+        platform: 2,
+        device: options.device,
+        // The protobuf slot is transport-internal and shared with the older
+        // Android endpoint field; the public iOS API names it accurately.
+        adbEndpoint: options.agentEndpoint,
+        preserveAppState: options.preserveAppState ?? false,
+        retryOptions: retryOptions(options.timeoutMs),
+      },
+    });
+    while (true) {
+      const event: SurfaceSessionEvent = await queue.next();
+      if (event.mobileConnected?.initialAppSessionId) {
+        return new MobileIosDeviceImpl(
+          event.mobileConnected.deviceSessionId ?? event.sessionId ?? "",
+          event.sessionId ?? "",
+          runtime,
+          stream,
+          queue,
+          event.mobileConnected.initialAppSessionId,
+        );
+      }
+      if (event.error?.message) throw new Error(event.error.message);
+    }
+  }
+}
+
 export const mobile: MobileSurfaceNamespace = {
   android: new MobileAndroidSurfaceImpl(),
+  ios: new MobileIosSurfaceImpl(),
 };

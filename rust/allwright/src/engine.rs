@@ -556,6 +556,9 @@ async fn handle_browser_command(
                     platform: mobile_platform_from_proto(platform)?,
                     device: device.clone(),
                     adb_endpoint: adb_endpoint.clone(),
+                    // This protobuf field predates the iOS surface. It stays an
+                    // internal transport slot; iOS clients name it agent_endpoint.
+                    agent_endpoint: adb_endpoint.clone(),
                     preserve_app_state,
                     timeout_ms: retry_options
                         .as_ref()

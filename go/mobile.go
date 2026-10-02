@@ -26,6 +26,20 @@ type MobileAndroidLaunchOptions struct {
 	Timeout          uint32
 }
 
+type MobileIOSConnectOptions struct {
+	Device           string
+	AgentEndpoint    string
+	PreserveAppState bool
+	Timeout          uint32
+}
+
+type MobileIOSLaunchOptions struct {
+	AppPath          string
+	AppID            string
+	StopBeforeLaunch bool
+	Timeout          uint32
+}
+
 type mobileSelectorFlavor string
 
 const (
@@ -70,13 +84,20 @@ type AndroidDevice struct {
 }
 
 type AndroidSurface struct{}
+type IOSSurface struct{}
+
+type IOSDevice struct{ android *AndroidDevice }
+type IOSApp = AndroidApp
+type IOSLocator = AndroidLocator
 
 type mobileNamespace struct {
 	Android AndroidSurface
+	IOS     IOSSurface
 }
 
 var Mobile = mobileNamespace{
 	Android: AndroidSurface{},
+	IOS:     IOSSurface{},
 }
 
 func (p *AndroidApp) SessionID() string {
@@ -661,6 +682,72 @@ func (AndroidSurface) Connect(ctx context.Context, options MobileAndroidConnectO
 			return nil, fmt.Errorf("device session error during Android connect: %s", payload.Error.GetMessage())
 		}
 	}
+}
+
+func (IOSSurface) Connect(ctx context.Context, options MobileIOSConnectOptions) (*IOSDevice, error) {
+	runtime, err := getRuntime(ctx)
+	if err != nil {
+		return nil, err
+	}
+	stream, err := runtime.engine.SurfaceSession(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("open iOS surface session stream: %w", err)
+	}
+	if err := stream.Send(&enginev1.SurfaceSessionCommand{
+		Command: &enginev1.SurfaceSessionCommand_ConnectMobile{
+			ConnectMobile: &enginev1.ConnectMobileCommand{
+				Platform:         enginev1.MobilePlatform_MOBILE_PLATFORM_IOS,
+				Device:           optionalString(options.Device),
+				AdbEndpoint:      optionalString(options.AgentEndpoint),
+				PreserveAppState: options.PreserveAppState,
+				RetryOptions:     retryOptionsProto(durationFromOptionalUint32(options.Timeout)),
+			},
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("send iOS ConnectMobileCommand: %w", err)
+	}
+	for {
+		event, err := stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("receive iOS connect event: %w", err)
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.SurfaceSessionEvent_MobileConnected:
+			sessionID := payload.MobileConnected.GetDeviceSessionId()
+			if sessionID == "" {
+				sessionID = event.GetSessionId()
+			}
+			return &IOSDevice{android: &AndroidDevice{
+				runtime: runtime, stream: stream, sessionID: sessionID,
+				surfaceSessionID: event.GetSessionId(),
+				app:              &AndroidApp{runtime: runtime, surfaceSessionID: event.GetSessionId(), sessionID: payload.MobileConnected.GetInitialAppSessionId()},
+			}}, nil
+		case *enginev1.SurfaceSessionEvent_Error:
+			return nil, fmt.Errorf("iOS device session error: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func (d *IOSDevice) SessionID() string {
+	if d == nil {
+		return ""
+	}
+	return d.android.SessionID()
+}
+func (d *IOSDevice) App() *IOSApp {
+	if d == nil {
+		return nil
+	}
+	return d.android.App()
+}
+func (d *IOSDevice) InitialApp() *IOSApp { return d.App() }
+func (d *IOSDevice) Launch(ctx context.Context, options MobileIOSLaunchOptions) (*IOSApp, error) {
+	if d == nil {
+		return nil, fmt.Errorf("ios device is nil")
+	}
+	return d.android.Launch(ctx, MobileAndroidLaunchOptions{
+		APKPath: options.AppPath, AppID: options.AppID, StopBeforeLaunch: options.StopBeforeLaunch, Timeout: options.Timeout,
+	})
 }
 
 func (l *AndroidLocator) App() *AndroidApp {

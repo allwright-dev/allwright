@@ -129,6 +129,10 @@ version = "0.1.15"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
+ "base64 0.22.1",
+ "reqwest",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 

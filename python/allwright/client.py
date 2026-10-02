@@ -12,6 +12,11 @@ from ._mobile import (
     AndroidApp,
     MobileAndroidConnectOptions,
     MobileAndroidLaunchOptions,
+    MobileIosConnectOptions,
+    MobileIosLaunchOptions,
+    IosDevice,
+    IosApp,
+    IosLocator,
     mobile,
 )
 from ._page import Page

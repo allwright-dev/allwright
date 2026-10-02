@@ -59,6 +59,24 @@ class MobileAndroidLaunchOptions:
         self.timeout_ms = timeout_ms
 
 
+class MobileIosConnectOptions:
+    def __init__(self, device: str | None = None, agent_endpoint: str | None = None,
+                 preserve_app_state: bool = False, timeout_ms: int | None = None) -> None:
+        self.device = device
+        self.agent_endpoint = agent_endpoint
+        self.preserve_app_state = preserve_app_state
+        self.timeout_ms = timeout_ms
+
+
+class MobileIosLaunchOptions:
+    def __init__(self, app_id: str | None = None, stop_before_launch: bool = False,
+                 timeout_ms: int | None = None, app_path: str | None = None) -> None:
+        self.app_id = app_id
+        self.stop_before_launch = stop_before_launch
+        self.timeout_ms = timeout_ms
+        self.app_path = app_path
+
+
 class AndroidApp:
     def __init__(self, runtime: RuntimeClient, surface_session_id: str, session_id: str) -> None:
         self._runtime = runtime
@@ -722,9 +740,51 @@ class AndroidSurface:
                     )
 
 
+IosApp = AndroidApp
+IosLocator = AndroidLocator
+
+
+class IosDevice(AndroidDevice):
+    def launch(self, options: MobileIosLaunchOptions | None = None) -> IosApp:
+        resolved = options or MobileIosLaunchOptions()
+        return super().launch(MobileAndroidLaunchOptions(
+            apk_path=resolved.app_path,
+            app_id=resolved.app_id,
+            stop_before_launch=resolved.stop_before_launch,
+            timeout_ms=resolved.timeout_ms,
+        ))
+
+
+class IosSurface:
+    def connect(self, options: MobileIosConnectOptions | None = None) -> IosDevice:
+        from ._runtime import get_runtime, retry_options
+        runtime = get_runtime()
+        stream = StreamHandle(runtime.stub.SurfaceSession)
+        resolved = options or MobileIosConnectOptions()
+        stream.send(engine_pb2.SurfaceSessionCommand(
+            connect_mobile=engine_pb2.ConnectMobileCommand(
+                platform=engine_pb2.MOBILE_PLATFORM_IOS,
+                device=resolved.device,
+                adb_endpoint=resolved.agent_endpoint,
+                preserve_app_state=resolved.preserve_app_state,
+                retry_options=retry_options(resolved.timeout_ms),
+            )
+        ))
+        while True:
+            event = stream.recv("receive iOS connect event")
+            match event.WhichOneof("event"):
+                case "mobile_connected":
+                    connected = event.mobile_connected
+                    return IosDevice(runtime, stream, connected.device_session_id or event.session_id,
+                                     event.session_id, connected.initial_app_session_id)
+                case "error":
+                    raise AllwrightError(f"iOS device session error: {event.error.message}")
+
+
 class MobileNamespace:
     def __init__(self) -> None:
         self.android = AndroidSurface()
+        self.ios = IosSurface()
 
 
 mobile = MobileNamespace()

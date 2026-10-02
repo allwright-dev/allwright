@@ -255,9 +255,39 @@ export interface MobileAndroidDevice {
   launch(options?: MobileAndroidLaunchOptions): Promise<MobileAndroidApp>;
 }
 
+export interface MobileIosConnectOptions {
+  device?: string;
+  agentEndpoint?: string;
+  preserveAppState?: boolean;
+  timeoutMs?: number;
+}
+
+export interface MobileIosLaunchOptions {
+  appPath?: string;
+  appId?: string;
+  stopBeforeLaunch?: boolean;
+  timeoutMs?: number;
+}
+
+// Mobile contexts intentionally expose one cross-surface action shape. These
+// aliases keep existing Android names source-compatible while iOS uses the
+// same locator/app contract.
+export type MobileIosLocator = MobileAndroidLocator;
+export type MobileIosApp = MobileAndroidApp;
+
+export interface MobileIosDevice {
+  readonly sessionId: string;
+  app(): MobileIosApp;
+  initialApp(): MobileIosApp;
+  launch(options?: MobileIosLaunchOptions): Promise<MobileIosApp>;
+}
+
 export interface MobileSurfaceNamespace {
   android: {
     connect(options?: MobileAndroidConnectOptions): Promise<MobileAndroidDevice>;
+  };
+  ios: {
+    connect(options?: MobileIosConnectOptions): Promise<MobileIosDevice>;
   };
 }
 

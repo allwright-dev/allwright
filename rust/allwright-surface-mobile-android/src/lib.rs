@@ -2558,6 +2558,7 @@ mod tests {
             platform: MobilePlatform::Android,
             device: Some("emulator-5554".to_string()),
             adb_endpoint: None,
+            agent_endpoint: None,
             preserve_app_state: true,
             timeout_ms: Some(5_000),
         };
@@ -2629,6 +2630,7 @@ mod tests {
             platform: MobilePlatform::Android,
             device: Some("R5CX123".to_string()),
             adb_endpoint: None,
+            agent_endpoint: None,
             preserve_app_state: false,
             timeout_ms: None,
         };
@@ -2658,6 +2660,7 @@ mod tests {
             platform: MobilePlatform::Android,
             device: None,
             adb_endpoint: None,
+            agent_endpoint: None,
             preserve_app_state: false,
             timeout_ms: None,
         };
@@ -2686,6 +2689,7 @@ mod tests {
             platform: MobilePlatform::Android,
             device: Some("qa galaxy s24".to_string()),
             adb_endpoint: None,
+            agent_endpoint: None,
             preserve_app_state: false,
             timeout_ms: None,
         };
@@ -2714,6 +2718,7 @@ mod tests {
             platform: MobilePlatform::Android,
             device: Some("missing-device".to_string()),
             adb_endpoint: None,
+            agent_endpoint: None,
             preserve_app_state: false,
             timeout_ms: None,
         };

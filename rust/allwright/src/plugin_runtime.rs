@@ -110,7 +110,7 @@ fn install_plugin_inner(
     ensure_plugin_install_supported(plugin_id)?;
     let target_version = resolve_target_version(package.version, version_override)?;
     let runtime_artifact = plugin_runtime_artifact_path(plugin_id)?;
-    if runtime_artifact.is_file()
+    if plugin_install_is_complete(plugin_id, &runtime_artifact)
         && installed_plugin_version(plugin_id)?.as_deref() == Some(target_version.as_str())
     {
         return Ok(InstalledPlugin {
@@ -136,9 +136,9 @@ fn install_plugin_inner(
     );
     write_installed_plugins(&installed)?;
 
-    if !runtime_artifact.is_file() {
+    if !plugin_install_is_complete(plugin_id, &runtime_artifact) {
         return Err(format!(
-            "plugin `{plugin_id}` installed but runtime artifact is missing at {}",
+            "plugin `{plugin_id}` installed but one or more bundled runtime artifacts are missing under {}",
             runtime_artifact.display()
         ));
     }
@@ -283,7 +283,9 @@ fn install_plugin_package(
         )
     })?;
 
-    if let Some(local_artifact) = repo_local_plugin_artifact_path(plugin_id, version) {
+    if plugin_id != "mobile-ios"
+        && let Some(local_artifact) = repo_local_plugin_artifact_path(plugin_id, version)
+    {
         println!(
             "Using local plugin artifact {} for `{plugin_id}`...",
             local_artifact.display()
@@ -319,8 +321,48 @@ fn install_plugin_package(
             "downloaded plugin `{plugin_id}` from {package_name}@{version} but did not find runtime artifact `{runtime_artifact}`"
         ));
     }
+    if plugin_id == "mobile-ios" && !bundled_ios_agent_is_complete(&install_root) {
+        return Err(format!(
+            "downloaded plugin `mobile-ios` from {package_name}@{version} but its bundled XCUITest runner is incomplete"
+        ));
+    }
     println!("Verified runtime artifact `{runtime_artifact}`.");
     Ok(())
+}
+
+fn plugin_install_is_complete(plugin_id: &str, runtime_artifact: &Path) -> bool {
+    if !runtime_artifact.is_file() {
+        return false;
+    }
+    plugin_id != "mobile-ios"
+        || runtime_artifact
+            .parent()
+            .and_then(Path::parent)
+            .is_some_and(bundled_ios_agent_is_complete)
+}
+
+fn bundled_ios_agent_is_complete(install_root: &Path) -> bool {
+    let agent_root = install_root.join("agent");
+    let has_xctestrun = fs::read_dir(&agent_root)
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .any(|entry| {
+            entry
+                .path()
+                .extension()
+                .is_some_and(|value| value == "xctestrun")
+        });
+    let has_products = fs::read_dir(&agent_root)
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .any(|products| products.join("AllwrightAgentUITests-Runner.app").is_dir());
+    has_xctestrun && has_products
 }
 
 fn resolve_target_version(
@@ -609,10 +651,10 @@ fn repo_local_plugin_artifact_path(plugin_id: &str, version: &str) -> Option<Pat
 }
 
 fn ensure_plugin_install_supported(plugin_id: &str) -> Result<(), String> {
-    match plugin_id {
-        "web" | "mobile-android" => Ok(()),
+    match (plugin_id, env::consts::OS) {
+        ("web" | "mobile-android", _) | ("mobile-ios", "macos") => Ok(()),
         _ => Err(format!(
-            "plugin `{plugin_id}` is not yet installable. Supported standalone runtime artifacts currently ship for `web` and `mobile-android`."
+            "plugin `{plugin_id}` is not installable on this platform. Runtime artifacts ship for `web`, `mobile-android`, and `mobile-ios` on macOS."
         )),
     }
 }
@@ -646,6 +688,7 @@ fn plugin_runtime_artifact_stem(plugin_id: &str) -> Result<&'static str, String>
     match plugin_id {
         "web" => Ok("allwright-surface-web"),
         "mobile-android" => Ok("allwright-surface-mobile-android"),
+        "mobile-ios" => Ok("allwright-surface-mobile-ios"),
         _ => Err(format!(
             "automatic install is not supported for allwright plugin `{plugin_id}`"
         )),
@@ -668,4 +711,33 @@ fn plugin_runtime_artifact_filename(plugin_id: &str) -> Result<String, String> {
 
 fn normalize_release_version(raw: &str) -> String {
     raw.trim().trim_start_matches('v').to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn ios_install_requires_xctestrun_and_runner_app() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = env::temp_dir().join(format!(
+            "allwright-ios-install-test-{}-{unique}",
+            std::process::id()
+        ));
+        let agent = root.join("agent");
+        let products = agent.join("Release-iphonesimulator");
+        fs::create_dir_all(&products).unwrap();
+
+        assert!(!bundled_ios_agent_is_complete(&root));
+        fs::write(agent.join("AllwrightIOSAgent.xctestrun"), b"plist").unwrap();
+        assert!(!bundled_ios_agent_is_complete(&root));
+        fs::create_dir(products.join("AllwrightAgentUITests-Runner.app")).unwrap();
+        assert!(bundled_ios_agent_is_complete(&root));
+
+        fs::remove_dir_all(root).unwrap();
+    }
 }

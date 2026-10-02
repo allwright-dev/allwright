@@ -10,6 +10,10 @@ import {
   type MobileAndroidDevice,
   type MobileAndroidLaunchOptions,
   type MobileAndroidApp,
+  type MobileIosConnectOptions,
+  type MobileIosDevice,
+  type MobileIosLaunchOptions,
+  type MobileIosApp,
   type Browser,
   type BrowserKind,
   type CommandOptions,
@@ -34,6 +38,10 @@ export interface AllwrightVitestOptions {
     connectOptions?: MobileAndroidConnectOptions;
     launchOptions?: MobileAndroidLaunchOptions;
   };
+  ios?: {
+    connectOptions?: MobileIosConnectOptions;
+    launchOptions?: MobileIosLaunchOptions;
+  };
   configFile?: string;
   suite?: string;
 }
@@ -43,15 +51,20 @@ export interface AllwrightVitestFixtures {
   page: Page;
   android: MobileAndroidDevice;
   androidApp: MobileAndroidApp;
+  ios: MobileIosDevice;
+  iosApp: MobileIosApp;
 }
 
 const DEFAULT_ANDROID_CONNECT_TIMEOUT_MS = 30_000;
 const DEFAULT_ANDROID_LAUNCH_TIMEOUT_MS = 60_000;
+const DEFAULT_IOS_CONNECT_TIMEOUT_MS = 30_000;
+const DEFAULT_IOS_LAUNCH_TIMEOUT_MS = 60_000;
 
 type AllwrightVitestContext = AllwrightVitestFixtures & {
   allwright: AllwrightVitestOptions;
   _browserResource: LazyResource<Browser>;
   _androidResource: LazyResource<MobileAndroidDevice>;
+  _iosResource: LazyResource<MobileIosDevice>;
 };
 
 type AsyncFactory<T> = () => Promise<T>;
@@ -408,13 +421,13 @@ function createLazyBrowser(browserResource: LazyResource<Browser>): Browser {
   return lazyBrowser;
 }
 
-function createLazyAndroidApp(appResource: LazyResource<MobileAndroidApp>): MobileAndroidApp {
+function createLazyMobileApp(appResource: LazyResource<MobileAndroidApp>): MobileAndroidApp {
   const lazyApp = {
     get sessionId() {
       return getLazySyncProperty(appResource, "sessionId");
     },
     locator(selector: string) {
-      return createLazyAndroidLocator(appResource, async () => selector);
+      return createLazyMobileLocator(appResource, async () => selector);
     },
     async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
       return (await appResource.get()).registerHook(type);
@@ -454,16 +467,16 @@ function createLazyAndroidApp(appResource: LazyResource<MobileAndroidApp>): Mobi
   return lazyApp;
 }
 
-function createLazyAndroidLocator(
+function createLazyMobileLocator(
   appResource: LazyResource<MobileAndroidApp>,
   selectorFactory: () => Promise<string>,
 ): MobileAndroidLocator {
   const lazyLocator = {
     get page() {
-      return createLazyAndroidApp(appResource);
+      return createLazyMobileApp(appResource);
     },
     get selector(): string {
-      throw new Error("lazy Android locator selector is not available before the app fixture is initialized");
+      throw new Error("lazy mobile locator selector is not available before the app fixture is initialized");
     },
     async click(options?: CommandOptions) {
       return (await appResource.get()).locator(await selectorFactory()).click(options);
@@ -490,7 +503,7 @@ function createLazyAndroidLocator(
       return (await appResource.get()).locator(await selectorFactory()).waitFor(options);
     },
     locator(selector: string) {
-      return createLazyAndroidLocator(appResource, async () =>
+      return createLazyMobileLocator(appResource, async () =>
         (await appResource.get()).locator(await selectorFactory()).locator(selector).selector,
       );
     },
@@ -509,10 +522,10 @@ function createLazyAndroidDevice(
       return getLazySyncProperty(deviceResource, "sessionId");
     },
     app() {
-      return createLazyAndroidApp(initialAppResource);
+      return createLazyMobileApp(initialAppResource);
     },
     initialApp() {
-      return createLazyAndroidApp(initialAppResource);
+      return createLazyMobileApp(initialAppResource);
     },
     async launch(options?: MobileAndroidLaunchOptions) {
       return (await deviceResource.get()).launch(options);
@@ -520,6 +533,25 @@ function createLazyAndroidDevice(
   } satisfies MobileAndroidDevice;
 
   return lazyDevice;
+}
+
+function createLazyIosDevice(deviceResource: LazyResource<MobileIosDevice>): MobileIosDevice {
+  const initialAppResource = createLazyResource(async () => (await deviceResource.get()).app());
+
+  return {
+    get sessionId() {
+      return getLazySyncProperty(deviceResource, "sessionId");
+    },
+    app() {
+      return createLazyMobileApp(initialAppResource);
+    },
+    initialApp() {
+      return createLazyMobileApp(initialAppResource);
+    },
+    async launch(options?: MobileIosLaunchOptions) {
+      return (await deviceResource.get()).launch(options);
+    },
+  } satisfies MobileIosDevice;
 }
 
 export const test = base.extend<AllwrightVitestContext>({
@@ -561,6 +593,19 @@ export const test = base.extend<AllwrightVitestContext>({
     await use(androidResource);
   },
 
+  _iosResource: async ({ allwright }, use) => {
+    const config = resolveVitestConfig(allwright);
+    if (config.serverAddr) {
+      setServerAddr(config.serverAddr);
+    }
+
+    const iosResource = createLazyResource(async () =>
+      mobile.ios.connect(resolveIosConnectOptions(config, allwright)),
+    );
+
+    await use(iosResource);
+  },
+
   browser: async ({ _browserResource }, use) => {
     try {
       await use(createLazyBrowser(_browserResource));
@@ -584,7 +629,21 @@ export const test = base.extend<AllwrightVitestContext>({
       return (await _androidResource.get()).launch(launchOptions);
     });
 
-    await use(createLazyAndroidApp(appResource));
+    await use(createLazyMobileApp(appResource));
+  },
+
+  ios: async ({ _iosResource }, use) => {
+    await use(createLazyIosDevice(_iosResource));
+  },
+
+  iosApp: async ({ _iosResource, allwright }, use) => {
+    const appResource = createLazyResource(async () => {
+      const config = resolveVitestConfig(allwright);
+      const launchOptions = resolveIosLaunchOptions(config, allwright);
+      return (await _iosResource.get()).launch(launchOptions);
+    });
+
+    await use(createLazyMobileApp(appResource));
   },
 });
 
@@ -609,7 +668,7 @@ function resolveVitestConfig(options: AllwrightVitestOptions): ResolvedAllwright
 
   return {
     ...config,
-    serverAddr: options.serverAddr ?? config.serverAddr,
+    serverAddr: options.serverAddr ?? process.env.ALLWRIGHT_SERVER_ADDR ?? config.serverAddr,
     browserName: options.browser ?? config.browserName,
     browserBinary: options.browserBinary ?? config.browserBinary,
     launchOptions: {
@@ -657,6 +716,53 @@ function resolveAndroidLaunchOptions(
   if (!launchOptions.apkPath && !launchOptions.appId) {
     throw new Error(
       "androidApp fixture requires android launch options with `apkPath` or `appId`, or config.mobile.android.app configured",
+    );
+  }
+
+  return launchOptions;
+}
+
+function resolveIosConnectOptions(
+  config: ResolvedAllwrightConfig,
+  options: AllwrightVitestOptions,
+): MobileIosConnectOptions {
+  return {
+    device:
+      options.ios?.connectOptions?.device ??
+      process.env.ALLWRIGHT_IOS_DEVICE ??
+      config.mobile.ios?.device,
+    agentEndpoint:
+      options.ios?.connectOptions?.agentEndpoint ??
+      process.env.ALLWRIGHT_IOS_AGENT_ENDPOINT,
+    preserveAppState: options.ios?.connectOptions?.preserveAppState ?? false,
+    timeoutMs:
+      options.ios?.connectOptions?.timeoutMs ??
+      DEFAULT_IOS_CONNECT_TIMEOUT_MS,
+  };
+}
+
+function resolveIosLaunchOptions(
+  config: ResolvedAllwrightConfig,
+  options: AllwrightVitestOptions,
+): MobileIosLaunchOptions {
+  const launchOptions: MobileIosLaunchOptions = {
+    appPath:
+      options.ios?.launchOptions?.appPath ??
+      process.env.ALLWRIGHT_IOS_APP_PATH ??
+      config.mobile.ios?.appBinary,
+    appId:
+      options.ios?.launchOptions?.appId ??
+      process.env.ALLWRIGHT_IOS_APP_ID ??
+      config.mobile.ios?.appId,
+    stopBeforeLaunch: options.ios?.launchOptions?.stopBeforeLaunch ?? false,
+    timeoutMs:
+      options.ios?.launchOptions?.timeoutMs ??
+      DEFAULT_IOS_LAUNCH_TIMEOUT_MS,
+  };
+
+  if (!launchOptions.appPath && !launchOptions.appId) {
+    throw new Error(
+      "iosApp fixture requires iOS launch options with `appPath` or `appId`, or config.mobile.ios.app configured",
     );
   }
 

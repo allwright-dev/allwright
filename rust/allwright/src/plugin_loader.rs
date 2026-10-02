@@ -197,7 +197,7 @@ pub async fn save_mobile_download(
 fn mobile_plugin_id(platform: MobilePlatform) -> Result<&'static str, String> {
     match platform {
         MobilePlatform::Android => Ok("mobile-android"),
-        MobilePlatform::Ios => Err("mobile-ios runtime plugin is not available yet".to_string()),
+        MobilePlatform::Ios => Ok("mobile-ios"),
     }
 }
 

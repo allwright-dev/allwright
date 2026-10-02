@@ -75,8 +75,9 @@ For users, the intended install model is simple:
 Today, the plugin ecosystem looks like this:
 
 - `allwright`: installable CLI package that starts the engine server and manages plugin installation
-- `web`: the first installable runtime surface plugin today, loaded by the core at runtime
-- `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux`: planned surface plugins with publishable crate boundaries, but not yet installable runtime artifacts
+- `web` and `mobile-android`: installable runtime surface plugins loaded by the core at runtime
+- `mobile-ios`: an experimental installable macOS plugin with a bundled, auto-started headless XCUITest runner for iOS Simulators; physical-device signing and forwarding are still pending
+- `desktop-mac`, `desktop-windows`, and `desktop-linux`: planned surface plugins with publishable crate boundaries, but not yet installable runtime artifacts
 
 What `plugin install` means today:
 
@@ -640,6 +641,6 @@ const yaml = await app.accessibilitySnapshot({ format: "yaml" });
 await app.locator(`ref=${node["aria-ref"]}`).click();
 ```
 
-Android uses a session-scoped cache of absolute XPath references without modifying the app or source XML. References expire and fail as stale when a fresh hierarchy differs; capture a new AI snapshot after screen changes. See the [Android snapshot contract](rust/allwright-surface-mobile-android/README.md#accessibility-snapshots) for modes and native limitations. iOS is not implemented.
+Android uses a session-scoped cache of absolute XPath references without modifying the app or source XML. References expire and fail as stale when a fresh hierarchy differs; capture a new AI snapshot after screen changes. See the [Android snapshot contract](rust/allwright-surface-mobile-android/README.md#accessibility-snapshots) for modes and native limitations. iOS now has an experimental XCUITest-backed plugin with a bundled simulator runner that installs and starts automatically; physical-device signing and forwarding are not yet automatic.
 
 Web pages and locators also support reading the current URL, live input values, selected dropdown options and textbox text, checkbox/radio checked state, attributes, and bounding boxes. See the [state capture examples](typescript/core/README.md#read-page-and-element-state).

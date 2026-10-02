@@ -10,6 +10,7 @@ pub enum MobileAutomationBackend {
     UiAutomator2,
     Espresso,
     WebViewBridge,
+    XcuiTest,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -82,6 +83,8 @@ pub struct ConnectOptions {
     pub platform: MobilePlatform,
     pub device: Option<String>,
     pub adb_endpoint: Option<String>,
+    #[serde(default)]
+    pub agent_endpoint: Option<String>,
     pub preserve_app_state: bool,
     pub timeout_ms: Option<u32>,
 }
@@ -732,6 +735,7 @@ mod tests {
             platform: MobilePlatform::Android,
             device: Some("emulator-5554".to_string()),
             adb_endpoint: None,
+            agent_endpoint: None,
             preserve_app_state: true,
             timeout_ms: Some(5_000),
         });

@@ -345,6 +345,7 @@ fn plugin_runtime_artifact_stem(plugin_id: &str) -> &'static str {
     match plugin_id {
         "web" => "allwright-surface-web",
         "mobile-android" => "allwright-surface-mobile-android",
+        "mobile-ios" => "allwright-surface-mobile-ios",
         _ => "allwright-plugin",
     }
 }
@@ -375,10 +376,10 @@ fn plugin_runtime_artifact_filename(plugin_id: &str) -> String {
 }
 
 fn ensure_plugin_install_supported(plugin_id: &str) -> Result<(), Box<dyn Error>> {
-    match plugin_id {
-        "web" | "mobile-android" => Ok(()),
+    match (plugin_id, env::consts::OS) {
+        ("web" | "mobile-android", _) | ("mobile-ios", "macos") => Ok(()),
         _ => Err(format!(
-            "plugin `{plugin_id}` is not yet installable. Supported standalone runtime artifacts currently ship for `web` and `mobile-android`."
+            "plugin `{plugin_id}` is not installable on this platform. Runtime artifacts ship for `web`, `mobile-android`, and `mobile-ios` on macOS."
         )
         .into()),
     }

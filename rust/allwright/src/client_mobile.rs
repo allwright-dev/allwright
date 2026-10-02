@@ -133,6 +133,30 @@ pub struct MobileAndroidLaunchOptions {
     pub timeout_ms: Option<u32>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct MobileIosConnectOptions {
+    pub device: Option<String>,
+    pub agent_endpoint: Option<String>,
+    pub preserve_app_state: bool,
+    pub timeout_ms: Option<u32>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct MobileIosLaunchOptions {
+    pub app_path: Option<String>,
+    pub app_id: Option<String>,
+    pub stop_before_launch: bool,
+    pub timeout_ms: Option<u32>,
+}
+
+pub type IosApp = AndroidApp;
+pub type IosLocator = AndroidLocator;
+
+#[derive(Clone)]
+pub struct IosDevice {
+    inner: AndroidDevice,
+}
+
 #[derive(Clone)]
 pub struct AndroidLocator {
     page: AndroidApp,
@@ -252,6 +276,110 @@ pub mod android {
                 _ => {}
             }
         }
+    }
+}
+
+pub mod ios {
+    use super::*;
+
+    pub async fn connect(options: MobileIosConnectOptions) -> Result<IosDevice> {
+        let runtime = get_runtime().await?;
+        let mut engine = runtime.engine.clone();
+        let (command_tx, command_rx) = mpsc::channel(16);
+        let response = engine
+            .surface_session(tonic::Request::new(ReceiverStream::new(command_rx)))
+            .await?;
+        let mut events = response.into_inner();
+
+        command_tx
+            .send(SurfaceSessionCommand {
+                command: Some(SurfaceCommand::ConnectMobile(ConnectMobileCommand {
+                    platform: ProtoMobilePlatform::Ios as i32,
+                    device: options.device,
+                    // The protobuf field is transport-internal; the public iOS
+                    // option accurately calls this the native agent endpoint.
+                    adb_endpoint: options.agent_endpoint,
+                    preserve_app_state: options.preserve_app_state,
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send iOS ConnectMobileCommand"))?;
+
+        loop {
+            let event = events
+                .message()
+                .await?
+                .ok_or_else(|| Error::new("surface session closed before iOS connect response"))?;
+            match event.event {
+                Some(SurfaceEvent::MobileConnected(MobileConnectedEvent {
+                    initial_app_session_id,
+                    device_session_id,
+                    ..
+                })) => {
+                    let initial_app = AndroidApp {
+                        inner: Arc::new(AndroidAppInner {
+                            runtime: Arc::clone(&runtime),
+                            surface_session_id: event.session_id.clone(),
+                            session_id: initial_app_session_id,
+                            state: AsyncMutex::new(AndroidAppState::default()),
+                        }),
+                    };
+                    return Ok(IosDevice {
+                        inner: AndroidDevice {
+                            inner: Arc::new(AndroidDeviceInner {
+                                runtime,
+                                state: AsyncMutex::new(AndroidDeviceState {
+                                    command_tx,
+                                    events,
+                                    closed: false,
+                                }),
+                                session_id: if device_session_id.is_empty() {
+                                    event.session_id
+                                } else {
+                                    device_session_id
+                                },
+                                initial_app: initial_app.clone(),
+                                current_app: Mutex::new(initial_app),
+                            }),
+                        },
+                    });
+                }
+                Some(SurfaceEvent::Error(error)) => {
+                    return Err(Error::new(format!(
+                        "surface session error during iOS connect: {}",
+                        error.message
+                    )));
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+impl IosDevice {
+    pub fn session_id(&self) -> &str {
+        self.inner.session_id()
+    }
+
+    pub fn app(&self) -> IosApp {
+        self.inner.app()
+    }
+
+    pub fn initial_app(&self) -> IosApp {
+        self.inner.initial_app()
+    }
+
+    pub async fn launch(&self, options: MobileIosLaunchOptions) -> Result<IosApp> {
+        self.inner
+            .launch(MobileAndroidLaunchOptions {
+                apk_path: options.app_path,
+                app_id: options.app_id,
+                stop_before_launch: options.stop_before_launch,
+                timeout_ms: options.timeout_ms,
+                ..MobileAndroidLaunchOptions::default()
+            })
+            .await
     }
 }
 

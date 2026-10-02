@@ -1,6 +1,7 @@
 # @allwright.dev/vitest
 
-Vitest fixtures for allwright with Playwright-style `browser` and `page` injection, plus Android mobile fixtures for hybrid tests.
+Vitest fixtures for allwright with Playwright-style `browser` and `page`
+injection, plus Android and iOS mobile fixtures for native and hybrid tests.
 
 Wrap the Vitest configuration with `allwrightVitestConfig`. It starts Allwright once before workers run and shuts it down once after the complete test run. Existing user global setup files remain supported and run after Allwright starts, then tear down before Allwright stops.
 
@@ -34,6 +35,10 @@ test("opens a page", async ({ page }) => {
 
 test("opens an Android app", async ({ androidApp }) => {
   await androidApp.click('Id=com.example.airticket:id/bottom_nav_account');
+});
+
+test("opens an iOS app", async ({ iosApp }) => {
+  await iosApp.locator("text=Login").click();
 });
 ```
 
@@ -105,7 +110,40 @@ test("hybrid web and android", async ({ page, androidApp }) => {
 });
 ```
 
-Fixtures are lazy on first use. Injecting `browser`, `page`, `android`, or `androidApp` does not launch or connect immediately; the underlying session is created only when the test first performs an action through that fixture. Sync metadata properties like `browser.sessionId` or `android.sessionId` are only available after the lazy fixture has been realized by a prior awaited call.
+iOS uses the same app and locator shape. Configure the native agent endpoint
+and bundle identifier once, then keep platform bootstrap out of test bodies:
+
+```yaml
+# allwright.config.yaml
+mobile:
+  ios:
+    device: iPhone 17 Pro
+    app:
+      binary: https://artifacts.example.test/Flights-simulator.zip
+```
+
+Set `ALLWRIGHT_IOS_AGENT_ENDPOINT` when the agent is not reachable at
+`http://127.0.0.1:8100`. The app value may also be a local `.app`, `.zip`, or
+`.ipa`; the fixture downloads/extracts it when needed, installs it on the
+selected simulator, derives its bundle identifier, and launches it. Override
+it with `ALLWRIGHT_IOS_APP_PATH`. No manual installation or polling belongs in
+the test. The test remains platform-client code only:
+
+```ts
+import { expect, test } from "@allwright.dev/vitest";
+
+test("logs in", async ({ iosApp }) => {
+  await iosApp.locator("text=Login").click();
+  await iosApp.locator("className=XCUIElementTypeTextField").fill("user@example.com");
+  await expect(iosApp.locator("text=Welcome back")).toBeVisible();
+});
+```
+
+Fixtures are lazy on first use. Injecting `browser`, `page`, `android`,
+`androidApp`, `ios`, or `iosApp` does not launch or connect immediately; the
+underlying session is created only when the test first performs an action
+through that fixture. Sync metadata properties are only available after the
+lazy fixture has been realized by a prior awaited call.
 
 Available fixtures:
 
@@ -113,10 +151,17 @@ Available fixtures:
 - `page`: initial web page
 - `android`: connected Android device session
 - `androidApp`: launched Android app page
+- `ios`: connected iOS device session
+- `iosApp`: launched iOS app page
 
 `androidApp` launches using `allwright.android.launchOptions` first, then falls back to `config.mobile.android`.
+`iosApp` does the same with `allwright.ios.launchOptions` and `config.mobile.ios`.
 
-Android apps and locators support the Android-applicable action and expectation subset: `click`, `count`, `focus`, `fill`, `press`, `textContent`, `innerText`, `waitForSelector`, and `screenshot`. `expect(androidApp)` and `expect(androidApp.locator(...))` provide `toHaveText`, `toContainText`, `toHaveCount`, and `toBeVisible` with the same retry controls as web fixtures. Hover and highlight remain web-only.
+Android and iOS apps and locators support the mobile action and expectation
+subset: `click`, `count`, `focus`, `fill`, `press`, `textContent`, `innerText`,
+`waitForSelector`, and `screenshot`. Mobile expectations provide `toHaveText`,
+`toContainText`, `toHaveCount`, and `toBeVisible` with the same retry controls
+as web fixtures. Hover and highlight remain web-only.
 
 The opt-in accessibility integration test exercises the public page fixture,
 bundled protobuf, running engine and dynamically loaded web plugin. From this
