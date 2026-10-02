@@ -1,4 +1,4 @@
-import type { WebLocators, LocatorFilterOptions } from "./web-locators.js";
+import type { WebLocators, LocatorFilterOptions, RoleOptions, TextMatcher, TextOptions } from "./web-locators.js";
 import grpc from "@grpc/grpc-js";
 
 export { AllwrightError } from "./errors.js";
@@ -230,12 +230,20 @@ export interface MobileAndroidLocator {
   innerText(options?: CommandOptions): Promise<TextResult>;
   waitFor(options?: WaitForSelectorOptions): Promise<WaitForSelectorResult>;
   locator(selector: string): MobileAndroidLocator;
+  getByRole(role: string, options?: RoleOptions): MobileAndroidLocator;
+  getByText(text: TextMatcher, options?: TextOptions): MobileAndroidLocator;
+  getByLabel(text: TextMatcher, options?: TextOptions): MobileAndroidLocator;
+  getByTestId(text: TextMatcher): MobileAndroidLocator;
 }
 
 export interface MobileAndroidApp {
   accessibilitySnapshot(options?: AccessibilitySnapshotOptions): Promise<string>;
   readonly sessionId: string;
   locator(selector: string): MobileAndroidLocator;
+  getByRole(role: string, options?: RoleOptions): MobileAndroidLocator;
+  getByText(text: TextMatcher, options?: TextOptions): MobileAndroidLocator;
+  getByLabel(text: TextMatcher, options?: TextOptions): MobileAndroidLocator;
+  getByTestId(text: TextMatcher): MobileAndroidLocator;
   click(selector: string, options?: CommandOptions): Promise<ClickResult>;
   count(selector: string, options?: CommandOptions): Promise<CountResult>;
   focus(selector: string, options?: CommandOptions): Promise<ElementResult>;

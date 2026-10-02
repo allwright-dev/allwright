@@ -628,6 +628,16 @@ await page.getByRole('listitem')
 await page.getByLabel('Email address').fill('you@example.com');
 ```
 
+Android and iOS apps and locators share the mobile subset `getByRole`,
+`getByText`, `getByLabel`, and `getByTestId`. These resolve against native
+accessibility metadata and retain automatic action/read retries, so scripts do
+not need polling loops:
+
+```ts
+await app.getByRole('button', { name: 'Login', exact: true }).click();
+await app.getByLabel('Email', { exact: true }).fill('user@example.com');
+```
+
 Filters support `has`, `hasNot`, `hasText`, `hasNotText`, and `visible`; locators also support `first`, `last`, and `nth`. See the [web locator reference](rust/allwright-surface-web/SELECTORS.md) for options, language conventions, and current limits.
 
 Exclude matching web elements with `locator.not(otherLocator)` (Python `not_`, Go

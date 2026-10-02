@@ -31,9 +31,9 @@ const UIAUTOMATOR_SELECTOR_KEYS = new Set([
   "instance",
 ]);
 
-const SELECTOR_PREFIXES = ["xpath=", "xpath:", "css=", "css:", "uia=", "uia:"] as const;
+const SELECTOR_PREFIXES = ["xpath=", "xpath:", "css=", "css:", "uia=", "uia:", "aw=", "aw:"] as const;
 
-type MobileSelectorFlavor = "css" | "xpath" | "uia";
+type MobileSelectorFlavor = "css" | "xpath" | "uia" | "aw";
 
 function decodeSelectorBody(body: string): string {
   const candidate = body.trim();
@@ -59,6 +59,9 @@ function parseExplicitSelectorPrefix(
   }
   if (lowered.startsWith("uia=") || lowered.startsWith("uia:")) {
     return { flavor: "uia", prefixLength: 4 };
+  }
+  if (lowered.startsWith("aw=") || lowered.startsWith("aw:")) {
+    return { flavor: "aw", prefixLength: 3 };
   }
   return null;
 }

@@ -243,18 +243,15 @@ final class AllwrightIOSAgent {
     }
 
     private func query(_ selector: String, in application: XCUIApplication) -> XCUIElementQuery {
-        let parsed = Selector.parse(selector)
-        let all = application.descendants(matching: .any)
-        switch parsed {
-        case .identifier(let value):
-            return all.matching(identifier: value)
-        case .label(let value):
-            return all.matching(NSPredicate(format: "label == %@ OR title == %@ OR value == %@", value, value, value))
-        case .type(let value):
-            return all.matching(NSPredicate(format: "elementType == %d", value.rawValue))
-        case .predicate(let predicate):
-            return all.matching(predicate)
+        let segments = Selector.parseAll(selector)
+        var candidates = application.descendants(matching: .any)
+        for (index, segment) in segments.enumerated() {
+            if index > 0 {
+                candidates = candidates.descendants(matching: .any)
+            }
+            candidates = segment.matching(candidates)
         }
+        return candidates
     }
 
     private func keyText(_ key: String, explicitText: String?) -> String {
@@ -297,6 +294,53 @@ private enum Selector {
     case type(XCUIElement.ElementType)
     case predicate(NSPredicate)
 
+    func matching(_ query: XCUIElementQuery) -> XCUIElementQuery {
+        switch self {
+        case .identifier(let value):
+            return query.matching(identifier: value)
+        case .label(let value):
+            return query.matching(NSPredicate(format: "label == %@ OR title == %@ OR value == %@", value, value, value))
+        case .type(let value):
+            return query.matching(NSPredicate(format: "elementType == %d", value.rawValue))
+        case .predicate(let predicate):
+            return query.matching(predicate)
+        }
+    }
+
+    static func parseAll(_ transport: String) -> [Selector] {
+        var segments: [Selector] = []
+        var index = transport.startIndex
+        while index < transport.endIndex {
+            while index < transport.endIndex, transport[index].isWhitespace {
+                index = transport.index(after: index)
+            }
+            guard index < transport.endIndex,
+                  let equals = transport[index...].firstIndex(of: "=") else { break }
+            let prefix = String(transport[index..<equals])
+            let bodyStart = transport.index(after: equals)
+            guard bodyStart < transport.endIndex, transport[bodyStart] == "\"" else { break }
+            var cursor = transport.index(after: bodyStart)
+            var escaped = false
+            var bodyEnd: String.Index?
+            while cursor < transport.endIndex {
+                let character = transport[cursor]
+                if escaped {
+                    escaped = false
+                } else if character == "\\" {
+                    escaped = true
+                } else if character == "\"" {
+                    bodyEnd = transport.index(after: cursor)
+                    break
+                }
+                cursor = transport.index(after: cursor)
+            }
+            guard let bodyEnd else { break }
+            segments.append(parse("\(prefix)=\(transport[bodyStart..<bodyEnd])"))
+            index = bodyEnd
+        }
+        return segments.isEmpty ? [parse(transport)] : segments
+    }
+
     static func parse(_ transport: String) -> Selector {
         let (prefix, encoded) = splitTransport(transport)
         let value = decodeJSONString(encoded)
@@ -317,6 +361,10 @@ private enum Selector {
             default: return .label(body)
             }
         }
+        if prefix == "aw", let data = value.data(using: .utf8),
+           let spec = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return semantic(spec)
+        }
         if prefix == "xpath" {
             if let name = attribute("name", in: value) { return .identifier(name) }
             if let label = attribute("label", in: value) { return .label(label) }
@@ -325,6 +373,78 @@ private enum Selector {
             }
         }
         return .identifier(value)
+    }
+
+    private static func semantic(_ spec: [String: Any]) -> Selector {
+        let kind = spec["kind"] as? String ?? ""
+        let exact = spec["exact"] as? Bool ?? false
+        switch kind {
+        case "role":
+            var predicates: [NSPredicate] = []
+            let role = (spec["role"] as? String ?? "").lowercased()
+            predicates.append(rolePredicate(role))
+            if let name = spec["name"] {
+                predicates.append(textPredicate(name, exact: exact, fields: ["label", "title", "value", "placeholderValue"]))
+            }
+            if let disabled = spec["disabled"] as? Bool {
+                predicates.append(NSPredicate(format: "enabled == %@", NSNumber(value: !disabled)))
+            }
+            if let selected = spec["selected"] as? Bool {
+                predicates.append(NSPredicate(format: "selected == %@", NSNumber(value: selected)))
+            }
+            if let checked = spec["checked"] as? Bool {
+                predicates.append(NSPredicate(format: "value == %@ OR selected == %@", checked ? "1" : "0", NSNumber(value: checked)))
+            }
+            return .predicate(NSCompoundPredicate(andPredicateWithSubpredicates: predicates))
+        case "text":
+            return .predicate(textPredicate(spec["text"], exact: exact, fields: ["label", "title", "value", "placeholderValue"]))
+        case "label":
+            return .predicate(textPredicate(spec["text"], exact: exact, fields: ["label", "title", "placeholderValue"]))
+        case "testId":
+            return .predicate(textPredicate(spec["text"], exact: true, fields: ["identifier"]))
+        default:
+            return .predicate(NSPredicate(value: false))
+        }
+    }
+
+    private static func textPredicate(_ raw: Any?, exact: Bool, fields: [String]) -> NSPredicate {
+        if let matcher = raw as? [String: Any], let pattern = matcher["regex"] as? String {
+            let flags = matcher["flags"] as? String ?? ""
+            let inlineFlags = String(flags.filter { "ims".contains($0) })
+            let resolvedPattern = inlineFlags.isEmpty ? pattern : "(?\(inlineFlags))\(pattern)"
+            return NSCompoundPredicate(orPredicateWithSubpredicates: fields.map {
+                NSPredicate(format: "\($0) MATCHES %@", resolvedPattern)
+            })
+        }
+        let text = raw as? String ?? ""
+        let operatorName = exact ? "==" : "CONTAINS[c]"
+        return NSCompoundPredicate(orPredicateWithSubpredicates: fields.map {
+            NSPredicate(format: "\($0) \(operatorName) %@", text)
+        })
+    }
+
+    private static func rolePredicate(_ role: String) -> NSPredicate {
+        let types: [XCUIElement.ElementType]
+        switch role {
+        case "button": types = [.button]
+        case "textbox": types = [.textField, .secureTextField]
+        case "checkbox", "switch": types = [.switch]
+        case "radio": types = [.radioButton]
+        case "slider": types = [.slider]
+        case "progressbar": types = [.progressIndicator]
+        case "combobox": types = [.picker, .pickerWheel]
+        case "list": types = [.table, .collectionView]
+        case "listitem": types = [.cell]
+        case "img", "image": types = [.image]
+        case "link": types = [.link]
+        case "text", "heading": types = [.staticText]
+        case "generic": types = [.any]
+        default: return NSPredicate(value: false)
+        }
+        if types == [.any] { return NSPredicate(value: true) }
+        return NSCompoundPredicate(orPredicateWithSubpredicates: types.map {
+            NSPredicate(format: "elementType == %d", $0.rawValue)
+        })
     }
 
     private static func splitTransport(_ value: String) -> (String, String) {

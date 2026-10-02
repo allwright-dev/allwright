@@ -140,6 +140,7 @@ pub enum SelectorFlavor {
     Css,
     XPath,
     UiAutomator,
+    Semantic,
 }
 
 impl SelectorFlavor {
@@ -148,6 +149,7 @@ impl SelectorFlavor {
             Self::Css => "css",
             Self::XPath => "xpath",
             Self::UiAutomator => "uia",
+            Self::Semantic => "aw",
         }
     }
 }
@@ -457,6 +459,9 @@ fn parse_explicit_selector_prefix(selector: &str) -> Option<(SelectorFlavor, usi
     if lowered.starts_with("uia=") || lowered.starts_with("uia:") {
         return Some((SelectorFlavor::UiAutomator, 4));
     }
+    if lowered.starts_with("aw=") || lowered.starts_with("aw:") {
+        return Some((SelectorFlavor::Semantic, 3));
+    }
     if let Some(prefix_len) = uiautomator_selector_prefix_len(&lowered) {
         return Some((SelectorFlavor::UiAutomator, prefix_len));
     }
@@ -591,6 +596,12 @@ pub fn parse_selector_for_transport(selector: &str) -> (SelectorFlavor, String) 
         return (
             SelectorFlavor::UiAutomator,
             decode_selector_body(&trimmed[4..]),
+        );
+    }
+    if lowered.starts_with("aw=") || lowered.starts_with("aw:") {
+        return (
+            SelectorFlavor::Semantic,
+            decode_selector_body(&trimmed[3..]),
         );
     }
     if let Some(prefix_len) = uiautomator_selector_prefix_len(&lowered) {

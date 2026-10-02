@@ -3,6 +3,7 @@ import { open, rename, unlink, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
 import { chainMobileSelectorForTransport, normalizeMobileSelectorForTransport } from "./mobileSelectors.js";
+import { semanticSelector, type RoleOptions, type TextMatcher, type TextOptions } from "./web-locators.js";
 import type {
   AccessibilitySnapshotOptions,
   SurfaceSessionEvent,
@@ -53,6 +54,22 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
 
   locator(selector: string): MobileAndroidLocator {
     return new MobileAndroidLocatorImpl(this, normalizeMobileSelectorForTransport(selector));
+  }
+
+  getByRole(role: string, options: RoleOptions = {}): MobileAndroidLocator {
+    return this.locator(semanticSelector({ ...options, kind: "role", role }));
+  }
+
+  getByText(text: TextMatcher, options: TextOptions = {}): MobileAndroidLocator {
+    return this.locator(semanticSelector({ ...options, kind: "text", text }));
+  }
+
+  getByLabel(text: TextMatcher, options: TextOptions = {}): MobileAndroidLocator {
+    return this.locator(semanticSelector({ ...options, kind: "label", text }));
+  }
+
+  getByTestId(text: TextMatcher): MobileAndroidLocator {
+    return this.locator(semanticSelector({ kind: "testId", text }));
   }
 
   async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
@@ -630,6 +647,22 @@ class MobileAndroidLocatorImpl implements MobileAndroidLocator {
 
   locator(selector: string): MobileAndroidLocator {
     return new MobileAndroidLocatorImpl(this.page, chainMobileSelectorForTransport(this.selector, selector));
+  }
+
+  getByRole(role: string, options: RoleOptions = {}): MobileAndroidLocator {
+    return this.locator(semanticSelector({ ...options, kind: "role", role }));
+  }
+
+  getByText(text: TextMatcher, options: TextOptions = {}): MobileAndroidLocator {
+    return this.locator(semanticSelector({ ...options, kind: "text", text }));
+  }
+
+  getByLabel(text: TextMatcher, options: TextOptions = {}): MobileAndroidLocator {
+    return this.locator(semanticSelector({ ...options, kind: "label", text }));
+  }
+
+  getByTestId(text: TextMatcher): MobileAndroidLocator {
+    return this.locator(semanticSelector({ kind: "testId", text }));
   }
 }
 

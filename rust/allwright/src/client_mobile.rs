@@ -115,6 +115,7 @@ use super::types::{
     PressResult, Result, RuntimeClient, ScreenshotOptions, ScreenshotResult, TextResult,
     WaitForSelectorOptions, WaitForSelectorResult,
 };
+use super::web_locators::{RoleOptions, TextMatcher, TextOptions};
 
 #[derive(Debug, Clone, Default)]
 pub struct MobileAndroidConnectOptions {
@@ -506,6 +507,51 @@ impl AndroidApp {
             page: self.clone(),
             selector: normalize_mobile_selector_for_transport(&selector.into()),
         }
+    }
+
+    pub fn get_by_role(&self, role: impl Into<String>) -> AndroidLocator {
+        self.get_by_role_with_options(role, RoleOptions::default())
+    }
+
+    pub fn get_by_role_with_options(
+        &self,
+        role: impl Into<String>,
+        options: RoleOptions,
+    ) -> AndroidLocator {
+        let mut spec = serde_json::to_value(options).expect("role options");
+        spec["kind"] = serde_json::json!("role");
+        spec["role"] = serde_json::json!(role.into());
+        self.locator(mobile_semantic_selector(spec))
+    }
+
+    pub fn get_by_text(&self, text: impl Into<TextMatcher>) -> AndroidLocator {
+        self.get_by_text_with_options(text, TextOptions::default())
+    }
+
+    pub fn get_by_text_with_options(
+        &self,
+        text: impl Into<TextMatcher>,
+        options: TextOptions,
+    ) -> AndroidLocator {
+        self.locator(mobile_text_selector("text", text.into(), options))
+    }
+
+    pub fn get_by_label(&self, text: impl Into<TextMatcher>) -> AndroidLocator {
+        self.get_by_label_with_options(text, TextOptions::default())
+    }
+
+    pub fn get_by_label_with_options(
+        &self,
+        text: impl Into<TextMatcher>,
+        options: TextOptions,
+    ) -> AndroidLocator {
+        self.locator(mobile_text_selector("label", text.into(), options))
+    }
+
+    pub fn get_by_test_id(&self, text: impl Into<TextMatcher>) -> AndroidLocator {
+        self.locator(mobile_semantic_selector(
+            serde_json::json!({"kind":"testId", "text":text.into()}),
+        ))
     }
 
     pub async fn click(&self, selector: &str, options: CommandOptions) -> Result<ClickResult> {
@@ -1308,6 +1354,51 @@ impl AndroidLocator {
         }
     }
 
+    pub fn get_by_role(&self, role: impl Into<String>) -> AndroidLocator {
+        self.get_by_role_with_options(role, RoleOptions::default())
+    }
+
+    pub fn get_by_role_with_options(
+        &self,
+        role: impl Into<String>,
+        options: RoleOptions,
+    ) -> AndroidLocator {
+        let mut spec = serde_json::to_value(options).expect("role options");
+        spec["kind"] = serde_json::json!("role");
+        spec["role"] = serde_json::json!(role.into());
+        self.locator(mobile_semantic_selector(spec))
+    }
+
+    pub fn get_by_text(&self, text: impl Into<TextMatcher>) -> AndroidLocator {
+        self.get_by_text_with_options(text, TextOptions::default())
+    }
+
+    pub fn get_by_text_with_options(
+        &self,
+        text: impl Into<TextMatcher>,
+        options: TextOptions,
+    ) -> AndroidLocator {
+        self.locator(mobile_text_selector("text", text.into(), options))
+    }
+
+    pub fn get_by_label(&self, text: impl Into<TextMatcher>) -> AndroidLocator {
+        self.get_by_label_with_options(text, TextOptions::default())
+    }
+
+    pub fn get_by_label_with_options(
+        &self,
+        text: impl Into<TextMatcher>,
+        options: TextOptions,
+    ) -> AndroidLocator {
+        self.locator(mobile_text_selector("label", text.into(), options))
+    }
+
+    pub fn get_by_test_id(&self, text: impl Into<TextMatcher>) -> AndroidLocator {
+        self.locator(mobile_semantic_selector(
+            serde_json::json!({"kind":"testId", "text":text.into()}),
+        ))
+    }
+
     pub async fn click(&self, options: CommandOptions) -> Result<ClickResult> {
         self.page.click(&self.selector, options).await
     }
@@ -1361,11 +1452,23 @@ fn ensure_android_app_open(handle: &AndroidTabHandle, session_id: &str) -> Resul
     Ok(())
 }
 
+fn mobile_semantic_selector(spec: serde_json::Value) -> String {
+    format!(
+        "aw={}",
+        serde_json::to_string(&spec.to_string()).expect("JSON string")
+    )
+}
+
+fn mobile_text_selector(kind: &str, text: TextMatcher, options: TextOptions) -> String {
+    mobile_semantic_selector(serde_json::json!({"kind":kind, "text":text, "exact":options.exact}))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MobileSelectorFlavor {
     Css,
     XPath,
     UiAutomator,
+    Semantic,
 }
 
 impl MobileSelectorFlavor {
@@ -1374,6 +1477,7 @@ impl MobileSelectorFlavor {
             Self::Css => "css",
             Self::XPath => "xpath",
             Self::UiAutomator => "uia",
+            Self::Semantic => "aw",
         }
     }
 }
@@ -1418,6 +1522,9 @@ fn parse_explicit_mobile_selector_prefix(selector: &str) -> Option<(MobileSelect
     }
     if lowered.starts_with("uia=") || lowered.starts_with("uia:") {
         return Some((MobileSelectorFlavor::UiAutomator, 4));
+    }
+    if lowered.starts_with("aw=") || lowered.starts_with("aw:") {
+        return Some((MobileSelectorFlavor::Semantic, 3));
     }
     if let Some(prefix_len) = parse_ui_automator_selector_prefix(&lowered) {
         return Some((MobileSelectorFlavor::UiAutomator, prefix_len));

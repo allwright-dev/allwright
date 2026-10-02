@@ -38,7 +38,7 @@ test("opens an Android app", async ({ androidApp }) => {
 });
 
 test("opens an iOS app", async ({ iosApp }) => {
-  await iosApp.locator("text=Login").click();
+  await iosApp.getByRole("button", { name: "Login", exact: true }).click();
 });
 ```
 
@@ -133,9 +133,9 @@ the test. The test remains platform-client code only:
 import { expect, test } from "@allwright.dev/vitest";
 
 test("logs in", async ({ iosApp }) => {
-  await iosApp.locator("text=Login").click();
-  await iosApp.locator("className=XCUIElementTypeTextField").fill("user@example.com");
-  await expect(iosApp.locator("text=Welcome back")).toBeVisible();
+  await iosApp.getByRole("button", { name: "Login", exact: true }).click();
+  await iosApp.getByLabel("Email", { exact: true }).fill("user@example.com");
+  await expect(iosApp.getByText("Welcome back", { exact: true })).toBeVisible();
 });
 ```
 

@@ -21,6 +21,22 @@ public final class AndroidLocator {
         return new AndroidLocator(page, AndroidSelectorSupport.chainSelectorForTransport(selector, childSelector));
     }
 
+    public AndroidLocator getByRole(String role) { return getByRole(role, new RoleOptions()); }
+    public AndroidLocator getByRole(String role, RoleOptions options) {
+        return locator(WebSelectorSupport.role(role, options == null ? new RoleOptions() : options));
+    }
+    public AndroidLocator getByText(Object text) { return getByText(text, new TextOptions()); }
+    public AndroidLocator getByText(Object text, TextOptions options) {
+        return locator(WebSelectorSupport.text("text", text, options == null ? new TextOptions() : options));
+    }
+    public AndroidLocator getByLabel(Object text) { return getByLabel(text, new TextOptions()); }
+    public AndroidLocator getByLabel(Object text, TextOptions options) {
+        return locator(WebSelectorSupport.text("label", text, options == null ? new TextOptions() : options));
+    }
+    public AndroidLocator getByTestId(Object text) {
+        return locator(WebSelectorSupport.selector(java.util.Map.of("kind", "testId", "text", text)));
+    }
+
     public ClickResult click() {
         return page.click(selector);
     }

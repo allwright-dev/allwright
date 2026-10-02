@@ -46,6 +46,7 @@ const (
 	mobileSelectorFlavorCSS   mobileSelectorFlavor = "css"
 	mobileSelectorFlavorXPath mobileSelectorFlavor = "xpath"
 	mobileSelectorFlavorUIA   mobileSelectorFlavor = "uia"
+	mobileSelectorFlavorAW    mobileSelectorFlavor = "aw"
 )
 
 var uiAutomatorSelectorKeys = map[string]struct{}{
@@ -115,6 +116,34 @@ func (p *AndroidApp) Locator(selector string) *AndroidLocator {
 		page:     p,
 		selector: normalizeMobileSelectorForTransport(selector),
 	}
+}
+
+func (p *AndroidApp) GetByRole(role string, options ...RoleOptions) *AndroidLocator {
+	o := RoleOptions{}
+	if len(options) > 0 {
+		o = options[0]
+	}
+	return p.Locator(roleSelector(role, o))
+}
+
+func (p *AndroidApp) GetByText(value any, options ...TextOptions) *AndroidLocator {
+	o := TextOptions{}
+	if len(options) > 0 {
+		o = options[0]
+	}
+	return p.Locator(semanticSelector(map[string]any{"kind": "text", "text": value, "exact": o.Exact}))
+}
+
+func (p *AndroidApp) GetByLabel(value any, options ...TextOptions) *AndroidLocator {
+	o := TextOptions{}
+	if len(options) > 0 {
+		o = options[0]
+	}
+	return p.Locator(semanticSelector(map[string]any{"kind": "label", "text": value, "exact": o.Exact}))
+}
+
+func (p *AndroidApp) GetByTestId(value any, _ ...TextOptions) *AndroidLocator {
+	return p.Locator(semanticSelector(map[string]any{"kind": "testId", "text": value}))
 }
 
 func (p *AndroidApp) ensureStream(ctx context.Context) error {
@@ -774,6 +803,34 @@ func (l *AndroidLocator) Locator(selector string) *AndroidLocator {
 	}
 }
 
+func (l *AndroidLocator) GetByRole(role string, options ...RoleOptions) *AndroidLocator {
+	o := RoleOptions{}
+	if len(options) > 0 {
+		o = options[0]
+	}
+	return l.Locator(roleSelector(role, o))
+}
+
+func (l *AndroidLocator) GetByText(value any, options ...TextOptions) *AndroidLocator {
+	o := TextOptions{}
+	if len(options) > 0 {
+		o = options[0]
+	}
+	return l.Locator(semanticSelector(map[string]any{"kind": "text", "text": value, "exact": o.Exact}))
+}
+
+func (l *AndroidLocator) GetByLabel(value any, options ...TextOptions) *AndroidLocator {
+	o := TextOptions{}
+	if len(options) > 0 {
+		o = options[0]
+	}
+	return l.Locator(semanticSelector(map[string]any{"kind": "label", "text": value, "exact": o.Exact}))
+}
+
+func (l *AndroidLocator) GetByTestId(value any, _ ...TextOptions) *AndroidLocator {
+	return l.Locator(semanticSelector(map[string]any{"kind": "testId", "text": value}))
+}
+
 func (l *AndroidLocator) Click(ctx context.Context, options ...CommandOptions) (*ClickResult, error) {
 	if l == nil || l.page == nil {
 		return nil, fmt.Errorf("android locator page is nil")
@@ -840,6 +897,9 @@ func parseExplicitMobileSelectorPrefix(selector string) (mobileSelectorFlavor, i
 	}
 	if strings.HasPrefix(lowered, "uia=") || strings.HasPrefix(lowered, "uia:") {
 		return mobileSelectorFlavorUIA, 4, true
+	}
+	if strings.HasPrefix(lowered, "aw=") || strings.HasPrefix(lowered, "aw:") {
+		return mobileSelectorFlavorAW, 3, true
 	}
 	return "", 0, false
 }

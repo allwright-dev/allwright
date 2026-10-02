@@ -77,6 +77,7 @@ const androidAvailable = [
   "Capture screenshots, including a full-page scroll-and-stitch capture",
   "Register typed file-chooser and public-download hooks with files streamed to and from the test machine",
   "Text, partial-text, resource id, class name, XPath, and state-based (e.g. clickable) selectors",
+  "Playwright-style getByRole, getByText, getByLabel, and getByTestId native accessibility locators",
   "Retrying text, count, and visibility assertions, including negation (via @allwright.dev/vitest)",
 ];
 
@@ -92,6 +93,7 @@ const iosAvailable = [
   "Install and launch a signed physical-device .ipa, ZIP, or .app bundle without a manual install step",
   "Click, focus, fill, press keys, read text, wait for selectors, count elements, and capture screenshots",
   "Accessibility-id, text, XCTest element type, and basic XPath selectors",
+  "Playwright-style getByRole, getByText, getByLabel, and getByTestId native accessibility locators",
   "Playwright-style action auto-waiting and retrying text, count, and visibility assertions",
   "The same Rust, Go, Java, Python, and TypeScript client shape used by Android",
 ];

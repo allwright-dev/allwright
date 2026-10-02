@@ -41,6 +41,8 @@ test.skipIf(!enabled)('Android snapshots and reference actions cross the gRPC/pl
     setServerAddr(`127.0.0.1:${port}`);
     const device = await mobile.android.connect({ device: 'emulator-5554' });
     const app = device.app();
+    expect((await app.getByRole('button', { name: 'save' }).count()).count).toBe(1);
+    expect((await app.getByText(/^save$/i).textContent()).text).toBe('Save');
     const snapshot = JSON.parse(await app.accessibilitySnapshot({ mode: 'ai' }));
     const node = snapshot.documents[0].root.children[0];
     expect(node.role).toBe('button');

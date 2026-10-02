@@ -391,7 +391,7 @@ export const pythonReference: LanguageReference = {
           name: "AndroidApp.locator",
           kind: "method",
           signature: "def locator(self, selector: str) -> AndroidLocator",
-          description: "Builds a chainable locator scoped to the app. Android has no get_by_role-style semantic builders — only raw CSS/XPath/UiAutomator selectors.",
+          description: "Builds a chainable locator scoped to the app. Android and iOS apps/locators also expose get_by_role, get_by_text, get_by_label, and get_by_test_id with native accessibility semantics and automatic retries.",
           since: "v0.0.45 – v0.0.52",
         },
         {

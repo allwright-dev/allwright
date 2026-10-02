@@ -23,8 +23,11 @@ import {
   type Locator,
   type MobileAndroidLocator,
   type Page,
+  type RoleOptions,
   type ResolvedAllwrightConfig,
   type ScreenshotOptions,
+  type TextMatcher,
+  type TextOptions,
   type WaitForSelectorOptions,
 } from "@allwright.dev/core";
 import { expect as vitestExpect, test as base, type Assertion } from "vitest";
@@ -429,6 +432,18 @@ function createLazyMobileApp(appResource: LazyResource<MobileAndroidApp>): Mobil
     locator(selector: string) {
       return createLazyMobileLocator(appResource, async () => selector);
     },
+    getByRole(role: string, options?: RoleOptions) {
+      return createLazyMobileLocator(appResource, async () => (await appResource.get()).getByRole(role, options).selector);
+    },
+    getByText(text: TextMatcher, options?: TextOptions) {
+      return createLazyMobileLocator(appResource, async () => (await appResource.get()).getByText(text, options).selector);
+    },
+    getByLabel(text: TextMatcher, options?: TextOptions) {
+      return createLazyMobileLocator(appResource, async () => (await appResource.get()).getByLabel(text, options).selector);
+    },
+    getByTestId(text: TextMatcher) {
+      return createLazyMobileLocator(appResource, async () => (await appResource.get()).getByTestId(text).selector);
+    },
     async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
       return (await appResource.get()).registerHook(type);
     },
@@ -505,6 +520,26 @@ function createLazyMobileLocator(
     locator(selector: string) {
       return createLazyMobileLocator(appResource, async () =>
         (await appResource.get()).locator(await selectorFactory()).locator(selector).selector,
+      );
+    },
+    getByRole(role: string, options?: RoleOptions) {
+      return createLazyMobileLocator(appResource, async () =>
+        (await appResource.get()).locator(await selectorFactory()).getByRole(role, options).selector,
+      );
+    },
+    getByText(text: TextMatcher, options?: TextOptions) {
+      return createLazyMobileLocator(appResource, async () =>
+        (await appResource.get()).locator(await selectorFactory()).getByText(text, options).selector,
+      );
+    },
+    getByLabel(text: TextMatcher, options?: TextOptions) {
+      return createLazyMobileLocator(appResource, async () =>
+        (await appResource.get()).locator(await selectorFactory()).getByLabel(text, options).selector,
+      );
+    },
+    getByTestId(text: TextMatcher) {
+      return createLazyMobileLocator(appResource, async () =>
+        (await appResource.get()).locator(await selectorFactory()).getByTestId(text).selector,
       );
     },
   } satisfies MobileAndroidLocator;

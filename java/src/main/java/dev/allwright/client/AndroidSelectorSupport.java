@@ -96,6 +96,9 @@ final class AndroidSelectorSupport {
         if (lowered.startsWith("uia=") || lowered.startsWith("uia:")) {
             return new SelectorPrefix("uia", 4);
         }
+        if (lowered.startsWith("aw=") || lowered.startsWith("aw:")) {
+            return new SelectorPrefix("aw", 3);
+        }
         return null;
     }
 

@@ -175,6 +175,7 @@ enum SelectorFlavorInternal {
     Css,
     XPath,
     UiAutomator,
+    Semantic,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -211,6 +212,20 @@ struct NodeCriteria {
     selected: Option<bool>,
     index: Option<usize>,
     instance: Option<usize>,
+    semantic_role: Option<String>,
+    semantic_name: Option<SemanticTextMatcher>,
+    semantic_text: Option<SemanticTextMatcher>,
+    semantic_label: Option<SemanticTextMatcher>,
+    semantic_test_id: Option<SemanticTextMatcher>,
+    semantic_disabled: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SemanticTextMatcher {
+    value: String,
+    regex: bool,
+    flags: String,
+    exact: bool,
 }
 
 impl SurfacePlugin for MobileAndroidPlugin {
@@ -2014,6 +2029,50 @@ fn ancestor_chain_matches(
 }
 
 fn node_matches_criteria(node: &AndroidUiNode, criteria: &NodeCriteria) -> bool {
+    if let Some(role) = criteria.semantic_role.as_deref()
+        && android_semantic_role(node) != role
+    {
+        return false;
+    }
+    if let Some(matcher) = criteria.semantic_name.as_ref()
+        && !semantic_matches_any(
+            matcher,
+            [node.content_desc.as_deref(), node.text.as_deref()],
+        )
+    {
+        return false;
+    }
+    if let Some(matcher) = criteria.semantic_text.as_ref()
+        && !semantic_text_matches(node.text.as_deref(), matcher)
+    {
+        return false;
+    }
+    if let Some(matcher) = criteria.semantic_label.as_ref()
+        && !semantic_matches_any(
+            matcher,
+            [node.content_desc.as_deref(), node.text.as_deref()],
+        )
+    {
+        return false;
+    }
+    if let Some(matcher) = criteria.semantic_test_id.as_ref()
+        && !semantic_matches_any(
+            matcher,
+            [
+                node.resource_id.as_deref(),
+                node.resource_id
+                    .as_deref()
+                    .and_then(|value| value.rsplit('/').next()),
+            ],
+        )
+    {
+        return false;
+    }
+    if let Some(disabled) = criteria.semantic_disabled
+        && node.enabled != Some(!disabled)
+    {
+        return false;
+    }
     if let Some(expected) = criteria.class_name.as_deref()
         && node.class_name.as_deref() != Some(expected)
     {
@@ -2145,6 +2204,63 @@ fn node_matches_criteria(node: &AndroidUiNode, criteria: &NodeCriteria) -> bool 
     true
 }
 
+fn android_semantic_role(node: &AndroidUiNode) -> &'static str {
+    match node
+        .class_name
+        .as_deref()
+        .unwrap_or("")
+        .rsplit('.')
+        .next()
+        .unwrap_or("")
+    {
+        "Button" | "ImageButton" => "button",
+        "EditText" => "textbox",
+        "CheckBox" => "checkbox",
+        "RadioButton" => "radio",
+        "Switch" | "SwitchCompat" | "ToggleButton" => "switch",
+        "SeekBar" => "slider",
+        "ProgressBar" => "progressbar",
+        "Spinner" => "combobox",
+        "ListView" | "RecyclerView" => "list",
+        "ImageView" => "img",
+        "TextView" => "text",
+        _ => "generic",
+    }
+}
+
+fn semantic_matches_any<'a>(
+    matcher: &SemanticTextMatcher,
+    values: impl IntoIterator<Item = Option<&'a str>>,
+) -> bool {
+    values
+        .into_iter()
+        .any(|value| semantic_text_matches(value, matcher))
+}
+
+fn semantic_text_matches(actual: Option<&str>, matcher: &SemanticTextMatcher) -> bool {
+    let Some(actual) = actual else { return false };
+    if matcher.regex {
+        let flags: String = matcher
+            .flags
+            .chars()
+            .filter(|flag| matches!(flag, 'i' | 'm' | 's'))
+            .collect();
+        let pattern = if flags.is_empty() {
+            matcher.value.clone()
+        } else {
+            format!("(?{flags}:{})", matcher.value)
+        };
+        return Regex::new(&pattern).is_ok_and(|regex| regex.is_match(actual));
+    }
+    if matcher.exact {
+        actual == matcher.value
+    } else {
+        actual
+            .to_lowercase()
+            .contains(&matcher.value.to_lowercase())
+    }
+}
+
 fn parse_selector_segments(selector: &str) -> Result<Vec<SelectorSegment>, String> {
     let mut segments = Vec::new();
     let normalized = normalize_selector_for_transport(selector);
@@ -2158,6 +2274,8 @@ fn parse_selector_segments(selector: &str) -> Result<Vec<SelectorSegment>, Strin
             (SelectorFlavorInternal::XPath, 6usize)
         } else if remainder.starts_with("uia=") {
             (SelectorFlavorInternal::UiAutomator, 4usize)
+        } else if remainder.starts_with("aw=") {
+            (SelectorFlavorInternal::Semantic, 3usize)
         } else {
             return Err(format!("unsupported selector segment in `{trimmed}`"));
         };
@@ -2202,7 +2320,68 @@ fn selector_segment_to_criteria(segment: &SelectorSegment) -> Result<NodeCriteri
         SelectorFlavorInternal::Css => parse_css_criteria(&segment.value),
         SelectorFlavorInternal::XPath => parse_xpath_criteria(&segment.value),
         SelectorFlavorInternal::UiAutomator => parse_uiautomator_criteria(&segment.value),
+        SelectorFlavorInternal::Semantic => parse_semantic_criteria(&segment.value),
     }
+}
+
+fn parse_semantic_criteria(selector: &str) -> Result<NodeCriteria, String> {
+    let spec: serde_json::Value = serde_json::from_str(selector)
+        .map_err(|error| format!("invalid semantic mobile selector: {error}"))?;
+    let kind = spec["kind"]
+        .as_str()
+        .ok_or("semantic mobile selector requires `kind`")?;
+    let exact = spec["exact"].as_bool().unwrap_or(false);
+    let matcher = |key: &str| parse_semantic_matcher(&spec[key], exact);
+    let mut criteria = NodeCriteria::default();
+    match kind {
+        "role" => {
+            criteria.semantic_role = Some(
+                spec["role"]
+                    .as_str()
+                    .ok_or("getByRole requires `role`")?
+                    .to_ascii_lowercase(),
+            );
+            if !spec["name"].is_null() {
+                criteria.semantic_name = Some(matcher("name")?);
+            }
+            criteria.checked = spec["checked"].as_bool();
+            criteria.selected = spec["selected"].as_bool();
+            criteria.semantic_disabled = spec["disabled"].as_bool();
+        }
+        "text" => criteria.semantic_text = Some(matcher("text")?),
+        "label" => criteria.semantic_label = Some(matcher("text")?),
+        "testId" => criteria.semantic_test_id = Some(parse_semantic_matcher(&spec["text"], true)?),
+        other => {
+            return Err(format!(
+                "unsupported semantic mobile selector kind `{other}`"
+            ));
+        }
+    }
+    Ok(criteria)
+}
+
+fn parse_semantic_matcher(
+    value: &serde_json::Value,
+    exact: bool,
+) -> Result<SemanticTextMatcher, String> {
+    if let Some(value) = value.as_str() {
+        return Ok(SemanticTextMatcher {
+            value: value.to_string(),
+            regex: false,
+            flags: String::new(),
+            exact,
+        });
+    }
+    let pattern = value["regex"]
+        .as_str()
+        .ok_or("semantic text matcher must be a string or regular expression")?;
+    let flags = value["flags"].as_str().unwrap_or("");
+    Ok(SemanticTextMatcher {
+        value: pattern.to_string(),
+        regex: true,
+        flags: flags.to_string(),
+        exact: false,
+    })
 }
 
 fn parse_uiautomator_criteria(selector: &str) -> Result<NodeCriteria, String> {
@@ -2859,6 +3038,38 @@ mod tests {
         assert_eq!(
             bare_by_css_id.resource_id.as_deref(),
             Some("signup_first_name")
+        );
+    }
+
+    #[test]
+    fn matches_playwright_style_semantic_mobile_selectors() {
+        let nodes = parse_android_ui_nodes(sample_ui_hierarchy()).expect("xml should parse");
+        let selector = |spec: serde_json::Value| {
+            format!("aw={}", serde_json::to_string(&spec.to_string()).unwrap())
+        };
+
+        let account = find_node_by_selector(
+            &nodes,
+            &selector(serde_json::json!({"kind":"role", "role":"text", "name":"account", "selected":true})),
+        )
+        .expect("semantic role selector");
+        assert_eq!(account.text.as_deref(), Some("Account"));
+
+        let by_text = find_node_by_selector(
+            &nodes,
+            &selector(serde_json::json!({"kind":"text", "text":{"regex":"^Acc", "flags":"i"}})),
+        )
+        .expect("semantic text selector");
+        assert_eq!(by_text.text.as_deref(), Some("Account"));
+
+        let by_test_id = find_node_by_selector(
+            &nodes,
+            &selector(serde_json::json!({"kind":"testId", "text":"bottom_nav_account"})),
+        )
+        .expect("semantic test id selector");
+        assert_eq!(
+            by_test_id.resource_id.as_deref(),
+            Some("com.example.airticket:id/bottom_nav_account")
         );
     }
 

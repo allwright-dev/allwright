@@ -368,7 +368,7 @@ export const goReference: LanguageReference = {
           name: "(*AndroidApp).Locator",
           kind: "method",
           signature: "func (p *AndroidApp) Locator(selector string) *AndroidLocator",
-          description: "Builds a chainable locator scoped to the app. Android has no GetByRole-style semantic builders — only raw CSS/XPath/UiAutomator (text=, resourceId=, className=, clickable=true) selectors.",
+          description: "Builds a chainable locator scoped to the app. Android and iOS apps/locators also expose GetByRole, GetByText, GetByLabel, and GetByTestId with native accessibility semantics and automatic retries.",
           since: "v0.0.45 – v0.0.52",
         },
         {

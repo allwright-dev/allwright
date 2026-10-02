@@ -12,13 +12,13 @@ async function main(): Promise<void> {
   });
 
   try {
-    await app.locator("text=Login").click();
-    await app.locator("className=XCUIElementTypeTextField").fill("allwright@example.com");
-    await app.locator("className=XCUIElementTypeSecureTextField").fill("not-a-real-password");
-    await app.locator("text=Submit").click();
+    await app.getByRole("button", { name: "Login", exact: true }).click();
+    await app.getByLabel("Email", { exact: true }).fill("allwright@example.com");
+    await app.getByLabel("Password", { exact: true }).fill("not-a-real-password");
+    await app.getByRole("button", { name: "Submit", exact: true }).click();
 
     const alert = await app
-      .locator("text=No account found. Please sign up first.")
+      .getByText("No account found. Please sign up first.", { exact: true })
       .textContent();
     console.log(alert.text);
   } finally {

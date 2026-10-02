@@ -391,7 +391,7 @@ export const typescriptReference: LanguageReference = {
           name: "androidApp.locator",
           kind: "method",
           signature: "locator(selector: string): MobileAndroidLocator",
-          description: "Builds a chainable locator scoped to the app. Android has no getByRole-style semantic builders — only raw CSS/XPath/UiAutomator selectors.",
+          description: "Builds a chainable locator scoped to the app. Android and iOS apps/locators also expose getByRole, getByText, getByLabel, and getByTestId with native accessibility semantics and automatic retries.",
           since: "v0.0.45 – v0.0.52",
         },
         {
@@ -408,7 +408,7 @@ export const typescriptReference: LanguageReference = {
           signature: "launch(options?: MobileIosLaunchOptions): Promise<MobileIosApp>",
           description: "Downloads or unpacks an app (local .app, .zip/.ipa, or URL), installs it on the connected Simulator or device, and launches it. app_id is optional when an app path is given. The returned app uses the same locator and action set as Android.",
           since: "v0.1.18",
-          example: "const app = await device.launch({ appPath: \"https://allwright.dev/Flights-simulator.ipa\" });\nawait app.locator(\"text=Login\").click();",
+          example: "const app = await device.launch({ appPath: \"https://allwright.dev/Flights-simulator.ipa\" });\nawait app.getByRole(\"button\", { name: \"Login\", exact: true }).click();",
         },
       ],
     },

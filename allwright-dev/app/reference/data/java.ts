@@ -385,7 +385,7 @@ export const javaReference: LanguageReference = {
           name: "AndroidApp.locator",
           kind: "method",
           signature: "public AndroidLocator locator(String selector)",
-          description: "Builds a chainable locator scoped to the app. Android has no getByRole-style semantic builders — only raw CSS/XPath/UiAutomator selectors.",
+          description: "Builds a chainable locator scoped to the app. Android and iOS apps/locators also expose getByRole, getByText, getByLabel, and getByTestId with native accessibility semantics and automatic retries.",
           since: "v0.0.45 – v0.0.52",
         },
         {

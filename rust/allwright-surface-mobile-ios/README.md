@@ -45,7 +45,7 @@ Connect through a high-level client. TypeScript example:
    const app = await device.launch({
      appPath: "https://allwright.dev/Flights-simulator.ipa",
    });
-   await app.locator("text=Login").click();
+   await app.getByRole("button", { name: "Login", exact: true }).click();
    ```
 
 The public sample IPA contains a universal (`arm64` and `x86_64`) Simulator
@@ -66,6 +66,12 @@ default 10-second deadline is not appropriate.
 Selectors use the common mobile transport. `id=`/`css=#...` resolve iOS
 accessibility identifiers; `text=` resolves labels/values; `className=` accepts
 XCTest element type names; basic XPath name/label/type forms are supported.
+Apps and locators also expose Playwright-shaped `getByRole`, `getByText`,
+`getByLabel`, and `getByTestId` builders. Strings support exact or
+case-insensitive substring matching, regular expressions are supported, and
+role locators accept `name`, `checked`, `disabled`, and `selected`. Chained
+semantic locators stay scoped to native descendants and use the same automatic
+waiting as raw selectors.
 
 ## Physical devices
 

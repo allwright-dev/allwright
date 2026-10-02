@@ -9,6 +9,7 @@ from typing import TypeVar
 from ._proto import engine_pb2
 from ._transport import RuntimeClient, StreamHandle
 from ._hooks import Download, FileChooser, Hook, HookType
+from ._web_locators import TextMatcher, semantic_selector
 from ._types import (
     AccessibilitySnapshotOptions,
     AllwrightError,
@@ -95,6 +96,22 @@ class AndroidApp:
             page=self,
             selector=normalize_mobile_selector_for_transport(selector),
         )
+
+    def get_by_role(self, role: str, *, name: TextMatcher | None = None, exact: bool = False,
+                    checked: bool | None = None, disabled: bool | None = None,
+                    selected: bool | None = None) -> AndroidLocator:
+        spec = dict(kind="role", role=role, name=name, exact=exact, checked=checked,
+                    disabled=disabled, selected=selected)
+        return self.locator(semantic_selector({key: value for key, value in spec.items() if value is not None}))
+
+    def get_by_text(self, text: TextMatcher, *, exact: bool = False) -> AndroidLocator:
+        return self.locator(semantic_selector(dict(kind="text", text=text, exact=exact)))
+
+    def get_by_label(self, text: TextMatcher, *, exact: bool = False) -> AndroidLocator:
+        return self.locator(semantic_selector(dict(kind="label", text=text, exact=exact)))
+
+    def get_by_test_id(self, text: TextMatcher) -> AndroidLocator:
+        return self.locator(semantic_selector(dict(kind="testId", text=text)))
 
     def register_hook(self, hook_type: HookType[T]) -> Hook[T]:
         if hook_type.name not in {"file_chooser", "download"}:
@@ -607,6 +624,22 @@ class AndroidLocator:
             selector=chain_mobile_selector_for_transport(self.selector, selector),
         )
 
+    def get_by_role(self, role: str, *, name: TextMatcher | None = None, exact: bool = False,
+                    checked: bool | None = None, disabled: bool | None = None,
+                    selected: bool | None = None) -> AndroidLocator:
+        spec = dict(kind="role", role=role, name=name, exact=exact, checked=checked,
+                    disabled=disabled, selected=selected)
+        return self.locator(semantic_selector({key: value for key, value in spec.items() if value is not None}))
+
+    def get_by_text(self, text: TextMatcher, *, exact: bool = False) -> AndroidLocator:
+        return self.locator(semantic_selector(dict(kind="text", text=text, exact=exact)))
+
+    def get_by_label(self, text: TextMatcher, *, exact: bool = False) -> AndroidLocator:
+        return self.locator(semantic_selector(dict(kind="label", text=text, exact=exact)))
+
+    def get_by_test_id(self, text: TextMatcher) -> AndroidLocator:
+        return self.locator(semantic_selector(dict(kind="testId", text=text)))
+
     def click(self, options: CommandOptions | None = None) -> ClickResult:
         return self.page.click(self.selector, options)
 
@@ -794,6 +827,7 @@ class MobileSelectorFlavor:
     CSS = "css"
     XPATH = "xpath"
     UIA = "uia"
+    SEMANTIC = "aw"
 
 
 UIAUTOMATOR_SELECTOR_KEYS = {
@@ -836,6 +870,8 @@ def parse_explicit_mobile_selector_prefix(selector: str) -> tuple[str, int] | No
         return (MobileSelectorFlavor.XPATH, 6)
     if lowered.startswith("uia=") or lowered.startswith("uia:"):
         return (MobileSelectorFlavor.UIA, 4)
+    if lowered.startswith("aw=") or lowered.startswith("aw:"):
+        return (MobileSelectorFlavor.SEMANTIC, 3)
     prefix_len = parse_ui_automator_selector_prefix(lowered)
     if prefix_len is not None:
         return (MobileSelectorFlavor.UIA, prefix_len)
