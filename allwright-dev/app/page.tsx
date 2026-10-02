@@ -19,7 +19,7 @@ const surfaces = [
   },
   {
     label: "Mobile",
-    description: "Android and iOS Simulator run natively with automatic runtime and app setup, exposing the same Playwright-style client shape.",
+    description: "Android and iOS Simulators or registered devices run natively with automatic runtime and app setup, exposing the same Playwright-style client shape.",
     status: "Available now",
     position: { left: "94%", top: "10%" },
     icon: (

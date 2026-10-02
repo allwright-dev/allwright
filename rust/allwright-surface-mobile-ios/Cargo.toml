@@ -17,6 +17,7 @@ crate-type = ["rlib", "cdylib"]
 allwright-plugin-sdk = { path = "../allwright-plugin-sdk", version = "0.1.17" }
 allwright-surface-mobile = { path = "../allwright-surface-mobile", version = "0.1.17" }
 base64 = { workspace = true }
+plist = "1"
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

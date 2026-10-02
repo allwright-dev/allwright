@@ -343,7 +343,12 @@ fn plugin_install_is_complete(plugin_id: &str, runtime_artifact: &Path) -> bool 
 
 fn bundled_ios_agent_is_complete(install_root: &Path) -> bool {
     let agent_root = install_root.join("agent");
-    let has_xctestrun = fs::read_dir(&agent_root)
+    ios_agent_variant_is_complete(&agent_root.join("simulator"), "Release-iphonesimulator")
+        && ios_agent_variant_is_complete(&agent_root.join("device"), "Release-iphoneos")
+}
+
+fn ios_agent_variant_is_complete(agent_root: &Path, products_directory: &str) -> bool {
+    let has_xctestrun = fs::read_dir(agent_root)
         .ok()
         .into_iter()
         .flatten()
@@ -354,14 +359,10 @@ fn bundled_ios_agent_is_complete(install_root: &Path) -> bool {
                 .extension()
                 .is_some_and(|value| value == "xctestrun")
         });
-    let has_products = fs::read_dir(&agent_root)
-        .ok()
-        .into_iter()
-        .flatten()
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.is_dir())
-        .any(|products| products.join("AllwrightAgentUITests-Runner.app").is_dir());
+    let has_products = agent_root
+        .join(products_directory)
+        .join("AllwrightAgentUITests-Runner.app")
+        .is_dir();
     has_xctestrun && has_products
 }
 
@@ -729,13 +730,20 @@ mod tests {
             std::process::id()
         ));
         let agent = root.join("agent");
-        let products = agent.join("Release-iphonesimulator");
-        fs::create_dir_all(&products).unwrap();
+        let simulator = agent.join("simulator");
+        let simulator_products = simulator.join("Release-iphonesimulator");
+        let device = agent.join("device");
+        let device_products = device.join("Release-iphoneos");
+        fs::create_dir_all(&simulator_products).unwrap();
+        fs::create_dir_all(&device_products).unwrap();
 
         assert!(!bundled_ios_agent_is_complete(&root));
-        fs::write(agent.join("AllwrightIOSAgent.xctestrun"), b"plist").unwrap();
+        fs::write(simulator.join("AllwrightIOSAgent.xctestrun"), b"plist").unwrap();
         assert!(!bundled_ios_agent_is_complete(&root));
-        fs::create_dir(products.join("AllwrightAgentUITests-Runner.app")).unwrap();
+        fs::create_dir(simulator_products.join("AllwrightAgentUITests-Runner.app")).unwrap();
+        assert!(!bundled_ios_agent_is_complete(&root));
+        fs::write(device.join("AllwrightIOSAgent.xctestrun"), b"plist").unwrap();
+        fs::create_dir(device_products.join("AllwrightAgentUITests-Runner.app")).unwrap();
         assert!(bundled_ios_agent_is_complete(&root));
 
         fs::remove_dir_all(root).unwrap();

@@ -479,9 +479,10 @@ export default function HowItWorks() {
           <code className="font-mono text-[var(--ink)]">mobile-android</code>{" "}
           plugin and the same client code taps, types, and reads a real app
           over <code className="font-mono text-[var(--ink)]">adb</code> —
-          no Appium, no separate driver server. iOS Simulator automatically
-          provisions its runtime and installs the app under test from a local
-          path or URL. Desktop and API testing will follow the same model
+          no Appium, no separate driver server. iOS automatically provisions
+          its Simulator runtime or locally re-signs its prebuilt physical-device
+          agent, then installs the app under test from a local path or URL.
+          Desktop and API testing will follow the same model
           once their plugins ship — no new tool to learn, just one more{" "}
           <code className="font-mono text-[var(--ink)]">plugin install</code>{" "}
           for whichever surface you need next.
@@ -496,7 +497,7 @@ export default function HowItWorks() {
           Try it in your own project
         </h2>
         <p className="max-w-[46ch] text-sm leading-6 text-[var(--muted)]">
-          Web, Android, and iOS Simulator are ready today. Scaffold a project
+          Web, Android, and iOS are ready today. Scaffold a project
           with one command and run your first test against a real target.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">

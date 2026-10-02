@@ -76,7 +76,7 @@ Today, the plugin ecosystem looks like this:
 
 - `allwright`: installable CLI package that starts the engine server and manages plugin installation
 - `web` and `mobile-android`: installable runtime surface plugins loaded by the core at runtime
-- `mobile-ios`: an experimental installable macOS plugin with a bundled, auto-started headless XCUITest runner for iOS Simulators; physical-device signing and forwarding are still pending
+- `mobile-ios`: an experimental installable macOS plugin with bundled, auto-started headless XCUITest runners for iOS Simulators and physical devices; device runners are re-signed locally from the user's Apple development credentials
 - `desktop-mac`, `desktop-windows`, and `desktop-linux`: planned surface plugins with publishable crate boundaries, but not yet installable runtime artifacts
 
 What `plugin install` means today:
@@ -645,6 +645,6 @@ const yaml = await app.accessibilitySnapshot({ format: "yaml" });
 await app.locator(`ref=${node["aria-ref"]}`).click();
 ```
 
-Android uses a session-scoped cache of absolute XPath references without modifying the app or source XML. References expire and fail as stale when a fresh hierarchy differs; capture a new AI snapshot after screen changes. See the [Android snapshot contract](rust/allwright-surface-mobile-android/README.md#accessibility-snapshots) for modes and native limitations. iOS now has an experimental XCUITest-backed plugin with a bundled simulator runner that installs and starts automatically. The public [`Flights-simulator.ipa`](https://allwright.dev/Flights-simulator.ipa) is a universal Simulator sample that the plugin downloads, installs, and launches without manual provisioning; physical-device signing and forwarding are not yet automatic.
+Android uses a session-scoped cache of absolute XPath references without modifying the app or source XML. References expire and fail as stale when a fresh hierarchy differs; capture a new AI snapshot after screen changes. See the [Android snapshot contract](rust/allwright-surface-mobile-android/README.md#accessibility-snapshots) for modes and native limitations. iOS now has an experimental XCUITest-backed plugin with bundled Simulator and physical-device runners. The public [`Flights-simulator.ipa`](https://allwright.dev/Flights-simulator.ipa) is a universal Simulator sample that the plugin downloads, installs, and launches without manual provisioning. For a registered physical device, the plugin re-signs the prebuilt ARM64 runner from local Apple development credentials, forwards it through usbmuxd, and installs a supplied signed device `.app`/`.ipa` automatically.
 
 Web pages and locators also support reading the current URL, live input values, selected dropdown options and textbox text, checkbox/radio checked state, attributes, and bounding boxes. See the [state capture examples](typescript/core/README.md#read-page-and-element-state).

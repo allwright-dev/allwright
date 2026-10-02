@@ -18,7 +18,9 @@ use std::env;
 use std::ffi::{CStr, CString, c_char};
 use std::fs;
 use std::io::{Read, Write};
-use std::net::{Shutdown, TcpStream};
+use std::net::{Shutdown, TcpListener, TcpStream};
+#[cfg(unix)]
+use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, OnceLock};
@@ -33,12 +35,8 @@ const IOS_APP_KINDS: &[MobileAppKind] = &[
     MobileAppKind::Hybrid,
     MobileAppKind::BrowserWrapped,
 ];
-const IOS_MISSING_RUNTIME_ARTIFACTS: &[&str] =
-    &["automatic signed runner provisioning and usbmux forwarding for physical devices"];
-const IOS_NEXT_MILESTONES: &[&str] = &[
-    "package device-signed XCUITest runners and usbmux forwarding",
-    "add file chooser and download hooks",
-];
+const IOS_MISSING_RUNTIME_ARTIFACTS: &[&str] = &[];
+const IOS_NEXT_MILESTONES: &[&str] = &["add file chooser and download hooks"];
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct MobileIosPlugin;
@@ -73,7 +71,7 @@ pub fn profile() -> MobileSurfaceProfile {
             supports_shell_commands: false,
             supports_device_logs: false,
         },
-        bootstrap_hint: "The installed plugin starts its bundled XCUITest runner automatically for simulators. Physical devices currently require a signed runner and forwarded agent endpoint.",
+        bootstrap_hint: "The installed plugin starts its bundled XCUITest runner automatically. Simulator runners are ready to use; physical-device runners are re-signed from local Apple development credentials and forwarded through usbmuxd.",
     }
 }
 
@@ -256,7 +254,35 @@ fn plugin_install_root() -> Result<PathBuf, String> {
     Ok(PathBuf::from(home).join(".allwright/plugins/mobile-ios"))
 }
 
-fn bundled_agent_xctestrun() -> Result<PathBuf, String> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IosTargetKind {
+    Simulator,
+    Device,
+}
+
+impl IosTargetKind {
+    fn package_directory(self) -> &'static str {
+        match self {
+            Self::Simulator => "simulator",
+            Self::Device => "device",
+        }
+    }
+
+    fn products_directory(self) -> &'static str {
+        match self {
+            Self::Simulator => "Release-iphonesimulator",
+            Self::Device => "Release-iphoneos",
+        }
+    }
+}
+
+fn bundled_agent_root(kind: IosTargetKind) -> Result<PathBuf, String> {
+    Ok(plugin_install_root()?
+        .join("agent")
+        .join(kind.package_directory()))
+}
+
+fn bundled_agent_xctestrun(kind: IosTargetKind) -> Result<PathBuf, String> {
     if let Ok(path) = env::var("ALLWRIGHT_IOS_AGENT_XCTESTRUN") {
         let path = PathBuf::from(path);
         if path.is_file() {
@@ -268,7 +294,7 @@ fn bundled_agent_xctestrun() -> Result<PathBuf, String> {
         ));
     }
 
-    let agent_dir = plugin_install_root()?.join("agent");
+    let agent_dir = bundled_agent_root(kind)?;
     let entries = fs::read_dir(&agent_dir).map_err(|error| {
         format!(
             "the mobile-ios plugin has no bundled XCUITest agent at {}: {error}; reinstall it with `allwright plugin install mobile-ios`",
@@ -288,6 +314,21 @@ fn bundled_agent_xctestrun() -> Result<PathBuf, String> {
                 agent_dir.display()
             )
         })
+}
+
+fn bundled_agent_runner(kind: IosTargetKind) -> Result<PathBuf, String> {
+    let path = bundled_agent_root(kind)?
+        .join(kind.products_directory())
+        .join("AllwrightAgentUITests-Runner.app");
+    if path.is_dir() {
+        Ok(path)
+    } else {
+        Err(format!(
+            "the mobile-ios plugin archive is missing its {} runner at {}",
+            kind.package_directory(),
+            path.display()
+        ))
+    }
 }
 
 fn available_simulator(requested: Option<&str>) -> Result<(String, String), String> {
@@ -340,23 +381,34 @@ fn available_simulator(requested: Option<&str>) -> Result<(String, String), Stri
         .ok_or_else(|| "no available iOS Simulator was found".to_string())
 }
 
-fn start_bundled_agent(requested_device: Option<&str>) -> Result<String, String> {
-    let xctestrun = bundled_agent_xctestrun()?;
-    let (simulator_id, simulator_name) = available_simulator(requested_device)?;
+fn stop_owned_agent() -> Result<(), String> {
     let process = AGENT_PROCESS.get_or_init(|| Mutex::new(None));
     let mut process = process
         .lock()
         .map_err(|_| "iOS agent process lock is poisoned".to_string())?;
-    if let Some(child) = process.as_mut() {
-        if child
-            .try_wait()
-            .map_err(|error| error.to_string())?
-            .is_none()
-        {
-            return Ok(simulator_name);
-        }
+    if let Some(mut child) = process.take() {
+        let _ = child.kill();
+        let _ = child.wait();
     }
+    Ok(())
+}
 
+fn store_agent_process(child: Child) -> Result<(), String> {
+    let process = AGENT_PROCESS.get_or_init(|| Mutex::new(None));
+    let mut process = process
+        .lock()
+        .map_err(|_| "iOS agent process lock is poisoned".to_string())?;
+    *process = Some(child);
+    Ok(())
+}
+
+fn start_simulator_agent(
+    requested_device: Option<&str>,
+) -> Result<(String, String, String), String> {
+    let xctestrun = bundled_agent_xctestrun(IosTargetKind::Simulator)?;
+    let _ = bundled_agent_runner(IosTargetKind::Simulator)?;
+    let (simulator_id, simulator_name) = available_simulator(requested_device)?;
+    stop_owned_agent()?;
     let child = Command::new("xcodebuild")
         .arg("test-without-building")
         .arg("-xctestrun")
@@ -378,30 +430,649 @@ fn start_bundled_agent(requested_device: Option<&str>) -> Result<String, String>
                 xctestrun.display()
             )
         })?;
-    *process = Some(child);
-    Ok(simulator_name)
+    store_agent_process(child)?;
+    Ok((
+        simulator_id,
+        simulator_name,
+        DEFAULT_AGENT_ENDPOINT.to_string(),
+    ))
 }
 
-fn connect_agent(options: &ConnectOptions, endpoint: &str) -> Result<Value, String> {
-    match invoke_agent(endpoint, &AgentRequest::new("status"), options.timeout_ms) {
-        Ok(status) => return Ok(status),
-        Err(initial_error) if endpoint != DEFAULT_AGENT_ENDPOINT => return Err(initial_error),
+#[derive(Debug, Clone)]
+struct PhysicalDevice {
+    identifier: String,
+    udid: String,
+    name: String,
+}
+
+fn physical_device(requested: &str) -> Result<PhysicalDevice, String> {
+    let output_path = env::temp_dir().join(format!(
+        "allwright-devicectl-{}-{}.json",
+        std::process::id(),
+        unique_id("devices")
+    ));
+    let output = Command::new("xcrun")
+        .args(["devicectl", "list", "devices", "--json-output"])
+        .arg(&output_path)
+        .output()
+        .map_err(|error| format!("could not run `xcrun devicectl`: {error}"))?;
+    if !output.status.success() {
+        let _ = fs::remove_file(&output_path);
+        return Err(format!(
+            "`xcrun devicectl list devices` failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let bytes = fs::read(&output_path).map_err(|error| {
+        format!(
+            "could not read devicectl JSON {}: {error}",
+            output_path.display()
+        )
+    })?;
+    let _ = fs::remove_file(&output_path);
+    let document: Value = serde_json::from_slice(&bytes)
+        .map_err(|error| format!("devicectl returned invalid JSON: {error}"))?;
+    let devices = document
+        .pointer("/result/devices")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "devicectl JSON did not contain result.devices".to_string())?;
+    devices
+        .iter()
+        .filter_map(|device| {
+            let identifier = device.get("identifier")?.as_str()?.to_string();
+            let udid = device
+                .pointer("/hardwareProperties/udid")
+                .and_then(Value::as_str)
+                .unwrap_or(&identifier)
+                .to_string();
+            let name = device
+                .pointer("/deviceProperties/name")
+                .or_else(|| device.get("name"))?
+                .as_str()?
+                .to_string();
+            let platform = device
+                .pointer("/hardwareProperties/platform")
+                .and_then(Value::as_str)
+                .unwrap_or("iOS");
+            (platform.eq_ignore_ascii_case("iOS")
+                && (requested == identifier
+                    || requested == udid
+                    || requested.eq_ignore_ascii_case(&name)))
+            .then_some(PhysicalDevice {
+                identifier,
+                udid,
+                name,
+            })
+        })
+        .next()
+        .ok_or_else(|| format!("no connected iOS physical device matches `{requested}`"))
+}
+
+fn signing_identity() -> Result<String, String> {
+    if let Ok(identity) = env::var("ALLWRIGHT_IOS_SIGNING_IDENTITY")
+        && !identity.trim().is_empty()
+    {
+        return Ok(identity);
+    }
+    let output = Command::new("security")
+        .args(["find-identity", "-v", "-p", "codesigning"])
+        .output()
+        .map_err(|error| format!("could not inspect code-signing identities: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "`security find-identity` failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|line| line.contains("Apple Development") || line.contains("iPhone Developer"))
+        .find_map(|line| line.split('"').nth(1).map(str::to_string))
+        .ok_or_else(|| {
+            "no Apple Development signing identity was found; sign in to Xcode or set ALLWRIGHT_IOS_SIGNING_IDENTITY"
+                .to_string()
+        })
+}
+
+fn installed_provisioning_profiles() -> Vec<PathBuf> {
+    if let Ok(profile) = env::var("ALLWRIGHT_IOS_PROVISIONING_PROFILE")
+        && !profile.trim().is_empty()
+    {
+        return vec![PathBuf::from(profile)];
+    }
+    let Some(home) = env::var_os("HOME") else {
+        return Vec::new();
+    };
+    [
+        PathBuf::from(&home).join("Library/Developer/Xcode/UserData/Provisioning Profiles"),
+        PathBuf::from(&home).join("Library/MobileDevice/Provisioning Profiles"),
+    ]
+    .into_iter()
+    .filter_map(|directory| fs::read_dir(directory).ok())
+    .flatten()
+    .filter_map(Result::ok)
+    .map(|entry| entry.path())
+    .filter(|path| path.is_file())
+    .collect()
+}
+
+fn decode_provisioning_profile(path: &Path) -> Result<plist::Value, String> {
+    let output = Command::new("security")
+        .args(["cms", "-D", "-i"])
+        .arg(path)
+        .output()
+        .map_err(|error| format!("could not decode {}: {error}", path.display()))?;
+    if !output.status.success() {
+        return Err(format!(
+            "could not decode provisioning profile {}: {}",
+            path.display(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    plist::Value::from_reader(std::io::Cursor::new(output.stdout))
+        .map_err(|error| format!("invalid provisioning profile {}: {error}", path.display()))
+}
+
+fn profile_supports_device(profile: &plist::Value, udid: &str) -> bool {
+    profile
+        .as_dictionary()
+        .and_then(|dictionary| dictionary.get("ProvisionedDevices"))
+        .and_then(plist::Value::as_array)
+        .is_some_and(|devices| {
+            devices
+                .iter()
+                .filter_map(plist::Value::as_string)
+                .any(|candidate| candidate == udid)
+        })
+}
+
+fn profile_is_usable_for_development(profile: &plist::Value, udid: &str) -> bool {
+    let Some(dictionary) = profile.as_dictionary() else {
+        return false;
+    };
+    let development_enabled = dictionary
+        .get("Entitlements")
+        .and_then(plist::Value::as_dictionary)
+        .and_then(|entitlements| entitlements.get("get-task-allow"))
+        .and_then(plist::Value::as_boolean)
+        .unwrap_or(false);
+    let unexpired = dictionary
+        .get("ExpirationDate")
+        .and_then(plist::Value::as_date)
+        .is_some_and(|expiration| SystemTime::from(expiration) > SystemTime::now());
+    development_enabled && unexpired && profile_supports_device(profile, udid)
+}
+
+fn profile_is_safe_for_agent(profile: &plist::Value) -> bool {
+    profile
+        .as_dictionary()
+        .and_then(|dictionary| dictionary.get("Entitlements"))
+        .and_then(plist::Value::as_dictionary)
+        .and_then(|entitlements| entitlements.get("application-identifier"))
+        .and_then(plist::Value::as_string)
+        .is_some_and(|identifier| {
+            identifier.ends_with('*') || identifier.to_ascii_lowercase().contains("allwright")
+        })
+}
+
+fn provisioning_profile(udid: &str) -> Result<(PathBuf, plist::Value), String> {
+    let explicit = env::var("ALLWRIGHT_IOS_PROVISIONING_PROFILE").is_ok();
+    for path in installed_provisioning_profiles() {
+        let Ok(profile) = decode_provisioning_profile(&path) else {
+            continue;
+        };
+        if profile_is_usable_for_development(&profile, udid)
+            && (explicit || profile_is_safe_for_agent(&profile))
+        {
+            return Ok((path, profile));
+        }
+        if explicit {
+            return Err(format!(
+                "provisioning profile {} is expired, is not a development profile, or does not include physical device `{udid}`",
+                path.display()
+            ));
+        }
+    }
+    Err(format!(
+        "no unexpired wildcard or Allwright-specific iOS development provisioning profile includes device `{udid}`; create a dedicated agent profile, or set ALLWRIGHT_IOS_PROVISIONING_PROFILE explicitly"
+    ))
+}
+
+fn profile_entitlements(profile: &plist::Value) -> Result<plist::Dictionary, String> {
+    profile
+        .as_dictionary()
+        .and_then(|dictionary| dictionary.get("Entitlements"))
+        .and_then(plist::Value::as_dictionary)
+        .cloned()
+        .ok_or_else(|| "the provisioning profile has no Entitlements dictionary".to_string())
+}
+
+fn signed_runner_bundle_id(entitlements: &plist::Dictionary) -> Result<String, String> {
+    let application_identifier = entitlements
+        .get("application-identifier")
+        .and_then(plist::Value::as_string)
+        .ok_or_else(|| "the provisioning profile has no application-identifier".to_string())?;
+    let (_, bundle_pattern) = application_identifier.split_once('.').ok_or_else(|| {
+        "the provisioning profile application-identifier is malformed".to_string()
+    })?;
+    let bundle_id = if let Ok(bundle_id) = env::var("ALLWRIGHT_IOS_AGENT_BUNDLE_ID")
+        && !bundle_id.trim().is_empty()
+    {
+        bundle_id
+    } else if let Some(prefix) = bundle_pattern.strip_suffix('*') {
+        format!("{prefix}allwright-agent.xctrunner")
+    } else {
+        bundle_pattern.to_string()
+    };
+    let permitted = bundle_pattern == bundle_id
+        || bundle_pattern
+            .strip_suffix('*')
+            .is_some_and(|prefix| bundle_id.starts_with(prefix));
+    if permitted {
+        Ok(bundle_id)
+    } else {
+        Err(format!(
+            "iOS agent bundle id `{bundle_id}` is not permitted by provisioning profile pattern `{bundle_pattern}`"
+        ))
+    }
+}
+
+fn materialize_profile_entitlements(
+    entitlements: &mut plist::Dictionary,
+    bundle_id: &str,
+) -> Result<(), String> {
+    let application_identifier = entitlements
+        .get("application-identifier")
+        .and_then(plist::Value::as_string)
+        .ok_or_else(|| "the provisioning profile has no application-identifier".to_string())?;
+    let (team_prefix, _) = application_identifier.split_once('.').ok_or_else(|| {
+        "the provisioning profile application-identifier is malformed".to_string()
+    })?;
+    let concrete_application_identifier = format!("{team_prefix}.{bundle_id}");
+    entitlements.insert(
+        "application-identifier".to_string(),
+        plist::Value::String(concrete_application_identifier.clone()),
+    );
+    if let Some(groups) = entitlements
+        .get_mut("keychain-access-groups")
+        .and_then(plist::Value::as_array_mut)
+    {
+        for group in groups {
+            if group.as_string().is_some_and(|value| value.ends_with('*')) {
+                *group = plist::Value::String(concrete_application_identifier.clone());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn run_checked(command: &mut Command, description: &str) -> Result<(), String> {
+    let output = command
+        .output()
+        .map_err(|error| format!("could not {description}: {error}"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "failed to {description}: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
+    }
+}
+
+fn prepare_signed_device_agent(device: &PhysicalDevice) -> Result<PathBuf, String> {
+    let source_root = bundled_agent_root(IosTargetKind::Device)?;
+    let _ = bundled_agent_runner(IosTargetKind::Device)?;
+    let source_xctestrun = bundled_agent_xctestrun(IosTargetKind::Device)?;
+    let identity = signing_identity()?;
+    let (profile_path, profile) = provisioning_profile(&device.udid)?;
+    let mut entitlements = profile_entitlements(&profile)?;
+    let bundle_id = signed_runner_bundle_id(&entitlements)?;
+    materialize_profile_entitlements(&mut entitlements, &bundle_id)?;
+    let signed_root = plugin_install_root()?
+        .join("agent-signed")
+        .join(&device.udid);
+    if signed_root.exists() {
+        fs::remove_dir_all(&signed_root)
+            .map_err(|error| format!("failed to refresh {}: {error}", signed_root.display()))?;
+    }
+    fs::create_dir_all(&signed_root)
+        .map_err(|error| format!("failed to create {}: {error}", signed_root.display()))?;
+    run_checked(
+        Command::new("ditto").arg(&source_root).arg(&signed_root),
+        "copy the bundled physical-device runner",
+    )?;
+    let xctestrun_name = source_xctestrun
+        .file_name()
+        .ok_or_else(|| "bundled device xctestrun has no file name".to_string())?;
+    let xctestrun = signed_root.join(xctestrun_name);
+    let runner = signed_root
+        .join(IosTargetKind::Device.products_directory())
+        .join("AllwrightAgentUITests-Runner.app");
+    let test_bundle = runner.join("PlugIns/AllwrightAgentUITests.xctest");
+    fs::copy(&profile_path, runner.join("embedded.mobileprovision")).map_err(|error| {
+        format!(
+            "failed to embed provisioning profile {}: {error}",
+            profile_path.display()
+        )
+    })?;
+    run_checked(
+        Command::new("plutil")
+            .args(["-replace", "CFBundleIdentifier", "-string"])
+            .arg(&bundle_id)
+            .arg(runner.join("Info.plist")),
+        "update the signed runner bundle identifier",
+    )?;
+    run_checked(
+        Command::new("plutil")
+            .args([
+                "-replace",
+                "TestConfigurations.0.TestTargets.0.TestHostBundleIdentifier",
+                "-string",
+            ])
+            .arg(&bundle_id)
+            .arg(&xctestrun),
+        "update the device xctestrun bundle identifier",
+    )?;
+    run_checked(
+        Command::new("plutil")
+            .args([
+                "-insert",
+                "TestConfigurations.0.TestTargets.0.EnvironmentVariables.ALLWRIGHT_IOS_DEVICE_ID",
+                "-string",
+            ])
+            .arg(&device.udid)
+            .arg(&xctestrun),
+        "record the physical device id in the device xctestrun",
+    )?;
+    let entitlements_path = signed_root.join("AllwrightAgent.entitlements.plist");
+    plist::Value::Dictionary(entitlements)
+        .to_file_xml(&entitlements_path)
+        .map_err(|error| format!("failed to write signing entitlements: {error}"))?;
+    run_checked(
+        Command::new("codesign")
+            .args(["--force", "--sign"])
+            .arg(&identity)
+            .args(["--timestamp=none"])
+            .arg(&test_bundle),
+        "sign the Allwright XCTest bundle",
+    )?;
+    run_checked(
+        Command::new("codesign")
+            .args(["--force", "--sign"])
+            .arg(&identity)
+            .args(["--timestamp=none", "--entitlements"])
+            .arg(&entitlements_path)
+            .arg(&runner),
+        "sign the Allwright physical-device runner",
+    )?;
+    run_checked(
+        Command::new("codesign")
+            .args(["--verify", "--deep", "--strict"])
+            .arg(&runner),
+        "verify the signed Allwright physical-device runner",
+    )?;
+    Ok(xctestrun)
+}
+
+#[cfg(unix)]
+fn usbmux_request(
+    stream: &mut UnixStream,
+    payload: &plist::Value,
+    tag: u32,
+) -> Result<plist::Value, String> {
+    let mut body = Vec::new();
+    payload
+        .to_writer_xml(&mut body)
+        .map_err(|error| format!("failed to encode usbmuxd request: {error}"))?;
+    let length =
+        u32::try_from(body.len() + 16).map_err(|_| "usbmuxd request is too large".to_string())?;
+    for value in [length, 1, 8, tag] {
+        stream
+            .write_all(&value.to_le_bytes())
+            .map_err(|error| format!("failed to write usbmuxd header: {error}"))?;
+    }
+    stream
+        .write_all(&body)
+        .map_err(|error| format!("failed to write usbmuxd request: {error}"))?;
+    let mut header = [0_u8; 16];
+    stream
+        .read_exact(&mut header)
+        .map_err(|error| format!("failed to read usbmuxd response header: {error}"))?;
+    let response_length = u32::from_le_bytes(header[0..4].try_into().unwrap()) as usize;
+    if response_length < 16 || response_length > 16 * 1024 * 1024 {
+        return Err(format!(
+            "usbmuxd returned invalid frame length {response_length}"
+        ));
+    }
+    let mut response = vec![0_u8; response_length - 16];
+    stream
+        .read_exact(&mut response)
+        .map_err(|error| format!("failed to read usbmuxd response: {error}"))?;
+    plist::Value::from_reader(std::io::Cursor::new(response))
+        .map_err(|error| format!("usbmuxd returned an invalid plist: {error}"))
+}
+
+#[cfg(unix)]
+fn usbmux_dictionary(message_type: &str) -> plist::Dictionary {
+    let mut dictionary = plist::Dictionary::new();
+    dictionary.insert(
+        "BundleID".to_string(),
+        plist::Value::String("dev.allwright.mobile-ios".to_string()),
+    );
+    dictionary.insert(
+        "ClientVersionString".to_string(),
+        plist::Value::String(env!("CARGO_PKG_VERSION").to_string()),
+    );
+    dictionary.insert(
+        "MessageType".to_string(),
+        plist::Value::String(message_type.to_string()),
+    );
+    dictionary.insert(
+        "ProgName".to_string(),
+        plist::Value::String("allwright".to_string()),
+    );
+    dictionary.insert(
+        "kLibUSBMuxVersion".to_string(),
+        plist::Value::Integer(3.into()),
+    );
+    dictionary
+}
+
+#[cfg(unix)]
+fn usbmux_device_id(udid: &str) -> Result<u64, String> {
+    let mut stream = UnixStream::connect("/var/run/usbmuxd")
+        .map_err(|error| format!("could not connect to usbmuxd: {error}"))?;
+    let response = usbmux_request(
+        &mut stream,
+        &plist::Value::Dictionary(usbmux_dictionary("ListDevices")),
+        1,
+    )?;
+    response
+        .as_dictionary()
+        .and_then(|dictionary| dictionary.get("DeviceList"))
+        .and_then(plist::Value::as_array)
+        .into_iter()
+        .flatten()
+        .find_map(|device| {
+            let dictionary = device.as_dictionary()?;
+            let serial = dictionary
+                .get("Properties")?
+                .as_dictionary()?
+                .get("SerialNumber")?
+                .as_string()?;
+            (serial == udid)
+                .then(|| dictionary.get("DeviceID")?.as_unsigned_integer())
+                .flatten()
+        })
+        .ok_or_else(|| {
+            format!(
+                "usbmuxd cannot see physical device `{udid}` over USB or a paired network transport"
+            )
+        })
+}
+
+#[cfg(unix)]
+fn usbmux_connect(device_id: u64, port: u16) -> Result<UnixStream, String> {
+    let mut stream = UnixStream::connect("/var/run/usbmuxd")
+        .map_err(|error| format!("could not connect to usbmuxd: {error}"))?;
+    let mut request = usbmux_dictionary("Connect");
+    request.insert(
+        "DeviceID".to_string(),
+        plist::Value::Integer(device_id.into()),
+    );
+    request.insert(
+        "PortNumber".to_string(),
+        plist::Value::Integer(u64::from(port.to_be()).into()),
+    );
+    let response = usbmux_request(&mut stream, &plist::Value::Dictionary(request), 2)?;
+    let result = response
+        .as_dictionary()
+        .and_then(|dictionary| dictionary.get("Number"))
+        .and_then(plist::Value::as_unsigned_integer)
+        .unwrap_or(u64::MAX);
+    if result == 0 {
+        Ok(stream)
+    } else {
+        Err(format!(
+            "usbmuxd rejected port forwarding with result {result}"
+        ))
+    }
+}
+
+#[cfg(unix)]
+fn start_usbmux_forwarder(udid: &str, remote_port: u16) -> Result<String, String> {
+    let device_id = usbmux_device_id(udid)?;
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .map_err(|error| format!("could not bind the local iOS agent port: {error}"))?;
+    let local_port = listener
+        .local_addr()
+        .map_err(|error| format!("could not inspect the local iOS agent port: {error}"))?
+        .port();
+    thread::Builder::new()
+        .name(format!("allwright-usbmux-{udid}"))
+        .spawn(move || {
+            for incoming in listener.incoming() {
+                let Ok(mut local) = incoming else { continue };
+                thread::spawn(move || {
+                    let Ok(mut device) = usbmux_connect(device_id, remote_port) else {
+                        return;
+                    };
+                    let Ok(mut local_read) = local.try_clone() else {
+                        return;
+                    };
+                    let Ok(mut device_write) = device.try_clone() else {
+                        return;
+                    };
+                    let upload = thread::spawn(move || {
+                        let _ = std::io::copy(&mut local_read, &mut device_write);
+                        let _ = device_write.shutdown(Shutdown::Write);
+                    });
+                    let _ = std::io::copy(&mut device, &mut local);
+                    let _ = local.shutdown(Shutdown::Write);
+                    let _ = upload.join();
+                });
+            }
+        })
+        .map_err(|error| format!("could not start usbmuxd forwarding: {error}"))?;
+    Ok(format!("http://127.0.0.1:{local_port}"))
+}
+
+fn start_physical_device_agent(requested: &str) -> Result<(String, String, String), String> {
+    let device = physical_device(requested)?;
+    let xctestrun = prepare_signed_device_agent(&device)?;
+    #[cfg(unix)]
+    let endpoint = start_usbmux_forwarder(&device.udid, 8100)?;
+    #[cfg(not(unix))]
+    let endpoint = return Err("physical iOS devices require macOS usbmuxd".to_string());
+    stop_owned_agent()?;
+    let child = Command::new("xcodebuild")
+        .arg("test-without-building")
+        .arg("-xctestrun")
+        .arg(&xctestrun)
+        .arg("-destination")
+        .arg(format!("platform=iOS,id={}", device.udid))
+        .args([
+            "-parallel-testing-enabled",
+            "NO",
+            "-only-testing:AllwrightAgentUITests/AllwrightAgentUITests/testAgent",
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|error| {
+            format!(
+                "could not launch signed iOS agent {}: {error}",
+                xctestrun.display()
+            )
+        })?;
+    store_agent_process(child)?;
+    Ok((device.identifier, device.name, endpoint))
+}
+
+fn status_matches_request(status: &Value, requested: Option<&str>) -> bool {
+    let Some(requested) = requested else {
+        return true;
+    };
+    status.get("device_id").and_then(Value::as_str) == Some(requested)
+        || status
+            .get("device_name")
+            .and_then(Value::as_str)
+            .is_some_and(|name| name.eq_ignore_ascii_case(requested))
+}
+
+fn connect_agent(
+    options: &ConnectOptions,
+    configured_endpoint: &str,
+) -> Result<(Value, String), String> {
+    match invoke_agent(
+        configured_endpoint,
+        &AgentRequest::new("status"),
+        options.timeout_ms,
+    ) {
+        Ok(status) if status_matches_request(&status, options.device.as_deref()) => {
+            return Ok((status, configured_endpoint.to_string()));
+        }
+        Ok(_) if configured_endpoint != DEFAULT_AGENT_ENDPOINT => {
+            return Err(format!(
+                "iOS agent at `{configured_endpoint}` is not attached to requested device `{}`",
+                options.device.as_deref().unwrap_or("<unspecified>")
+            ));
+        }
+        Err(initial_error) if configured_endpoint != DEFAULT_AGENT_ENDPOINT => {
+            return Err(initial_error);
+        }
         Err(_) => {}
+        Ok(_) => {}
     }
 
-    let simulator_name = start_bundled_agent(options.device.as_deref())?;
+    let (_, device_name, endpoint) = match available_simulator(options.device.as_deref()) {
+        Ok(_) => start_simulator_agent(options.device.as_deref())?,
+        Err(simulator_error) if options.device.is_some() => {
+            start_physical_device_agent(options.device.as_deref().unwrap()).map_err(|device_error| {
+                format!(
+                    "requested iOS target matched neither an available Simulator nor a connected physical device; Simulator: {simulator_error}; device: {device_error}"
+                )
+            })?
+        }
+        Err(error) => return Err(error),
+    };
     let deadline =
         Instant::now() + Duration::from_millis(options.timeout_ms.unwrap_or(30_000).max(1) as u64);
     let mut last_error = String::new();
     while Instant::now() < deadline {
-        match invoke_agent(endpoint, &AgentRequest::new("status"), Some(1_000)) {
-            Ok(status) => return Ok(status),
+        match invoke_agent(&endpoint, &AgentRequest::new("status"), Some(1_000)) {
+            Ok(status) if status_matches_request(&status, options.device.as_deref()) => {
+                return Ok((status, endpoint));
+            }
+            Ok(_) => last_error = "agent reported a different device".to_string(),
             Err(error) => last_error = error,
         }
         thread::sleep(Duration::from_millis(250));
     }
     Err(format!(
-        "bundled XCUITest agent did not become ready on `{simulator_name}`: {last_error}"
+        "bundled XCUITest agent did not become ready on `{device_name}`: {last_error}"
     ))
 }
 
@@ -409,8 +1080,8 @@ pub fn connect(options: &ConnectOptions) -> Result<MobileConnectInfo, String> {
     if options.platform != MobilePlatform::Ios {
         return Err("mobile-ios connect only supports the iOS platform".to_string());
     }
-    let endpoint = endpoint_for_connect(options);
-    let status = connect_agent(options, &endpoint)?;
+    let configured_endpoint = endpoint_for_connect(options);
+    let (status, endpoint) = connect_agent(options, &configured_endpoint)?;
     let device_id = result_string(&status, "device_id")?.to_string();
     let device_name = result_string(&status, "device_name")?.to_string();
     if let Some(requested) = options.device.as_deref()
@@ -491,7 +1162,12 @@ pub fn launch_app(
                 .to_string()
         })?;
     if let Some(app) = resolved_app.as_ref() {
-        install_simulator_app(&browser_session.device.device_id, &app.path)?;
+        match browser_session.device.connection_kind {
+            DeviceConnectionKind::Emulator => {
+                install_simulator_app(&browser_session.device.device_id, &app.path)?;
+            }
+            _ => install_device_app(&browser_session.device.device_id, &app.path)?,
+        }
     }
     let endpoint = endpoint_from_session(browser_session)?;
     let mut request = AgentRequest::new("launch");
@@ -692,6 +1368,30 @@ fn install_simulator_app(device_id: &str, app: &Path) -> Result<(), String> {
     } else {
         Err(format!(
             "failed to install iOS Simulator app {}: {}. The bundle must be built for iOS Simulator, not a physical device",
+            app.display(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
+    }
+}
+
+fn install_device_app(device_id: &str, app: &Path) -> Result<(), String> {
+    let output = Command::new("xcrun")
+        .args([
+            "devicectl",
+            "device",
+            "install",
+            "app",
+            "--device",
+            device_id,
+        ])
+        .arg(app)
+        .output()
+        .map_err(|error| format!("could not run `xcrun devicectl device install app`: {error}"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "failed to install physical-device iOS app {}: {}. The app must contain an arm64 device binary signed for this device",
             app.display(),
             String::from_utf8_lossy(&output.stderr).trim()
         ))
@@ -1076,5 +1776,79 @@ mod tests {
         assert_eq!(find_primary_app_bundle(&root).unwrap(), Some(primary));
 
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn materializes_wildcard_signing_entitlements() {
+        let mut entitlements = plist::Dictionary::new();
+        entitlements.insert(
+            "application-identifier".to_string(),
+            plist::Value::String("TEAM123.com.example.*".to_string()),
+        );
+        entitlements.insert(
+            "keychain-access-groups".to_string(),
+            plist::Value::Array(vec![plist::Value::String(
+                "TEAM123.com.example.*".to_string(),
+            )]),
+        );
+
+        materialize_profile_entitlements(
+            &mut entitlements,
+            "com.example.allwright-agent.xctrunner",
+        )
+        .unwrap();
+
+        assert_eq!(
+            entitlements
+                .get("application-identifier")
+                .and_then(plist::Value::as_string),
+            Some("TEAM123.com.example.allwright-agent.xctrunner")
+        );
+        assert_eq!(
+            entitlements
+                .get("keychain-access-groups")
+                .and_then(plist::Value::as_array)
+                .and_then(|groups| groups.first())
+                .and_then(plist::Value::as_string),
+            Some("TEAM123.com.example.allwright-agent.xctrunner")
+        );
+    }
+
+    #[test]
+    fn matches_a_device_provisioning_profile_by_udid() {
+        let mut profile = plist::Dictionary::new();
+        profile.insert(
+            "ProvisionedDevices".to_string(),
+            plist::Value::Array(vec![plist::Value::String("device-123".to_string())]),
+        );
+        let profile = plist::Value::Dictionary(profile);
+
+        assert!(profile_supports_device(&profile, "device-123"));
+        assert!(!profile_supports_device(&profile, "device-456"));
+    }
+
+    #[test]
+    fn automatic_profile_selection_avoids_unrelated_exact_app_ids() {
+        let profile = |application_identifier: &str| {
+            let mut entitlements = plist::Dictionary::new();
+            entitlements.insert(
+                "application-identifier".to_string(),
+                plist::Value::String(application_identifier.to_string()),
+            );
+            let mut profile = plist::Dictionary::new();
+            profile.insert(
+                "Entitlements".to_string(),
+                plist::Value::Dictionary(entitlements),
+            );
+            plist::Value::Dictionary(profile)
+        };
+
+        assert!(profile_is_safe_for_agent(&profile("TEAM123.com.example.*")));
+        assert!(profile_is_safe_for_agent(&profile(
+            "TEAM123.com.example.allwright-agent"
+        )));
+        assert!(!profile_is_safe_for_agent(&profile(
+            "TEAM123.com.example.customer-app"
+        )));
     }
 }

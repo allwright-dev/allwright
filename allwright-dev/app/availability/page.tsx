@@ -6,7 +6,7 @@ import { SITE_NAME } from "../brand";
 import { StatusPill } from "../status-pill";
 
 const description =
-  "The honest, current picture of allwright: what web, Android, and iOS Simulator automation can do today, what desktop and API testing still need, and which client languages are published.";
+  "The honest, current picture of allwright: what web, Android, and iOS automation can do today, what desktop and API testing still need, and which client languages are published.";
 
 export const metadata: Metadata = {
   title: "Availability",
@@ -87,7 +87,9 @@ const androidNotYetAvailable = [
 
 const iosAvailable = [
   "Connect to an available iOS Simulator with no separate driver setup",
+  "Connect to a registered physical device; the prebuilt agent is discovered, re-signed, installed, and forwarded automatically",
   "Download a simulator .ipa or ZIP, or use a local .app bundle, then install and launch it automatically",
+  "Install and launch a signed physical-device .ipa, ZIP, or .app bundle without a manual install step",
   "Click, focus, fill, press keys, read text, wait for selectors, count elements, and capture screenshots",
   "Accessibility-id, text, XCTest element type, and basic XPath selectors",
   "Playwright-style action auto-waiting and retrying text, count, and visibility assertions",
@@ -95,7 +97,6 @@ const iosAvailable = [
 ];
 
 const iosNotYetAvailable = [
-  "Automatic physical-device signing, installation, and usbmux port forwarding",
   "Direct WebView DOM automation",
   "File chooser and download hooks",
   "Deep-link helpers",
@@ -119,8 +120,8 @@ export default function Availability() {
           &ldquo;Available&rdquo; should mean something specific: installed,
           working, and ready for your test suite. Web automation runs today
           against real Chromium and Firefox browsers, Android automation runs
-          on real devices and emulators, and iOS Simulator automation runs
-          natively — each with the actions, locators, and retrying
+          on real devices and emulators, and iOS automation runs natively on
+          Simulators and registered devices — each with the actions, locators, and retrying
           assertions everyday tests rely on. This page is the detailed,
           continuously updated picture behind the status pills you see
           elsewhere on the site — surface by surface, capability by
@@ -135,7 +136,7 @@ export default function Availability() {
             Surfaces
           </h2>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
-            Web, Mobile Android, and Mobile iOS Simulator have real,
+            Web, Mobile Android, and Mobile iOS have real,
             installable plugins today. The rest have a reserved place in the
             plugin catalog but no runtime build yet — installing them
             isn&apos;t possible until that changes.
@@ -272,7 +273,7 @@ export default function Availability() {
       <section aria-label="ios capabilities" className="mx-auto mt-14 w-full sm:mt-16">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
-            Mobile — iOS Simulator, capability by capability
+            Mobile — iOS, capability by capability
           </h2>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
             The mobile-ios plugin is installable on macOS and provisions the

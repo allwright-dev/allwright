@@ -559,17 +559,27 @@ jobs:
       - name: Build mobile-ios plugin library
         run: cargo build -p allwright-surface-mobile-ios --release --target ${{ matrix.target }}
 
-      - name: Build simulator XCUITest agent
+      - name: Build simulator and physical-device XCUITest agents
         run: |
           xcodebuild build-for-testing \
             -project swiftui/AllwrightIOSAgent/AllwrightIOSAgent.xcodeproj \
             -scheme AllwrightIOSAgent \
             -configuration Release \
             -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath target/ios-agent-derived \
+            -derivedDataPath target/ios-agent-simulator-derived \
             ARCHS='arm64 x86_64' \
             ONLY_ACTIVE_ARCH=NO \
             CODE_SIGN_IDENTITY=-
+
+          xcodebuild build-for-testing \
+            -project swiftui/AllwrightIOSAgent/AllwrightIOSAgent.xcodeproj \
+            -scheme AllwrightIOSAgent \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath target/ios-agent-device-derived \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Package release asset
         id: package
@@ -585,10 +595,15 @@ jobs:
           asset_path="dist/${asset_name}"
 
           rm -rf "$package_root" dist
-          mkdir -p "$package_root/lib" "$package_root/agent/Release-iphonesimulator"
+          mkdir -p \
+            "$package_root/lib" \
+            "$package_root/agent/simulator/Release-iphonesimulator" \
+            "$package_root/agent/device/Release-iphoneos"
           cp "target/${TARGET}/release/liballwright_surface_mobile_ios.dylib" "$package_root/lib/"
-          cp target/ios-agent-derived/Build/Products/*.xctestrun "$package_root/agent/"
-          cp -R target/ios-agent-derived/Build/Products/Release-iphonesimulator/AllwrightAgentUITests-Runner.app "$package_root/agent/Release-iphonesimulator/"
+          cp target/ios-agent-simulator-derived/Build/Products/*.xctestrun "$package_root/agent/simulator/"
+          cp -R target/ios-agent-simulator-derived/Build/Products/Release-iphonesimulator/AllwrightAgentUITests-Runner.app "$package_root/agent/simulator/Release-iphonesimulator/"
+          cp target/ios-agent-device-derived/Build/Products/*.xctestrun "$package_root/agent/device/"
+          cp -R target/ios-agent-device-derived/Build/Products/Release-iphoneos/AllwrightAgentUITests-Runner.app "$package_root/agent/device/Release-iphoneos/"
           tar -C "$package_root" -czf "$asset_path" .
 
           echo "asset_name=${asset_name}" >> "$GITHUB_OUTPUT"

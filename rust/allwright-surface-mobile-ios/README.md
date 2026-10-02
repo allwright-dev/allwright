@@ -23,8 +23,8 @@ and direct WebView DOM automation are not yet supported.
 
 ## Install and run
 
-The macOS release archive bundles the dylib, `.xctestrun`, and XCTest runner
-app. Install them together with:
+The macOS release archive bundles the dylib plus separate prebuilt Simulator
+and physical-device `.xctestrun`/runner app pairs. Install them together with:
 
 ```sh
 allwright plugin install mobile-ios
@@ -32,10 +32,9 @@ allwright plugin install mobile-ios
 
 The normal client auto-install path downloads the same archive when any bundled
 component is absent. On `mobile.ios.connect()`, the plugin selects the requested
-simulator (or a booted/available iPhone), starts the bundled runner with
-parallel testing disabled, and waits for port `8100`. The runner has no target
-host application, so it never presents an Allwright screen over the app under
-test.
+Simulator or physical device, starts the bundled runner with parallel testing
+disabled, and waits for port `8100`. The runner has no target host application,
+so it never presents an Allwright screen over the app under test.
 
 Connect through a high-level client. TypeScript example:
 
@@ -50,13 +49,13 @@ Connect through a high-level client. TypeScript example:
    ```
 
 The public sample IPA contains a universal (`arm64` and `x86_64`) Simulator
-build. `appPath` accepts a local `.app` directory, a local `.zip`/`.ipa` archive, or
-an HTTP(S) archive URL. The plugin downloads and extracts archives, installs the
-app on the selected simulator, reads its bundle identifier, and launches it.
+build. `appPath` accepts a local `.app` directory, a local `.zip`/`.ipa` archive,
+or an HTTP(S) archive URL. The plugin downloads and extracts archives, installs
+the app on the selected target, reads its bundle identifier, and launches it.
 `appId` is optional when `appPath` is present; when both are present they must
-match. The app bundle must be built for the iOS Simulator. Device `.ipa` files
-cannot run in a simulator, and physical-device installation/signing is not yet
-part of this path.
+match. Simulator bundles must contain a Simulator binary. Physical-device
+bundles must contain an ARM64 device binary with valid signing for that device;
+the two formats are not interchangeable.
 
 Actions and reads auto-wait inside the native bridge. `click`, `focus`, `fill`,
 and key input wait for the target to exist, be enabled, and become hittable;
@@ -68,9 +67,32 @@ Selectors use the common mobile transport. `id=`/`css=#...` resolve iOS
 accessibility identifiers; `text=` resolves labels/values; `className=` accepts
 XCTest element type names; basic XPath name/label/type forms are supported.
 
-## Physical-device constraint
+## Physical devices
 
-Simulator provisioning is automatic. Physical devices still need a runner
-signed for the developer team and host/device port forwarding; pass that
-forwarded URL as `agentEndpoint`. A custom endpoint intentionally disables the
-simulator auto-bootstrap path.
+Pass a connected device's name or UDID through the normal `device` connect
+option. The plugin copies the prebuilt ARM64 runner into its local cache,
+discovers an Apple Development identity and a provisioning profile containing
+that device, materializes wildcard entitlements, re-signs the runner, starts it
+through XCTest, and forwards port `8100` through the system usbmuxd socket. No
+agent source checkout, manual runner installation, or separate `iproxy`
+process is required.
+
+Apple still requires the device to be trusted, Developer Mode/UI Automation to
+be enabled, and the device to be registered in a local development provisioning
+profile. To avoid ever replacing an unrelated installed app, automatic
+discovery only uses wildcard or Allwright-specific profiles. A dedicated exact
+profile may be selected explicitly for CI or advanced setups:
+
+```sh
+export ALLWRIGHT_IOS_SIGNING_IDENTITY="Apple Development: Example (TEAMID)"
+export ALLWRIGHT_IOS_PROVISIONING_PROFILE=/path/to/profile.mobileprovision
+export ALLWRIGHT_IOS_AGENT_BUNDLE_ID=com.example.allwright-agent.xctrunner
+```
+
+`appPath` uses the same local path/archive/URL input for a physical device, but
+the contained `.app` must be an ARM64 device build already signed for that
+device. The plugin extracts and installs it automatically with `devicectl`.
+Simulator apps and physical-device apps are not interchangeable.
+
+Passing a custom `agentEndpoint` still disables automatic runner bootstrap and
+attaches to that endpoint directly.

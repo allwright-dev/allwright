@@ -46,7 +46,7 @@ export const surfaceStatus = [
   },
   {
     label: "Mobile",
-    detail: "Android and iOS Simulator are available with automatic runtime and app setup, using the same Playwright-style client shape.",
+    detail: "Android plus iOS Simulators and registered physical devices are available with automatic runtime and app setup, using the same Playwright-style client shape.",
     status: "Available now" as const,
   },
   { label: "Desktop", detail: "macOS, Windows, and Linux applications.", status: "Not yet available" as const },

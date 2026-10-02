@@ -94,7 +94,8 @@ final class AllwrightIOSAgent {
         switch command {
         case "status":
             let environment = ProcessInfo.processInfo.environment
-            let identifier = environment["SIMULATOR_UDID"]
+            let identifier = environment["ALLWRIGHT_IOS_DEVICE_ID"]
+                ?? environment["SIMULATOR_UDID"]
                 ?? UIDevice.current.identifierForVendor?.uuidString
                 ?? "ios-device"
             return .success([

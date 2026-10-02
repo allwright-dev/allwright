@@ -193,7 +193,7 @@ async function selectSurfaces(interactive: boolean): Promise<SurfaceId[]> {
         ? "browser automation"
         : surface.value === "mobile-android"
           ? "Android app automation"
-          : "iOS Simulator automation",
+          : "iOS app automation",
     })),
     required: true,
   });
@@ -466,8 +466,8 @@ function generatedReadmeContents(surfaces: SurfaceId[]): string {
 
   if (hasSurface(surfaces, "mobile-ios")) {
     nextSteps.push(
-      `${step++}. Start an iOS Simulator.`,
-      `${step++}. The first iOS run downloads and installs the Flights simulator IPA configured in \`allwright.config.yaml\`; no manual app or agent installation is needed.`,
+      `${step++}. Start an iOS Simulator, or connect a registered physical device with Developer Mode and UI Automation enabled.`,
+      `${step++}. The first Simulator run downloads and installs the Flights IPA configured in \`allwright.config.yaml\`; physical-device apps must use a signed device build. No manual app or agent installation is needed.`,
     );
   }
 
