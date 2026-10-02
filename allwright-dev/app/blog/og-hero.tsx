@@ -162,6 +162,47 @@ function AndroidOgDiagram() {
   );
 }
 
+function IosOgDiagram() {
+  const { width, height } = DIAGRAM_SIZE;
+  const midY = 132;
+  const coreX = 172;
+
+  return (
+    <div style={{ position: "relative", width, height, display: "flex" }}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ position: "absolute", left: 0, top: 0 }}>
+        <rect x={0} y={midY - 40} width={84} height={80} rx={16} fill="#3178C6" />
+        <line x1={90} y1={midY} x2={coreX - 44} y2={midY} stroke={MUTED} strokeWidth={2} />
+
+        <circle cx={coreX} cy={midY} r={44} fill="rgba(14,159,142,0.16)" stroke={BRAND_TO} strokeWidth={2} />
+
+        <line x1={coreX + 44} y1={midY - 14} x2={306} y2={midY - 50} stroke={BRAND_TO} strokeWidth={2} />
+        <line x1={coreX + 44} y1={midY + 14} x2={306} y2={midY + 50} stroke={BRAND_TO} strokeWidth={2} />
+
+        {/* Simulator phone */}
+        <rect x={322} y={midY - 100} width={56} height={84} rx={14} fill="none" stroke={LINE} strokeWidth={2} />
+        <rect x={340} y={midY - 94} width={20} height={4} rx={2} fill={MUTED} />
+        {/* Physical device phone */}
+        <rect x={322} y={midY + 16} width={56} height={84} rx={14} fill="none" stroke={LINE} strokeWidth={2} />
+        <rect x={340} y={midY + 22} width={20} height={4} rx={2} fill={MUTED} />
+      </svg>
+
+      <div style={{ position: "absolute", left: 42, top: midY - 22, transform: "translate(-50%,-50%)", display: "flex", fontSize: 24, fontWeight: 700, color: "#ffffff" }}>
+        TS
+      </div>
+      <div style={{ position: "absolute", left: coreX, top: midY - 20, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ display: "flex", fontSize: 14, fontWeight: 700, color: INK_SOFT }}>allwright</div>
+        <div style={{ display: "flex", fontSize: 11, color: MUTED, marginTop: 2 }}>core</div>
+      </div>
+      <div style={{ position: "absolute", left: 392, top: midY - 64, display: "flex", fontSize: 13, fontWeight: 600, color: INK }}>
+        Simulator
+      </div>
+      <div style={{ position: "absolute", left: 392, top: midY + 52, display: "flex", fontSize: 13, fontWeight: 600, color: INK }}>
+        iPhone
+      </div>
+    </div>
+  );
+}
+
 // Same "today, then dashed road ahead" story as RoadmapHero in
 // hero-image.tsx, compressed to fit the thumbnail: a solid line from day
 // one to today's filled milestone, a dashed line on to v0.1.0.
@@ -431,6 +472,7 @@ const ogHeroRegistry: Record<string, () => React.ReactElement> = {
   "v0-1-0-is-here": MilestoneOgDiagram,
   "hooks-popups-uploads-downloads": HooksOgDiagram,
   "iframes-as-pages": IframesOgDiagram,
+  "ios-testing-simulators-and-devices": IosOgDiagram,
 };
 
 /** Returns the post's diagram element for its social-preview card, or null for posts without one (their card falls back to a text-only layout). */

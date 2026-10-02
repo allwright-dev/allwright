@@ -200,10 +200,10 @@ we said web was "driverless but early." **Update:** `count_elements`,
 `get_text`, `focus`, and `press` have since landed too, and screenshots now
 support a full-page scroll-and-stitch capture the same way web does — so
 Android assertions can read state directly now, not just infer it from
-`click`/`fill`. `hover` and `highlight` stay web-only for now. iOS, desktop,
+`click`/`fill`. `hover` and `highlight` stay web-only for now. Desktop
 and API are still exactly where our
 [architecture post](/blog/why-allwright-if-playwright-exists) left them:
-reserved plugin slots, not yet installable. [Availability](/availability) and
+reserved plugin slots, not yet installable; iOS has since shipped (see below). [Availability](/availability) and
 [How it works](/how-it-works) now reflect Android's real status — this post
 originally got ahead of the site; it's caught up since.
 
@@ -217,4 +217,5 @@ originally got ahead of the site; it's caught up since.
   for the architecture this fixture is actually proving out.
 - Star or watch [the repo](https://github.com/allwright-dev/allwright) —
   `count_elements`/`get_text`/`wait_for_selector` shipped since this post
-  went up (see the update above) — iOS is next.
+  went up (see the update above) — and iOS has landed too:
+  see [iOS testing, now on Simulators and real iPhones](/blog/ios-testing-simulators-and-devices).

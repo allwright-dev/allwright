@@ -15,6 +15,17 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "v0.1.16 – v0.1.18",
+    date: "2026-10-02",
+    title: "iOS automation arrives",
+    highlights: [
+      "Mobile iOS is now available across all five clients: connect to an iOS Simulator or a registered physical iPhone, then launch an app from a local .app, a .zip/.ipa, or a URL. allwright installs the runtime and the app for you — there is no separate driver to set up and no manual install step.",
+      "iOS apps use the same locator and action set as Android: click, fill, focus, press, count, text reads, selector waits, and screenshots, with accessibility-id, text, element-type, and basic XPath selectors. Actions wait for their target automatically, so tests don't need polling loops.",
+      "@allwright.dev/vitest adds ios and iosApp fixtures, configured through the mobile.ios section of allwright.config.yaml, and npm init allwright can now scaffold an iOS project with --ios. The public Flights-simulator.ipa sample works out of the box.",
+      "iOS runs on macOS. File chooser and download hooks, deep-link helpers, and direct WebView DOM automation are not available yet.",
+    ],
+  },
+  {
     version: "v0.1.14",
     date: "2026-09-24",
     title: "Read page and element state",

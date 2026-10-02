@@ -289,7 +289,7 @@ export const goReference: LanguageReference = {
       slug: "mobile",
       title: "Mobile",
       description:
-        "Android automation over adb — no Appium, no separate driver server. Reached through the Mobile package variable; iOS has no runtime yet.",
+        "Android automation over adb — no Appium, no separate driver server. Reached through the Mobile package variable, for both Android and iOS.",
       members: [
         {
           name: "Mobile.Android.Connect",
@@ -370,6 +370,22 @@ export const goReference: LanguageReference = {
           signature: "func (p *AndroidApp) Locator(selector string) *AndroidLocator",
           description: "Builds a chainable locator scoped to the app. Android has no GetByRole-style semantic builders — only raw CSS/XPath/UiAutomator (text=, resourceId=, className=, clickable=true) selectors.",
           since: "v0.0.45 – v0.0.52",
+        },
+        {
+          name: "Mobile.IOS.Connect",
+          kind: "method",
+          signature: "func (IOSSurface) Connect(ctx context.Context, options MobileIOSConnectOptions) (*IOSDevice, error)",
+          description: "Connects to an iOS Simulator or a registered physical device (by name or UDID, or the first one available) and returns a device handle. The runtime is installed and started automatically.",
+          since: "v0.1.18",
+          example: "device, _ := allwright.Mobile.IOS.Connect(ctx, allwright.MobileIOSConnectOptions{Device: \"iPhone 17 Pro\"})",
+        },
+        {
+          name: "iOS device launch",
+          kind: "method",
+          signature: "func (d *IOSDevice) Launch(ctx context.Context, options MobileIOSLaunchOptions) (*IOSApp, error)",
+          description: "Downloads or unpacks an app (local .app, .zip/.ipa, or URL), installs it on the connected Simulator or device, and launches it. app_id is optional when an app path is given. The returned app uses the same locator and action set as Android.",
+          since: "v0.1.18",
+          example: "app, _ := device.Launch(ctx, allwright.MobileIOSLaunchOptions{AppPath: \"https://allwright.dev/Flights-simulator.ipa\"})",
         },
       ],
     },

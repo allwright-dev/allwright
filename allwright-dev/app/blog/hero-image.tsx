@@ -632,6 +632,74 @@ function IframesHero({ variant }: { variant?: HeroVariant }) {
   );
 }
 
+function IosHero({ variant }: { variant?: HeroVariant }) {
+  const targets = [
+    { label: "iOS Simulator", sub: "Flights-simulator.ipa", y: 70 },
+    { label: "Registered iPhone", sub: "signed device build", y: 260 },
+  ];
+
+  return (
+    <HeroFrame
+      variant={variant}
+      label="A TypeScript client node with an arrow into the allwright core, and two arrows out of the core: one into an iOS Simulator phone and one into a registered physical iPhone, both driven with the same iosApp.locator click and fill calls"
+    >
+      <defs>
+        <ArrowMarker id="hero-ios-arrow" />
+      </defs>
+
+      <text x={380} y={196} textAnchor="middle" fontSize="14" fontFamily="var(--font-mono)" fill="var(--muted)">
+        mobile.ios.connect
+      </text>
+      <line x1={230} y1={230} x2={494} y2={230} stroke="currentColor" strokeWidth="1.4" markerEnd="url(#hero-ios-arrow)" />
+
+      {/* TypeScript node */}
+      <rect x={90} y={170} width={140} height={120} rx={24} fill="#3178C6" />
+      <text x={160} y={246} textAnchor="middle" fontSize="52" fontWeight="700" fill="#ffffff" fontFamily="var(--font-mono)">
+        TS
+      </text>
+      <text x={160} y={140} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--ink)">
+        TypeScript client
+      </text>
+
+      {/* allwright core */}
+      <circle cx={560} cy={230} r={66} fill="var(--accent-soft)" stroke="var(--accent-2)" strokeWidth="1.6" />
+      <text x={560} y={224} textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--accent-2)">
+        allwright
+      </text>
+      <text x={560} y={246} textAnchor="middle" fontSize="13" fill="var(--accent-2)">
+        core
+      </text>
+
+      <line x1={624} y1={205} x2={800} y2={150} stroke="currentColor" strokeWidth="1.4" markerEnd="url(#hero-ios-arrow)" />
+      <line x1={624} y1={255} x2={800} y2={320} stroke="currentColor" strokeWidth="1.4" markerEnd="url(#hero-ios-arrow)" />
+      <text x={700} y={170} textAnchor="middle" fontSize="12.5" fontFamily="var(--font-mono)" fill="var(--muted)">
+        iosApp.click
+      </text>
+      <text x={700} y={318} textAnchor="middle" fontSize="12.5" fontFamily="var(--font-mono)" fill="var(--muted)">
+        iosApp.fill
+      </text>
+
+      {targets.map((t) => (
+        <g key={t.label}>
+          {/* Phone outline with a home indicator and tap ripple */}
+          <rect x={820} y={t.y} width={92} height={150} rx={22} fill="var(--background)" stroke="currentColor" strokeWidth="1" />
+          <rect x={848} y={t.y + 12} width={36} height={8} rx={4} fill="var(--muted)" opacity="0.6" />
+          <rect x={850} y={t.y + 134} width={32} height={4} rx={2} fill="var(--muted)" opacity="0.6" />
+          <circle cx={866} cy={t.y + 78} r={20} fill="none" stroke="var(--accent)" strokeWidth="1.4" opacity="0.55" />
+          <circle cx={866} cy={t.y + 78} r={10} fill="none" stroke="var(--accent)" strokeWidth="1.4" />
+          <circle cx={866} cy={t.y + 78} r={3} fill="var(--accent)" />
+          <text x={940} y={t.y + 66} fontSize="15" fontWeight="600" fill="var(--ink)">
+            {t.label}
+          </text>
+          <text x={940} y={t.y + 88} fontSize="12" fontFamily="var(--font-mono)" fill="var(--muted)">
+            {t.sub}
+          </text>
+        </g>
+      ))}
+    </HeroFrame>
+  );
+}
+
 function DefaultHero({ variant }: { variant?: HeroVariant }) {
   return (
     <HeroFrame variant={variant} label="The allwright logo mark on a gradient card">
@@ -662,6 +730,7 @@ const heroRegistry: Record<string, (props: { variant?: HeroVariant }) => React.R
   "v0-1-0-is-here": MilestoneHero,
   "hooks-popups-uploads-downloads": HooksHero,
   "iframes-as-pages": IframesHero,
+  "ios-testing-simulators-and-devices": IosHero,
 };
 
 export function HeroImage({ slug, variant }: { slug: string; variant?: HeroVariant }) {

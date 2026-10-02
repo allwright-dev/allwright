@@ -296,7 +296,7 @@ export const rustReference: LanguageReference = {
       slug: "mobile",
       title: "Mobile",
       description:
-        "Android automation over adb — no Appium, no separate driver server. Reached through the allwright::mobile::android module; iOS has no runtime yet. Android methods take options directly, without a *_with_options split.",
+        "Android automation over adb — no Appium, no separate driver server. Reached through the allwright::mobile::android and allwright::mobile::ios modules. Android methods take options directly, without a *_with_options split.",
       members: [
         {
           name: "mobile::android::connect",
@@ -376,6 +376,22 @@ export const rustReference: LanguageReference = {
           signature: "pub fn locator(&self, selector: impl Into<String>) -> AndroidLocator",
           description: "Builds a chainable locator scoped to the app. Android has no get_by_role-style semantic builders — only raw CSS/id=/xpath=/uia= selectors.",
           since: "v0.0.45 – v0.0.52",
+        },
+        {
+          name: "mobile::ios::connect",
+          kind: "function",
+          signature: "pub async fn connect(options: MobileIosConnectOptions) -> Result<IosDevice>",
+          description: "Connects to an iOS Simulator or a registered physical device (by name or UDID, or the first one available) and returns a device handle. The runtime is installed and started automatically.",
+          since: "v0.1.18",
+          example: "let device = mobile::ios::connect(MobileIosConnectOptions { device: Some(\"iPhone 17 Pro\".into()), ..Default::default() }).await?;",
+        },
+        {
+          name: "iOS device launch",
+          kind: "method",
+          signature: "pub async fn launch(&self, options: MobileIosLaunchOptions) -> Result<IosApp>",
+          description: "Downloads or unpacks an app (local .app, .zip/.ipa, or URL), installs it on the connected Simulator or device, and launches it. app_id is optional when an app path is given. The returned app uses the same locator and action set as Android.",
+          since: "v0.1.18",
+          example: "let app = device.launch(MobileIosLaunchOptions { app_path: Some(\"https://allwright.dev/Flights-simulator.ipa\".into()), ..Default::default() }).await?;",
         },
       ],
     },

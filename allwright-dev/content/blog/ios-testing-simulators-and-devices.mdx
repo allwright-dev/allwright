@@ -1,0 +1,184 @@
+---
+title: "iOS testing, now on Simulators and real iPhones"
+description: "allwright now drives iOS apps on Simulators and registered iPhones with the same Playwright-style API as web and Android, and no driver to set up."
+date: "2026-10-02"
+author: "The allwright team"
+published: true
+tags: ["ios", "mobile", "vitest", "release", "changelog", "xcuitest"]
+keywords:
+  [
+    "ios test automation typescript",
+    "ios simulator testing",
+    "ios testing without appium",
+    "playwright style ios testing",
+    "real iphone test automation",
+    "vitest ios testing",
+    "allwright ios",
+    "cross platform mobile test automation",
+  ]
+---
+
+Mobile iOS is available. As of v0.1.18, allwright drives native iOS apps on
+iOS Simulators and on registered physical iPhones, from all five client
+languages, with the same locators, actions, and retrying assertions you already
+use for web and Android.
+
+That finishes the mobile story we started when we
+[announced Android](/blog/android-testing-playwright-style): one test file, one
+config, one engine, and now Web, Android, and iOS are all real surfaces you can
+install today. Our [Availability](/availability) and
+[How it works](/how-it-works) pages already reflect it.
+
+## What you can do
+
+- **Connect** to a Simulator or a registered iPhone by name or UDID, or let
+  allwright pick one.
+- **Launch an app** from a local `.app`, a `.zip` or `.ipa`, or a URL.
+  allwright downloads, unpacks, installs, and launches it for you. You don't
+  install the app by hand, and you don't install a driver.
+- **Click, fill, focus, press keys, count elements, read text, wait for
+  selectors, and take screenshots**, using accessibility-id, text,
+  element-type, and basic XPath selectors.
+- **Assert with retries** through `@allwright.dev/vitest`: `toHaveText`,
+  `toContainText`, `toHaveCount`, and `toBeVisible`, negatable, with the same
+  timeout controls as web.
+
+Actions wait for their target automatically: an element has to exist, be
+enabled, and be tappable before a click or fill goes through, and text reads
+wait for the element to exist. Your tests don't need sleeps or polling loops
+around mobile commands. Pass a per-call `timeoutMs` only when the default
+10 seconds isn't right.
+
+## Step by step: your first iOS test
+
+iOS automation runs on macOS, so you need a Mac with Xcode installed and an
+iOS Simulator runtime available.
+
+### 1. Scaffold a project
+
+If you don't have a project yet, the initializer can set one up with an iOS
+surface:
+
+```bash
+npm init allwright@latest ios-tests -- --typescript --ios
+cd ios-tests
+```
+
+Already have an allwright project? Skip to step 2. The scaffold writes
+`tests/ios.spec.ts` and the config below for you.
+
+### 2. Point your config at an iOS app
+
+```yaml
+schemaVersion: 1
+
+mobile:
+  ios:
+    device: iPhone 17 Pro   # optional: omit to use an available Simulator
+    app:
+      binary: https://allwright.dev/Flights-simulator.ipa
+```
+
+`binary` takes a local path or a URL. The Flights sample is a public
+Simulator build, so you can try everything here without your own app. Use your
+own `.app`, `.zip`, or `.ipa` when you're ready. A Simulator build and a
+physical-device build are not interchangeable, so give each target a build
+made for it.
+
+### 3. Write the test
+
+```ts
+import { expect, test } from "@allwright.dev/vitest";
+
+test("logs in to the Flights app", { timeout: 180_000 }, async ({ iosApp }) => {
+  await iosApp.locator("text=Login").click();
+  await iosApp.locator("className=XCUIElementTypeTextField").fill("allwright@example.com");
+  await iosApp.locator("className=XCUIElementTypeSecureTextField").fill("not-a-real-password");
+  await iosApp.locator("text=Submit").click();
+
+  await expect(iosApp.locator("text=No account found. Please sign up first.")).toBeVisible();
+});
+```
+
+`iosApp` is injected like `page` and `androidApp`. It's lazy: the Simulator
+connects and the app installs and launches the first time the test actually
+uses it.
+
+### 4. Run it
+
+```bash
+npm test
+```
+
+The first run installs the iOS plugin automatically, then the app, so give it
+a little longer than a later run. If you'd rather do that up front:
+
+```bash
+allwright plugin install mobile-ios
+```
+
+### Selectors
+
+| Selector | Matches |
+|---|---|
+| `text=Login` | A label or value |
+| `id=login-button` | An accessibility identifier |
+| `className=XCUIElementTypeTextField` | An element type |
+| `xpath=//XCUIElementTypeButton[@name="Submit"]` | Basic name, label, and type forms |
+
+## Real iPhones
+
+Point `device` at a connected iPhone's name or UDID and run the same test.
+allwright takes care of the runtime and installs your device build; Apple's own
+requirements still apply, and no tool can skip them:
+
+- The device is trusted by your Mac, with Developer Mode and UI Automation
+  turned on.
+- The device is registered in a local Apple Development provisioning profile,
+  and you have a matching Apple Development signing identity on your Mac.
+- The app you supply is a device build already signed for that iPhone.
+
+For CI or a dedicated test setup you can choose the signing identity and
+provisioning profile explicitly with `ALLWRIGHT_IOS_SIGNING_IDENTITY` and
+`ALLWRIGHT_IOS_PROVISIONING_PROFILE`.
+
+## Web and mobile in one test
+
+Like Android, iOS shares a process with every other surface:
+
+```ts
+test("web and iOS, one process", async ({ page, iosApp }) => {
+  await page.goto("https://themoderninternet.vercel.app");
+  await expect(page.locator("//h1[text()='Form Inputs']")).toBeVisible();
+
+  await iosApp.locator("text=Login").click();
+});
+```
+
+One `npm test`, one config file, one retrying `expect`, three surfaces if you
+add Android too.
+
+## The honest status line
+
+iOS is experimental, the same way we described web and Android when they
+launched. Not available yet:
+
+- Direct WebView DOM automation. Hybrid apps can be driven through their native
+  elements only.
+- File chooser and download hooks.
+- Deep-link helpers.
+- Hover and highlight, which stay web-only.
+
+Desktop and API automation are still reserved plugin slots, not installable.
+The [Changelog](/changelog) and [Availability](/availability) pages stay the
+source of truth for what's real.
+
+## Where to go next
+
+- Run `npm init allwright@latest my-app -- --typescript --all` to scaffold Web,
+  Android, and iOS together.
+- Read the [`@allwright.dev/vitest` README](https://github.com/allwright-dev/allwright/tree/main/typescript/vitest)
+  for the full fixture list and config precedence.
+- See the iOS client calls for your language in the [Reference](/reference).
+- Star or watch [the repo](https://github.com/allwright-dev/allwright) and tell
+  us what breaks. Early reports shape what ships next.

@@ -313,7 +313,7 @@ export const typescriptReference: LanguageReference = {
       slug: "mobile",
       title: "Mobile",
       description:
-        "Android automation over adb — no Appium, no separate driver server. Reached through the mobile namespace; iOS has no runtime yet.",
+        "Android automation over adb — no Appium, no separate driver server. Reached through the mobile namespace, for both Android and iOS.",
       members: [
         {
           name: "mobile.android.connect",
@@ -393,6 +393,22 @@ export const typescriptReference: LanguageReference = {
           signature: "locator(selector: string): MobileAndroidLocator",
           description: "Builds a chainable locator scoped to the app. Android has no getByRole-style semantic builders — only raw CSS/XPath/UiAutomator selectors.",
           since: "v0.0.45 – v0.0.52",
+        },
+        {
+          name: "mobile.ios.connect",
+          kind: "method",
+          signature: "mobile.ios.connect(options?: MobileIosConnectOptions): Promise<MobileIosDevice>",
+          description: "Connects to an iOS Simulator or a registered physical device (by name or UDID, or the first one available) and returns a device handle. The runtime is installed and started automatically.",
+          since: "v0.1.18",
+          example: "const device = await mobile.ios.connect({ device: \"iPhone 17 Pro\" });",
+        },
+        {
+          name: "iOS device launch",
+          kind: "method",
+          signature: "launch(options?: MobileIosLaunchOptions): Promise<MobileIosApp>",
+          description: "Downloads or unpacks an app (local .app, .zip/.ipa, or URL), installs it on the connected Simulator or device, and launches it. app_id is optional when an app path is given. The returned app uses the same locator and action set as Android.",
+          since: "v0.1.18",
+          example: "const app = await device.launch({ appPath: \"https://allwright.dev/Flights-simulator.ipa\" });\nawait app.locator(\"text=Login\").click();",
         },
       ],
     },

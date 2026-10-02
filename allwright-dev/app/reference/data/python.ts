@@ -312,7 +312,7 @@ export const pythonReference: LanguageReference = {
       slug: "mobile",
       title: "Mobile",
       description:
-        "Android automation over adb — no Appium, no separate driver server. Reached through the mobile singleton; iOS has no runtime yet.",
+        "Android automation over adb — no Appium, no separate driver server. Reached through the mobile singleton, for both Android and iOS.",
       members: [
         {
           name: "mobile.android.connect",
@@ -393,6 +393,22 @@ export const pythonReference: LanguageReference = {
           signature: "def locator(self, selector: str) -> AndroidLocator",
           description: "Builds a chainable locator scoped to the app. Android has no get_by_role-style semantic builders — only raw CSS/XPath/UiAutomator selectors.",
           since: "v0.0.45 – v0.0.52",
+        },
+        {
+          name: "mobile.ios.connect",
+          kind: "method",
+          signature: "def connect(self, options: MobileIosConnectOptions | None = None) -> IosDevice",
+          description: "Connects to an iOS Simulator or a registered physical device (by name or UDID, or the first one available) and returns a device handle. The runtime is installed and started automatically.",
+          since: "v0.1.18",
+          example: "device = mobile.ios.connect(MobileIosConnectOptions(device=\"iPhone 17 Pro\"))",
+        },
+        {
+          name: "iOS device launch",
+          kind: "method",
+          signature: "def launch(self, options: MobileIosLaunchOptions | None = None) -> IosApp",
+          description: "Downloads or unpacks an app (local .app, .zip/.ipa, or URL), installs it on the connected Simulator or device, and launches it. app_id is optional when an app path is given. The returned app uses the same locator and action set as Android.",
+          since: "v0.1.18",
+          example: "app = device.launch(MobileIosLaunchOptions(app_path=\"https://allwright.dev/Flights-simulator.ipa\"))",
         },
       ],
     },

@@ -71,10 +71,11 @@ allwright plugin install web
 
 `web` is the first plugin, and it's real today: driverless, using CDP plus
 Chromium BiDi for Chromium and Firefox's native WebDriver BiDi Remote Agent
-for Firefox. `mobile-android`, `mobile-ios`, `desktop-mac`,
-`desktop-windows`, and `desktop-linux` already exist as crate boundaries in
-the workspace, but they're not installable runtimes yet. That's the honest
-current-status line, not marketing copy.
+for Firefox. `mobile-android` and `mobile-ios` have since shipped as
+installable plugins too; `desktop-mac`, `desktop-windows`, and
+`desktop-linux` already exist as crate boundaries in the workspace, but
+they're not installable runtimes yet. That's the honest current-status
+line, not marketing copy.
 
 The bet is the plugin boundary itself: the core owns sessions, lifecycle,
 and the shared automation model, and every surface plugs into that same
@@ -105,7 +106,7 @@ built to reach.
 | | Playwright | allwright |
 |---|---|---|
 | Web automation maturity | Production-hardened, feature-complete | Early, driverless, functional for core flows |
-| Mobile | Out of scope | Android installable and functional; iOS reserved, not yet installable |
+| Mobile | Out of scope | Android and iOS installable and functional |
 | Desktop / API | Out of scope | Reserved plugin slots, not yet installable |
 | Automation model | One per surface you bolt on separately | One core model, extended by plugins |
 | Client languages | JS/TS, Python, Java, .NET | Rust, Go, Java, Python, TypeScript |
