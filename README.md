@@ -513,6 +513,10 @@ The release workflow syncs `python/pyproject.toml` to `X.Y.Z`, builds the source
 The TypeScript client lives in `typescript/core` as `@allwright.dev/core`.
 The Vitest fixture package lives in `typescript/vitest` as `@allwright.dev/vitest`.
 The project initializer lives in `typescript/create` as `create-allwright` and powers `npm init allwright`.
+It can scaffold Web, Mobile Android, and Mobile iOS projects interactively;
+use `--ios` or `--surface mobile-ios` for scripted iOS setup. The generated
+iOS project points at the public Flights simulator IPA and relies on lazy core
+plugin installation, so initialization does not require a manual agent install.
 
 You only create the root release tag manually:
 

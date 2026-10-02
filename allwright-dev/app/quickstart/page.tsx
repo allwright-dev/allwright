@@ -28,7 +28,10 @@ export const metadata: Metadata = {
 const INIT_FLAGS = [
   { flag: "--yes / -y", does: "Accept defaults (TypeScript, Web) without prompting" },
   { flag: "--typescript / --javascript", does: "Skip the language prompt" },
-  { flag: "--web / --mobile / --both", does: "Pick which surfaces to scaffold tests for" },
+  { flag: "--web / --mobile / --ios", does: "Pick a surface without the interactive prompt" },
+  { flag: "--surface <web|mobile-android|mobile-ios>", does: "Repeat to scaffold any surface combination" },
+  { flag: "--both", does: "Preserve the Web + Mobile Android shortcut" },
+  { flag: "--all", does: "Scaffold Web, Mobile Android, and Mobile iOS together" },
   { flag: "--package-manager <bun|npm|pnpm|yarn>", does: "Override auto-detection" },
   { flag: "--no-install", does: "Scaffold without installing dependencies" },
 ];
@@ -65,7 +68,7 @@ export default function Quickstart() {
           <div className="rounded-2xl border border-[var(--line)] bg-[var(--background)]/60 p-5 font-mono text-xs leading-6 text-[var(--muted)] sm:text-sm">
             <p className="text-[var(--accent-2)]">$ npm init allwright@latest my-app</p>
             <p className="text-[var(--muted)]">✔ TypeScript or JavaScript?</p>
-            <p className="text-[var(--muted)]">✔ Web, Mobile Android, or both?</p>
+            <p className="text-[var(--muted)]">✔ Web, Mobile Android, Mobile iOS — select any?</p>
             <p className="text-[var(--ink)]">✔ scaffolded, dependencies installed</p>
             <p className="mt-3 text-[var(--accent-2)]">$ cd my-app</p>
             <p className="text-[var(--accent-2)]">$ npm test</p>
@@ -76,8 +79,9 @@ export default function Quickstart() {
             then writes a real, runnable project against the same public demo
             targets used throughout our guides, detects your package manager
             from an existing lockfile (or falls back to whichever manager
-            invoked it), and installs for you. <code className="rounded-md border border-[var(--line)] bg-[var(--card)] px-1.5 py-0.5 font-mono text-[0.85em] text-[var(--ink)]">npm test</code> passes
-            immediately, before you change a line.
+            invoked it), and installs for you. The generated Web test runs
+            immediately; mobile tests run once the selected emulator,
+            simulator, or device is available.
           </p>
         </div>
       </section>
@@ -93,7 +97,8 @@ export default function Quickstart() {
 {`.
 |-- tests/
 |   |-- web.spec.ts
-|   \`-- mobile.spec.ts
+|   |-- mobile.spec.ts
+|   \`-- ios.spec.ts
 |-- allwright.config.yaml
 |-- vitest.config.ts
 |-- tsconfig.json
@@ -101,8 +106,9 @@ export default function Quickstart() {
 \`-- README.md`}
           </pre>
           <p className="mt-5 text-xs leading-6 text-[var(--muted)] sm:text-sm">
-            <code className="rounded-md border border-[var(--line)] bg-[var(--card)] px-1.5 py-0.5 font-mono text-[0.85em] text-[var(--ink)]">web.spec.ts</code> and{" "}
-            <code className="rounded-md border border-[var(--line)] bg-[var(--card)] px-1.5 py-0.5 font-mono text-[0.85em] text-[var(--ink)]">mobile.spec.ts</code> are
+            <code className="rounded-md border border-[var(--line)] bg-[var(--card)] px-1.5 py-0.5 font-mono text-[0.85em] text-[var(--ink)]">web.spec.ts</code>,{" "}
+            <code className="rounded-md border border-[var(--line)] bg-[var(--card)] px-1.5 py-0.5 font-mono text-[0.85em] text-[var(--ink)]">mobile.spec.ts</code>, and{" "}
+            <code className="rounded-md border border-[var(--line)] bg-[var(--card)] px-1.5 py-0.5 font-mono text-[0.85em] text-[var(--ink)]">ios.spec.ts</code> are
             included based on which surfaces you pick;{" "}
             <code className="rounded-md border border-[var(--line)] bg-[var(--card)] px-1.5 py-0.5 font-mono text-[0.85em] text-[var(--ink)]">tsconfig.json</code> only
             for TypeScript projects.
@@ -148,7 +154,7 @@ export default function Quickstart() {
             </table>
           </div>
           <p className="mt-5 text-sm leading-6 text-[var(--muted)]">
-            Example: <code className="rounded-md border border-[var(--line)] bg-[var(--card)] px-1.5 py-0.5 font-mono text-[0.85em] text-[var(--ink)]">npm init allwright@latest my-app -- --typescript --web --no-install</code>.
+            Example: <code className="rounded-md border border-[var(--line)] bg-[var(--card)] px-1.5 py-0.5 font-mono text-[0.85em] text-[var(--ink)]">npm init allwright@latest my-app -- --typescript --ios --no-install</code>.
             See the{" "}
             <a
               href={`${GITHUB_URL}/tree/main/typescript/create`}
@@ -186,7 +192,10 @@ export default function Quickstart() {
             <Link href="/blog/android-testing-playwright-style" className="font-medium text-[var(--accent-2)] hover:underline">
               Android testing walkthrough
             </Link>{" "}
-            once you have a project scaffolded. Working in another language,
+            once you have a project scaffolded. For iOS, select Mobile iOS in
+            the initializer; it writes the public Flights IPA configuration and
+            a retrying <code className="font-mono text-[var(--ink)]">iosApp</code> test.
+            Working in another language,
             allwright&apos;s client libraries are published and ready to install
             directly:
           </p>

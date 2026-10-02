@@ -16,7 +16,7 @@ export default function TwitterImage() {
         eyebrow="Quickstart"
         title="One command to a passing test."
         description={description}
-        pills={["Web", "Mobile Android", "TypeScript", "JavaScript"]}
+        pills={["Web", "Mobile Android", "Mobile iOS", "TypeScript", "JavaScript"]}
       />
     ),
     { ...size }

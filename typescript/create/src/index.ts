@@ -129,6 +129,9 @@ function parseArgs(args: string[]): InitOptions {
       case "--both":
         options.surfaces.push("web", "mobile-android");
         break;
+      case "--all":
+        options.surfaces.push("web", "mobile-android", "mobile-ios");
+        break;
       case "--surface": {
         const value = args[index + 1];
         if (!value) {

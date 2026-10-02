@@ -46,8 +46,8 @@ export const surfaceStatus = [
   },
   {
     label: "Mobile",
-    detail: "Android runs today over adb — tap, fill, read, screenshot, assert, and capture native accessibility trees. iOS isn't wired up yet.",
-    status: "Android available" as const,
+    detail: "Android and iOS Simulator are available with automatic runtime and app setup, using the same Playwright-style client shape.",
+    status: "Available now" as const,
   },
   { label: "Desktop", detail: "macOS, Windows, and Linux applications.", status: "Not yet available" as const },
   { label: "API", detail: "Backend checks in the same test run.", status: "Not yet available" as const },

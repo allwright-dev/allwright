@@ -6,7 +6,7 @@ import { SITE_NAME } from "../brand";
 import { StatusPill } from "../status-pill";
 
 const description =
-  "The honest, current picture of allwright: what web and Android automation can do today, what iOS, desktop, and API testing still need, and which client languages are published versus build-from-source.";
+  "The honest, current picture of allwright: what web, Android, and iOS Simulator automation can do today, what desktop and API testing still need, and which client languages are published.";
 
 export const metadata: Metadata = {
   title: "Availability",
@@ -82,18 +82,28 @@ const androidAvailable = [
 
 const androidNotYetAvailable = [
   "Hover and highlight (web-only for now)",
-  "iOS (Android is the only mobile platform today)",
   "Broader session and state management as the surface matures",
 ];
 
-// Mobile only gets one card in the shared `surfaceStatus` list (used by the
-// home page and how-it-works diagrams), but Android and iOS are at very
-// different points, so this page splits Mobile into its own explicit iOS
-// entry alongside the shared Desktop and API entries.
-const plannedSurfaces = [
-  { label: "Mobile — iOS", detail: "Native and hybrid iOS apps.", status: "Not yet available" as const },
-  ...surfaceStatus.filter((surface) => surface.label === "Desktop" || surface.label === "API"),
+const iosAvailable = [
+  "Connect to an available iOS Simulator with no separate driver setup",
+  "Download a simulator .ipa or ZIP, or use a local .app bundle, then install and launch it automatically",
+  "Click, focus, fill, press keys, read text, wait for selectors, count elements, and capture screenshots",
+  "Accessibility-id, text, XCTest element type, and basic XPath selectors",
+  "Playwright-style action auto-waiting and retrying text, count, and visibility assertions",
+  "The same Rust, Go, Java, Python, and TypeScript client shape used by Android",
 ];
+
+const iosNotYetAvailable = [
+  "Automatic physical-device signing, installation, and usbmux port forwarding",
+  "Direct WebView DOM automation",
+  "File chooser and download hooks",
+  "Deep-link helpers",
+];
+
+const plannedSurfaces = surfaceStatus.filter(
+  (surface) => surface.label === "Desktop" || surface.label === "API",
+);
 
 export default function Availability() {
   return (
@@ -108,8 +118,9 @@ export default function Availability() {
         <p className="mt-5 text-[clamp(1rem,1.6vw,1.15rem)] leading-8 text-[var(--muted)]">
           &ldquo;Available&rdquo; should mean something specific: installed,
           working, and ready for your test suite. Web automation runs today
-          against real Chromium and Firefox browsers, and Android automation
-          runs today over adb — each with the actions, locators, and retrying
+          against real Chromium and Firefox browsers, Android automation runs
+          on real devices and emulators, and iOS Simulator automation runs
+          natively — each with the actions, locators, and retrying
           assertions everyday tests rely on. This page is the detailed,
           continuously updated picture behind the status pills you see
           elsewhere on the site — surface by surface, capability by
@@ -124,8 +135,8 @@ export default function Availability() {
             Surfaces
           </h2>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
-            Web and Mobile (Android) are the only surfaces with a real,
-            installable plugin today. The rest have a reserved place in the
+            Web, Mobile Android, and Mobile iOS Simulator have real,
+            installable plugins today. The rest have a reserved place in the
             plugin catalog but no runtime build yet — installing them
             isn&apos;t possible until that changes.
           </p>
@@ -258,13 +269,50 @@ export default function Availability() {
         </p>
       </section>
 
+      <section aria-label="ios capabilities" className="mx-auto mt-14 w-full sm:mt-16">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
+            Mobile — iOS Simulator, capability by capability
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
+            The mobile-ios plugin is installable on macOS and provisions the
+            runtime and app under test automatically, so users do not install
+            a separate driver or sample IPA manually.
+          </p>
+        </div>
+        <div className="mt-8 grid gap-6 sm:grid-cols-2">
+          <div className="rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl sm:p-8">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--ink)]">Available now</h3>
+            <ul className="mt-5 space-y-3">
+              {iosAvailable.map((item) => (
+                <li key={item} className="flex gap-2.5 text-sm leading-6 text-[var(--muted)]">
+                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" aria-hidden="true" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-[2rem] border border-dashed border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl sm:p-8">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--ink)]">Not yet available</h3>
+            <ul className="mt-5 space-y-3">
+              {iosNotYetAvailable.map((item) => (
+                <li key={item} className="flex gap-2.5 text-sm leading-6 text-[var(--muted)]">
+                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full border border-dashed border-[var(--muted)]" aria-hidden="true" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
       <section aria-label="planned surfaces" className="mx-auto mt-14 w-full sm:mt-16">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
-            iOS, desktop, and API
+            Desktop and API
           </h2>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
-            These have a reserved slot in the plugin catalog and are part of
+            These have reserved slots in the plugin catalog and are part of
             the direction, but there is no installable plugin and nothing to
             try yet.
           </p>

@@ -28,12 +28,12 @@ export const metadata: Metadata = {
 };
 
 // The real plugin catalog: one entry per installable surface plugin, laid
-// out around the core in a hexagon. Web is the only one installable today —
-// everything else already has a reserved slot but ships nothing yet.
+// out around the core in a hexagon. Solid entries ship installable artifacts;
+// dashed entries retain reserved slots for future surfaces.
 const pluginCatalog = [
   { label: "Web", center: { x: 240, y: 60 }, status: "Available now" as const },
   { label: "Mobile — Android", center: { x: 370, y: 135 }, status: "Available now" as const },
-  { label: "Mobile — iOS", center: { x: 370, y: 285 }, status: "Not yet available" as const },
+  { label: "Mobile — iOS", center: { x: 370, y: 285 }, status: "Available now" as const },
   { label: "Desktop — Windows", center: { x: 240, y: 360 }, status: "Not yet available" as const },
   { label: "Desktop — Linux", center: { x: 110, y: 285 }, status: "Not yet available" as const },
   { label: "Desktop — macOS", center: { x: 110, y: 135 }, status: "Not yet available" as const },
@@ -161,7 +161,7 @@ function PluginCatalogDiagram() {
       <svg
         viewBox="0 0 480 420"
         role="img"
-        aria-label="The allwright core in the center with today's plugin slots around it: Web is filled in and installed, while Mobile Android, Mobile iOS, Desktop Windows, Desktop Linux, and Desktop macOS are outlined as reserved but not yet installable."
+        aria-label="The allwright core in the center with today's plugin slots around it: Web, Mobile Android, and Mobile iOS are installed; Desktop Windows, Desktop Linux, and Desktop macOS remain reserved."
         className="h-auto w-full max-w-md text-[var(--line)]"
       >
         <defs>
@@ -397,6 +397,7 @@ export default function HowItWorks() {
             <p className="text-[var(--ink)]">$ allwright plugin list</p>
             <p className="text-[var(--ink)]">$ allwright plugin install web</p>
             <p className="text-[var(--ink)]">$ allwright plugin install mobile-android</p>
+            <p className="text-[var(--ink)]">$ allwright plugin install mobile-ios</p>
           </div>
         </div>
       </section>
@@ -478,9 +479,10 @@ export default function HowItWorks() {
           <code className="font-mono text-[var(--ink)]">mobile-android</code>{" "}
           plugin and the same client code taps, types, and reads a real app
           over <code className="font-mono text-[var(--ink)]">adb</code> —
-          no Appium, no separate driver server. iOS, desktop, and API testing
-          will work the same way once their plugins ship — no new tool to
-          learn, just one more{" "}
+          no Appium, no separate driver server. iOS Simulator automatically
+          provisions its runtime and installs the app under test from a local
+          path or URL. Desktop and API testing will follow the same model
+          once their plugins ship — no new tool to learn, just one more{" "}
           <code className="font-mono text-[var(--ink)]">plugin install</code>{" "}
           for whichever surface you need next.
         </p>
@@ -494,8 +496,8 @@ export default function HowItWorks() {
           Try it in your own project
         </h2>
         <p className="max-w-[46ch] text-sm leading-6 text-[var(--muted)]">
-          Web and Android are ready today. Scaffold a project with one
-          command and run your first test against a real browser.
+          Web, Android, and iOS Simulator are ready today. Scaffold a project
+          with one command and run your first test against a real target.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Link

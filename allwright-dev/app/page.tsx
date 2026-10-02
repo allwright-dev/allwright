@@ -19,8 +19,8 @@ const surfaces = [
   },
   {
     label: "Mobile",
-    description: "Android runs today over adb — tap, fill, read, and assert against a live app. iOS isn't wired up yet.",
-    status: "Android available",
+    description: "Android and iOS Simulator run natively with automatic runtime and app setup, exposing the same Playwright-style client shape.",
+    status: "Available now",
     position: { left: "94%", top: "10%" },
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">

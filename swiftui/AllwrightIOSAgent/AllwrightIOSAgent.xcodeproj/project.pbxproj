@@ -3,26 +3,28 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 56;
 	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* AllwrightIOSAgentApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* AllwrightIOSAgentApp.swift */; };
+		A10000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* ContentView.swift */; };
+		A10000000000000000000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* Assets.xcassets */; };
+		A10000000000000000000004 /* AllwrightAgentUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* AllwrightAgentUITests.swift */; };
+		A10000000000000000000005 /* AllwrightAgentUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* AllwrightAgentUITestsLaunchTests.swift */; };
+		A10000000000000000000006 /* AllwrightIOSAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* AllwrightIOSAgent.swift */; };
+/* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		2825923C3042DCB4002C8CF8 /* AllwrightIOSAgent.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AllwrightIOSAgent.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2825924E3042DD6B002C8CF8 /* AllwrightAgentUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AllwrightAgentUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000001 /* AllwrightIOSAgentApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllwrightIOSAgentApp.swift; sourceTree = "<group>"; };
+		B10000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B10000000000000000000003 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B10000000000000000000004 /* AllwrightAgentUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllwrightAgentUITests.swift; sourceTree = "<group>"; };
+		B10000000000000000000005 /* AllwrightAgentUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllwrightAgentUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000006 /* AllwrightIOSAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllwrightIOSAgent.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		2825923E3042DCB4002C8CF8 /* AllwrightIOSAgent */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = AllwrightIOSAgent;
-			sourceTree = "<group>";
-		};
-		2825924F3042DD6B002C8CF8 /* AllwrightAgentUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = AllwrightAgentUITests;
-			sourceTree = "<group>";
-		};
-/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		282592393042DCB4002C8CF8 /* Frameworks */ = {
@@ -42,6 +44,26 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2825923E3042DCB4002C8CF8 /* AllwrightIOSAgent */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000001 /* AllwrightIOSAgentApp.swift */,
+				B10000000000000000000002 /* ContentView.swift */,
+				B10000000000000000000003 /* Assets.xcassets */,
+			);
+			path = AllwrightIOSAgent;
+			sourceTree = "<group>";
+		};
+		2825924F3042DD6B002C8CF8 /* AllwrightAgentUITests */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000004 /* AllwrightAgentUITests.swift */,
+				B10000000000000000000005 /* AllwrightAgentUITestsLaunchTests.swift */,
+				B10000000000000000000006 /* AllwrightIOSAgent.swift */,
+			);
+			path = AllwrightAgentUITests;
+			sourceTree = "<group>";
+		};
 		282592333042DCB4002C8CF8 = {
 			isa = PBXGroup;
 			children = (
@@ -75,9 +97,6 @@
 			);
 			dependencies = (
 			);
-			fileSystemSynchronizedGroups = (
-				2825923E3042DCB4002C8CF8 /* AllwrightIOSAgent */,
-			);
 			name = AllwrightIOSAgent;
 			packageProductDependencies = (
 			);
@@ -97,9 +116,6 @@
 			);
 			dependencies = (
 			);
-			fileSystemSynchronizedGroups = (
-				2825924F3042DD6B002C8CF8 /* AllwrightAgentUITests */,
-			);
 			name = AllwrightAgentUITests;
 			packageProductDependencies = (
 			);
@@ -114,18 +130,19 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2620;
-				LastUpgradeCheck = 2620;
+				LastSwiftUpdateCheck = 1540;
+				LastUpgradeCheck = 1540;
 				TargetAttributes = {
 					2825923B3042DCB4002C8CF8 = {
-						CreatedOnToolsVersion = 26.2;
+						CreatedOnToolsVersion = 15.4;
 					};
 					2825924D3042DD6B002C8CF8 = {
-						CreatedOnToolsVersion = 26.2;
+						CreatedOnToolsVersion = 15.4;
 					};
 				};
 			};
 			buildConfigurationList = 282592373042DCB4002C8CF8 /* Build configuration list for PBXProject "AllwrightIOSAgent" */;
+			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -133,8 +150,6 @@
 				Base,
 			);
 			mainGroup = 282592333042DCB4002C8CF8;
-			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			productRefGroup = 2825923D3042DCB4002C8CF8 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -150,6 +165,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000003 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -167,6 +183,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000001 /* AllwrightIOSAgentApp.swift in Sources */,
+				A10000000000000000000002 /* ContentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -174,6 +192,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000004 /* AllwrightAgentUITests.swift in Sources */,
+				A10000000000000000000005 /* AllwrightAgentUITestsLaunchTests.swift in Sources */,
+				A10000000000000000000006 /* AllwrightIOSAgent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -232,7 +253,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -289,7 +310,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -321,10 +342,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = dev.allwright.AllwrightIOSAgent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -352,10 +370,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = dev.allwright.AllwrightIOSAgent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -371,9 +386,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = dev.allwright.AllwrightAgentUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -389,9 +402,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = dev.allwright.AllwrightAgentUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
