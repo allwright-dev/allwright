@@ -18,6 +18,10 @@ pip install -e ./python
 
 ## Example
 
+Runnable examples include [`examples/web_basic.py`](./examples/web_basic.py),
+[`examples/android_basic.py`](./examples/android_basic.py), and
+[`examples/ios_basic.py`](./examples/ios_basic.py).
+
 ```python
 from allwright import firefox
 

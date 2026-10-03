@@ -45,14 +45,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             .await?;
         let expected_heading = std::env::var("ALLWRIGHT_WEB_HEADING_TEXT")
             .unwrap_or_else(|_| DEFAULT_WEB_HEADING_TEXT.to_string());
-        if !heading.text.contains(&expected_heading) {
+        let heading = heading.unwrap_or_default();
+        if !heading.contains(&expected_heading) {
             return Err(format!(
                 "expected heading to contain {expected_heading:?}, got {:?}",
-                heading.text
+                heading
             )
             .into());
         }
-        println!("[rust-web-basic] heading={:?}", heading.text);
+        println!("[rust-web-basic] heading={heading:?}");
         Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     }
     .await;

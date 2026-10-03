@@ -42,7 +42,8 @@ test("opens an iOS app", async ({ iosApp }) => {
 });
 ```
 
-A checked-in example spec also lives in [examples/basic.spec.ts](./examples/basic.spec.ts).
+Checked-in example specs live in [examples/basic.spec.ts](./examples/basic.spec.ts)
+and [examples/ios-flights.spec.ts](./examples/ios-flights.spec.ts).
 
 The fixture package reads the shared stack-agnostic config format through `@allwright.dev/core`.
 Use `allwright.config.yaml` by default, or `allwright.config.json` if you prefer. Both follow the same root schema in `allwright.schema.json`.

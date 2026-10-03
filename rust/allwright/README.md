@@ -23,6 +23,12 @@ The surrounding Rust workspace now also publishes:
 
 Installing the `allwright` package is intended to provide the CLI plus this lightweight core together, while surface crates are added separately as plugins.
 
+Runnable client examples include `web_basic`, `android_basic`, and `ios_basic`:
+
+```sh
+cargo run -p allwright-core --example ios_basic
+```
+
 Typed hooks use one generic registration/wait lifecycle. For example, register
 the web-owned new-page hook before the action that opens a tab:
 

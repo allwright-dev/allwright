@@ -3,7 +3,7 @@ import { mobile, shutdown } from "../dist/index.js";
 async function main(): Promise<void> {
   const appPath = process.env.ALLWRIGHT_IOS_APP_PATH ?? "https://allwright.dev/Flights-simulator.ipa";
   const device = await mobile.ios.connect({
-    agentEndpoint: process.env.ALLWRIGHT_IOS_AGENT_ENDPOINT ?? "http://127.0.0.1:8100",
+    agentEndpoint: process.env.ALLWRIGHT_IOS_AGENT_ENDPOINT,
   });
   const app = await device.launch({
     appPath,

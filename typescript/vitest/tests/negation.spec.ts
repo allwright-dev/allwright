@@ -3,10 +3,10 @@ import { expect } from '../src/index.js';
 import type { Locator, MobileAndroidLocator, Page, MobileAndroidApp } from '@allwright.dev/core';
 
 function fixture(web = true) {
-  const count = vi.fn(async (_options?: unknown) => ({ count: 1 }));
-  const visibleCount = vi.fn(async (_options?: unknown) => ({ count: 1 }));
-  const textContent = vi.fn(async (_options?: unknown) => ({ text: 'Ready' }));
-  const waitFor = vi.fn(async (_options?: unknown) => ({ visible: true }));
+  const count = vi.fn(async (_options?: unknown) => 1);
+  const visibleCount = vi.fn(async (_options?: unknown) => 1);
+  const textContent = vi.fn(async (_options?: unknown) => 'Ready' as string | null);
+  const waitFor = vi.fn(async (_options?: unknown) => undefined);
   const locator = {
     page: {}, click: async () => {}, count, textContent, waitFor,
     ...(web ? { filter: vi.fn(() => ({ count: visibleCount })) } : {}),
@@ -35,15 +35,15 @@ for (const web of [true, false]) describe(web ? 'web' : 'Android', () => {
   });
   test('negative text retries the inverted predicate', async () => {
     const f = fixture(web);
-    f.textContent.mockResolvedValueOnce({ text: 'Loading' }).mockResolvedValue({ text: 'Ready' });
+    f.textContent.mockResolvedValueOnce('Loading').mockResolvedValue('Ready');
     await expect(f.locator).not.toHaveText('Loading', retry);
     check(f.textContent).toHaveBeenCalledTimes(2);
-    f.textContent.mockResolvedValueOnce({ text: 'Still loading' }).mockResolvedValue({ text: 'Ready' });
+    f.textContent.mockResolvedValueOnce('Still loading').mockResolvedValue('Ready');
     await expect(f.page).not().toContainText('ignored', /loading/gi, retry);
   });
   test('negative count retries until counts differ and failures retain the negative assertion', async () => {
     const f = fixture(web);
-    f.count.mockResolvedValueOnce({ count: 2 }).mockResolvedValue({ count: 1 });
+    f.count.mockResolvedValueOnce(2).mockResolvedValue(1);
     await expect(f.locator).not().toHaveCount(2, retry);
     check(f.count).toHaveBeenCalledTimes(2);
     await check(expect(f.locator).not.toHaveCount(1, once)).rejects.toThrow();
@@ -64,19 +64,19 @@ for (const web of [true, false]) describe(web ? 'web' : 'Android', () => {
 
 test('web negative visibility observes hidden and removed elements without waiting for visibility', async () => {
   const f = fixture();
-  f.visibleCount.mockResolvedValueOnce({ count: 1 }).mockResolvedValue({ count: 0 });
+  f.visibleCount.mockResolvedValueOnce(1).mockResolvedValue(0);
   await expect(f.locator).not().toBeVisible(retry);
   check(f.visibleCount).toHaveBeenCalledTimes(2);
   check(f.waitFor).not.toHaveBeenCalled();
   await expect(f.page).not.toBeVisible('missing', once);
-  f.visibleCount.mockResolvedValueOnce({ count: 0 }).mockResolvedValue({ count: 1 });
+  f.visibleCount.mockResolvedValueOnce(0).mockResolvedValue(1);
   await expect(f.locator).toBeVisible(retry);
   await check(expect(f.locator).not.toBeVisible(once)).rejects.toThrow();
 });
 
 test('Android negative visibility accepts absence and only the native hidden-node error', async () => {
   const f = fixture(false);
-  f.count.mockResolvedValueOnce({ count: 0 });
+  f.count.mockResolvedValueOnce(0);
   await expect(f.locator).not().toBeVisible(once);
   check(f.waitFor).not.toHaveBeenCalled();
   f.waitFor.mockRejectedValueOnce(new Error('selector found but not visible: text="Hidden"'));
