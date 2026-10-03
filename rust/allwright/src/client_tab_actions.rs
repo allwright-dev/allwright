@@ -8,13 +8,10 @@ use crate::proto::{
 use super::command::command_retry_options;
 use super::selectors::normalize_selector_for_transport;
 use super::tab::ensure_tab_open;
-use super::types::{
-    ClickResult, CommandOptions, ElementResult, Error, FillResult, PressOptions, PressResult,
-    Result, Tab,
-};
+use super::types::{CommandOptions, Error, PressOptions, Result, Tab};
 
 impl Tab {
-    pub async fn click(&self, css_selector: impl Into<String>) -> Result<ClickResult> {
+    pub async fn click(&self, css_selector: impl Into<String>) -> Result<()> {
         self.click_with_options(css_selector, CommandOptions::default())
             .await
     }
@@ -23,7 +20,7 @@ impl Tab {
         &self,
         css_selector: impl Into<String>,
         options: CommandOptions,
-    ) -> Result<ClickResult> {
+    ) -> Result<()> {
         let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -50,13 +47,7 @@ impl Tab {
 
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
-                Some(ContextEvent::ElementClicked(clicked)) => {
-                    return Ok(ClickResult {
-                        selector: clicked.css_selector,
-                        note: clicked.note,
-                        bidi_session_id: clicked.bidi_session_id,
-                    });
-                }
+                Some(ContextEvent::ElementClicked(_)) => return Ok(()),
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while clicking locator {:?}: {}",
@@ -75,7 +66,7 @@ impl Tab {
         }
     }
 
-    pub async fn focus(&self, css_selector: impl Into<String>) -> Result<ElementResult> {
+    pub async fn focus(&self, css_selector: impl Into<String>) -> Result<()> {
         self.focus_with_options(css_selector, CommandOptions::default())
             .await
     }
@@ -84,7 +75,7 @@ impl Tab {
         &self,
         css_selector: impl Into<String>,
         options: CommandOptions,
-    ) -> Result<ElementResult> {
+    ) -> Result<()> {
         let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -110,12 +101,7 @@ impl Tab {
                 })?;
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
-                Some(ContextEvent::ElementFocused(focused)) => {
-                    return Ok(ElementResult {
-                        selector: focused.css_selector,
-                        note: focused.note,
-                    });
-                }
+                Some(ContextEvent::ElementFocused(_)) => return Ok(()),
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while focusing locator {:?}: {}",
@@ -138,7 +124,7 @@ impl Tab {
         &self,
         css_selector: impl Into<String>,
         value: impl Into<String>,
-    ) -> Result<FillResult> {
+    ) -> Result<()> {
         self.fill_with_options(css_selector, value, CommandOptions::default())
             .await
     }
@@ -148,7 +134,7 @@ impl Tab {
         css_selector: impl Into<String>,
         value: impl Into<String>,
         options: CommandOptions,
-    ) -> Result<FillResult> {
+    ) -> Result<()> {
         let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -174,13 +160,7 @@ impl Tab {
                 })?;
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
-                Some(ContextEvent::ElementFilled(filled)) => {
-                    return Ok(FillResult {
-                        selector: filled.css_selector,
-                        value: filled.value,
-                        note: filled.note,
-                    });
-                }
+                Some(ContextEvent::ElementFilled(_)) => return Ok(()),
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while filling locator {:?}: {}",
@@ -199,7 +179,7 @@ impl Tab {
         }
     }
 
-    pub async fn hover(&self, css_selector: impl Into<String>) -> Result<ElementResult> {
+    pub async fn hover(&self, css_selector: impl Into<String>) -> Result<()> {
         self.hover_with_options(css_selector, CommandOptions::default())
             .await
     }
@@ -208,7 +188,7 @@ impl Tab {
         &self,
         css_selector: impl Into<String>,
         options: CommandOptions,
-    ) -> Result<ElementResult> {
+    ) -> Result<()> {
         let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -232,12 +212,7 @@ impl Tab {
                 })?;
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
-                Some(ContextEvent::ElementHovered(hovered)) => {
-                    return Ok(ElementResult {
-                        selector: hovered.css_selector,
-                        note: hovered.note,
-                    });
-                }
+                Some(ContextEvent::ElementHovered(_)) => return Ok(()),
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while hovering locator {:?}: {}",
@@ -260,7 +235,7 @@ impl Tab {
         &self,
         css_selector: impl Into<String>,
         key: impl Into<String>,
-    ) -> Result<PressResult> {
+    ) -> Result<()> {
         self.press_with_options(css_selector, key, PressOptions::default())
             .await
     }
@@ -270,7 +245,7 @@ impl Tab {
         css_selector: impl Into<String>,
         key: impl Into<String>,
         options: PressOptions,
-    ) -> Result<PressResult> {
+    ) -> Result<()> {
         let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -296,13 +271,7 @@ impl Tab {
                 })?;
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
-                Some(ContextEvent::KeyPressed(pressed)) => {
-                    return Ok(PressResult {
-                        selector: pressed.css_selector,
-                        key: pressed.key,
-                        note: pressed.note,
-                    });
-                }
+                Some(ContextEvent::KeyPressed(_)) => return Ok(()),
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while pressing key: {}",

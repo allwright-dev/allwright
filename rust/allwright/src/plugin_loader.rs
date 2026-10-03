@@ -9,7 +9,7 @@ use allwright_surface_mobile::{
     ConnectOptions as MobileConnectOptions, MobileBrowserSessionHandle, MobileClickInfo,
     MobileCommand, MobileCommandResult, MobileConnectInfo, MobileDownloadSavedInfo,
     MobileElementCountInfo, MobileElementInfo, MobileFileChooserFilesSetInfo, MobileFillInfo,
-    MobileHookRegistration, MobileHookResult, MobileHookType, MobilePageInfo,
+    MobileHookRegistration, MobileHookResult, MobileHookType, MobileNavigationInfo, MobilePageInfo,
     MobilePageSessionHandle, MobilePlatform, MobilePressInfo, MobileScreenshotInfo, MobileTextInfo,
     MobileWaitForSelectorInfo,
 };
@@ -88,6 +88,9 @@ fn mobile_plugin_id_for_command(command: &MobileCommand) -> Result<&'static str,
         }
         | MobileCommand::OpenPage { browser_session }
         | MobileCommand::ClosePage {
+            browser_session, ..
+        }
+        | MobileCommand::NavigateApp {
             browser_session, ..
         }
         | MobileCommand::ClickElement {
@@ -233,6 +236,25 @@ pub async fn open_mobile_page(
     {
         MobileCommandResult::OpenPage(result) => Ok(result),
         _ => Err("mobile plugin returned an unexpected response for OpenPage".to_string()),
+    }
+}
+
+pub async fn navigate_mobile_app(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    url: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobileNavigationInfo, String> {
+    match invoke_mobile_expected(MobileCommand::NavigateApp {
+        browser_session: browser_session.clone(),
+        page_session: page_session.clone(),
+        url: url.to_string(),
+        timeout_ms,
+    })
+    .await?
+    {
+        MobileCommandResult::NavigateApp(result) => Ok(result),
+        _ => Err("mobile plugin returned an unexpected navigation response".to_string()),
     }
 }
 

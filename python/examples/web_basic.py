@@ -28,9 +28,9 @@ def main() -> None:
             os.getenv("ALLWRIGHT_WEB_HEADING_SELECTOR", DEFAULT_WEB_HEADING_SELECTOR)
         )
         expected_heading = os.getenv("ALLWRIGHT_WEB_HEADING_TEXT", DEFAULT_WEB_HEADING_TEXT)
-        if expected_heading not in heading.text:
-            raise RuntimeError(f"expected heading to contain {expected_heading!r}, got {heading.text!r}")
-        print(f"[py-web-basic] heading={heading.text!r}")
+        if expected_heading not in heading:
+            raise RuntimeError(f"expected heading to contain {expected_heading!r}, got {heading!r}")
+        print(f"[py-web-basic] heading={heading!r}")
     finally:
         browser.close()
         shutdown()

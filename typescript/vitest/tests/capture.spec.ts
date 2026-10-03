@@ -39,8 +39,8 @@ test.skipIf(!process.env.ALLWRIGHT_TEST_BROWSER)('capture live page and element 
   expect(await page.locator('#checked').isChecked()).toBe(true);
   expect(await page.isChecked('#radio')).toBe(false);
   expect(await page.isChecked('#mixed')).toBe(false);
-  expect(await page.locator('#box').textContent()).toMatchObject({ text: 'Hello hidden' });
-  expect(await page.innerText('#box')).toMatchObject({ text: 'Hello' });
+  expect(await page.locator('#box').textContent()).toBe('Hello hidden');
+  expect(await page.innerText('#box')).toBe('Hello');
   expect(await page.getAttribute('#box', 'data-empty')).toBe('');
   expect(await page.getAttribute('#box', 'data-quote')).toBe('a"b');
   expect(await page.getAttribute('#box', 'absent')).toBeNull();

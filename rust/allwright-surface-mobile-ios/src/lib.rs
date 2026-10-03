@@ -6,7 +6,9 @@ use allwright_surface_mobile::{
     ConnectOptions, DeviceConnectionKind, DeviceTarget, LaunchOptions, MobileAppKind,
     MobileAutomationBackend, MobileAutomationSessionInfo, MobileBrowserSessionHandle,
     MobileCapabilitySet, MobileClickInfo, MobileCommand, MobileCommandResult, MobileConnectInfo,
-    MobileElementCountInfo, MobileElementInfo, MobileFillInfo, MobilePageInfo,
+    MobileDownloadInfo, MobileDownloadSavedInfo, MobileElementCountInfo, MobileElementInfo,
+    MobileFileChooserFilesSetInfo, MobileFileChooserInfo, MobileFillInfo, MobileHookRegistration,
+    MobileHookResult, MobileHookType, MobileNavigationInfo, MobilePageInfo,
     MobilePageSessionHandle, MobilePlatform, MobilePressInfo, MobileRuntimeReadiness,
     MobileScreenshotInfo, MobileSurfaceProfile, MobileTextInfo, MobileWaitForSelectorInfo,
     RuntimeMaturity, boot_surface, normalize_selector_for_transport,
@@ -29,6 +31,15 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const DEFAULT_AGENT_ENDPOINT: &str = "http://127.0.0.1:8100";
 static AGENT_PROCESS: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
+static IOS_HOOKS: OnceLock<Mutex<std::collections::HashMap<String, IosHookState>>> =
+    OnceLock::new();
+static IOS_CHOOSERS: OnceLock<Mutex<std::collections::HashMap<String, IosChooserState>>> =
+    OnceLock::new();
+static IOS_DOWNLOADS: OnceLock<Mutex<std::collections::HashMap<String, IosDownloadState>>> =
+    OnceLock::new();
+static IOS_CURRENT_PAGES: OnceLock<
+    Mutex<std::collections::HashMap<String, MobilePageSessionHandle>>,
+> = OnceLock::new();
 const IOS_BACKENDS: &[MobileAutomationBackend] = &[MobileAutomationBackend::XcuiTest];
 const IOS_APP_KINDS: &[MobileAppKind] = &[
     MobileAppKind::Native,
@@ -36,7 +47,8 @@ const IOS_APP_KINDS: &[MobileAppKind] = &[
     MobileAppKind::BrowserWrapped,
 ];
 const IOS_MISSING_RUNTIME_ARTIFACTS: &[&str] = &[];
-const IOS_NEXT_MILESTONES: &[&str] = &["add file chooser and download hooks"];
+const IOS_NEXT_MILESTONES: &[&str] =
+    &["add a WebKit inspector backend for arbitrary WebView DOM and JavaScript sessions"];
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct MobileIosPlugin;
@@ -66,8 +78,8 @@ pub fn profile() -> MobileSurfaceProfile {
         supported_app_kinds: IOS_APP_KINDS,
         capabilities: MobileCapabilitySet {
             supports_native_views: true,
-            supports_webviews: false,
-            supports_deep_links: false,
+            supports_webviews: true,
+            supports_deep_links: true,
             supports_shell_commands: false,
             supports_device_logs: false,
         },
@@ -104,6 +116,10 @@ struct AgentRequest<'a> {
     timeout_ms: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     terminate_running: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    full_page: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    files: Option<Vec<&'a str>>,
 }
 
 impl<'a> AgentRequest<'a> {
@@ -119,8 +135,44 @@ impl<'a> AgentRequest<'a> {
             visible: None,
             timeout_ms: None,
             terminate_running: None,
+            full_page: None,
+            files: None,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+enum IosHookState {
+    FileChooser {
+        device_id: String,
+        page: MobilePageSessionHandle,
+    },
+    Download {
+        device_id: String,
+        page: MobilePageSessionHandle,
+        existing_files: std::collections::HashMap<String, IosFileInfo>,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct IosChooserState {
+    device_id: String,
+    page: MobilePageSessionHandle,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct IosFileInfo {
+    path: String,
+    size: u64,
+    signature: String,
+    domain_bundle_id: String,
+}
+
+#[derive(Debug, Clone)]
+struct IosDownloadState {
+    device_id: String,
+    file: IosFileInfo,
+    observed_size: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1176,14 +1228,22 @@ pub fn launch_app(
     request.timeout_ms = options.timeout_ms;
     let result = invoke_agent(endpoint, &request, options.timeout_ms)?;
     let agent_session_id = result_string(&result, "session_id")?.to_string();
+    let page_session = MobilePageSessionHandle {
+        page_id: agent_session_id,
+        package_name: Some(bundle_id.to_string()),
+        activity_name: None,
+        webview_context: Some("xctest-accessibility".to_string()),
+    };
+    ios_current_pages()
+        .lock()
+        .map_err(|_| "iOS current app registry is unavailable".to_string())?
+        .insert(
+            browser_session.automation.session_id.clone(),
+            page_session.clone(),
+        );
     Ok(MobilePageInfo {
         note: format!("launched iOS app `{bundle_id}` through XCUITest"),
-        page_session: MobilePageSessionHandle {
-            page_id: agent_session_id,
-            package_name: Some(bundle_id.to_string()),
-            activity_name: None,
-            webview_context: None,
-        },
+        page_session,
     })
 }
 
@@ -1405,6 +1465,593 @@ fn validate_ios_session(session: &MobileBrowserSessionHandle) -> Result<(), Stri
     Ok(())
 }
 
+fn ios_hooks() -> &'static Mutex<std::collections::HashMap<String, IosHookState>> {
+    IOS_HOOKS.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+}
+
+fn ios_choosers() -> &'static Mutex<std::collections::HashMap<String, IosChooserState>> {
+    IOS_CHOOSERS.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+}
+
+fn ios_downloads() -> &'static Mutex<std::collections::HashMap<String, IosDownloadState>> {
+    IOS_DOWNLOADS.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+}
+
+fn ios_current_pages() -> &'static Mutex<std::collections::HashMap<String, MobilePageSessionHandle>>
+{
+    IOS_CURRENT_PAGES.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+}
+
+fn simulator_app_container(device_id: &str, bundle_id: &str) -> Result<PathBuf, String> {
+    let output = Command::new("xcrun")
+        .args(["simctl", "get_app_container", device_id, bundle_id, "data"])
+        .output()
+        .map_err(|error| format!("could not resolve iOS Simulator app container: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "could not resolve iOS Simulator container for `{bundle_id}`: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(PathBuf::from(
+        String::from_utf8_lossy(&output.stdout).trim(),
+    ))
+}
+
+fn collect_host_files(
+    root: &Path,
+    domain_bundle_id: &str,
+    files: &mut std::collections::HashMap<String, IosFileInfo>,
+) -> Result<(), String> {
+    if !root.exists() {
+        return Ok(());
+    }
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(&directory)
+            .map_err(|error| format!("failed to inspect {}: {error}", directory.display()))?
+        {
+            let path = entry.map_err(|error| error.to_string())?.path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.is_file() {
+                let metadata = fs::metadata(&path)
+                    .map_err(|error| format!("failed to inspect {}: {error}", path.display()))?;
+                let modified = metadata
+                    .modified()
+                    .ok()
+                    .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+                    .map(|value| value.as_nanos())
+                    .unwrap_or_default();
+                let key = path.to_string_lossy().to_string();
+                files.insert(
+                    key.clone(),
+                    IosFileInfo {
+                        path: key,
+                        size: metadata.len(),
+                        signature: format!("{}:{modified}", metadata.len()),
+                        domain_bundle_id: domain_bundle_id.to_string(),
+                    },
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn collect_device_file_objects(
+    value: &Value,
+    bundle_id: &str,
+    files: &mut std::collections::HashMap<String, IosFileInfo>,
+) {
+    match value {
+        Value::Array(values) => {
+            for value in values {
+                collect_device_file_objects(value, bundle_id, files);
+            }
+        }
+        Value::Object(object) => {
+            let path = ["relativePath", "path", "filePath", "name"]
+                .iter()
+                .find_map(|key| object.get(*key).and_then(Value::as_str));
+            let size = ["size", "fileSize"]
+                .iter()
+                .find_map(|key| object.get(*key).and_then(Value::as_u64));
+            if let (Some(path), Some(size)) = (path, size)
+                && !path.ends_with('/')
+            {
+                let modified = object
+                    .get("modificationDate")
+                    .or_else(|| object.get("modifiedDate"))
+                    .map(Value::to_string)
+                    .unwrap_or_default();
+                files.insert(
+                    format!("{bundle_id}:{path}"),
+                    IosFileInfo {
+                        path: path.to_string(),
+                        size,
+                        signature: format!("{size}:{modified}"),
+                        domain_bundle_id: bundle_id.to_string(),
+                    },
+                );
+            }
+            for value in object.values() {
+                collect_device_file_objects(value, bundle_id, files);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn physical_device_files(
+    device_id: &str,
+    bundle_id: &str,
+) -> Result<std::collections::HashMap<String, IosFileInfo>, String> {
+    let output_path =
+        env::temp_dir().join(format!("allwright-ios-files-{}.json", unique_id("list")));
+    let output = Command::new("xcrun")
+        .args([
+            "devicectl",
+            "device",
+            "info",
+            "files",
+            "--device",
+            device_id,
+            "--domain-type",
+            "appDataContainer",
+            "--domain-identifier",
+            bundle_id,
+            "--subdirectory",
+            "Documents",
+            "--json-output",
+        ])
+        .arg(&output_path)
+        .output()
+        .map_err(|error| format!("could not list physical-device files: {error}"))?;
+    if !output.status.success() {
+        let _ = fs::remove_file(&output_path);
+        return Err(format!(
+            "could not list files for `{bundle_id}`: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let bytes = fs::read(&output_path)
+        .map_err(|error| format!("could not read devicectl file listing: {error}"))?;
+    let _ = fs::remove_file(&output_path);
+    let value: Value = serde_json::from_slice(&bytes)
+        .map_err(|error| format!("could not decode devicectl file listing: {error}"))?;
+    let mut files = std::collections::HashMap::new();
+    collect_device_file_objects(&value, bundle_id, &mut files);
+    Ok(files)
+}
+
+fn ios_visible_files(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+) -> Result<std::collections::HashMap<String, IosFileInfo>, String> {
+    let app_bundle = page_session
+        .package_name
+        .as_deref()
+        .ok_or_else(|| "iOS app session has no bundle identifier".to_string())?;
+    let bundles = [app_bundle, "com.apple.DocumentsApp"];
+    let mut files = std::collections::HashMap::new();
+    for bundle_id in bundles {
+        match browser_session.device.connection_kind {
+            DeviceConnectionKind::Emulator => {
+                if let Ok(container) =
+                    simulator_app_container(&browser_session.device.device_id, bundle_id)
+                {
+                    collect_host_files(&container.join("Documents"), bundle_id, &mut files)?;
+                    collect_host_files(
+                        &container.join("Library/Downloads"),
+                        bundle_id,
+                        &mut files,
+                    )?;
+                }
+            }
+            _ => {
+                if let Ok(found) =
+                    physical_device_files(&browser_session.device.device_id, bundle_id)
+                {
+                    files.extend(found);
+                }
+            }
+        }
+    }
+    Ok(files)
+}
+
+fn register_ios_hook(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    hook_type: MobileHookType,
+) -> Result<MobileHookRegistration, String> {
+    validate_ios_session(browser_session)?;
+    if page_session.package_name.is_none() {
+        return Err("iOS hooks require a launched app".to_string());
+    }
+    let id = unique_id("ios-hook");
+    let state = match hook_type {
+        MobileHookType::FileChooser => IosHookState::FileChooser {
+            device_id: browser_session.device.device_id.clone(),
+            page: page_session.clone(),
+        },
+        MobileHookType::Download => IosHookState::Download {
+            device_id: browser_session.device.device_id.clone(),
+            page: page_session.clone(),
+            existing_files: ios_visible_files(browser_session, page_session)?,
+        },
+    };
+    ios_hooks()
+        .lock()
+        .map_err(|_| "iOS hook registry is unavailable".to_string())?
+        .insert(id.clone(), state);
+    Ok(MobileHookRegistration { opaque_state: id })
+}
+
+fn poll_ios_hook(
+    browser_session: &MobileBrowserSessionHandle,
+    registration: &MobileHookRegistration,
+) -> Result<MobileHookResult, String> {
+    let id = &registration.opaque_state;
+    let state = ios_hooks()
+        .lock()
+        .map_err(|_| "iOS hook registry is unavailable".to_string())?
+        .get(id)
+        .cloned()
+        .ok_or_else(|| "iOS hook registration is no longer available".to_string())?;
+    match state {
+        IosHookState::FileChooser { device_id, page } => {
+            if device_id != browser_session.device.device_id {
+                return Err("iOS hook belongs to a different device".to_string());
+            }
+            let mut request = AgentRequest::new("file_chooser_status");
+            request.session_id = Some(&page.page_id);
+            let result = invoke_agent(
+                endpoint_from_session(browser_session)?,
+                &request,
+                Some(1_000),
+            )?;
+            if !result
+                .get("opened")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            {
+                return Err(
+                    "iOS file chooser hook is still waiting for a document picker".to_string(),
+                );
+            }
+            let chooser_id = unique_id("ios-chooser");
+            ios_choosers()
+                .lock()
+                .map_err(|_| "iOS chooser registry is unavailable".to_string())?
+                .insert(chooser_id.clone(), IosChooserState { device_id, page });
+            ios_hooks()
+                .lock()
+                .map_err(|_| "iOS hook registry is unavailable".to_string())?
+                .remove(id);
+            Ok(MobileHookResult::FileChooser(MobileFileChooserInfo {
+                file_chooser_id: chooser_id,
+                is_multiple: result
+                    .get("multiple")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+                note: "iOS document picker opened".to_string(),
+            }))
+        }
+        IosHookState::Download {
+            device_id,
+            page,
+            existing_files,
+        } => {
+            if device_id != browser_session.device.device_id {
+                return Err("iOS hook belongs to a different device".to_string());
+            }
+            let current = ios_visible_files(browser_session, &page)?;
+            let Some(file) = current
+                .values()
+                .find(|file| {
+                    existing_files
+                        .values()
+                        .find(|before| {
+                            before.path == file.path
+                                && before.domain_bundle_id == file.domain_bundle_id
+                        })
+                        .map(|before| &before.signature)
+                        != Some(&file.signature)
+                })
+                .cloned()
+            else {
+                return Err("iOS download hook is still waiting for a downloaded file".to_string());
+            };
+            let download_id = unique_id("ios-download");
+            let suggested_filename = Path::new(&file.path)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("download")
+                .to_string();
+            ios_downloads()
+                .lock()
+                .map_err(|_| "iOS download registry is unavailable".to_string())?
+                .insert(
+                    download_id.clone(),
+                    IosDownloadState {
+                        device_id,
+                        file,
+                        observed_size: None,
+                    },
+                );
+            ios_hooks()
+                .lock()
+                .map_err(|_| "iOS hook registry is unavailable".to_string())?
+                .remove(id);
+            Ok(MobileHookResult::Download(MobileDownloadInfo {
+                download_id,
+                suggested_filename,
+                note: "iOS app download appeared in the Files container".to_string(),
+            }))
+        }
+    }
+}
+
+fn stage_ios_chooser_file(
+    browser_session: &MobileBrowserSessionHandle,
+    page: &MobilePageSessionHandle,
+    source: &Path,
+) -> Result<String, String> {
+    let filename = source
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "iOS chooser upload requires a valid file name".to_string())?;
+    let app_bundle = page
+        .package_name
+        .as_deref()
+        .ok_or_else(|| "iOS app session has no bundle identifier".to_string())?;
+    let candidates = ["com.apple.DocumentsApp", app_bundle];
+    match browser_session.device.connection_kind {
+        DeviceConnectionKind::Emulator => {
+            let mut last_error = None;
+            for bundle_id in candidates {
+                match simulator_app_container(&browser_session.device.device_id, bundle_id) {
+                    Ok(container) => {
+                        let directory = container.join("Documents/Allwright");
+                        fs::create_dir_all(&directory).map_err(|error| {
+                            format!("failed to create iOS chooser staging directory: {error}")
+                        })?;
+                        fs::copy(source, directory.join(filename)).map_err(|error| {
+                            format!(
+                                "failed to stage `{filename}` for the iOS document picker: {error}"
+                            )
+                        })?;
+                        return Ok(filename.to_string());
+                    }
+                    Err(error) => last_error = Some(error),
+                }
+            }
+            Err(last_error.unwrap_or_else(|| "no writable iOS Files container found".to_string()))
+        }
+        _ => {
+            let output = Command::new("xcrun")
+                .args([
+                    "devicectl",
+                    "device",
+                    "copy",
+                    "to",
+                    "--device",
+                    &browser_session.device.device_id,
+                    "--source",
+                ])
+                .arg(source)
+                .args([
+                    "--destination",
+                    "Documents/Allwright",
+                    "--domain-type",
+                    "appDataContainer",
+                    "--domain-identifier",
+                    app_bundle,
+                ])
+                .output()
+                .map_err(|error| format!("could not stage file on physical iOS device: {error}"))?;
+            if !output.status.success() {
+                return Err(format!(
+                    "could not stage `{filename}` on the physical iOS device: {}",
+                    String::from_utf8_lossy(&output.stderr).trim()
+                ));
+            }
+            Ok(filename.to_string())
+        }
+    }
+}
+
+fn set_ios_file_chooser_files(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    file_chooser_id: &str,
+    files: &[String],
+) -> Result<MobileFileChooserFilesSetInfo, String> {
+    if files.is_empty() {
+        return Err("iOS file chooser requires at least one file".to_string());
+    }
+    let chooser = ios_choosers()
+        .lock()
+        .map_err(|_| "iOS chooser registry is unavailable".to_string())?
+        .get(file_chooser_id)
+        .cloned()
+        .ok_or_else(|| format!("unknown iOS file chooser {file_chooser_id}"))?;
+    if chooser.device_id != browser_session.device.device_id
+        || chooser.page.page_id != page_session.page_id
+    {
+        return Err("iOS file chooser belongs to a different app session".to_string());
+    }
+    let mut names = Vec::with_capacity(files.len());
+    for file in files {
+        let source = fs::canonicalize(file)
+            .map_err(|error| format!("resolve staged upload {file}: {error}"))?;
+        names.push(stage_ios_chooser_file(
+            browser_session,
+            page_session,
+            &source,
+        )?);
+    }
+    let mut request = AgentRequest::new("select_file");
+    request.session_id = Some(&page_session.page_id);
+    request.files = Some(names.iter().map(String::as_str).collect());
+    request.timeout_ms = Some(10_000);
+    invoke_agent(
+        endpoint_from_session(browser_session)?,
+        &request,
+        request.timeout_ms,
+    )?;
+    ios_choosers()
+        .lock()
+        .map_err(|_| "iOS chooser registry is unavailable".to_string())?
+        .remove(file_chooser_id);
+    Ok(MobileFileChooserFilesSetInfo {
+        file_chooser_id: file_chooser_id.to_string(),
+        files: files.to_vec(),
+        note: format!(
+            "staged and selected {} file(s) in the iOS document picker",
+            files.len()
+        ),
+    })
+}
+
+fn save_ios_download(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    download_id: &str,
+    path: &str,
+) -> Result<MobileDownloadSavedInfo, String> {
+    if page_session.package_name.is_none() {
+        return Err("iOS download requires a launched app".to_string());
+    }
+    let mut downloads = ios_downloads()
+        .lock()
+        .map_err(|_| "iOS download registry is unavailable".to_string())?;
+    let download = downloads
+        .get_mut(download_id)
+        .ok_or_else(|| format!("unknown iOS download {download_id}"))?;
+    if download.device_id != browser_session.device.device_id {
+        return Err("iOS download belongs to a different device".to_string());
+    }
+    let current = ios_visible_files(browser_session, page_session)?
+        .values()
+        .find(|file| {
+            file.path == download.file.path
+                && file.domain_bundle_id == download.file.domain_bundle_id
+        })
+        .cloned()
+        .ok_or_else(|| "iOS download disappeared before it could be saved".to_string())?;
+    if download.observed_size != Some(current.size) {
+        download.observed_size = Some(current.size);
+        return Err("iOS download is still in progress".to_string());
+    }
+    if let Some(parent) = Path::new(path).parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("create iOS download destination: {error}"))?;
+    }
+    match browser_session.device.connection_kind {
+        DeviceConnectionKind::Emulator => {
+            fs::copy(&current.path, path)
+                .map_err(|error| format!("copy iOS Simulator download: {error}"))?;
+        }
+        _ => {
+            let output = Command::new("xcrun")
+                .args([
+                    "devicectl",
+                    "device",
+                    "copy",
+                    "from",
+                    "--device",
+                    &browser_session.device.device_id,
+                    "--source",
+                    &current.path,
+                    "--destination",
+                    path,
+                    "--domain-type",
+                    "appDataContainer",
+                    "--domain-identifier",
+                    &current.domain_bundle_id,
+                ])
+                .output()
+                .map_err(|error| format!("could not copy physical-device download: {error}"))?;
+            if !output.status.success() {
+                return Err(format!(
+                    "could not copy iOS download: {}",
+                    String::from_utf8_lossy(&output.stderr).trim()
+                ));
+            }
+        }
+    }
+    let suggested_filename = Path::new(&current.path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("download")
+        .to_string();
+    let result = MobileDownloadSavedInfo {
+        download_id: download_id.to_string(),
+        path: fs::canonicalize(path)
+            .map_err(|error| format!("resolve saved iOS download: {error}"))?
+            .to_string_lossy()
+            .to_string(),
+        suggested_filename,
+        size: current.size,
+        note: "copied completed iOS download to server staging".to_string(),
+    };
+    downloads.remove(download_id);
+    Ok(result)
+}
+
+fn navigate_ios_app(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    url: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobileNavigationInfo, String> {
+    validate_ios_session(browser_session)?;
+    if !url.contains(':') {
+        return Err("iOS deep link must be an absolute URL with a scheme".to_string());
+    }
+    let mut command = Command::new("xcrun");
+    match browser_session.device.connection_kind {
+        DeviceConnectionKind::Emulator => {
+            command.args(["simctl", "openurl", &browser_session.device.device_id, url]);
+        }
+        _ => {
+            let bundle_id = page_session
+                .package_name
+                .as_deref()
+                .ok_or_else(|| "iOS deep link requires a launched app bundle".to_string())?;
+            command.args([
+                "devicectl",
+                "device",
+                "process",
+                "launch",
+                "--device",
+                &browser_session.device.device_id,
+                "--payload-url",
+                url,
+                "--timeout",
+                &(timeout_ms.unwrap_or(10_000) as f64 / 1_000.0).to_string(),
+                bundle_id,
+            ]);
+        }
+    }
+    let output = command
+        .output()
+        .map_err(|error| format!("could not open iOS deep link `{url}`: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "could not open iOS deep link `{url}`: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(MobileNavigationInfo {
+        url: url.to_string(),
+        note: "opened iOS deep link through the platform URL router".to_string(),
+    })
+}
+
 fn action_request<'a>(
     command: &'a str,
     page: &'a MobilePageSessionHandle,
@@ -1454,14 +2101,49 @@ fn read_text_command(
 
 fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, String> {
     match command {
+        MobileCommand::RegisterHook {
+            browser_session,
+            page_session,
+            hook_type,
+        } => register_ios_hook(&browser_session, &page_session, hook_type)
+            .map(MobileCommandResult::RegisterHook),
+        MobileCommand::PollHook {
+            browser_session,
+            registration,
+        } => poll_ios_hook(&browser_session, &registration).map(MobileCommandResult::PollHook),
+        MobileCommand::SetFileChooserFiles {
+            browser_session,
+            page_session,
+            file_chooser_id,
+            files,
+        } => set_ios_file_chooser_files(&browser_session, &page_session, &file_chooser_id, &files)
+            .map(MobileCommandResult::SetFileChooserFiles),
+        MobileCommand::SaveDownload {
+            browser_session,
+            page_session,
+            download_id,
+            path,
+        } => save_ios_download(&browser_session, &page_session, &download_id, &path)
+            .map(MobileCommandResult::SaveDownload),
         MobileCommand::Connect(options) => connect(&options).map(MobileCommandResult::Connect),
         MobileCommand::LaunchApp {
             browser_session,
             options,
         } => launch_app(&browser_session, &options).map(MobileCommandResult::LaunchApp),
-        MobileCommand::OpenPage { .. } => Err(
-            "iOS exposes one app context per launched bundle; call launch_app instead".to_string(),
-        ),
+        MobileCommand::OpenPage { browser_session } => {
+            let page_session = ios_current_pages()
+                .lock()
+                .map_err(|_| "iOS current app registry is unavailable".to_string())?
+                .get(&browser_session.automation.session_id)
+                .cloned()
+                .ok_or_else(|| {
+                    "iOS has no launched app context; call launch_app first".to_string()
+                })?;
+            Ok(MobileCommandResult::OpenPage(MobilePageInfo {
+                note: "attached to the current iOS app context".to_string(),
+                page_session,
+            }))
+        }
         MobileCommand::ClosePage {
             browser_session,
             page_session,
@@ -1470,8 +2152,19 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             let mut request = AgentRequest::new("close");
             request.session_id = Some(&page_session.page_id);
             invoke_agent(endpoint_from_session(&browser_session)?, &request, None)?;
+            ios_current_pages()
+                .lock()
+                .map_err(|_| "iOS current app registry is unavailable".to_string())?
+                .remove(&browser_session.automation.session_id);
             Ok(MobileCommandResult::ClosePage)
         }
+        MobileCommand::NavigateApp {
+            browser_session,
+            page_session,
+            url,
+            timeout_ms,
+        } => navigate_ios_app(&browser_session, &page_session, &url, timeout_ms)
+            .map(MobileCommandResult::NavigateApp),
         MobileCommand::ClickElement {
             browser_session,
             page_session,
@@ -1613,15 +2306,21 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             browser_session,
             page_session,
             timeout_ms,
-            ..
+            full_page,
         } => {
             let mut request = AgentRequest::new("screenshot");
             request.session_id = Some(&page_session.page_id);
-            request.timeout_ms = timeout_ms;
+            let screenshot_timeout = if full_page {
+                Some(timeout_ms.unwrap_or(60_000))
+            } else {
+                timeout_ms
+            };
+            request.timeout_ms = screenshot_timeout;
+            request.full_page = Some(full_page);
             let result = invoke_agent(
                 endpoint_from_session(&browser_session)?,
                 &request,
-                timeout_ms,
+                screenshot_timeout,
             )?;
             let png_data = base64::engine::general_purpose::STANDARD
                 .decode(result_string(&result, "png_base64")?)
@@ -1640,26 +2339,34 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             let mut request = AgentRequest::new("source");
             request.session_id = Some(&page_session.page_id);
             request.value = Some(&mode);
-            let result = invoke_agent(endpoint_from_session(&browser_session)?, &request, None)?;
-            let snapshot = result_string(&result, "snapshot")?.to_string();
-            if format != "json" && !format.is_empty() {
-                return Err(
-                    "the iOS agent currently supports JSON accessibility snapshots only"
-                        .to_string(),
-                );
-            }
+            request.timeout_ms = Some(60_000);
+            let result = invoke_agent(
+                endpoint_from_session(&browser_session)?,
+                &request,
+                request.timeout_ms,
+            )?;
+            let json_snapshot = result_string(&result, "snapshot")?;
+            let resolved_format = if format.is_empty() {
+                "json"
+            } else {
+                format.as_str()
+            };
+            let snapshot = match resolved_format {
+                "json" => json_snapshot.to_string(),
+                "yaml" => {
+                    let value: Value = serde_json::from_str(json_snapshot)
+                        .map_err(|error| format!("invalid iOS accessibility snapshot: {error}"))?;
+                    serde_yaml::to_string(&value)
+                        .map_err(|error| format!("could not encode iOS YAML snapshot: {error}"))?
+                }
+                _ => return Err("accessibility snapshot format must be json or yaml".to_string()),
+            };
             Ok(MobileCommandResult::AccessibilitySnapshot(
                 AccessibilitySnapshotInfo {
                     snapshot,
-                    format: "json".to_string(),
+                    format: resolved_format.to_string(),
                 },
             ))
-        }
-        MobileCommand::RegisterHook { .. }
-        | MobileCommand::PollHook { .. }
-        | MobileCommand::SetFileChooserFiles { .. }
-        | MobileCommand::SaveDownload { .. } => {
-            Err("mobile hooks are not yet supported by the iOS XCUITest agent".to_string())
         }
     }
 }

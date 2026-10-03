@@ -37,67 +37,67 @@ public final class AndroidLocator {
         return locator(WebSelectorSupport.selector(java.util.Map.of("kind", "testId", "text", text)));
     }
 
-    public ClickResult click() {
-        return page.click(selector);
+    public void click() {
+        page.click(selector);
     }
 
-    public ClickResult click(CommandOptions options) {
-        return page.click(selector, options);
+    public void click(CommandOptions options) {
+        page.click(selector, options);
     }
 
-    public CountResult count() {
+    public int count() {
         return page.count(selector);
     }
 
-    public CountResult count(CommandOptions options) {
+    public int count(CommandOptions options) {
         return page.count(selector, options);
     }
 
-    public ElementResult focus() {
-        return page.focus(selector);
+    public void focus() {
+        page.focus(selector);
     }
 
-    public ElementResult focus(CommandOptions options) {
-        return page.focus(selector, options);
+    public void focus(CommandOptions options) {
+        page.focus(selector, options);
     }
 
-    public FillResult fill(String value) {
-        return page.fill(selector, value);
+    public void fill(String value) {
+        page.fill(selector, value);
     }
 
-    public FillResult fill(String value, CommandOptions options) {
-        return page.fill(selector, value, options);
+    public void fill(String value, CommandOptions options) {
+        page.fill(selector, value, options);
     }
 
-    public PressResult press(String key) {
-        return page.press(selector, key);
+    public void press(String key) {
+        page.press(selector, key);
     }
 
-    public PressResult press(String key, PressOptions options) {
-        return page.press(selector, key, options);
+    public void press(String key, PressOptions options) {
+        page.press(selector, key, options);
     }
 
-    public TextResult textContent() {
+    public String textContent() {
         return page.textContent(selector);
     }
 
-    public TextResult textContent(CommandOptions options) {
+    public String textContent(CommandOptions options) {
         return page.textContent(selector, options);
     }
 
-    public TextResult innerText() {
+    public String innerText() {
         return page.innerText(selector);
     }
 
-    public TextResult innerText(CommandOptions options) {
+    public String innerText(CommandOptions options) {
         return page.innerText(selector, options);
     }
 
-    public WaitForSelectorResult waitFor() {
-        return page.waitForSelector(selector);
+    public void waitFor() {
+        page.waitForSelector(selector);
     }
 
-    public WaitForSelectorResult waitFor(WaitForSelectorOptions options) {
-        return page.waitForSelector(selector, options);
+    public void waitFor(WaitForSelectorOptions options) {
+        page.waitForSelector(selector, options);
     }
 }

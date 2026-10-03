@@ -8,18 +8,10 @@ from typing import TYPE_CHECKING
 from ._selectors import chain_selector_for_transport
 from ._types import (
     CapturedOption, BoundingBox,
-    ClickResult,
     CommandOptions,
-    CountResult,
-    ElementResult,
-    FillResult,
     HighlightOptions,
-    HighlightResult,
     PressOptions,
-    PressResult,
-    TextResult,
     WaitForSelectorOptions,
-    WaitForSelectorResult,
 )
 
 if TYPE_CHECKING:
@@ -66,25 +58,25 @@ class Locator(WebLocators):
     def last(self) -> Locator:
         return self.nth(-1)
 
-    def click(self, options: CommandOptions | None = None) -> ClickResult:
+    def click(self, options: CommandOptions | None = None) -> None:
         return self.page.click(self.selector, options)
 
-    def count(self, options: CommandOptions | None = None) -> CountResult:
+    def count(self, options: CommandOptions | None = None) -> int:
         return self.page.count(self.selector, options)
 
-    def highlight(self, options: HighlightOptions | None = None) -> HighlightResult:
+    def highlight(self, options: HighlightOptions | None = None) -> None:
         return self.page.highlight(self.selector, options)
 
-    def focus(self, options: CommandOptions | None = None) -> ElementResult:
+    def focus(self, options: CommandOptions | None = None) -> None:
         return self.page.focus(self.selector, options)
 
-    def fill(self, value: str, options: CommandOptions | None = None) -> FillResult:
+    def fill(self, value: str, options: CommandOptions | None = None) -> None:
         return self.page.fill(self.selector, value, options)
 
-    def hover(self, options: CommandOptions | None = None) -> ElementResult:
+    def hover(self, options: CommandOptions | None = None) -> None:
         return self.page.hover(self.selector, options)
 
-    def press(self, key: str, options: PressOptions | None = None) -> PressResult:
+    def press(self, key: str, options: PressOptions | None = None) -> None:
         return self.page.press(self.selector, key, options)
 
     def input_value(self, options: CommandOptions | None = None) -> str:
@@ -105,11 +97,11 @@ class Locator(WebLocators):
     def bounding_box(self, options: CommandOptions | None = None) -> BoundingBox | None:
         return self.page.bounding_box(self.selector, options)
 
-    def text_content(self, options: CommandOptions | None = None) -> TextResult:
+    def text_content(self, options: CommandOptions | None = None) -> str | None:
         return self.page.text_content(self.selector, options)
 
-    def inner_text(self, options: CommandOptions | None = None) -> TextResult:
+    def inner_text(self, options: CommandOptions | None = None) -> str:
         return self.page.inner_text(self.selector, options)
 
-    def wait_for(self, options: WaitForSelectorOptions | None = None) -> WaitForSelectorResult:
+    def wait_for(self, options: WaitForSelectorOptions | None = None) -> None:
         return self.page.wait_for_selector(self.selector, options)

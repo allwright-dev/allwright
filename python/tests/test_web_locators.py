@@ -18,7 +18,7 @@ class WebLocatorTest(unittest.TestCase):
         self.assertEqual(spec['name'], {'regex': '^Save "now"$', 'flags': 'i'})
         stream = FakeStream(engine_pb2.ContextSessionEvent(element_counted=engine_pb2.ElementCountedEvent(count=2)))
         page._handle = stream
-        self.assertEqual(locator.count().count, 2)
+        self.assertEqual(locator.count(), 2)
         self.assertEqual(stream.commands[0].count_elements.css_selector, locator.selector)
 
     def test_filter_rejects_another_page(self):

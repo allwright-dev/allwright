@@ -44,13 +44,13 @@ func main() {
 	}()
 
 	page := browser.Page()
-	if _, err := page.Navigate(ctx, envOr("ALLWRIGHT_WEB_URL", defaultWebURL)); err != nil {
+	if err := page.Navigate(ctx, envOr("ALLWRIGHT_WEB_URL", defaultWebURL)); err != nil {
 		log.Fatalf("navigate: %v", err)
 	}
-	if _, err := page.Click(ctx, envOr("ALLWRIGHT_WEB_ENTRY_SELECTOR", defaultWebEntrySelector)); err != nil {
+	if err := page.Click(ctx, envOr("ALLWRIGHT_WEB_ENTRY_SELECTOR", defaultWebEntrySelector)); err != nil {
 		log.Fatalf("click entry: %v", err)
 	}
-	if _, err := page.WaitForSelector(ctx, envOr("ALLWRIGHT_WEB_HEADING_SELECTOR", defaultWebHeadingSelector), allwright.WaitForSelectorOptions{
+	if err := page.WaitForSelector(ctx, envOr("ALLWRIGHT_WEB_HEADING_SELECTOR", defaultWebHeadingSelector), allwright.WaitForSelectorOptions{
 		Visible: boolPtr(true),
 		Timeout: 10 * time.Second,
 	}); err != nil {
@@ -61,10 +61,10 @@ func main() {
 		log.Fatalf("read h1: %v", err)
 	}
 	expected := envOr("ALLWRIGHT_WEB_HEADING_TEXT", defaultWebHeadingText)
-	if !strings.Contains(heading.Text, expected) {
-		log.Fatalf("expected heading to contain %q, got %q", expected, heading.Text)
+	if !strings.Contains(heading, expected) {
+		log.Fatalf("expected heading to contain %q, got %q", expected, heading)
 	}
-	fmt.Printf("[go-web-basic] heading=%q\n", heading.Text)
+	fmt.Printf("[go-web-basic] heading=%q\n", heading)
 }
 
 func serverAddr() string {

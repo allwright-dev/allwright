@@ -8,12 +8,8 @@ import type {
   AccessibilitySnapshotOptions,
   SurfaceSessionEvent,
   SurfaceSessionStream,
-  ClickResult,
   CommandOptions,
-  CountResult,
-  ElementResult,
   EventQueue,
-  FillResult,
   FileChooser,
   Download,
   Hook,
@@ -29,13 +25,10 @@ import type {
   MobileSurfaceNamespace,
   PageHandle,
   PressOptions,
-  PressResult,
   RuntimeClient,
   ScreenshotOptions,
-  ScreenshotResult,
   TextResult,
   WaitForSelectorOptions,
-  WaitForSelectorResult,
 } from "./types.js";
 
 function retryOptions(timeoutMs?: number): { timeoutMs?: number } | undefined {
@@ -240,7 +233,7 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     }
   }
 
-  async click(selector: string, options: CommandOptions = {}): Promise<ClickResult> {
+  async click(selector: string, options: CommandOptions = {}): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -255,11 +248,7 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     while (true) {
       const event = await handle.queue.next();
       if (event.elementClicked) {
-        return {
-          selector: event.elementClicked.cssSelector ?? "",
-          note: event.elementClicked.note ?? "",
-          bidiSessionId: event.elementClicked.bidiSessionId ?? "",
-        };
+        return;
       }
       if (event.error?.message) {
         throw new Error(event.error.message);
@@ -271,7 +260,32 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     }
   }
 
-  async count(selector: string, options: CommandOptions = {}): Promise<CountResult> {
+  async goto(url: string, options: CommandOptions = {}): Promise<void> {
+    return this.navigate(url, options);
+  }
+
+  async navigate(url: string, options: CommandOptions = {}): Promise<void> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.#surfaceSessionId,
+      contextSessionId: this.sessionId,
+      navigate: { url, retryOptions: retryOptions(options.timeoutMs) },
+    });
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.navigated) {
+        return;
+      }
+      if (event.error?.message) throw new Error(event.error.message);
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`mobile app session ${this.sessionId} closed while opening deep link`);
+      }
+    }
+  }
+
+  async count(selector: string, options: CommandOptions = {}): Promise<number> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -286,11 +300,7 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     while (true) {
       const event = await handle.queue.next();
       if (event.elementCounted) {
-        return {
-          selector: event.elementCounted.cssSelector ?? "",
-          count: event.elementCounted.count ?? 0,
-          note: event.elementCounted.note ?? "",
-        };
+        return event.elementCounted.count ?? 0;
       }
       if (event.error?.message) {
         throw new Error(event.error.message);
@@ -302,7 +312,7 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     }
   }
 
-  async focus(selector: string, options: CommandOptions = {}): Promise<ElementResult> {
+  async focus(selector: string, options: CommandOptions = {}): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -317,10 +327,7 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     while (true) {
       const event = await handle.queue.next();
       if (event.elementFocused) {
-        return {
-          selector: event.elementFocused.cssSelector ?? "",
-          note: event.elementFocused.note ?? "",
-        };
+        return;
       }
       if (event.error?.message) {
         throw new Error(event.error.message);
@@ -332,7 +339,7 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     }
   }
 
-  async fill(selector: string, value: string, options: CommandOptions = {}): Promise<FillResult> {
+  async fill(selector: string, value: string, options: CommandOptions = {}): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -348,11 +355,7 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     while (true) {
       const event = await handle.queue.next();
       if (event.elementFilled) {
-        return {
-          selector: event.elementFilled.cssSelector ?? "",
-          value: event.elementFilled.value ?? "",
-          note: event.elementFilled.note ?? "",
-        };
+        return;
       }
       if (event.error?.message) {
         throw new Error(event.error.message);
@@ -364,7 +367,7 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     }
   }
 
-  async press(selector: string, key: string, options: PressOptions = {}): Promise<PressResult> {
+  async press(selector: string, key: string, options: PressOptions = {}): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -381,11 +384,7 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     while (true) {
       const event = await handle.queue.next();
       if (event.keyPressed) {
-        return {
-          selector: event.keyPressed.cssSelector ?? "",
-          key: event.keyPressed.key ?? "",
-          note: event.keyPressed.note ?? "",
-        };
+        return;
       }
       if (event.error?.message) {
         throw new Error(event.error.message);
@@ -397,18 +396,18 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     }
   }
 
-  async textContent(selector: string, options: CommandOptions = {}): Promise<TextResult> {
-    return this.#readText(selector, options, true);
+  async textContent(selector: string, options: CommandOptions = {}): Promise<string | null> {
+    return (await this.#readText(selector, options, true)).text;
   }
 
-  async innerText(selector: string, options: CommandOptions = {}): Promise<TextResult> {
-    return this.#readText(selector, options, false);
+  async innerText(selector: string, options: CommandOptions = {}): Promise<string> {
+    return (await this.#readText(selector, options, false)).text;
   }
 
   async waitForSelector(
     selector: string,
     options: WaitForSelectorOptions = {},
-  ): Promise<WaitForSelectorResult> {
+  ): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -424,11 +423,7 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     while (true) {
       const event = await handle.queue.next();
       if (event.selectorWaitSatisfied) {
-        return {
-          selector: event.selectorWaitSatisfied.cssSelector ?? "",
-          visible: event.selectorWaitSatisfied.visible ?? false,
-          note: event.selectorWaitSatisfied.note ?? "",
-        };
+        return;
       }
       if (event.error?.message) {
         throw new Error(event.error.message);
@@ -471,7 +466,7 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
     }
   }
 
-  async screenshot(options: ScreenshotOptions = {}): Promise<ScreenshotResult> {
+  async screenshot(options: ScreenshotOptions = {}): Promise<Uint8Array> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -493,7 +488,7 @@ class MobileAndroidAppImpl implements MobileAndroidApp {
         if (options.path) {
           await writeFile(options.path, screenshot.pngData);
         }
-        return screenshot;
+        return screenshot.pngData;
       }
       if (event.error?.message) {
         throw new Error(event.error.message);
@@ -613,35 +608,35 @@ class MobileAndroidLocatorImpl implements MobileAndroidLocator {
     readonly selector: string,
   ) {}
 
-  async click(options: CommandOptions = {}): Promise<ClickResult> {
+  async click(options: CommandOptions = {}): Promise<void> {
     return this.page.click(this.selector, options);
   }
 
-  async fill(value: string, options: CommandOptions = {}): Promise<FillResult> {
+  async fill(value: string, options: CommandOptions = {}): Promise<void> {
     return this.page.fill(this.selector, value, options);
   }
 
-  async count(options: CommandOptions = {}): Promise<CountResult> {
+  async count(options: CommandOptions = {}): Promise<number> {
     return this.page.count(this.selector, options);
   }
 
-  async focus(options: CommandOptions = {}): Promise<ElementResult> {
+  async focus(options: CommandOptions = {}): Promise<void> {
     return this.page.focus(this.selector, options);
   }
 
-  async press(key: string, options: PressOptions = {}): Promise<PressResult> {
+  async press(key: string, options: PressOptions = {}): Promise<void> {
     return this.page.press(this.selector, key, options);
   }
 
-  async textContent(options: CommandOptions = {}): Promise<TextResult> {
+  async textContent(options: CommandOptions = {}): Promise<string | null> {
     return this.page.textContent(this.selector, options);
   }
 
-  async innerText(options: CommandOptions = {}): Promise<TextResult> {
+  async innerText(options: CommandOptions = {}): Promise<string> {
     return this.page.innerText(this.selector, options);
   }
 
-  async waitFor(options: WaitForSelectorOptions = {}): Promise<WaitForSelectorResult> {
+  async waitFor(options: WaitForSelectorOptions = {}): Promise<void> {
     return this.page.waitForSelector(this.selector, options);
   }
 

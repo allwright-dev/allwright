@@ -45,10 +45,10 @@ func main() {
 		log.Fatalf("launch android app: %v", err)
 	}
 
-	if _, err := app.Click(ctx, envOr("ALLWRIGHT_ANDROID_TAP_SELECTOR", defaultAndroidTapSelector)); err != nil {
+	if err := app.Click(ctx, envOr("ALLWRIGHT_ANDROID_TAP_SELECTOR", defaultAndroidTapSelector)); err != nil {
 		log.Fatalf("tap android control: %v", err)
 	}
-	if _, err := app.Fill(
+	if err := app.Fill(
 		ctx,
 		envOr("ALLWRIGHT_ANDROID_FILL_SELECTOR", defaultAndroidFillSelector),
 		envOr("ALLWRIGHT_ANDROID_FILL_VALUE", defaultAndroidFillValue),

@@ -2,21 +2,13 @@ import { WebLocatorBuilders, semanticSelector, type LocatorFilterOptions } from 
 import { chainSelectorForTransport } from "./selectors.js";
 import type {
   BoundingBox, CapturedOption, CaptureResult,
-  ClickResult,
   CommandOptions,
-  CountResult,
-  ElementResult,
-  FillResult,
   HighlightOptions,
-  HighlightResult,
   Locator,
   LocatorInfo,
   Page,
   PressOptions,
-  PressResult,
-  TextResult,
   WaitForSelectorOptions,
-  WaitForSelectorResult,
 } from "./types.js";
 
 export class LocatorImpl extends WebLocatorBuilders implements Locator {
@@ -32,31 +24,31 @@ export class LocatorImpl extends WebLocatorBuilders implements Locator {
   frame(options: CommandOptions = {}): Promise<Page> { return this.page.frame(this.selector, options); }
   Frame(options: CommandOptions = {}): Promise<Page> { return this.frame(options); }
 
-  async click(options: CommandOptions = {}): Promise<ClickResult> {
+  async click(options: CommandOptions = {}): Promise<void> {
     return this.page.click(this.selector, options);
   }
 
-  async count(options: CommandOptions = {}): Promise<CountResult> {
+  async count(options: CommandOptions = {}): Promise<number> {
     return this.page.count(this.selector, options);
   }
 
-  async highlight(options: HighlightOptions = {}): Promise<HighlightResult> {
+  async highlight(options: HighlightOptions = {}): Promise<void> {
     return this.page.highlight(this.selector, options);
   }
 
-  async focus(options: CommandOptions = {}): Promise<ElementResult> {
+  async focus(options: CommandOptions = {}): Promise<void> {
     return this.page.focus(this.selector, options);
   }
 
-  async fill(value: string, options: CommandOptions = {}): Promise<FillResult> {
+  async fill(value: string, options: CommandOptions = {}): Promise<void> {
     return this.page.fill(this.selector, value, options);
   }
 
-  async hover(options: CommandOptions = {}): Promise<ElementResult> {
+  async hover(options: CommandOptions = {}): Promise<void> {
     return this.page.hover(this.selector, options);
   }
 
-  async press(key: string, options: PressOptions = {}): Promise<PressResult> {
+  async press(key: string, options: PressOptions = {}): Promise<void> {
     return this.page.press(this.selector, key, options);
   }
 
@@ -79,15 +71,15 @@ export class LocatorImpl extends WebLocatorBuilders implements Locator {
     return this.page.boundingBox(this.selector, options);
   }
 
-  async textContent(options: CommandOptions = {}): Promise<TextResult> {
+  async textContent(options: CommandOptions = {}): Promise<string | null> {
     return this.page.textContent(this.selector, options);
   }
 
-  async innerText(options: CommandOptions = {}): Promise<TextResult> {
+  async innerText(options: CommandOptions = {}): Promise<string> {
     return this.page.innerText(this.selector, options);
   }
 
-  async waitFor(options: WaitForSelectorOptions = {}): Promise<WaitForSelectorResult> {
+  async waitFor(options: WaitForSelectorOptions = {}): Promise<void> {
     return this.page.waitForSelector(this.selector, options);
   }
 

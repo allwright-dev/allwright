@@ -41,6 +41,14 @@ final class AndroidSelectorSupport {
         if (trimmed.isEmpty()) {
             return "";
         }
+        String lowered = trimmed.toLowerCase(java.util.Locale.ROOT);
+        if (lowered.startsWith("ref=") || lowered.startsWith("ref:")) {
+            String body = trimmed.substring(4).trim();
+            if (body.length() >= 2 && body.startsWith("\"") && body.endsWith("\"")) {
+                body = body.substring(1, body.length() - 1);
+            }
+            return "ref=" + body;
+        }
         if (isNormalizedTransportSelector(trimmed)) {
             return trimmed;
         }

@@ -39,72 +39,72 @@ func (l *Locator) Locator(selector string) *Locator {
 	}
 }
 
-func (l *Locator) Click(ctx context.Context, options ...CommandOptions) (*ClickResult, error) {
+func (l *Locator) Click(ctx context.Context, options ...CommandOptions) error {
 	if l == nil || l.page == nil {
-		return nil, fmt.Errorf("locator page is nil")
+		return fmt.Errorf("locator page is nil")
 	}
 	return l.page.Click(ctx, l.selector, options...)
 }
 
-func (l *Locator) Count(ctx context.Context, options ...CommandOptions) (*CountResult, error) {
+func (l *Locator) Count(ctx context.Context, options ...CommandOptions) (int, error) {
 	if l == nil || l.page == nil {
-		return nil, fmt.Errorf("locator page is nil")
+		return 0, fmt.Errorf("locator page is nil")
 	}
 	return l.page.Count(ctx, l.selector, options...)
 }
 
-func (l *Locator) Highlight(ctx context.Context, options ...HighlightOptions) (*HighlightResult, error) {
+func (l *Locator) Highlight(ctx context.Context, options ...HighlightOptions) error {
 	if l == nil || l.page == nil {
-		return nil, fmt.Errorf("locator page is nil")
+		return fmt.Errorf("locator page is nil")
 	}
 	return l.page.Highlight(ctx, l.selector, options...)
 }
 
-func (l *Locator) Focus(ctx context.Context, options ...CommandOptions) (*ElementResult, error) {
+func (l *Locator) Focus(ctx context.Context, options ...CommandOptions) error {
 	if l == nil || l.page == nil {
-		return nil, fmt.Errorf("locator page is nil")
+		return fmt.Errorf("locator page is nil")
 	}
 	return l.page.Focus(ctx, l.selector, options...)
 }
 
-func (l *Locator) Fill(ctx context.Context, value string, options ...CommandOptions) (*FillResult, error) {
+func (l *Locator) Fill(ctx context.Context, value string, options ...CommandOptions) error {
 	if l == nil || l.page == nil {
-		return nil, fmt.Errorf("locator page is nil")
+		return fmt.Errorf("locator page is nil")
 	}
 	return l.page.Fill(ctx, l.selector, value, options...)
 }
 
-func (l *Locator) Hover(ctx context.Context, options ...CommandOptions) (*ElementResult, error) {
+func (l *Locator) Hover(ctx context.Context, options ...CommandOptions) error {
 	if l == nil || l.page == nil {
-		return nil, fmt.Errorf("locator page is nil")
+		return fmt.Errorf("locator page is nil")
 	}
 	return l.page.Hover(ctx, l.selector, options...)
 }
 
-func (l *Locator) Press(ctx context.Context, key string, options ...PressOptions) (*PressResult, error) {
+func (l *Locator) Press(ctx context.Context, key string, options ...PressOptions) error {
 	if l == nil || l.page == nil {
-		return nil, fmt.Errorf("locator page is nil")
+		return fmt.Errorf("locator page is nil")
 	}
 	return l.page.Press(ctx, l.selector, key, options...)
 }
 
-func (l *Locator) TextContent(ctx context.Context, options ...CommandOptions) (*TextResult, error) {
+func (l *Locator) TextContent(ctx context.Context, options ...CommandOptions) (string, error) {
 	if l == nil || l.page == nil {
-		return nil, fmt.Errorf("locator page is nil")
+		return "", fmt.Errorf("locator page is nil")
 	}
 	return l.page.TextContent(ctx, l.selector, options...)
 }
 
-func (l *Locator) InnerText(ctx context.Context, options ...CommandOptions) (*TextResult, error) {
+func (l *Locator) InnerText(ctx context.Context, options ...CommandOptions) (string, error) {
 	if l == nil || l.page == nil {
-		return nil, fmt.Errorf("locator page is nil")
+		return "", fmt.Errorf("locator page is nil")
 	}
 	return l.page.InnerText(ctx, l.selector, options...)
 }
 
-func (l *Locator) WaitFor(ctx context.Context, options ...WaitForSelectorOptions) (*WaitForSelectorResult, error) {
+func (l *Locator) WaitFor(ctx context.Context, options ...WaitForSelectorOptions) error {
 	if l == nil || l.page == nil {
-		return nil, fmt.Errorf("locator page is nil")
+		return fmt.Errorf("locator page is nil")
 	}
 	return l.page.WaitForSelector(ctx, l.selector, options...)
 }

@@ -104,7 +104,7 @@ const value = await page.locator('input, textarea').inputValue();
 const options = await page.locator('select').selectedOptions(); // [{ value, label, index }]
 const selectedText = await page.locator('textarea').selectedText();
 const checked = await page.locator('input[type=checkbox]').isChecked();
-const text = await page.locator('h1').innerText(); // { selector, text, note }
+const text = await page.locator('h1').innerText(); // string
 const attribute = await page.locator('a').getAttribute('href');
 const box = await page.locator('button').boundingBox(); // { x, y, width, height }
 ```

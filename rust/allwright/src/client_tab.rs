@@ -9,7 +9,7 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use super::command::command_retry_options;
 use super::selectors::normalize_selector_for_transport;
-use super::types::{CommandOptions, Error, NavigateResult, Result, Tab, TabHandle, TabState};
+use super::types::{CommandOptions, Error, Result, Tab, TabHandle, TabState};
 
 impl Tab {
     pub fn locator(&self, css_selector: impl Into<String>) -> super::types::Locator {
@@ -72,7 +72,7 @@ impl Tab {
         }
     }
 
-    pub async fn goto(&self, url: impl Into<String>) -> Result<NavigateResult> {
+    pub async fn goto(&self, url: impl Into<String>) -> Result<()> {
         self.navigate(url).await
     }
 
@@ -121,7 +121,7 @@ impl Tab {
         }
     }
 
-    pub async fn navigate(&self, url: impl Into<String>) -> Result<NavigateResult> {
+    pub async fn navigate(&self, url: impl Into<String>) -> Result<()> {
         self.navigate_with_options(url, CommandOptions::default())
             .await
     }
@@ -130,7 +130,7 @@ impl Tab {
         &self,
         url: impl Into<String>,
         options: CommandOptions,
-    ) -> Result<NavigateResult> {
+    ) -> Result<()> {
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
         ensure_tab_open(handle, &self.inner.session_id)?;
@@ -183,20 +183,7 @@ impl Tab {
             }
 
             if navigated.is_some() && injection.is_some() {
-                let navigated_event = navigated
-                    .take()
-                    .ok_or_else(|| Error::new("navigation event disappeared unexpectedly"))?;
-                let injection_event = injection
-                    .take()
-                    .ok_or_else(|| Error::new("bidi injection event disappeared unexpectedly"))?;
-                return Ok(NavigateResult {
-                    url: navigated_event.url,
-                    note: navigated_event.note,
-                    bidi_session_id: injection_event.bidi_session_id,
-                    mapper_target_id: injection_event.mapper_target_id,
-                    mapper_session_id: injection_event.mapper_session_id,
-                    package_version: injection_event.package_version,
-                });
+                return Ok(());
             }
         }
     }

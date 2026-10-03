@@ -88,13 +88,14 @@ function expectedText(expected: string | RegExp | null) {
 
 async function isVisible(locator: AnyLocator, command: CommandOptions): Promise<boolean> {
   if ("filter" in locator) {
-    return (await locator.filter({ visible: true }).count(command)).count > 0;
+    return (await locator.filter({ visible: true }).count(command)) > 0;
   }
   // Android has no visibility-filter query. An absent node is not visible; only
   // its explicit native visibility failure is a negative observation.
-  if ((await locator.count(command)).count === 0) return false;
+  if ((await locator.count(command)) === 0) return false;
   try {
-    return (await locator.waitFor({ ...command, visible: true })).visible;
+    await locator.waitFor({ ...command, visible: true });
+    return true;
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("selector found but not visible: ")) return false;
     throw error;
@@ -110,21 +111,21 @@ export function createLocatorExpect(locator: AnyLocator, defaults: Defaults, neg
     get not() { return callableMatchers(createLocatorExpect(locator, defaults, !negated)); },
     async toHaveText(expected, options = {}) {
       await retryExpectation(async command => {
-        const { text } = await locator.textContent(command);
+        const text = await locator.textContent(command);
         if (expected instanceof RegExp) assertion(text).toMatch(new RegExp(expected.source, expected.flags));
         else assertion(text).toBe(expected);
       }, options, defaults());
     },
     async toContainText(expected, options = {}) {
       await retryExpectation(async command => {
-        const { text } = await locator.textContent(command);
+        const text = await locator.textContent(command);
         if (expected instanceof RegExp) assertion(text).toMatch(new RegExp(expected.source, expected.flags));
         else assertion(text).toContain(expected);
       }, options, defaults());
     },
     async toHaveCount(expected, options = {}) {
       await retryExpectation(async command => {
-        assertion((await locator.count(command)).count).toBe(expected);
+        assertion(await locator.count(command)).toBe(expected);
       }, options, defaults());
     },
     async toBeVisible(options = {}) {

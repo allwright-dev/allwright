@@ -20,7 +20,7 @@ async function main(): Promise<void> {
     const alert = await app
       .getByText("No account found. Please sign up first.", { exact: true })
       .textContent();
-    console.log(alert.text);
+    console.log(alert);
   } finally {
     await shutdown();
   }

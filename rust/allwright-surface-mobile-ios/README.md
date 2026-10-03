@@ -16,10 +16,12 @@ Only the XCUITest process touches `XCUIApplication` and `XCUIElement`. The
 plugin owns protocol translation and session routing. Clients never load the
 plugin or call the agent directly.
 
-The first runtime cut supports connect, app provisioning and launch, click,
-count, focus, fill, key input, text reads, selector waits, screenshots, close,
-and JSON accessibility source capture. File chooser/download hooks, deep links,
-and direct WebView DOM automation are not yet supported.
+The runtime supports connect, app provisioning and launch, click, count, focus,
+fill, key input, text reads, selector waits, screenshots, close, deep links,
+file chooser/download hooks, and JSON or YAML accessibility snapshots with AI
+element references. WebViews participate through the accessibility elements
+XCTest exposes; arbitrary in-page JavaScript and a general WebView CSS/DOM
+session are outside the native command surface.
 
 ## Install and run
 
@@ -72,6 +74,25 @@ case-insensitive substring matching, regular expressions are supported, and
 role locators accept `name`, `checked`, `disabled`, and `selected`. Chained
 semantic locators stay scoped to native descendants and use the same automatic
 waiting as raw selectors.
+
+`app.goto(url)` / `app.navigate(url)` opens a universal link or custom URL
+scheme through `simctl openurl` on Simulators and the device URL payload route
+on physical devices. `screenshot({ fullPage: true })` scrolls the first native
+scroll container, stitches its captures, and restores the original position.
+
+Native app contexts support the same `fileChooser` and `download` hook shape as
+Android. The engine performs the polling internally. Uploads are staged into a
+Files/app Documents container and selected through XCTest; downloads are
+observed in the launched app or Files Documents/Downloads containers, checked
+for a stable size, copied to engine staging, and streamed back to the client.
+Private containers and cloud-only files fail clearly rather than pretending to
+be portable.
+
+Accessibility snapshots support `default`, `codegen`, `autoexpect`, and `ai`
+modes in JSON or YAML. AI mode adds scoped `aria-ref` values to actionable
+elements, which can be targeted with `app.locator("ref=<id>")`. A reference is
+invalidated when the native accessibility hierarchy changes and must be
+refreshed from a new snapshot.
 
 ## Physical devices
 

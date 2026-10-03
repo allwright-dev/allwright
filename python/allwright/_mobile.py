@@ -13,18 +13,12 @@ from ._web_locators import TextMatcher, semantic_selector
 from ._types import (
     AccessibilitySnapshotOptions,
     AllwrightError,
-    ClickResult,
     CommandOptions,
-    CountResult,
     ElementResult,
-    FillResult,
     PressOptions,
-    PressResult,
     ScreenshotOptions,
-    ScreenshotResult,
     TextResult,
     WaitForSelectorOptions,
-    WaitForSelectorResult,
 )
 
 T = TypeVar("T")
@@ -273,7 +267,39 @@ class AndroidApp:
                 pass
             raise
 
-    def click(self, selector: str, options: CommandOptions | None = None) -> ClickResult:
+    def goto(self, url: str, options: CommandOptions | None = None) -> None:
+        return self.navigate(url, options)
+
+    def navigate(self, url: str, options: CommandOptions | None = None) -> None:
+        from ._runtime import retry_options
+
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            handle.send(
+                engine_pb2.ContextSessionCommand(
+                    surface_session_id=self._surface_session_id,
+                    context_session_id=self._session_id,
+                    navigate=engine_pb2.NavigatePageCommand(
+                        url=url,
+                        retry_options=retry_options((options or CommandOptions()).timeout_ms),
+                    ),
+                )
+            )
+            while True:
+                event = handle.recv("receive mobile app event while opening deep link")
+                match event.WhichOneof("event"):
+                    case "attached":
+                        pass
+                    case "navigated":
+                        return None
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError("mobile app session closed while opening deep link")
+                    case "error":
+                        raise AllwrightError(event.error.message)
+
+    def click(self, selector: str, options: CommandOptions | None = None) -> None:
         from ._runtime import retry_options
 
         with self._lock:
@@ -297,12 +323,7 @@ class AndroidApp:
                     case "attached":
                         pass
                     case "element_clicked":
-                        clicked = event.element_clicked
-                        return ClickResult(
-                            selector=clicked.css_selector,
-                            note=clicked.note,
-                            bidi_session_id=clicked.bidi_session_id,
-                        )
+                        return None
                     case "closed":
                         self._closed = True
                         raise AllwrightError(
@@ -313,7 +334,7 @@ class AndroidApp:
                             f"android app session error while clicking: {event.error.message}"
                         )
 
-    def count(self, selector: str, options: CommandOptions | None = None) -> CountResult:
+    def count(self, selector: str, options: CommandOptions | None = None) -> int:
         from ._runtime import retry_options
 
         with self._lock:
@@ -337,12 +358,7 @@ class AndroidApp:
                     case "attached":
                         pass
                     case "element_counted":
-                        counted = event.element_counted
-                        return CountResult(
-                            selector=counted.css_selector,
-                            count=counted.count,
-                            note=counted.note,
-                        )
+                        return event.element_counted.count
                     case "closed":
                         self._closed = True
                         raise AllwrightError(
@@ -353,10 +369,10 @@ class AndroidApp:
                             f"android app session error while counting elements: {event.error.message}"
                         )
 
-    def focus(self, selector: str, options: CommandOptions | None = None) -> ElementResult:
+    def focus(self, selector: str, options: CommandOptions | None = None) -> None:
         from ._runtime import retry_options
 
-        return self._element_command(
+        self._element_command(
             action="focusing Android element",
             event_name="element_focused",
             command=engine_pb2.ContextSessionCommand(
@@ -374,7 +390,7 @@ class AndroidApp:
         selector: str,
         value: str,
         options: CommandOptions | None = None,
-    ) -> FillResult:
+    ) -> None:
         from ._runtime import retry_options
 
         with self._lock:
@@ -399,12 +415,7 @@ class AndroidApp:
                     case "attached":
                         pass
                     case "element_filled":
-                        filled = event.element_filled
-                        return FillResult(
-                            selector=filled.css_selector,
-                            value=filled.value,
-                            note=filled.note,
-                        )
+                        return None
                     case "closed":
                         self._closed = True
                         raise AllwrightError(
@@ -420,7 +431,7 @@ class AndroidApp:
         selector: str,
         key: str,
         options: PressOptions | None = None,
-    ) -> PressResult:
+    ) -> None:
         from ._runtime import retry_options
 
         with self._lock:
@@ -446,12 +457,7 @@ class AndroidApp:
                     case "attached":
                         pass
                     case "key_pressed":
-                        pressed = event.key_pressed
-                        return PressResult(
-                            selector=pressed.css_selector,
-                            key=pressed.key,
-                            note=pressed.note,
-                        )
+                        return None
                     case "closed":
                         self._closed = True
                         raise AllwrightError(
@@ -466,29 +472,29 @@ class AndroidApp:
         self,
         selector: str,
         options: CommandOptions | None = None,
-    ) -> TextResult:
+    ) -> str | None:
         return self._read_text(
             selector,
             options or CommandOptions(),
             text_content=True,
-        )
+        ).text
 
     def inner_text(
         self,
         selector: str,
         options: CommandOptions | None = None,
-    ) -> TextResult:
+    ) -> str:
         return self._read_text(
             selector,
             options or CommandOptions(),
             text_content=False,
-        )
+        ).text
 
     def wait_for_selector(
         self,
         selector: str,
         options: WaitForSelectorOptions | None = None,
-    ) -> WaitForSelectorResult:
+    ) -> None:
         from ._runtime import retry_options
 
         with self._lock:
@@ -514,12 +520,7 @@ class AndroidApp:
                     case "attached":
                         pass
                     case "selector_wait_satisfied":
-                        satisfied = event.selector_wait_satisfied
-                        return WaitForSelectorResult(
-                            selector=satisfied.css_selector,
-                            visible=satisfied.visible,
-                            note=satisfied.note,
-                        )
+                        return None
                     case "closed":
                         self._closed = True
                         raise AllwrightError(
@@ -561,7 +562,7 @@ class AndroidApp:
                     case "error":
                         raise AllwrightError(f"accessibility snapshot failed: {event.error.message}")
 
-    def screenshot(self, options: ScreenshotOptions | None = None) -> ScreenshotResult:
+    def screenshot(self, options: ScreenshotOptions | None = None) -> bytes:
         from ._runtime import retry_options
 
         with self._lock:
@@ -586,13 +587,9 @@ class AndroidApp:
                         pass
                     case "screenshot_captured":
                         captured = event.screenshot_captured
-                        screenshot = ScreenshotResult(
-                            png_data=captured.png_data,
-                            note=captured.note,
-                        )
                         if command_options.path is not None:
-                            Path(command_options.path).write_bytes(screenshot.png_data)
-                        return screenshot
+                            Path(command_options.path).write_bytes(captured.png_data)
+                        return captured.png_data
                     case "closed":
                         self._closed = True
                         raise AllwrightError(
@@ -640,28 +637,28 @@ class AndroidLocator:
     def get_by_test_id(self, text: TextMatcher) -> AndroidLocator:
         return self.locator(semantic_selector(dict(kind="testId", text=text)))
 
-    def click(self, options: CommandOptions | None = None) -> ClickResult:
+    def click(self, options: CommandOptions | None = None) -> None:
         return self.page.click(self.selector, options)
 
-    def count(self, options: CommandOptions | None = None) -> CountResult:
+    def count(self, options: CommandOptions | None = None) -> int:
         return self.page.count(self.selector, options)
 
-    def focus(self, options: CommandOptions | None = None) -> ElementResult:
+    def focus(self, options: CommandOptions | None = None) -> None:
         return self.page.focus(self.selector, options)
 
-    def fill(self, value: str, options: CommandOptions | None = None) -> FillResult:
+    def fill(self, value: str, options: CommandOptions | None = None) -> None:
         return self.page.fill(self.selector, value, options)
 
-    def press(self, key: str, options: PressOptions | None = None) -> PressResult:
+    def press(self, key: str, options: PressOptions | None = None) -> None:
         return self.page.press(self.selector, key, options)
 
-    def text_content(self, options: CommandOptions | None = None) -> TextResult:
+    def text_content(self, options: CommandOptions | None = None) -> str | None:
         return self.page.text_content(self.selector, options)
 
-    def inner_text(self, options: CommandOptions | None = None) -> TextResult:
+    def inner_text(self, options: CommandOptions | None = None) -> str:
         return self.page.inner_text(self.selector, options)
 
-    def wait_for(self, options: WaitForSelectorOptions | None = None) -> WaitForSelectorResult:
+    def wait_for(self, options: WaitForSelectorOptions | None = None) -> None:
         return self.page.wait_for_selector(self.selector, options)
 
 
@@ -984,6 +981,15 @@ def normalize_mobile_selector_for_transport(selector: str) -> str:
     trimmed = selector.strip()
     if not trimmed:
         return ""
+    if trimmed.lower().startswith(("ref=", "ref:")):
+        import json
+        body = trimmed[4:].strip()
+        if body.startswith('"') and body.endswith('"'):
+            try:
+                body = json.loads(body)
+            except ValueError:
+                pass
+        return f"ref={body}"
     if is_normalized_mobile_transport_selector(trimmed):
         return trimmed
     import json

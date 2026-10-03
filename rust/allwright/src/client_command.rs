@@ -1,6 +1,6 @@
-use crate::proto::{CommandRetryOptions, ElementCountedEvent, ElementsHighlightedEvent};
+use crate::proto::CommandRetryOptions;
 
-use super::types::{CountResult, HighlightResult, RetryConfig};
+use super::types::RetryConfig;
 
 pub(crate) fn command_retry_options(timeout_ms: Option<u32>) -> Option<CommandRetryOptions> {
     timeout_ms.map(|timeout_ms| CommandRetryOptions {
@@ -23,20 +23,4 @@ pub(crate) fn merge_retry_config(
         }
     }
     merged
-}
-
-pub(crate) fn count_result_from_event(event: ElementCountedEvent) -> CountResult {
-    CountResult {
-        selector: event.css_selector,
-        count: event.count,
-        note: event.note,
-    }
-}
-
-pub(crate) fn highlight_result_from_event(event: ElementsHighlightedEvent) -> HighlightResult {
-    HighlightResult {
-        selector: event.css_selector,
-        count: event.count,
-        note: event.note,
-    }
 }

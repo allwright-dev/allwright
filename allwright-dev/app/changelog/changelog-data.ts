@@ -22,7 +22,8 @@ export const changelog: ChangelogEntry[] = [
       "Mobile iOS is now available across all five clients: connect to an iOS Simulator or a registered physical iPhone, then launch an app from a local .app, a .zip/.ipa, or a URL. allwright installs the runtime and the app for you — there is no separate driver to set up and no manual install step.",
       "iOS apps use the same locator and action set as Android: click, fill, focus, press, count, text reads, selector waits, and screenshots. Both mobile surfaces now support Playwright-style getByRole, getByText, getByLabel, and getByTestId alongside their raw native selectors. Actions wait for their target automatically, so tests don't need polling loops.",
       "@allwright.dev/vitest adds ios and iosApp fixtures, configured through the mobile.ios section of allwright.config.yaml, and npm init allwright can now scaffold an iOS project with --ios. The public Flights-simulator.ipa sample works out of the box.",
-      "iOS runs on macOS. File chooser and download hooks, deep-link helpers, and direct WebView DOM automation are not available yet.",
+      "iOS now includes app-level file chooser and download hooks, goto/navigate deep-link helpers, full-page screenshots, and JSON/YAML accessibility snapshots with reusable AI references. WebView accessibility content is available through native locators; arbitrary JavaScript and general CSS/DOM sessions remain outside the native surface.",
+      "Web and mobile clients now unwrap internal command acknowledgements at the API boundary: actions and waits return void, count returns a number, text reads return strings, and screenshots return raw bytes across TypeScript, Python, Go, Java, and Rust.",
     ],
   },
   {

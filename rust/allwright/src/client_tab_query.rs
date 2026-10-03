@@ -5,19 +5,16 @@ use crate::proto::{
     HighlightElementsCommand, ScreenshotCommand, WaitForSelectorCommand,
 };
 
-use super::command::{command_retry_options, count_result_from_event, highlight_result_from_event};
+use super::command::command_retry_options;
 use super::selectors::normalize_selector_for_transport;
 use super::tab::ensure_tab_open;
 use super::types::{
-    CommandOptions, Error, HighlightOptions, HighlightResult, Result, ScreenshotOptions,
-    ScreenshotResult, Tab, TextResult, WaitForSelectorOptions, WaitForSelectorResult,
+    CommandOptions, Error, HighlightOptions, Result, ScreenshotOptions, Tab, TextResult,
+    WaitForSelectorOptions,
 };
 
 impl Tab {
-    pub async fn count(
-        &self,
-        css_selector: impl Into<String>,
-    ) -> Result<super::types::CountResult> {
+    pub async fn count(&self, css_selector: impl Into<String>) -> Result<u32> {
         self.count_with_options(css_selector, CommandOptions::default())
             .await
     }
@@ -26,7 +23,7 @@ impl Tab {
         &self,
         css_selector: impl Into<String>,
         options: CommandOptions,
-    ) -> Result<super::types::CountResult> {
+    ) -> Result<u32> {
         let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -54,7 +51,7 @@ impl Tab {
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
                 Some(ContextEvent::ElementCounted(counted)) => {
-                    return Ok(count_result_from_event(counted));
+                    return Ok(counted.count);
                 }
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
@@ -74,7 +71,7 @@ impl Tab {
         }
     }
 
-    pub async fn highlight(&self, css_selector: impl Into<String>) -> Result<HighlightResult> {
+    pub async fn highlight(&self, css_selector: impl Into<String>) -> Result<()> {
         self.highlight_with_options(css_selector, HighlightOptions::default())
             .await
     }
@@ -83,7 +80,7 @@ impl Tab {
         &self,
         css_selector: impl Into<String>,
         options: HighlightOptions,
-    ) -> Result<HighlightResult> {
+    ) -> Result<()> {
         let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -112,9 +109,7 @@ impl Tab {
 
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
-                Some(ContextEvent::ElementsHighlighted(highlighted)) => {
-                    return Ok(highlight_result_from_event(highlighted));
-                }
+                Some(ContextEvent::ElementsHighlighted(_)) => return Ok(()),
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while highlighting locator {:?}: {}",
@@ -133,7 +128,7 @@ impl Tab {
         }
     }
 
-    pub async fn text_content(&self, css_selector: impl Into<String>) -> Result<TextResult> {
+    pub async fn text_content(&self, css_selector: impl Into<String>) -> Result<Option<String>> {
         self.text_content_with_options(css_selector, CommandOptions::default())
             .await
     }
@@ -142,16 +137,17 @@ impl Tab {
         &self,
         css_selector: impl Into<String>,
         options: CommandOptions,
-    ) -> Result<TextResult> {
+    ) -> Result<Option<String>> {
         self.read_text(
             normalize_selector_for_transport(&css_selector.into()),
             options,
             true,
         )
         .await
+        .map(|result| Some(result.text))
     }
 
-    pub async fn inner_text(&self, css_selector: impl Into<String>) -> Result<TextResult> {
+    pub async fn inner_text(&self, css_selector: impl Into<String>) -> Result<String> {
         self.inner_text_with_options(css_selector, CommandOptions::default())
             .await
     }
@@ -160,19 +156,17 @@ impl Tab {
         &self,
         css_selector: impl Into<String>,
         options: CommandOptions,
-    ) -> Result<TextResult> {
+    ) -> Result<String> {
         self.read_text(
             normalize_selector_for_transport(&css_selector.into()),
             options,
             false,
         )
         .await
+        .map(|result| result.text)
     }
 
-    pub async fn wait_for_selector(
-        &self,
-        css_selector: impl Into<String>,
-    ) -> Result<WaitForSelectorResult> {
+    pub async fn wait_for_selector(&self, css_selector: impl Into<String>) -> Result<()> {
         self.wait_for_selector_with_options(css_selector, WaitForSelectorOptions::default())
             .await
     }
@@ -181,7 +175,7 @@ impl Tab {
         &self,
         css_selector: impl Into<String>,
         options: WaitForSelectorOptions,
-    ) -> Result<WaitForSelectorResult> {
+    ) -> Result<()> {
         let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -207,13 +201,7 @@ impl Tab {
                 .ok_or_else(|| Error::new("tab session closed while waiting for selector"))?;
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
-                Some(ContextEvent::SelectorWaitSatisfied(waited)) => {
-                    return Ok(WaitForSelectorResult {
-                        selector: waited.css_selector,
-                        visible: waited.visible,
-                        note: waited.note,
-                    });
-                }
+                Some(ContextEvent::SelectorWaitSatisfied(_)) => return Ok(()),
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "tab session error while waiting for locator {:?}: {}",
@@ -232,15 +220,12 @@ impl Tab {
         }
     }
 
-    pub async fn screenshot(&self) -> Result<ScreenshotResult> {
+    pub async fn screenshot(&self) -> Result<Vec<u8>> {
         self.screenshot_with_options(ScreenshotOptions::default())
             .await
     }
 
-    pub async fn screenshot_with_options(
-        &self,
-        options: ScreenshotOptions,
-    ) -> Result<ScreenshotResult> {
+    pub async fn screenshot_with_options(&self, options: ScreenshotOptions) -> Result<Vec<u8>> {
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
         ensure_tab_open(handle, &self.inner.session_id)?;
@@ -265,16 +250,12 @@ impl Tab {
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
                 Some(ContextEvent::ScreenshotCaptured(screenshot)) => {
-                    let result = ScreenshotResult {
-                        png_data: screenshot.png_data,
-                        note: screenshot.note,
-                    };
                     if let Some(path) = options.path.as_ref() {
-                        std::fs::write(path, &result.png_data).map_err(|error| {
+                        std::fs::write(path, &screenshot.png_data).map_err(|error| {
                             Error::new(format!("write screenshot to {}: {error}", path.display()))
                         })?;
                     }
-                    return Ok(result);
+                    return Ok(screenshot.png_data);
                 }
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(

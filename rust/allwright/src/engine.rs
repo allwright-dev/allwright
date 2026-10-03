@@ -1797,15 +1797,36 @@ async fn handle_tab_command(
                     EngineBrowserSessionHandle::Web(surface_session),
                     EnginePageSessionHandle::Web(page_session),
                 ) => (surface_session, page_session),
-                (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
+                (
+                    EngineBrowserSessionHandle::Mobile(surface_session),
+                    EnginePageSessionHandle::Mobile(page_session),
+                ) => {
+                    let timeout_ms = retry_options
+                        .as_ref()
+                        .and_then(|options| options.timeout_ms)
+                        .and_then(|value| u32::try_from(value).ok());
+                    let result = retry_with_timeout(
+                        command_retry_policy(retry_options.as_ref()),
+                        || async {
+                            web_lib::navigate_mobile_app(
+                                surface_session,
+                                page_session,
+                                &url,
+                                timeout_ms,
+                            )
+                            .await
+                        },
+                    )
+                    .await;
+                    let event = match result {
+                        Ok(navigation) => ContextEvent::Navigated(PageNavigatedEvent {
+                            url: navigation.url,
+                            note: navigation.note,
+                        }),
+                        Err(message) => ContextEvent::Error(ContextSessionErrorEvent { message }),
+                    };
                     return Ok(TabCommandOutcome {
-                        events: vec![tab_event(
-                            &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "navigate is not supported for mobile tab sessions"
-                                    .to_string(),
-                            }),
-                        )],
+                        events: vec![tab_event(&context_session_id, event)],
                         should_close: false,
                     });
                 }

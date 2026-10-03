@@ -1,8 +1,6 @@
 use super::selectors::chain_selector_for_transport;
 use super::types::{
-    ClickResult, CommandOptions, CountResult, ElementResult, FillResult, HighlightOptions,
-    HighlightResult, Locator, Page, PressOptions, PressResult, Result, TextResult,
-    WaitForSelectorOptions, WaitForSelectorResult,
+    CommandOptions, HighlightOptions, Locator, Page, PressOptions, Result, WaitForSelectorOptions,
 };
 
 impl Locator {
@@ -32,50 +30,47 @@ impl Locator {
             .await
     }
 
-    pub async fn click(&self) -> Result<ClickResult> {
+    pub async fn click(&self) -> Result<()> {
         self.page.click(self.selector.clone()).await
     }
 
-    pub async fn click_with_options(&self, options: CommandOptions) -> Result<ClickResult> {
+    pub async fn click_with_options(&self, options: CommandOptions) -> Result<()> {
         self.page
             .click_with_options(self.selector.clone(), options)
             .await
     }
 
-    pub async fn count(&self) -> Result<CountResult> {
+    pub async fn count(&self) -> Result<u32> {
         self.page.count(self.selector.clone()).await
     }
 
-    pub async fn count_with_options(&self, options: CommandOptions) -> Result<CountResult> {
+    pub async fn count_with_options(&self, options: CommandOptions) -> Result<u32> {
         self.page
             .count_with_options(self.selector.clone(), options)
             .await
     }
 
-    pub async fn highlight(&self) -> Result<HighlightResult> {
+    pub async fn highlight(&self) -> Result<()> {
         self.page.highlight(self.selector.clone()).await
     }
 
-    pub async fn highlight_with_options(
-        &self,
-        options: HighlightOptions,
-    ) -> Result<HighlightResult> {
+    pub async fn highlight_with_options(&self, options: HighlightOptions) -> Result<()> {
         self.page
             .highlight_with_options(self.selector.clone(), options)
             .await
     }
 
-    pub async fn focus(&self) -> Result<ElementResult> {
+    pub async fn focus(&self) -> Result<()> {
         self.page.focus(self.selector.clone()).await
     }
 
-    pub async fn focus_with_options(&self, options: CommandOptions) -> Result<ElementResult> {
+    pub async fn focus_with_options(&self, options: CommandOptions) -> Result<()> {
         self.page
             .focus_with_options(self.selector.clone(), options)
             .await
     }
 
-    pub async fn fill(&self, value: impl Into<String>) -> Result<FillResult> {
+    pub async fn fill(&self, value: impl Into<String>) -> Result<()> {
         self.page.fill(self.selector.clone(), value.into()).await
     }
 
@@ -83,23 +78,23 @@ impl Locator {
         &self,
         value: impl Into<String>,
         options: CommandOptions,
-    ) -> Result<FillResult> {
+    ) -> Result<()> {
         self.page
             .fill_with_options(self.selector.clone(), value.into(), options)
             .await
     }
 
-    pub async fn hover(&self) -> Result<ElementResult> {
+    pub async fn hover(&self) -> Result<()> {
         self.page.hover(self.selector.clone()).await
     }
 
-    pub async fn hover_with_options(&self, options: CommandOptions) -> Result<ElementResult> {
+    pub async fn hover_with_options(&self, options: CommandOptions) -> Result<()> {
         self.page
             .hover_with_options(self.selector.clone(), options)
             .await
     }
 
-    pub async fn press(&self, key: impl Into<String>) -> Result<PressResult> {
+    pub async fn press(&self, key: impl Into<String>) -> Result<()> {
         self.page.press(self.selector.clone(), key.into()).await
     }
 
@@ -107,33 +102,36 @@ impl Locator {
         &self,
         key: impl Into<String>,
         options: PressOptions,
-    ) -> Result<PressResult> {
+    ) -> Result<()> {
         self.page
             .press_with_options(self.selector.clone(), key.into(), options)
             .await
     }
 
-    pub async fn text_content(&self) -> Result<TextResult> {
+    pub async fn text_content(&self) -> Result<Option<String>> {
         self.page.text_content(self.selector.clone()).await
     }
 
-    pub async fn text_content_with_options(&self, options: CommandOptions) -> Result<TextResult> {
+    pub async fn text_content_with_options(
+        &self,
+        options: CommandOptions,
+    ) -> Result<Option<String>> {
         self.page
             .text_content_with_options(self.selector.clone(), options)
             .await
     }
 
-    pub async fn inner_text(&self) -> Result<TextResult> {
+    pub async fn inner_text(&self) -> Result<String> {
         self.page.inner_text(self.selector.clone()).await
     }
 
-    pub async fn inner_text_with_options(&self, options: CommandOptions) -> Result<TextResult> {
+    pub async fn inner_text_with_options(&self, options: CommandOptions) -> Result<String> {
         self.page
             .inner_text_with_options(self.selector.clone(), options)
             .await
     }
 
-    pub async fn wait_for(&self) -> Result<WaitForSelectorResult> {
+    pub async fn wait_for(&self) -> Result<()> {
         self.wait_for_with_options(WaitForSelectorOptions {
             visible: Some(true),
             ..Default::default()
@@ -141,10 +139,7 @@ impl Locator {
         .await
     }
 
-    pub async fn wait_for_with_options(
-        &self,
-        options: WaitForSelectorOptions,
-    ) -> Result<WaitForSelectorResult> {
+    pub async fn wait_for_with_options(&self, options: WaitForSelectorOptions) -> Result<()> {
         let mut options = options;
         if options.visible.is_none() {
             options.visible = Some(true);

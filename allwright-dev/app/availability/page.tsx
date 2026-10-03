@@ -92,6 +92,11 @@ const iosAvailable = [
   "Download a simulator .ipa or ZIP, or use a local .app bundle, then install and launch it automatically",
   "Install and launch a signed physical-device .ipa, ZIP, or .app bundle without a manual install step",
   "Click, focus, fill, press keys, read text, wait for selectors, count elements, and capture screenshots",
+  "Open universal links and custom URL schemes with app.goto / app.navigate",
+  "Capture full-page scroll-and-stitch screenshots",
+  "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
+  "Register typed file-chooser and download hooks with files streamed to and from the test machine",
+  "Automate WebView content exposed through the native XCTest accessibility tree",
   "Accessibility-id, text, XCTest element type, and basic XPath selectors",
   "Playwright-style getByRole, getByText, getByLabel, and getByTestId native accessibility locators",
   "Playwright-style action auto-waiting and retrying text, count, and visibility assertions",
@@ -99,9 +104,7 @@ const iosAvailable = [
 ];
 
 const iosNotYetAvailable = [
-  "Direct WebView DOM automation",
-  "File chooser and download hooks",
-  "Deep-link helpers",
+  "Arbitrary in-page JavaScript and general CSS/DOM sessions inside WebViews",
 ];
 
 const plannedSurfaces = surfaceStatus.filter(

@@ -8,10 +8,10 @@ use allwright_surface_mobile::{
     MobileCapabilitySet, MobileClickInfo, MobileCommand, MobileCommandResult, MobileConnectInfo,
     MobileDownloadInfo, MobileDownloadSavedInfo, MobileElementCountInfo, MobileElementInfo,
     MobileFileChooserFilesSetInfo, MobileFileChooserInfo, MobileFillInfo, MobileHookRegistration,
-    MobileHookResult, MobileHookType, MobilePageInfo, MobilePageSessionHandle, MobilePlatform,
-    MobilePressInfo, MobileRuntimeReadiness, MobileScreenshotInfo, MobileSurfaceProfile,
-    MobileTextInfo, MobileWaitForSelectorInfo, RuntimeMaturity, boot_surface,
-    normalize_selector_for_transport,
+    MobileHookResult, MobileHookType, MobileNavigationInfo, MobilePageInfo,
+    MobilePageSessionHandle, MobilePlatform, MobilePressInfo, MobileRuntimeReadiness,
+    MobileScreenshotInfo, MobileSurfaceProfile, MobileTextInfo, MobileWaitForSelectorInfo,
+    RuntimeMaturity, boot_surface, normalize_selector_for_transport,
 };
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use regex::Regex;
@@ -747,6 +747,30 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
         } => {
             accessibility::clear(&browser_session, &page_session)?;
             Ok(MobileCommandResult::ClosePage)
+        }
+        MobileCommand::NavigateApp {
+            browser_session,
+            page_session,
+            url,
+            ..
+        } => {
+            accessibility::validate_scope(&browser_session, &page_session, "deep link")?;
+            run_adb_for_device(
+                &browser_session.device.device_id,
+                &[
+                    "shell",
+                    "am",
+                    "start",
+                    "-a",
+                    "android.intent.action.VIEW",
+                    "-d",
+                    &url,
+                ],
+            )?;
+            Ok(MobileCommandResult::NavigateApp(MobileNavigationInfo {
+                url,
+                note: "opened Android deep link through the platform intent router".to_string(),
+            }))
         }
         MobileCommand::AccessibilitySnapshot {
             browser_session,

@@ -12,6 +12,9 @@ final class AllwrightIOSAgent {
     private let queue = DispatchQueue(label: "dev.allwright.ios-agent.http")
     private var listener: NWListener?
     private var applications: [String: XCUIApplication] = [:]
+    private var applicationBundleIDs: [String: String] = [:]
+    private var snapshotReferences: [String: [String: SnapshotReference]] = [:]
+    private var snapshotGenerations: [String: Int] = [:]
 
     func start() throws {
         let rawPort = ProcessInfo.processInfo.environment["ALLWRIGHT_IOS_AGENT_PORT"] ?? "8100"
@@ -118,12 +121,16 @@ final class AllwrightIOSAgent {
             }
             let sessionID = UUID().uuidString
             applications[sessionID] = application
+            applicationBundleIDs[sessionID] = bundleID
             return .success(["session_id": sessionID, "bundle_id": bundleID])
 
         case "close":
             let (sessionID, application) = try application(for: request)
             application.terminate()
             applications.removeValue(forKey: sessionID)
+            applicationBundleIDs.removeValue(forKey: sessionID)
+            snapshotReferences.removeValue(forKey: sessionID)
+            snapshotGenerations.removeValue(forKey: sessionID)
             return .success(["closed": true])
 
         case "click":
@@ -154,8 +161,11 @@ final class AllwrightIOSAgent {
             return .success(["performed": true])
 
         case "count":
-            let (_, application) = try application(for: request)
+            let (sessionID, application) = try application(for: request)
             let selector = try requiredString("selector", in: request)
+            if selector.hasPrefix("ref=") {
+                return .success(["count": (try? referencedElement(selector, sessionID: sessionID, application: application)) == nil ? 0 : 1])
+            }
             return .success(["count": query(selector, in: application).count])
 
         case "text":
@@ -165,10 +175,19 @@ final class AllwrightIOSAgent {
             return .success(["text": text])
 
         case "wait":
-            let (_, application) = try application(for: request)
+            let (sessionID, application) = try application(for: request)
             let selector = try requiredString("selector", in: request)
             let visible = request["visible"] as? Bool ?? true
             let timeout = seconds(request["timeout_ms"])
+            if selector.hasPrefix("ref=") {
+                let deadline = Date().addingTimeInterval(timeout)
+                repeat {
+                    let exists = (try? referencedElement(selector, sessionID: sessionID, application: application))?.exists == true
+                    if exists == visible { return .success(["visible": visible]) }
+                    RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+                } while Date() < deadline
+                throw AgentError("reference did not become \(visible ? "visible" : "hidden") before timeout")
+            }
             let element = query(selector, in: application).firstMatch
             if visible, element.waitForExistence(timeout: timeout) {
                 return .success(["visible": true])
@@ -186,24 +205,54 @@ final class AllwrightIOSAgent {
 
         case "screenshot":
             let (_, application) = try application(for: request)
-            return .success(["png_base64": application.screenshot().pngRepresentation.base64EncodedString()])
+            let fullPage = request["full_page"] as? Bool ?? false
+            let png = fullPage ? fullPageScreenshot(application) : application.screenshot().pngRepresentation
+            return .success(["png_base64": png.base64EncodedString()])
+
+        case "file_chooser_status":
+            let (_, application) = try application(for: request)
+            let cancel = application.buttons.matching(
+                NSPredicate(format: "label IN[c] %@", ["Cancel", "Close"])
+            ).firstMatch
+            let choose = application.buttons.matching(
+                NSPredicate(format: "label IN[c] %@", ["Open", "Choose", "Done", "Add"])
+            ).firstMatch
+            let browser = application.collectionViews.firstMatch.exists
+                || application.tables.firstMatch.exists
+                || application.navigationBars.firstMatch.exists
+            return .success([
+                "opened": cancel.exists && (choose.exists || browser),
+                "multiple": application.buttons.matching(
+                    NSPredicate(format: "label CONTAINS[c] %@", "Select")
+                ).firstMatch.exists,
+            ])
+
+        case "select_file":
+            let (_, application) = try application(for: request)
+            let names = request["files"] as? [String] ?? []
+            guard !names.isEmpty else { throw AgentError("select_file requires at least one file name") }
+            for name in names {
+                let candidate = application.descendants(matching: .any).matching(
+                    NSPredicate(format: "label == %@ OR identifier == %@ OR value == %@", name, name, name)
+                ).firstMatch
+                guard candidate.waitForExistence(timeout: seconds(request["timeout_ms"])) else {
+                    throw AgentError("iOS document picker does not show `\(name)`")
+                }
+                candidate.tap()
+            }
+            let confirmation = application.buttons.matching(
+                NSPredicate(format: "label IN[c] %@", ["Open", "Choose", "Done", "Add"])
+            ).firstMatch
+            if confirmation.exists && confirmation.isEnabled { confirmation.tap() }
+            return .success(["selected": names])
 
         case "source":
             let (sessionID, application) = try application(for: request)
-            let document: [String: Any] = [
-                "version": 1,
-                "documents": [[
-                    "id": sessionID,
-                    "platform": "ios",
-                    "application": [
-                        "role": "application",
-                        "name": application.label,
-                        "states": [:],
-                        "properties": ["debug_description": application.debugDescription],
-                        "children": [],
-                    ],
-                ]],
-            ]
+            let mode = request["value"] as? String ?? "default"
+            guard ["default", "ai", "autoexpect", "codegen"].contains(mode) else {
+                throw AgentError("invalid accessibility snapshot mode `\(mode)`")
+            }
+            let document = accessibilityDocument(sessionID: sessionID, application: application, mode: mode)
             let data = try JSONSerialization.data(withJSONObject: document)
             return .success(["snapshot": String(decoding: data, as: UTF8.self)])
 
@@ -224,9 +273,11 @@ final class AllwrightIOSAgent {
         for request: [String: Any],
         requiringActionability: Bool = false
     ) throws -> XCUIElement {
-        let (_, application) = try application(for: request)
+        let (sessionID, application) = try application(for: request)
         let selector = try requiredString("selector", in: request)
-        let element = query(selector, in: application).firstMatch
+        let element = selector.hasPrefix("ref=")
+            ? try referencedElement(selector, sessionID: sessionID, application: application)
+            : query(selector, in: application).firstMatch
         let timeout = seconds(request["timeout_ms"])
         if requiringActionability {
             let expectation = XCTNSPredicateExpectation(
@@ -240,6 +291,239 @@ final class AllwrightIOSAgent {
             throw AgentError("no iOS element matched `\(selector)` before timeout")
         }
         return element
+    }
+
+    private func referencedElement(
+        _ selector: String,
+        sessionID: String,
+        application: XCUIApplication
+    ) throws -> XCUIElement {
+        guard !selector.contains(" >> ") else {
+            throw AgentError("snapshot references must be standalone ref=<id> selectors")
+        }
+        let referenceID = String(selector.dropFirst("ref=".count)).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+        guard let reference = snapshotReferences[sessionID]?[referenceID] else {
+            let available = snapshotReferences[sessionID]?.keys.sorted().joined(separator: ",") ?? "none"
+            throw AgentError("stale or foreign iOS snapshot reference `\(referenceID)` (available: \(available)); capture a new AI accessibility snapshot")
+        }
+        guard debugHierarchySignature(application.debugDescription) == reference.hierarchySignature else {
+            throw AgentError("stale iOS snapshot reference: accessibility hierarchy changed; capture a new AI snapshot")
+        }
+        var query = application.descendants(matching: reference.type)
+        if !reference.identifier.isEmpty {
+            query = query.matching(identifier: reference.identifier)
+        } else {
+            query = query.matching(NSPredicate(
+                format: "label == %@ OR title == %@ OR value == %@ OR placeholderValue == %@",
+                reference.label, reference.label, reference.label, reference.label
+            ))
+        }
+        let element = query.element(boundBy: reference.matchIndex)
+        guard element.exists else {
+            throw AgentError("stale iOS snapshot reference: referenced element disappeared")
+        }
+        return element
+    }
+
+    private func accessibilityDocument(
+        sessionID: String,
+        application: XCUIApplication,
+        mode: String
+    ) -> [String: Any] {
+        let hierarchy = application.debugDescription
+        let hierarchySignature = debugHierarchySignature(hierarchy)
+        let generation = (snapshotGenerations[sessionID] ?? 0) + 1
+        snapshotGenerations[sessionID] = generation
+        var references: [String: SnapshotReference] = [:]
+        var children: [[String: Any]] = []
+        var matchIndexes: [String: Int] = [:]
+
+        for (index, rawLine) in hierarchy.split(separator: "\n").enumerated() {
+            let line = String(rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "→"))
+            guard let type = debugElementType(line), type != .application else { continue }
+            let identifier = debugQuotedValue("identifier", in: line) ?? ""
+            let label = debugQuotedValue("label", in: line)
+                ?? debugQuotedValue("title", in: line)
+                ?? debugQuotedValue("value", in: line)
+                ?? debugQuotedValue("placeholderValue", in: line)
+                ?? ""
+            let frame = debugFrame(line)
+            let rendered = frame.width > 0 && frame.height > 0
+            if mode == "autoexpect" && !rendered { continue }
+            var properties: [String: Any] = [
+                "type": elementTypeName(type),
+                "identifier": identifier,
+                "frame": ["x": frame.origin.x, "y": frame.origin.y, "width": frame.width, "height": frame.height],
+                "rendered": rendered,
+                "index": index,
+            ]
+            if let placeholder = debugQuotedValue("placeholderValue", in: line), !placeholder.isEmpty {
+                properties["placeholder"] = placeholder
+            }
+            let disabled = line.contains("Disabled") || line.contains("enabled: 0")
+            let selected = line.contains("Selected") || line.contains("selected: 1")
+            if mode == "ai" && rendered && !disabled && actionable(type) && (!identifier.isEmpty || !label.isEmpty) {
+                let referenceID = "e\(generation)-\(index + 1)"
+                properties["aria-ref"] = referenceID
+                let matchKey = "\(type.rawValue)|\(identifier)|\(label)"
+                let matchIndex = matchIndexes[matchKey, default: 0]
+                matchIndexes[matchKey] = matchIndex + 1
+                references[referenceID] = SnapshotReference(
+                    type: type,
+                    identifier: identifier,
+                    label: label,
+                    matchIndex: matchIndex,
+                    hierarchySignature: hierarchySignature
+                )
+            }
+            children.append([
+                "role": accessibilityRole(type),
+                "name": type == .secureTextField ? (debugQuotedValue("placeholderValue", in: line) ?? label) : label,
+                "states": ["disabled": disabled, "selected": selected],
+                "properties": properties,
+                "children": [],
+            ])
+        }
+        snapshotReferences[sessionID] = mode == "ai" ? references : [:]
+        var document: [String: Any] = [
+            "contextId": sessionID,
+            "parentContextId": NSNull(),
+            "platform": "ios",
+            "root": [
+                "role": "application",
+                "name": application.label,
+                "states": [:],
+                "properties": ["bundleIdentifier": applicationBundleIDs[sessionID] ?? ""],
+                "children": children,
+            ],
+        ]
+        if mode == "ai" { document["snapshotId"] = generation }
+        return ["version": 1, "documents": [document]]
+    }
+
+    private func debugQuotedValue(_ key: String, in line: String) -> String? {
+        for quote in ["'", "\""] {
+            let marker = "\(key): \(quote)"
+            guard let start = line.range(of: marker) else { continue }
+            let tail = line[start.upperBound...]
+            guard let end = tail.firstIndex(of: Character(quote)) else { continue }
+            return String(tail[..<end])
+        }
+        return nil
+    }
+
+    private func debugHierarchySignature(_ hierarchy: String) -> String {
+        hierarchy.split(separator: "\n").compactMap { rawLine -> String? in
+            let line = String(rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "→"))
+            guard let type = debugElementType(line) else { return nil }
+            let identifier = debugQuotedValue("identifier", in: line) ?? ""
+            let label = debugQuotedValue("label", in: line) ?? ""
+            let value = debugQuotedValue("value", in: line) ?? ""
+            let placeholder = debugQuotedValue("placeholderValue", in: line) ?? ""
+            let frame = debugFrame(line)
+            return "\(type.rawValue)|\(identifier)|\(label)|\(value)|\(placeholder)|\(frame.origin.x),\(frame.origin.y),\(frame.width),\(frame.height)"
+        }.joined(separator: "\u{1f}")
+    }
+
+    private func debugFrame(_ line: String) -> CGRect {
+        let pattern = #"\{\{(-?[0-9.]+),\s*(-?[0-9.]+)\},\s*\{([0-9.]+),\s*([0-9.]+)\}\}"#
+        guard let expression = try? NSRegularExpression(pattern: pattern),
+              let match = expression.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+              match.numberOfRanges == 5 else { return .zero }
+        let values = (1..<5).compactMap { offset -> CGFloat? in
+            guard let range = Range(match.range(at: offset), in: line),
+                  let number = Double(line[range]) else { return nil }
+            return CGFloat(number)
+        }
+        guard values.count == 4 else { return .zero }
+        return CGRect(x: values[0], y: values[1], width: values[2], height: values[3])
+    }
+
+    private func debugElementType(_ line: String) -> XCUIElement.ElementType? {
+        let name = line.split(separator: ",", maxSplits: 1).first.map(String.init) ?? ""
+        switch name {
+        case "Application": return .application
+        case "Window": return .window
+        case "Other": return .other
+        case "NavigationBar": return .navigationBar
+        case "Button": return .button
+        case "StaticText": return .staticText
+        case "TextField": return .textField
+        case "SecureTextField": return .secureTextField
+        case "TextView": return .textView
+        case "Image": return .image
+        case "Cell": return .cell
+        case "CheckBox": return .checkBox
+        case "Switch": return .switch
+        case "RadioButton": return .radioButton
+        case "Slider": return .slider
+        case "ProgressIndicator": return .progressIndicator
+        case "Picker": return .picker
+        case "PickerWheel": return .pickerWheel
+        case "Table": return .table
+        case "CollectionView": return .collectionView
+        case "ScrollView": return .scrollView
+        case "Link": return .link
+        case "WebView": return .webView
+        case "MenuItem": return .menuItem
+        default: return nil
+        }
+    }
+
+    private func actionable(_ type: XCUIElement.ElementType) -> Bool {
+        [.button, .cell, .checkBox, .link, .menuItem, .radioButton, .secureTextField, .slider, .switch, .textField].contains(type)
+    }
+
+    private func accessibilityRole(_ type: XCUIElement.ElementType) -> String {
+        switch type {
+        case .button: return "button"
+        case .textField, .secureTextField, .textView: return "textbox"
+        case .checkBox: return "checkbox"
+        case .switch: return "switch"
+        case .radioButton: return "radio"
+        case .slider: return "slider"
+        case .progressIndicator: return "progressbar"
+        case .picker, .pickerWheel: return "combobox"
+        case .table, .collectionView: return "list"
+        case .cell: return "listitem"
+        case .image: return "img"
+        case .link: return "link"
+        case .staticText: return "text"
+        case .webView: return "document"
+        default: return "generic"
+        }
+    }
+
+    private func elementTypeName(_ type: XCUIElement.ElementType) -> String {
+        String(describing: type)
+    }
+
+    private func fullPageScreenshot(_ application: XCUIApplication) -> Data {
+        let scrollable = [application.scrollViews.firstMatch, application.tables.firstMatch, application.collectionViews.firstMatch]
+            .first(where: { $0.exists && $0.isHittable })
+        guard let scrollable else { return application.screenshot().pngRepresentation }
+        var shots: [Data] = []
+        var previous: Data?
+        for _ in 0..<20 {
+            let shot = application.screenshot().pngRepresentation
+            if shot == previous { break }
+            shots.append(shot)
+            previous = shot
+            scrollable.swipeUp()
+        }
+        for _ in 1..<shots.count { scrollable.swipeDown() }
+        let images = shots.compactMap(UIImage.init(data:))
+        guard images.count > 1, let first = images.first else { return shots.first ?? application.screenshot().pngRepresentation }
+        let size = CGSize(width: first.size.width, height: images.reduce(0) { $0 + $1.size.height })
+        return UIGraphicsImageRenderer(size: size).pngData { context in
+            var y: CGFloat = 0
+            for image in images {
+                image.draw(at: CGPoint(x: 0, y: y))
+                y += image.size.height
+            }
+        }
     }
 
     private func query(_ selector: String, in application: XCUIApplication) -> XCUIElementQuery {
@@ -346,8 +630,20 @@ private enum Selector {
         let value = decodeJSONString(encoded)
 
         if prefix == "css" {
-            let identifier = value.hasPrefix("#") ? String(value.dropFirst()) : value
-            return .identifier(identifier)
+            if value.hasPrefix("#") { return .identifier(String(value.dropFirst())) }
+            if let label = cssAttribute("aria-label", in: value) { return .label(label) }
+            if let identifier = cssAttribute("data-testid", in: value) { return .identifier(identifier) }
+            switch value.lowercased() {
+            case "button": return .type(.button)
+            case "a": return .type(.link)
+            case "img": return .type(.image)
+            case "input", "textarea": return .predicate(NSCompoundPredicate(orPredicateWithSubpredicates: [
+                NSPredicate(format: "elementType == %d", XCUIElement.ElementType.textField.rawValue),
+                NSPredicate(format: "elementType == %d", XCUIElement.ElementType.secureTextField.rawValue),
+                NSPredicate(format: "elementType == %d", XCUIElement.ElementType.textView.rawValue),
+            ]))
+            default: return .identifier(value)
+            }
         }
         if prefix == "uia", let separator = value.firstIndex(of: "=") {
             let key = value[..<separator].lowercased()
@@ -468,6 +764,17 @@ private enum Selector {
         return nil
     }
 
+    private static func cssAttribute(_ name: String, in selector: String) -> String? {
+        for quote in ["'", "\""] {
+            let marker = "[\(name)=\(quote)"
+            guard let start = selector.range(of: marker) else { continue }
+            let tail = selector[start.upperBound...]
+            guard let end = tail.firstIndex(of: Character(quote)) else { continue }
+            return String(tail[..<end])
+        }
+        return nil
+    }
+
     private static func elementType(_ raw: String) -> XCUIElement.ElementType {
         switch raw.lowercased().replacingOccurrences(of: "xcuielementtype", with: "") {
         case "button": return .button
@@ -510,6 +817,14 @@ private struct HTTPRequest {
             body: data.subdata(in: bodyStart..<(bodyStart + contentLength))
         )
     }
+}
+
+private struct SnapshotReference {
+    let type: XCUIElement.ElementType
+    let identifier: String
+    let label: String
+    let matchIndex: Int
+    let hierarchySignature: String
 }
 
 private struct AgentResponse {

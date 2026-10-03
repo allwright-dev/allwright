@@ -8,7 +8,74 @@ import (
 	enginev1 "allwright.dev/gen/allwright/engine/v1"
 )
 
-func (t *Tab) Hover(ctx context.Context, cssSelector string, options ...CommandOptions) (*ElementResult, error) {
+func (t *Tab) Click(ctx context.Context, cssSelector string, options ...CommandOptions) error {
+	_, err := t.clickResult(ctx, cssSelector, options...)
+	return err
+}
+
+func (t *Tab) Count(ctx context.Context, cssSelector string, options ...CommandOptions) (int, error) {
+	result, err := t.countResult(ctx, cssSelector, options...)
+	if err != nil {
+		return 0, err
+	}
+	return int(result.Count), nil
+}
+
+func (t *Tab) Highlight(ctx context.Context, cssSelector string, options ...HighlightOptions) error {
+	_, err := t.highlightResult(ctx, cssSelector, options...)
+	return err
+}
+
+func (t *Tab) Focus(ctx context.Context, cssSelector string, options ...CommandOptions) error {
+	_, err := t.focusResult(ctx, cssSelector, options...)
+	return err
+}
+
+func (t *Tab) Fill(ctx context.Context, cssSelector, value string, options ...CommandOptions) error {
+	_, err := t.fillResult(ctx, cssSelector, value, options...)
+	return err
+}
+
+func (t *Tab) Hover(ctx context.Context, cssSelector string, options ...CommandOptions) error {
+	_, err := t.hoverResult(ctx, cssSelector, options...)
+	return err
+}
+
+func (t *Tab) Press(ctx context.Context, cssSelector, key string, options ...PressOptions) error {
+	_, err := t.pressResult(ctx, cssSelector, key, options...)
+	return err
+}
+
+func (t *Tab) TextContent(ctx context.Context, cssSelector string, options ...CommandOptions) (string, error) {
+	result, err := t.textContentResult(ctx, cssSelector, options...)
+	if err != nil {
+		return "", err
+	}
+	return result.Text, nil
+}
+
+func (t *Tab) InnerText(ctx context.Context, cssSelector string, options ...CommandOptions) (string, error) {
+	result, err := t.innerTextResult(ctx, cssSelector, options...)
+	if err != nil {
+		return "", err
+	}
+	return result.Text, nil
+}
+
+func (t *Tab) WaitForSelector(ctx context.Context, cssSelector string, options ...WaitForSelectorOptions) error {
+	_, err := t.waitForSelectorResult(ctx, cssSelector, options...)
+	return err
+}
+
+func (t *Tab) Screenshot(ctx context.Context, options ...ScreenshotOptions) ([]byte, error) {
+	result, err := t.screenshotResult(ctx, options...)
+	if err != nil {
+		return nil, err
+	}
+	return result.PNGData, nil
+}
+
+func (t *Tab) hoverResult(ctx context.Context, cssSelector string, options ...CommandOptions) (*ElementResult, error) {
 	if t == nil {
 		return nil, fmt.Errorf("tab is nil")
 	}
@@ -59,7 +126,7 @@ func (t *Tab) Hover(ctx context.Context, cssSelector string, options ...CommandO
 	}
 }
 
-func (t *Tab) Press(ctx context.Context, cssSelector string, key string, options ...PressOptions) (*PressResult, error) {
+func (t *Tab) pressResult(ctx context.Context, cssSelector string, key string, options ...PressOptions) (*PressResult, error) {
 	if t == nil {
 		return nil, fmt.Errorf("tab is nil")
 	}
@@ -113,21 +180,21 @@ func (t *Tab) Press(ctx context.Context, cssSelector string, key string, options
 	}
 }
 
-func (t *Tab) TextContent(ctx context.Context, cssSelector string, options ...CommandOptions) (*TextResult, error) {
+func (t *Tab) textContentResult(ctx context.Context, cssSelector string, options ...CommandOptions) (*TextResult, error) {
 	if t == nil {
 		return nil, fmt.Errorf("tab is nil")
 	}
 	return t.readText(ctx, cssSelector, true, firstCommandOptions(options))
 }
 
-func (t *Tab) InnerText(ctx context.Context, cssSelector string, options ...CommandOptions) (*TextResult, error) {
+func (t *Tab) innerTextResult(ctx context.Context, cssSelector string, options ...CommandOptions) (*TextResult, error) {
 	if t == nil {
 		return nil, fmt.Errorf("tab is nil")
 	}
 	return t.readText(ctx, cssSelector, false, firstCommandOptions(options))
 }
 
-func (t *Tab) WaitForSelector(ctx context.Context, cssSelector string, options ...WaitForSelectorOptions) (*WaitForSelectorResult, error) {
+func (t *Tab) waitForSelectorResult(ctx context.Context, cssSelector string, options ...WaitForSelectorOptions) (*WaitForSelectorResult, error) {
 	if t == nil {
 		return nil, fmt.Errorf("tab is nil")
 	}
@@ -180,7 +247,7 @@ func (t *Tab) WaitForSelector(ctx context.Context, cssSelector string, options .
 	}
 }
 
-func (t *Tab) Screenshot(ctx context.Context, options ...ScreenshotOptions) (*ScreenshotResult, error) {
+func (t *Tab) screenshotResult(ctx context.Context, options ...ScreenshotOptions) (*ScreenshotResult, error) {
 	if t == nil {
 		return nil, fmt.Errorf("tab is nil")
 	}

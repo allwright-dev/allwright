@@ -9,32 +9,23 @@ import { createPageHandle } from "./runtime.js";
 import type {
   BoundingBox, CapturedOption, CaptureResult,
   AccessibilitySnapshotOptions,
-  ClickResult,
   CommandOptions,
-  CountResult,
-  ElementResult,
-  FillResult,
   FileChooser,
   Dialog,
   Download,
   HighlightOptions,
-  HighlightResult,
   Hook,
   HookType,
   Locator,
-  NavigateResult,
   Page,
   PageHandle,
   PageInfo,
   PressOptions,
-  PressResult,
   RuntimeClient,
   ScreenshotOptions,
-  ScreenshotResult,
   ContextSessionEvent,
   TextResult,
   WaitForSelectorOptions,
-  WaitForSelectorResult,
 } from "./types.js";
 
 export class PageImpl extends WebLocatorBuilders implements Page {
@@ -298,7 +289,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     return options ? result.filter(options) : result;
   }
 
-  async goto(url: string, options: CommandOptions = {}): Promise<NavigateResult> {
+  async goto(url: string, options: CommandOptions = {}): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -330,19 +321,12 @@ export class PageImpl extends WebLocatorBuilders implements Page {
       }
 
       if (navigated && injection) {
-        return {
-          url: navigated.url ?? "",
-          note: navigated.note ?? "",
-          bidiSessionId: injection.bidiSessionId ?? "",
-          mapperTargetId: injection.mapperTargetId ?? "",
-          mapperSessionId: injection.mapperSessionId ?? "",
-          packageVersion: injection.packageVersion ?? "",
-        };
+        return;
       }
     }
   }
 
-  async click(selector: string, options: CommandOptions = {}): Promise<ClickResult> {
+  async click(selector: string, options: CommandOptions = {}): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
@@ -358,11 +342,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     while (true) {
       const event = await handle.queue.next();
       if (event.elementClicked) {
-        return {
-          selector: event.elementClicked.cssSelector ?? "",
-          note: event.elementClicked.note ?? "",
-          bidiSessionId: event.elementClicked.bidiSessionId ?? "",
-        };
+        return;
       }
       if (event.error?.message) {
         throw formatActionError("click", event.error.message, selector);
@@ -374,7 +354,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     }
   }
 
-  async count(selector: string, options: CommandOptions = {}): Promise<CountResult> {
+  async count(selector: string, options: CommandOptions = {}): Promise<number> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
@@ -390,11 +370,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     while (true) {
       const event = await handle.queue.next();
       if (event.elementCounted) {
-        return {
-          selector: event.elementCounted.cssSelector ?? "",
-          count: event.elementCounted.count ?? 0,
-          note: event.elementCounted.note ?? "",
-        };
+        return event.elementCounted.count ?? 0;
       }
       if (event.error?.message) {
         throw formatActionError("count elements", event.error.message, selector);
@@ -406,7 +382,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     }
   }
 
-  async highlight(selector: string, options: HighlightOptions = {}): Promise<HighlightResult> {
+  async highlight(selector: string, options: HighlightOptions = {}): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
@@ -423,11 +399,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     while (true) {
       const event = await handle.queue.next();
       if (event.elementsHighlighted) {
-        return {
-          selector: event.elementsHighlighted.cssSelector ?? "",
-          count: event.elementsHighlighted.count ?? 0,
-          note: event.elementsHighlighted.note ?? "",
-        };
+        return;
       }
       if (event.error?.message) {
         throw formatActionError("highlight elements", event.error.message, selector);
@@ -439,7 +411,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     }
   }
 
-  async focus(selector: string, options: CommandOptions = {}): Promise<ElementResult> {
+  async focus(selector: string, options: CommandOptions = {}): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
@@ -455,10 +427,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     while (true) {
       const event = await handle.queue.next();
       if (event.elementFocused) {
-        return {
-          selector: event.elementFocused.cssSelector ?? "",
-          note: event.elementFocused.note ?? "",
-        };
+        return;
       }
       if (event.error?.message) {
         throw formatActionError("focus", event.error.message, selector);
@@ -470,7 +439,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     }
   }
 
-  async fill(selector: string, value: string, options: CommandOptions = {}): Promise<FillResult> {
+  async fill(selector: string, value: string, options: CommandOptions = {}): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
@@ -487,11 +456,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     while (true) {
       const event = await handle.queue.next();
       if (event.elementFilled) {
-        return {
-          selector: event.elementFilled.cssSelector ?? "",
-          value: event.elementFilled.value ?? "",
-          note: event.elementFilled.note ?? "",
-        };
+        return;
       }
       if (event.error?.message) {
         throw formatActionError("fill", event.error.message, selector);
@@ -503,7 +468,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     }
   }
 
-  async hover(selector: string, options: CommandOptions = {}): Promise<ElementResult> {
+  async hover(selector: string, options: CommandOptions = {}): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
@@ -519,10 +484,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     while (true) {
       const event = await handle.queue.next();
       if (event.elementHovered) {
-        return {
-          selector: event.elementHovered.cssSelector ?? "",
-          note: event.elementHovered.note ?? "",
-        };
+        return;
       }
       if (event.error?.message) {
         throw formatActionError("hover", event.error.message, selector);
@@ -534,7 +496,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     }
   }
 
-  async press(selector: string, key: string, options: PressOptions = {}): Promise<PressResult> {
+  async press(selector: string, key: string, options: PressOptions = {}): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
@@ -552,11 +514,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     while (true) {
       const event = await handle.queue.next();
       if (event.keyPressed) {
-        return {
-          selector: event.keyPressed.cssSelector ?? "",
-          key: event.keyPressed.key ?? "",
-          note: event.keyPressed.note ?? "",
-        };
+        return;
       }
       if (event.error?.message) {
         throw formatActionError("press key", event.error.message, selector);
@@ -610,18 +568,18 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     return r.boundingBox ?? null;
   }
 
-  async textContent(selector: string, options: CommandOptions = {}): Promise<TextResult> {
-    return this.#readText(selector, options, true);
+  async textContent(selector: string, options: CommandOptions = {}): Promise<string | null> {
+    return (await this.#readText(selector, options, true)).text;
   }
 
-  async innerText(selector: string, options: CommandOptions = {}): Promise<TextResult> {
-    return this.#readText(selector, options, false);
+  async innerText(selector: string, options: CommandOptions = {}): Promise<string> {
+    return (await this.#readText(selector, options, false)).text;
   }
 
   async waitForSelector(
     selector: string,
     options: WaitForSelectorOptions = {},
-  ): Promise<WaitForSelectorResult> {
+  ): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
@@ -638,11 +596,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     while (true) {
       const event = await handle.queue.next();
       if (event.selectorWaitSatisfied) {
-        return {
-          selector: event.selectorWaitSatisfied.cssSelector ?? "",
-          visible: event.selectorWaitSatisfied.visible ?? false,
-          note: event.selectorWaitSatisfied.note ?? "",
-        };
+        return;
       }
       if (event.error?.message) {
         throw formatActionError("wait for selector", event.error.message, selector);
@@ -685,7 +639,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     }
   }
 
-  async screenshot(options: ScreenshotOptions = {}): Promise<ScreenshotResult> {
+  async screenshot(options: ScreenshotOptions = {}): Promise<Uint8Array> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -707,7 +661,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
         if (options.path) {
           await writeFile(options.path, screenshot.pngData);
         }
-        return screenshot;
+        return screenshot.pngData;
       }
       if (event.error?.message) {
         throw formatActionError("screenshot", event.error.message);
@@ -777,7 +731,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     };
   }
 
-  async navigate(url: string, options: CommandOptions = {}): Promise<NavigateResult> {
+  async navigate(url: string, options: CommandOptions = {}): Promise<void> {
     return this.goto(url, options);
   }
 

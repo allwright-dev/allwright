@@ -260,6 +260,12 @@ pub struct MobileScreenshotInfo {
     pub note: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MobileNavigationInfo {
+    pub url: String,
+    pub note: String,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MobileHookType {
     FileChooser,
@@ -350,6 +356,12 @@ pub enum MobileCommand {
         browser_session: MobileBrowserSessionHandle,
         page_session: MobilePageSessionHandle,
     },
+    NavigateApp {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+        url: String,
+        timeout_ms: Option<u32>,
+    },
     ClickElement {
         browser_session: MobileBrowserSessionHandle,
         page_session: MobilePageSessionHandle,
@@ -422,6 +434,7 @@ pub enum MobileCommandResult {
     LaunchApp(MobilePageInfo),
     OpenPage(MobilePageInfo),
     ClosePage,
+    NavigateApp(MobileNavigationInfo),
     ClickElement(MobileClickInfo),
     CountElements(MobileElementCountInfo),
     FocusElement(MobileElementInfo),
@@ -639,10 +652,20 @@ pub fn parse_selector_for_transport(selector: &str) -> (SelectorFlavor, String) 
     (SelectorFlavor::Css, trimmed.to_string())
 }
 
+fn normalize_reference_selector(selector: &str) -> Option<String> {
+    let trimmed = selector.trim();
+    let lowered = trimmed.to_ascii_lowercase();
+    (lowered.starts_with("ref=") || lowered.starts_with("ref:"))
+        .then(|| format!("ref={}", decode_selector_body(&trimmed[4..])))
+}
+
 pub fn normalize_selector_for_transport(selector: &str) -> String {
     let trimmed = selector.trim();
     if trimmed.is_empty() {
         return String::new();
+    }
+    if let Some(reference) = normalize_reference_selector(trimmed) {
+        return reference;
     }
     if is_normalized_transport_selector(trimmed) {
         return trimmed.to_string();
@@ -696,6 +719,9 @@ mod tests {
             "xpath=\"//android.widget.TextView\""
         );
         assert_eq!(normalize_selector_for_transport("#login"), "css=\"#login\"");
+        assert_eq!(normalize_selector_for_transport("ref=e1-2"), "ref=e1-2");
+        assert_eq!(normalize_selector_for_transport("ref:e1-2"), "ref=e1-2");
+        assert_eq!(normalize_selector_for_transport("ref=\"e1-2\""), "ref=e1-2");
         assert_eq!(
             normalize_selector_for_transport("Id=bottom_nav_account"),
             "css=\"#bottom_nav_account\""

@@ -55,7 +55,14 @@ pub(super) fn clear(
     Ok(())
 }
 fn reference(selector: &str) -> Result<Option<String>, String> {
-    let segments = parse_selector_segments(selector)?;
+    let normalized = normalize_selector_for_transport(selector);
+    if let Some(reference) = normalized.strip_prefix("ref=") {
+        if reference.is_empty() || reference.chars().any(char::is_whitespace) {
+            return Err("snapshot references must be standalone ref=<id> selectors".into());
+        }
+        return Ok(Some(reference.to_string()));
+    }
+    let segments = parse_selector_segments(&normalized)?;
     let refs: Vec<_> = segments
         .iter()
         .filter_map(|s| s.value.strip_prefix("ref="))

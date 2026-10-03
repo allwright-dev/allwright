@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import dev.allwright.client.Allwright;
 import dev.allwright.client.Browser;
 import dev.allwright.client.Page;
-import dev.allwright.client.TextResult;
 import dev.allwright.client.WaitForSelectorOptions;
 import org.junit.jupiter.api.Test;
 
@@ -34,11 +33,11 @@ final class WebBasicTest {
                     System.getenv().getOrDefault("ALLWRIGHT_WEB_HEADING_SELECTOR", DEFAULT_WEB_HEADING_SELECTOR),
                     new WaitForSelectorOptions(10_000, true)
             );
-            TextResult heading = page.textContent(
+            String heading = page.textContent(
                     System.getenv().getOrDefault("ALLWRIGHT_WEB_HEADING_SELECTOR", DEFAULT_WEB_HEADING_SELECTOR)
             );
             assertTrue(
-                    heading.text().contains(
+                    heading.contains(
                             System.getenv().getOrDefault("ALLWRIGHT_WEB_HEADING_TEXT", DEFAULT_WEB_HEADING_TEXT)
                     )
             );

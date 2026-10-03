@@ -14,25 +14,25 @@ func (t *Tab) SessionID() string {
 	return t.sessionID
 }
 
-func (t *Tab) Goto(ctx context.Context, url string, options ...CommandOptions) (*NavigateResult, error) {
+func (t *Tab) Goto(ctx context.Context, url string, options ...CommandOptions) error {
 	if t == nil {
-		return nil, fmt.Errorf("tab is nil")
+		return fmt.Errorf("tab is nil")
 	}
 	return t.Navigate(ctx, url, options...)
 }
 
-func (t *Tab) Navigate(ctx context.Context, url string, options ...CommandOptions) (*NavigateResult, error) {
+func (t *Tab) Navigate(ctx context.Context, url string, options ...CommandOptions) error {
 	if t == nil {
-		return nil, fmt.Errorf("tab is nil")
+		return fmt.Errorf("tab is nil")
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	if err := t.ensureStream(ctx); err != nil {
-		return nil, err
+		return err
 	}
 	if t.closed {
-		return nil, fmt.Errorf("tab session %s is closed", t.sessionID)
+		return fmt.Errorf("tab session %s is closed", t.sessionID)
 	}
 
 	commandOptions := firstCommandOptions(options)
@@ -47,14 +47,14 @@ func (t *Tab) Navigate(ctx context.Context, url string, options ...CommandOption
 			},
 		},
 	}); err != nil {
-		return nil, fmt.Errorf("send NavigatePageCommand: %w", err)
+		return fmt.Errorf("send NavigatePageCommand: %w", err)
 	}
 
 	result := &NavigateResult{}
 	for {
 		event, err := t.stream.Recv()
 		if err != nil {
-			return nil, fmt.Errorf("receive tab session event during navigate: %w", err)
+			return fmt.Errorf("receive tab session event during navigate: %w", err)
 		}
 
 		switch payload := event.GetEvent().(type) {
@@ -70,14 +70,14 @@ func (t *Tab) Navigate(ctx context.Context, url string, options ...CommandOption
 			result.MapperSessionID = payload.ChromiumBidiInjection.GetMapperSessionId()
 			result.PackageVersion = payload.ChromiumBidiInjection.GetPackageVersion()
 			t.lastBidiSessionID = result.BidiSessionID
-			return result, nil
+			return nil
 		case *enginev1.ContextSessionEvent_Error:
-			return nil, fmt.Errorf("tab session error while navigating: %s", payload.Error.GetMessage())
+			return fmt.Errorf("tab session error while navigating: %s", payload.Error.GetMessage())
 		}
 	}
 }
 
-func (t *Tab) Click(ctx context.Context, cssSelector string, options ...CommandOptions) (*ClickResult, error) {
+func (t *Tab) clickResult(ctx context.Context, cssSelector string, options ...CommandOptions) (*ClickResult, error) {
 	if t == nil {
 		return nil, fmt.Errorf("tab is nil")
 	}
@@ -130,7 +130,7 @@ func (t *Tab) Click(ctx context.Context, cssSelector string, options ...CommandO
 	}
 }
 
-func (t *Tab) Count(ctx context.Context, cssSelector string, options ...CommandOptions) (*CountResult, error) {
+func (t *Tab) countResult(ctx context.Context, cssSelector string, options ...CommandOptions) (*CountResult, error) {
 	if t == nil {
 		return nil, fmt.Errorf("tab is nil")
 	}
@@ -182,7 +182,7 @@ func (t *Tab) Count(ctx context.Context, cssSelector string, options ...CommandO
 	}
 }
 
-func (t *Tab) Highlight(ctx context.Context, cssSelector string, options ...HighlightOptions) (*HighlightResult, error) {
+func (t *Tab) highlightResult(ctx context.Context, cssSelector string, options ...HighlightOptions) (*HighlightResult, error) {
 	if t == nil {
 		return nil, fmt.Errorf("tab is nil")
 	}
@@ -235,7 +235,7 @@ func (t *Tab) Highlight(ctx context.Context, cssSelector string, options ...High
 	}
 }
 
-func (t *Tab) Focus(ctx context.Context, cssSelector string, options ...CommandOptions) (*ElementResult, error) {
+func (t *Tab) focusResult(ctx context.Context, cssSelector string, options ...CommandOptions) (*ElementResult, error) {
 	if t == nil {
 		return nil, fmt.Errorf("tab is nil")
 	}
@@ -286,7 +286,7 @@ func (t *Tab) Focus(ctx context.Context, cssSelector string, options ...CommandO
 	}
 }
 
-func (t *Tab) Fill(ctx context.Context, cssSelector string, value string, options ...CommandOptions) (*FillResult, error) {
+func (t *Tab) fillResult(ctx context.Context, cssSelector string, value string, options ...CommandOptions) (*FillResult, error) {
 	if t == nil {
 		return nil, fmt.Errorf("tab is nil")
 	}

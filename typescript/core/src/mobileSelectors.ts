@@ -171,6 +171,9 @@ export function normalizeMobileSelectorForTransport(selector: string): string {
   if (!trimmed) {
     return "";
   }
+  if (/^ref[=:]/i.test(trimmed)) {
+    return `ref=${decodeSelectorBody(trimmed.slice(4))}`;
+  }
   if (isNormalizedTransportSelector(trimmed)) {
     return trimmed;
   }

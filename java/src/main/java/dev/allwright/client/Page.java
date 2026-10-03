@@ -351,11 +351,11 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
         }
     }
 
-    public synchronized NavigateResult goTo(String url) {
-        return goTo(url, new CommandOptions());
+    private synchronized NavigateResult goToResult(String url) {
+        return goToResult(url, new CommandOptions());
     }
 
-    public synchronized NavigateResult goTo(String url, CommandOptions options) {
+    private synchronized NavigateResult goToResult(String url, CommandOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
@@ -407,19 +407,39 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
         }
     }
 
-    public synchronized NavigateResult navigate(String url) {
-        return goTo(url, new CommandOptions());
+    public void goTo(String url) { goToResult(url); }
+    public void goTo(String url, CommandOptions options) { goToResult(url, options); }
+    public void navigate(String url) { goToResult(url); }
+    public void navigate(String url, CommandOptions options) { goToResult(url, options); }
+
+    public void click(String selector) { clickResult(selector); }
+    public void click(String selector, CommandOptions options) { clickResult(selector, options); }
+    public int count(String selector) { return countResult(selector).count(); }
+    public int count(String selector, CommandOptions options) { return countResult(selector, options).count(); }
+    public void highlight(String selector) { highlightResult(selector); }
+    public void highlight(String selector, HighlightOptions options) { highlightResult(selector, options); }
+    public void focus(String selector) { focusResult(selector); }
+    public void focus(String selector, CommandOptions options) { focusResult(selector, options); }
+    public void fill(String selector, String value) { fillResult(selector, value); }
+    public void fill(String selector, String value, CommandOptions options) { fillResult(selector, value, options); }
+    public void hover(String selector) { hoverResult(selector); }
+    public void hover(String selector, CommandOptions options) { hoverResult(selector, options); }
+    public void press(String selector, String key) { pressResult(selector, key); }
+    public void press(String selector, String key, PressOptions options) { pressResult(selector, key, options); }
+    public String textContent(String selector) { return textContentResult(selector).text(); }
+    public String textContent(String selector, CommandOptions options) { return textContentResult(selector, options).text(); }
+    public String innerText(String selector) { return innerTextResult(selector).text(); }
+    public String innerText(String selector, CommandOptions options) { return innerTextResult(selector, options).text(); }
+    public void waitForSelector(String selector) { waitForSelectorResult(selector); }
+    public void waitForSelector(String selector, WaitForSelectorOptions options) { waitForSelectorResult(selector, options); }
+    public byte[] screenshot() { return screenshotResult().pngData(); }
+    public byte[] screenshot(ScreenshotOptions options) { return screenshotResult(options).pngData(); }
+
+    private synchronized ClickResult clickResult(String selector) {
+        return clickResult(selector, new CommandOptions());
     }
 
-    public synchronized NavigateResult navigate(String url, CommandOptions options) {
-        return goTo(url, options);
-    }
-
-    public synchronized ClickResult click(String selector) {
-        return click(selector, new CommandOptions());
-    }
-
-    public synchronized ClickResult click(String selector, CommandOptions options) {
+    private synchronized ClickResult clickResult(String selector, CommandOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
@@ -459,11 +479,11 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
         }
     }
 
-    public synchronized CountResult count(String selector) {
-        return count(selector, new CommandOptions());
+    private synchronized CountResult countResult(String selector) {
+        return countResult(selector, new CommandOptions());
     }
 
-    public synchronized CountResult count(String selector, CommandOptions options) {
+    private synchronized CountResult countResult(String selector, CommandOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
@@ -503,11 +523,11 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
         }
     }
 
-    public synchronized HighlightResult highlight(String selector) {
-        return highlight(selector, new HighlightOptions());
+    private synchronized HighlightResult highlightResult(String selector) {
+        return highlightResult(selector, new HighlightOptions());
     }
 
-    public synchronized HighlightResult highlight(String selector, HighlightOptions options) {
+    private synchronized HighlightResult highlightResult(String selector, HighlightOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         HighlightOptions resolvedOptions = options == null ? new HighlightOptions() : options;
@@ -551,11 +571,11 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
         }
     }
 
-    public synchronized ElementResult focus(String selector) {
-        return focus(selector, new CommandOptions());
+    private synchronized ElementResult focusResult(String selector) {
+        return focusResult(selector, new CommandOptions());
     }
 
-    public synchronized ElementResult focus(String selector, CommandOptions options) {
+    private synchronized ElementResult focusResult(String selector, CommandOptions options) {
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
         FocusElementCommand.Builder focus = FocusElementCommand.newBuilder()
                 .setCssSelector(SelectorSupport.normalizeSelectorForTransport(selector));
@@ -573,11 +593,11 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
         );
     }
 
-    public synchronized FillResult fill(String selector, String value) {
-        return fill(selector, value, new CommandOptions());
+    private synchronized FillResult fillResult(String selector, String value) {
+        return fillResult(selector, value, new CommandOptions());
     }
 
-    public synchronized FillResult fill(String selector, String value, CommandOptions options) {
+    private synchronized FillResult fillResult(String selector, String value, CommandOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
@@ -617,11 +637,11 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
         }
     }
 
-    public synchronized ElementResult hover(String selector) {
-        return hover(selector, new CommandOptions());
+    private synchronized ElementResult hoverResult(String selector) {
+        return hoverResult(selector, new CommandOptions());
     }
 
-    public synchronized ElementResult hover(String selector, CommandOptions options) {
+    private synchronized ElementResult hoverResult(String selector, CommandOptions options) {
         CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
         HoverElementCommand.Builder hover = HoverElementCommand.newBuilder()
                 .setCssSelector(SelectorSupport.normalizeSelectorForTransport(selector));
@@ -639,11 +659,11 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
         );
     }
 
-    public synchronized PressResult press(String selector, String key) {
-        return press(selector, key, new PressOptions());
+    private synchronized PressResult pressResult(String selector, String key) {
+        return pressResult(selector, key, new PressOptions());
     }
 
-    public synchronized PressResult press(String selector, String key, PressOptions options) {
+    private synchronized PressResult pressResult(String selector, String key, PressOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         PressOptions resolvedOptions = options == null ? new PressOptions() : options;
@@ -686,27 +706,27 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
         }
     }
 
-    public synchronized TextResult textContent(String selector) {
-        return textContent(selector, new CommandOptions());
+    private synchronized TextResult textContentResult(String selector) {
+        return textContentResult(selector, new CommandOptions());
     }
 
-    public synchronized TextResult textContent(String selector, CommandOptions options) {
+    private synchronized TextResult textContentResult(String selector, CommandOptions options) {
         return readText(selector, options, true);
     }
 
-    public synchronized TextResult innerText(String selector) {
-        return innerText(selector, new CommandOptions());
+    private synchronized TextResult innerTextResult(String selector) {
+        return innerTextResult(selector, new CommandOptions());
     }
 
-    public synchronized TextResult innerText(String selector, CommandOptions options) {
+    private synchronized TextResult innerTextResult(String selector, CommandOptions options) {
         return readText(selector, options, false);
     }
 
-    public synchronized WaitForSelectorResult waitForSelector(String selector) {
-        return waitForSelector(selector, new WaitForSelectorOptions());
+    private synchronized WaitForSelectorResult waitForSelectorResult(String selector) {
+        return waitForSelectorResult(selector, new WaitForSelectorOptions());
     }
 
-    public synchronized WaitForSelectorResult waitForSelector(String selector, WaitForSelectorOptions options) {
+    private synchronized WaitForSelectorResult waitForSelectorResult(String selector, WaitForSelectorOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         WaitForSelectorOptions resolvedOptions = options == null ? new WaitForSelectorOptions() : options;
@@ -779,11 +799,11 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
         }
     }
 
-    public synchronized ScreenshotResult screenshot() {
-        return screenshot(new ScreenshotOptions());
+    private synchronized ScreenshotResult screenshotResult() {
+        return screenshotResult(new ScreenshotOptions());
     }
 
-    public synchronized ScreenshotResult screenshot(ScreenshotOptions options) {
+    private synchronized ScreenshotResult screenshotResult(ScreenshotOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
         ScreenshotOptions resolvedOptions = options == null ? new ScreenshotOptions() : options;

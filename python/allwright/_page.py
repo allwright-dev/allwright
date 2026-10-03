@@ -16,22 +16,14 @@ from ._transport import RuntimeClient, StreamHandle
 from ._types import (
     CapturedOption, BoundingBox,
     AllwrightError,
-    ClickResult,
     CommandOptions,
-    CountResult,
     ElementResult,
-    FillResult,
     HighlightOptions,
-    HighlightResult,
-    NavigateResult,
     PressOptions,
-    PressResult,
     AccessibilitySnapshotOptions,
     ScreenshotOptions,
-    ScreenshotResult,
     TextResult,
     WaitForSelectorOptions,
-    WaitForSelectorResult,
 )
 
 
@@ -352,7 +344,7 @@ class Page(WebLocators):
                 pass
             raise
 
-    def goto(self, url: str, options: CommandOptions | None = None) -> NavigateResult:
+    def goto(self, url: str, options: CommandOptions | None = None) -> None:
         from ._runtime import retry_options
 
         with self._lock:
@@ -391,19 +383,12 @@ class Page(WebLocators):
                         )
 
                 if navigated is not None and injection is not None:
-                    return NavigateResult(
-                        url=navigated.url,
-                        note=navigated.note,
-                        bidi_session_id=injection.bidi_session_id,
-                        mapper_target_id=injection.mapper_target_id,
-                        mapper_session_id=injection.mapper_session_id,
-                        package_version=injection.package_version,
-                    )
+                    return None
 
-    def navigate(self, url: str, options: CommandOptions | None = None) -> NavigateResult:
+    def navigate(self, url: str, options: CommandOptions | None = None) -> None:
         return self.goto(url, options)
 
-    def click(self, selector: str, options: CommandOptions | None = None) -> ClickResult:
+    def click(self, selector: str, options: CommandOptions | None = None) -> None:
         from ._runtime import retry_options
 
         with self._lock:
@@ -426,12 +411,7 @@ class Page(WebLocators):
                 event = handle.recv("receive tab session event while clicking")
                 match event.WhichOneof("event"):
                     case "element_clicked":
-                        clicked = event.element_clicked
-                        return ClickResult(
-                            selector=clicked.css_selector,
-                            note=clicked.note,
-                            bidi_session_id=clicked.bidi_session_id,
-                        )
+                        return None
                     case "closed":
                         self._closed = True
                         raise AllwrightError(
@@ -442,7 +422,7 @@ class Page(WebLocators):
                             f"page session error while clicking: {event.error.message}"
                         )
 
-    def count(self, selector: str, options: CommandOptions | None = None) -> CountResult:
+    def count(self, selector: str, options: CommandOptions | None = None) -> int:
         from ._runtime import retry_options
 
         with self._lock:
@@ -465,12 +445,7 @@ class Page(WebLocators):
                 event = handle.recv("receive tab session event while counting elements")
                 match event.WhichOneof("event"):
                     case "element_counted":
-                        counted = event.element_counted
-                        return CountResult(
-                            selector=counted.css_selector,
-                            count=counted.count,
-                            note=counted.note,
-                        )
+                        return event.element_counted.count
                     case "closed":
                         self._closed = True
                         raise AllwrightError(
@@ -481,7 +456,7 @@ class Page(WebLocators):
                             f"page session error while counting elements: {event.error.message}"
                         )
 
-    def highlight(self, selector: str, options: HighlightOptions | None = None) -> HighlightResult:
+    def highlight(self, selector: str, options: HighlightOptions | None = None) -> None:
         from ._runtime import retry_options
 
         with self._lock:
@@ -505,12 +480,7 @@ class Page(WebLocators):
                 event = handle.recv("receive tab session event while highlighting elements")
                 match event.WhichOneof("event"):
                     case "elements_highlighted":
-                        highlighted = event.elements_highlighted
-                        return HighlightResult(
-                            selector=highlighted.css_selector,
-                            count=highlighted.count,
-                            note=highlighted.note,
-                        )
+                        return None
                     case "closed":
                         self._closed = True
                         raise AllwrightError(
@@ -521,11 +491,11 @@ class Page(WebLocators):
                             f"page session error while highlighting elements: {event.error.message}"
                         )
 
-    def focus(self, selector: str, options: CommandOptions | None = None) -> ElementResult:
+    def focus(self, selector: str, options: CommandOptions | None = None) -> None:
         from ._runtime import retry_options
 
         transport_selector = normalize_selector_for_transport(selector)
-        return self._element_command(
+        self._element_command(
             action="focusing",
             event_name="element_focused",
             command=engine_pb2.ContextSessionCommand(
@@ -538,11 +508,11 @@ class Page(WebLocators):
             ),
         )
 
-    def hover(self, selector: str, options: CommandOptions | None = None) -> ElementResult:
+    def hover(self, selector: str, options: CommandOptions | None = None) -> None:
         from ._runtime import retry_options
 
         transport_selector = normalize_selector_for_transport(selector)
-        return self._element_command(
+        self._element_command(
             action="hovering",
             event_name="element_hovered",
             command=engine_pb2.ContextSessionCommand(
@@ -560,7 +530,7 @@ class Page(WebLocators):
         selector: str,
         value: str,
         options: CommandOptions | None = None,
-    ) -> FillResult:
+    ) -> None:
         from ._runtime import retry_options
 
         with self._lock:
@@ -584,12 +554,7 @@ class Page(WebLocators):
                 event = handle.recv("receive tab session event while filling")
                 match event.WhichOneof("event"):
                     case "element_filled":
-                        filled = event.element_filled
-                        return FillResult(
-                            selector=filled.css_selector,
-                            value=filled.value,
-                            note=filled.note,
-                        )
+                        return None
                     case "closed":
                         self._closed = True
                         raise AllwrightError(
@@ -605,7 +570,7 @@ class Page(WebLocators):
         selector: str,
         key: str,
         options: PressOptions | None = None,
-    ) -> PressResult:
+    ) -> None:
         from ._runtime import retry_options
 
         with self._lock:
@@ -630,12 +595,7 @@ class Page(WebLocators):
                 event = handle.recv("receive tab session event while pressing key")
                 match event.WhichOneof("event"):
                     case "key_pressed":
-                        pressed = event.key_pressed
-                        return PressResult(
-                            selector=pressed.css_selector,
-                            key=pressed.key,
-                            note=pressed.note,
-                        )
+                        return None
                     case "closed":
                         self._closed = True
                         raise AllwrightError(
@@ -693,17 +653,17 @@ class Page(WebLocators):
         r = self._capture("BOUNDING_BOX", selector, "", options)
         return BoundingBox(r.bounding_box.x, r.bounding_box.y, r.bounding_box.width, r.bounding_box.height) if r.HasField("bounding_box") else None
 
-    def text_content(self, selector: str, options: CommandOptions | None = None) -> TextResult:
-        return self._read_text(selector, options or CommandOptions(), text_content=True)
+    def text_content(self, selector: str, options: CommandOptions | None = None) -> str | None:
+        return self._read_text(selector, options or CommandOptions(), text_content=True).text
 
-    def inner_text(self, selector: str, options: CommandOptions | None = None) -> TextResult:
-        return self._read_text(selector, options or CommandOptions(), text_content=False)
+    def inner_text(self, selector: str, options: CommandOptions | None = None) -> str:
+        return self._read_text(selector, options or CommandOptions(), text_content=False).text
 
     def wait_for_selector(
         self,
         selector: str,
         options: WaitForSelectorOptions | None = None,
-    ) -> WaitForSelectorResult:
+    ) -> None:
         from ._runtime import retry_options
 
         with self._lock:
@@ -727,12 +687,7 @@ class Page(WebLocators):
                 event = handle.recv("receive tab session event while waiting for selector")
                 match event.WhichOneof("event"):
                     case "selector_wait_satisfied":
-                        satisfied = event.selector_wait_satisfied
-                        return WaitForSelectorResult(
-                            selector=satisfied.css_selector,
-                            visible=satisfied.visible,
-                            note=satisfied.note,
-                        )
+                        return None
                     case "closed":
                         self._closed = True
                         raise AllwrightError(
@@ -774,7 +729,7 @@ class Page(WebLocators):
                     case "error":
                         raise AllwrightError(f"accessibility snapshot failed: {event.error.message}")
 
-    def screenshot(self, options: ScreenshotOptions | None = None) -> ScreenshotResult:
+    def screenshot(self, options: ScreenshotOptions | None = None) -> bytes:
         from ._runtime import retry_options
 
         with self._lock:
@@ -797,13 +752,9 @@ class Page(WebLocators):
                 match event.WhichOneof("event"):
                     case "screenshot_captured":
                         captured = event.screenshot_captured
-                        screenshot = ScreenshotResult(
-                            png_data=captured.png_data,
-                            note=captured.note,
-                        )
                         if command_options.path is not None:
-                            Path(command_options.path).write_bytes(screenshot.png_data)
-                        return screenshot
+                            Path(command_options.path).write_bytes(captured.png_data)
+                        return captured.png_data
                     case "closed":
                         self._closed = True
                         raise AllwrightError(

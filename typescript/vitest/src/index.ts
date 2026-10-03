@@ -447,6 +447,12 @@ function createLazyMobileApp(appResource: LazyResource<MobileAndroidApp>): Mobil
     async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
       return (await appResource.get()).registerHook(type);
     },
+    async goto(url: string, options?: CommandOptions) {
+      return (await appResource.get()).goto(url, options);
+    },
+    async navigate(url: string, options?: CommandOptions) {
+      return (await appResource.get()).navigate(url, options);
+    },
     async click(selector: string, options?: CommandOptions) {
       return (await appResource.get()).click(selector, options);
     },

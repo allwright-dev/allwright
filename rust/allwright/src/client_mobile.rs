@@ -17,10 +17,11 @@ use crate::proto::{
     AccessibilitySnapshotCommand, AppLaunchedEvent, ClickElementCommand, ConnectMobileCommand,
     ContextSessionCommand, CountElementsCommand, FillElementCommand, FocusElementCommand,
     GetInnerTextCommand, GetTextContentCommand, LaunchAppCommand, MobileConnectedEvent,
-    MobilePlatform as ProtoMobilePlatform, PressKeyCommand, ReadFileChunkCommand,
-    RegisterHookCommand, RegisterMobileDownloadHook, RegisterMobileFileChooserHook,
-    SaveMobileDownloadCommand, ScreenshotCommand, SetMobileFileChooserFilesCommand,
-    SurfaceSessionCommand, UploadFileChunkCommand, WaitForHookCommand, WaitForSelectorCommand,
+    MobilePlatform as ProtoMobilePlatform, NavigatePageCommand, PressKeyCommand,
+    ReadFileChunkCommand, RegisterHookCommand, RegisterMobileDownloadHook,
+    RegisterMobileFileChooserHook, SaveMobileDownloadCommand, ScreenshotCommand,
+    SetMobileFileChooserFilesCommand, SurfaceSessionCommand, UploadFileChunkCommand,
+    WaitForHookCommand, WaitForSelectorCommand,
 };
 
 use super::hook::{DownloadHook, FileChooserHook};
@@ -111,9 +112,8 @@ use super::command::command_retry_options;
 use super::runtime::get_runtime;
 use super::types::{
     AccessibilitySnapshotFormat, AccessibilitySnapshotMode, AccessibilitySnapshotOptions,
-    ClickResult, CommandOptions, CountResult, ElementResult, Error, FillResult, PressOptions,
-    PressResult, Result, RuntimeClient, ScreenshotOptions, ScreenshotResult, TextResult,
-    WaitForSelectorOptions, WaitForSelectorResult,
+    CommandOptions, Error, PressOptions, Result, RuntimeClient, ScreenshotOptions, TextResult,
+    WaitForSelectorOptions,
 };
 use super::web_locators::{RoleOptions, TextMatcher, TextOptions};
 
@@ -554,7 +554,46 @@ impl AndroidApp {
         ))
     }
 
-    pub async fn click(&self, selector: &str, options: CommandOptions) -> Result<ClickResult> {
+    pub async fn goto(&self, url: &str, options: CommandOptions) -> Result<()> {
+        self.navigate(url, options).await
+    }
+
+    pub async fn navigate(&self, url: &str, options: CommandOptions) -> Result<()> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.inner.session_id)?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::Navigate(NavigatePageCommand {
+                    url: url.to_string(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send mobile NavigatePageCommand"))?;
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("mobile app session closed while opening deep link")
+                })?;
+            match event.event {
+                Some(ContextEvent::Navigated(_)) => return Ok(()),
+                Some(ContextEvent::Error(error)) => return Err(Error::new(error.message)),
+                Some(ContextEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new(
+                        "mobile app session closed while opening deep link",
+                    ));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn click(&self, selector: &str, options: CommandOptions) -> Result<()> {
         let selector = normalize_mobile_selector_for_transport(selector);
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -581,13 +620,7 @@ impl AndroidApp {
 
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
-                Some(ContextEvent::ElementClicked(clicked)) => {
-                    return Ok(ClickResult {
-                        selector: clicked.css_selector,
-                        note: clicked.note,
-                        bidi_session_id: clicked.bidi_session_id,
-                    });
-                }
+                Some(ContextEvent::ElementClicked(_)) => return Ok(()),
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "app session error while clicking Android locator {:?}: {}",
@@ -606,12 +639,7 @@ impl AndroidApp {
         }
     }
 
-    pub async fn fill(
-        &self,
-        selector: &str,
-        value: &str,
-        options: CommandOptions,
-    ) -> Result<FillResult> {
+    pub async fn fill(&self, selector: &str, value: &str, options: CommandOptions) -> Result<()> {
         let selector = normalize_mobile_selector_for_transport(selector);
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -639,13 +667,7 @@ impl AndroidApp {
 
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
-                Some(ContextEvent::ElementFilled(filled)) => {
-                    return Ok(FillResult {
-                        selector: filled.css_selector,
-                        value: filled.value,
-                        note: filled.note,
-                    });
-                }
+                Some(ContextEvent::ElementFilled(_)) => return Ok(()),
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "app session error while filling Android locator {:?}: {}",
@@ -664,7 +686,7 @@ impl AndroidApp {
         }
     }
 
-    pub async fn count(&self, selector: &str, options: CommandOptions) -> Result<CountResult> {
+    pub async fn count(&self, selector: &str, options: CommandOptions) -> Result<u32> {
         let selector = normalize_mobile_selector_for_transport(selector);
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -691,13 +713,7 @@ impl AndroidApp {
 
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
-                Some(ContextEvent::ElementCounted(counted)) => {
-                    return Ok(CountResult {
-                        selector: counted.css_selector,
-                        count: counted.count,
-                        note: counted.note,
-                    });
-                }
+                Some(ContextEvent::ElementCounted(counted)) => return Ok(counted.count),
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "app session error while counting Android locator {:?}: {}",
@@ -716,7 +732,7 @@ impl AndroidApp {
         }
     }
 
-    pub async fn focus(&self, selector: &str, options: CommandOptions) -> Result<ElementResult> {
+    pub async fn focus(&self, selector: &str, options: CommandOptions) -> Result<()> {
         let selector = normalize_mobile_selector_for_transport(selector);
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -743,12 +759,7 @@ impl AndroidApp {
 
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
-                Some(ContextEvent::ElementFocused(focused)) => {
-                    return Ok(ElementResult {
-                        selector: focused.css_selector,
-                        note: focused.note,
-                    });
-                }
+                Some(ContextEvent::ElementFocused(_)) => return Ok(()),
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "app session error while focusing Android locator {:?}: {}",
@@ -767,12 +778,7 @@ impl AndroidApp {
         }
     }
 
-    pub async fn press(
-        &self,
-        selector: &str,
-        key: &str,
-        options: PressOptions,
-    ) -> Result<PressResult> {
+    pub async fn press(&self, selector: &str, key: &str, options: PressOptions) -> Result<()> {
         let selector = normalize_mobile_selector_for_transport(selector);
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -801,13 +807,7 @@ impl AndroidApp {
 
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
-                Some(ContextEvent::KeyPressed(pressed)) => {
-                    return Ok(PressResult {
-                        selector: pressed.css_selector,
-                        key: pressed.key,
-                        note: pressed.note,
-                    });
-                }
+                Some(ContextEvent::KeyPressed(_)) => return Ok(()),
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "app session error while pressing Android key on {:?}: {}",
@@ -830,19 +830,23 @@ impl AndroidApp {
         &self,
         selector: &str,
         options: CommandOptions,
-    ) -> Result<TextResult> {
-        self.read_text(selector, options, true).await
+    ) -> Result<Option<String>> {
+        self.read_text(selector, options, true)
+            .await
+            .map(|result| Some(result.text))
     }
 
-    pub async fn inner_text(&self, selector: &str, options: CommandOptions) -> Result<TextResult> {
-        self.read_text(selector, options, false).await
+    pub async fn inner_text(&self, selector: &str, options: CommandOptions) -> Result<String> {
+        self.read_text(selector, options, false)
+            .await
+            .map(|result| result.text)
     }
 
     pub async fn wait_for_selector(
         &self,
         selector: &str,
         options: WaitForSelectorOptions,
-    ) -> Result<WaitForSelectorResult> {
+    ) -> Result<()> {
         let selector = normalize_mobile_selector_for_transport(selector);
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -869,13 +873,7 @@ impl AndroidApp {
 
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
-                Some(ContextEvent::SelectorWaitSatisfied(wait)) => {
-                    return Ok(WaitForSelectorResult {
-                        selector: wait.css_selector,
-                        visible: wait.visible,
-                        note: wait.note,
-                    });
-                }
+                Some(ContextEvent::SelectorWaitSatisfied(_)) => return Ok(()),
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
                         "app session error while waiting for Android locator {:?}: {}",
@@ -894,15 +892,12 @@ impl AndroidApp {
         }
     }
 
-    pub async fn screenshot(&self) -> Result<ScreenshotResult> {
+    pub async fn screenshot(&self) -> Result<Vec<u8>> {
         self.screenshot_with_options(ScreenshotOptions::default())
             .await
     }
 
-    pub async fn screenshot_with_options(
-        &self,
-        options: ScreenshotOptions,
-    ) -> Result<ScreenshotResult> {
+    pub async fn screenshot_with_options(&self, options: ScreenshotOptions) -> Result<Vec<u8>> {
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
         ensure_android_app_open(handle, &self.inner.session_id)?;
@@ -928,16 +923,12 @@ impl AndroidApp {
             match event.event {
                 Some(ContextEvent::Attached(_)) => {}
                 Some(ContextEvent::ScreenshotCaptured(screenshot)) => {
-                    let result = ScreenshotResult {
-                        png_data: screenshot.png_data,
-                        note: screenshot.note,
-                    };
                     if let Some(path) = options.path.as_ref() {
-                        std::fs::write(path, &result.png_data).map_err(|error| {
+                        std::fs::write(path, &screenshot.png_data).map_err(|error| {
                             Error::new(format!("write screenshot to {}: {error}", path.display()))
                         })?;
                     }
-                    return Ok(result);
+                    return Ok(screenshot.png_data);
                 }
                 Some(ContextEvent::Error(error)) => {
                     return Err(Error::new(format!(
@@ -1399,35 +1390,35 @@ impl AndroidLocator {
         ))
     }
 
-    pub async fn click(&self, options: CommandOptions) -> Result<ClickResult> {
+    pub async fn click(&self, options: CommandOptions) -> Result<()> {
         self.page.click(&self.selector, options).await
     }
 
-    pub async fn count(&self, options: CommandOptions) -> Result<CountResult> {
+    pub async fn count(&self, options: CommandOptions) -> Result<u32> {
         self.page.count(&self.selector, options).await
     }
 
-    pub async fn focus(&self, options: CommandOptions) -> Result<ElementResult> {
+    pub async fn focus(&self, options: CommandOptions) -> Result<()> {
         self.page.focus(&self.selector, options).await
     }
 
-    pub async fn fill(&self, value: &str, options: CommandOptions) -> Result<FillResult> {
+    pub async fn fill(&self, value: &str, options: CommandOptions) -> Result<()> {
         self.page.fill(&self.selector, value, options).await
     }
 
-    pub async fn press(&self, key: &str, options: PressOptions) -> Result<PressResult> {
+    pub async fn press(&self, key: &str, options: PressOptions) -> Result<()> {
         self.page.press(&self.selector, key, options).await
     }
 
-    pub async fn text_content(&self, options: CommandOptions) -> Result<TextResult> {
+    pub async fn text_content(&self, options: CommandOptions) -> Result<Option<String>> {
         self.page.text_content(&self.selector, options).await
     }
 
-    pub async fn inner_text(&self, options: CommandOptions) -> Result<TextResult> {
+    pub async fn inner_text(&self, options: CommandOptions) -> Result<String> {
         self.page.inner_text(&self.selector, options).await
     }
 
-    pub async fn wait_for(&self, options: WaitForSelectorOptions) -> Result<WaitForSelectorResult> {
+    pub async fn wait_for(&self, options: WaitForSelectorOptions) -> Result<()> {
         self.page.wait_for_selector(&self.selector, options).await
     }
 }
@@ -1690,6 +1681,10 @@ fn normalize_mobile_selector_for_transport(selector: &str) -> String {
     let trimmed = selector.trim();
     if trimmed.is_empty() {
         return String::new();
+    }
+    let lowered = trimmed.to_ascii_lowercase();
+    if lowered.starts_with("ref=") || lowered.starts_with("ref:") {
+        return format!("ref={}", decode_selector_body(&trimmed[4..]));
     }
     if is_normalized_mobile_transport_selector(trimmed) {
         return trimmed.to_string();
