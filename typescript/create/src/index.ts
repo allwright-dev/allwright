@@ -13,13 +13,14 @@ const PACKAGE_VERSION = getPackageVersion();
 const ALLWRIGHT_VERSION = `^${PACKAGE_VERSION}`;
 
 type Language = "ts" | "js";
-type SurfaceId = "web" | "mobile-android" | "mobile-ios";
+type SurfaceId = "web" | "mobile-android" | "mobile-ios" | "desktop-mac";
 type PackageManager = "bun" | "npm" | "pnpm" | "yarn";
 
 const SURFACE_OPTIONS: Array<{ label: string; value: SurfaceId }> = [
   { label: "Web", value: "web" },
   { label: "Mobile Android", value: "mobile-android" },
   { label: "Mobile iOS", value: "mobile-ios" },
+  { label: "Desktop macOS", value: "desktop-mac" },
 ];
 
 interface InitOptions {
@@ -126,11 +127,16 @@ function parseArgs(args: string[]): InitOptions {
       case "--ios":
         options.surfaces.push("mobile-ios");
         break;
+      case "--desktop-mac":
+      case "--macos":
+      case "--mac":
+        options.surfaces.push("desktop-mac");
+        break;
       case "--both":
         options.surfaces.push("web", "mobile-android");
         break;
       case "--all":
-        options.surfaces.push("web", "mobile-android", "mobile-ios");
+        options.surfaces.push("web", "mobile-android", "mobile-ios", "desktop-mac");
         break;
       case "--surface": {
         const value = args[index + 1];
@@ -193,7 +199,9 @@ async function selectSurfaces(interactive: boolean): Promise<SurfaceId[]> {
         ? "browser automation"
         : surface.value === "mobile-android"
           ? "Android app automation"
-          : "iOS app automation",
+          : surface.value === "mobile-ios"
+            ? "iOS app automation"
+            : "native macOS app automation",
     })),
     required: true,
   });
@@ -284,6 +292,10 @@ function buildProjectFiles(input: {
 
   if (hasSurface(surfaces, "mobile-ios")) {
     files[`tests/ios.spec.${extension}`] = iosSpecContents(language);
+  }
+
+  if (hasSurface(surfaces, "desktop-mac")) {
+    files[`tests/macos.spec.${extension}`] = macosSpecContents(language);
   }
 
   return files;
@@ -388,6 +400,14 @@ function allwrightConfigContents(surfaces: SurfaceId[]): string {
     lines.push('      binary: "https://allwright.dev/Flights-simulator.ipa"');
   }
 
+  if (hasSurface(surfaces, "desktop-mac")) {
+    lines.push("");
+    lines.push("desktop:");
+    lines.push("  mac:");
+    lines.push("    app:");
+    lines.push("      id: com.apple.calculator");
+  }
+
   lines.push("");
   lines.push("expect:");
   lines.push("  timeoutMs: 7000");
@@ -448,6 +468,21 @@ test("opens the iOS Flights demo app", { timeout: 180_000 }, async ({ iosApp }) 
 `;
 }
 
+function macosSpecContents(language: Language): string {
+  const importLine =
+    language === "ts"
+      ? 'import { expect, test } from "@allwright.dev/vitest";'
+      : 'import { expect, test } from "@allwright.dev/vitest";';
+
+  return `${importLine}
+
+test("opens Calculator through the macOS desktop agent", { timeout: 90_000 }, async ({ macosApp }) => {
+  const screenshot = await macosApp.screenshot();
+  expect(screenshot.byteLength).toBeGreaterThan(0);
+});
+`;
+}
+
 function generatedReadmeContents(surfaces: SurfaceId[]): string {
   const nextSteps = [
     "## Next steps",
@@ -468,6 +503,13 @@ function generatedReadmeContents(surfaces: SurfaceId[]): string {
     nextSteps.push(
       `${step++}. Start an iOS Simulator, or connect a registered physical device with Developer Mode and UI Automation enabled.`,
       `${step++}. The first Simulator run downloads and installs the Flights IPA configured in \`allwright.config.yaml\`; physical-device apps must use a signed device build. No manual app or agent installation is needed.`,
+    );
+  }
+
+  if (hasSurface(surfaces, "desktop-mac")) {
+    nextSteps.push(
+      `${step++}. Run the suite on macOS 14 or newer with Xcode installed and UI Automation enabled for the process running Xcode.`,
+      `${step++}. The first macOS run installs the desktop plugin, starts its bundled XCUITest runner, and launches Calculator by bundle identifier.`,
     );
   }
 
@@ -507,6 +549,14 @@ function parseSurfaceId(input: string): SurfaceId {
   }
   if (normalized === "mobile-ios" || normalized === "ios") {
     return "mobile-ios";
+  }
+  if (
+    normalized === "desktop-mac" ||
+    normalized === "desktop-macos" ||
+    normalized === "macos" ||
+    normalized === "mac"
+  ) {
+    return "desktop-mac";
   }
   throw new Error(`Unknown surface: ${input}`);
 }
@@ -614,6 +664,9 @@ function printSummary(
   }
   if (hasSurface(surfaces, "mobile-ios")) {
     console.log("  xcrun simctl list devices available");
+  }
+  if (hasSurface(surfaces, "desktop-mac")) {
+    console.log("  xcodebuild -version");
   }
   console.log(`${packageManager === "npm" ? "  npm test" : `  ${packageManager} test`}`);
 }

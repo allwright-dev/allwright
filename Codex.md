@@ -54,6 +54,7 @@ This instruction should be treated as ongoing project policy for all future AI c
 - `typescript/core/`: published npm package `@allwright.dev/core`, containing the TypeScript/JavaScript client, bundled shared proto files, and examples
 - `typescript/vitest/`: published npm package `@allwright.dev/vitest`, containing Vitest fixtures and retrying browser assertions on top of `@allwright.dev/core`
 - `typescript/vitest/` owns lazy native fixtures for Android (`android`, `androidApp`), iOS (`ios`, `iosApp`), and macOS (`macos`, `macosApp`), and supports hybrid tests that use web and native surfaces in the same test run
+- `typescript/create/` scaffolds Web, Mobile Android, Mobile iOS, and Desktop macOS Vitest projects. Desktop macOS is available interactively and through `--macos`, `--desktop-mac`, or `--surface desktop-mac`, and generates `desktop.mac` config plus a lazy `macosApp` starter.
 - `proto/`: shared protobuf and gRPC contract root for all stacks
 - `proto/engine/v1/engine.proto`: umbrella engine service contract that imports the split proto ownership layers
 - `proto/core/v1/`: core-owned shared engine/session/context message contracts
