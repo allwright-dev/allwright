@@ -414,6 +414,36 @@ export const javaReference: LanguageReference = {
       ],
     },
     {
+      slug: "desktop",
+      title: "Desktop",
+      description: "Native macOS application automation through the installable desktop-mac XCUITest plugin. Windows and Linux are not available yet.",
+      members: [
+        {
+          name: "Allwright.desktop().mac().connect",
+          kind: "method",
+          signature: "public MacDesktop connect()\npublic MacDesktop connect(DesktopMacConnectOptions options)",
+          description: "Connects to the local macOS desktop and starts the bundled XCUITest runner automatically. Requires macOS 14 or newer, Xcode, and UI automation permission for the process running Xcode.",
+          since: "v0.1.21",
+          example: "MacDesktop mac = Allwright.desktop().mac().connect();",
+        },
+        {
+          name: "MacDesktop.launch",
+          kind: "method",
+          signature: "public synchronized MacApp launch()\npublic synchronized MacApp launch(DesktopMacLaunchOptions options)",
+          description: "Launches an installed macOS application by bundle identifier. The returned app supports native locators, actions, text reads, waits, screenshots, and accessibility snapshots.",
+          since: "v0.1.21",
+          example: 'MacApp app = mac.launch(new DesktopMacLaunchOptions("com.apple.TextEdit", false, null));',
+        },
+        {
+          name: "MacApp locators and actions",
+          kind: "method",
+          signature: "public AndroidLocator locator(String selector)\npublic AndroidLocator getByRole(String role, RoleOptions options)",
+          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, textContent, innerText, waitForSelector, screenshot, and accessibilitySnapshot.",
+          since: "v0.1.21",
+        },
+      ],
+    },
+    {
       slug: "config",
       title: "Config",
       description:

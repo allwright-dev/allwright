@@ -420,6 +420,36 @@ export const typescriptReference: LanguageReference = {
       ],
     },
     {
+      slug: "desktop",
+      title: "Desktop",
+      description: "Native macOS application automation through the installable desktop-mac XCUITest plugin. Windows and Linux are not available yet.",
+      members: [
+        {
+          name: "desktop.mac.connect",
+          kind: "method",
+          signature: "desktop.mac.connect(options?: DesktopMacConnectOptions): Promise<DesktopMacDesktop>",
+          description: "Connects to the local macOS desktop and starts the bundled XCUITest runner automatically. Requires macOS 14 or newer, Xcode, and UI automation permission for the process running Xcode.",
+          since: "v0.1.21",
+          example: 'const mac = await desktop.mac.connect();',
+        },
+        {
+          name: "DesktopMacDesktop.launch",
+          kind: "method",
+          signature: "launch(options: DesktopMacLaunchOptions): Promise<DesktopMacApp>",
+          description: "Launches an installed macOS application by bundle identifier. The returned app supports native locators, actions, text reads, waits, screenshots, and accessibility snapshots.",
+          since: "v0.1.21",
+          example: 'const app = await mac.launch({ appId: "com.apple.TextEdit" });',
+        },
+        {
+          name: "DesktopMacApp locators and actions",
+          kind: "method",
+          signature: "locator(selector: string): DesktopMacLocator\ngetByRole(role: string, options?: RoleOptions): DesktopMacLocator",
+          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, textContent, innerText, waitForSelector, screenshot, and accessibilitySnapshot.",
+          since: "v0.1.21",
+        },
+      ],
+    },
+    {
       slug: "config",
       title: "Config",
       description:

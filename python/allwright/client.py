@@ -19,6 +19,14 @@ from ._mobile import (
     IosLocator,
     mobile,
 )
+from ._desktop import (
+    DesktopMacConnectOptions,
+    DesktopMacLaunchOptions,
+    MacApp,
+    MacDesktop,
+    MacLocator,
+    desktop,
+)
 from ._page import Page
 from ._proto import engine_pb2
 from ._runtime import launch_browser_with_kind, ping, set_server_addr, shutdown

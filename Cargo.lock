@@ -38,6 +38,7 @@ name = "allwright-core"
 version = "0.1.20"
 dependencies = [
  "allwright-plugin-sdk",
+ "allwright-surface-desktop",
  "allwright-surface-mobile",
  "clap",
  "flate2",
@@ -68,6 +69,8 @@ name = "allwright-surface-desktop"
 version = "0.1.20"
 dependencies = [
  "allwright-plugin-sdk",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
@@ -86,6 +89,10 @@ version = "0.1.20"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
+ "base64 0.22.1",
+ "serde",
+ "serde_json",
+ "serde_yaml",
  "tokio",
 ]
 

@@ -13,6 +13,10 @@ use allwright_plugin_sdk::{
     BrowserSessionHandle, HookRegistration, HookResult, HookType as PluginHookType,
     PageSessionHandle,
 };
+use allwright_surface_desktop::{
+    ConnectOptions as DesktopConnectOptions, DesktopAppSessionHandle, DesktopPlatform,
+    DesktopSessionHandle, LaunchOptions as DesktopLaunchOptions,
+};
 use allwright_surface_mobile::{
     ConnectOptions as MobileConnectOptions, DeviceConnectionKind as MobileDeviceConnectionKind,
     LaunchOptions as MobileLaunchOptions, MobileBrowserSessionHandle, MobileHookRegistration,
@@ -27,26 +31,28 @@ use proto::engine_service_server::{EngineService, EngineServiceServer};
 use proto::{
     AppLaunchedEvent, BrowserKind, BrowserLaunchedEvent, ChromeLaunchedEvent,
     ChromiumBidiInjectionEvent, ClickElementCommand, CloseContextSessionCommand,
-    CloseSurfaceSessionCommand, CommandRetryOptions, ConnectMobileCommand, ContextOpenedEvent,
-    ContextSessionAttachedEvent, ContextSessionClosedEvent, ContextSessionCommand,
-    ContextSessionErrorEvent, ContextSessionEvent, ContextSessionPingCommand,
-    ContextSessionPongEvent, CountElementsCommand, DeviceConnectionKind, DownloadHookResult,
-    DownloadSavedEvent, ElementClickedEvent, ElementCountedEvent, ElementFilledEvent,
-    ElementFocusedEvent, ElementHoveredEvent, ElementsHighlightedEvent, FileChooserFilesSetEvent,
-    FileChooserHookResult, FileChunkEvent, FileUploadedEvent, FillElementCommand,
-    FocusElementCommand, GetInnerTextCommand, GetTextContentCommand, HighlightElementsCommand,
-    HookCompletedEvent, HookRegisteredEvent, HoverElementCommand, InnerTextResolvedEvent,
-    KeyPressedEvent, LaunchAppCommand, LaunchBrowserCommand, LaunchChromeCommand,
-    MobileConnectedEvent, MobileDownloadHookResult, MobileDownloadSavedEvent,
-    MobileFileChooserFilesSetEvent, MobileFileChooserHookResult,
-    MobilePlatform as ProtoMobilePlatform, NavigatePageCommand, NewPageHookResult,
-    OpenContextCommand, PageNavigatedEvent, PingRequest, PingResponse, PressKeyCommand,
-    ReadFileChunkCommand, RegisterHookCommand, SaveDownloadCommand, SaveMobileDownloadCommand,
-    ScreenshotCapturedEvent, ScreenshotCommand, SelectorWaitSatisfiedEvent, SessionPingCommand,
-    SessionPongEvent, SetFileChooserFilesCommand, SetMobileFileChooserFilesCommand,
-    SurfaceSessionClosedEvent, SurfaceSessionCommand, SurfaceSessionErrorEvent,
-    SurfaceSessionEvent, TextContentResolvedEvent, UploadFileChunkCommand, WaitForHookCommand,
-    WaitForSelectorCommand, context_session_command::Command as ContextCommand,
+    CloseSurfaceSessionCommand, CommandRetryOptions, ConnectDesktopCommand, ConnectMobileCommand,
+    ContextOpenedEvent, ContextSessionAttachedEvent, ContextSessionClosedEvent,
+    ContextSessionCommand, ContextSessionErrorEvent, ContextSessionEvent,
+    ContextSessionPingCommand, ContextSessionPongEvent, CountElementsCommand,
+    DesktopAppLaunchedEvent, DesktopConnectedEvent, DesktopPlatform as ProtoDesktopPlatform,
+    DeviceConnectionKind, DownloadHookResult, DownloadSavedEvent, ElementClickedEvent,
+    ElementCountedEvent, ElementFilledEvent, ElementFocusedEvent, ElementHoveredEvent,
+    ElementsHighlightedEvent, FileChooserFilesSetEvent, FileChooserHookResult, FileChunkEvent,
+    FileUploadedEvent, FillElementCommand, FocusElementCommand, GetInnerTextCommand,
+    GetTextContentCommand, HighlightElementsCommand, HookCompletedEvent, HookRegisteredEvent,
+    HoverElementCommand, InnerTextResolvedEvent, KeyPressedEvent, LaunchAppCommand,
+    LaunchBrowserCommand, LaunchChromeCommand, LaunchDesktopAppCommand, MobileConnectedEvent,
+    MobileDownloadHookResult, MobileDownloadSavedEvent, MobileFileChooserFilesSetEvent,
+    MobileFileChooserHookResult, MobilePlatform as ProtoMobilePlatform, NavigatePageCommand,
+    NewPageHookResult, OpenContextCommand, PageNavigatedEvent, PingRequest, PingResponse,
+    PressKeyCommand, ReadFileChunkCommand, RegisterHookCommand, SaveDownloadCommand,
+    SaveMobileDownloadCommand, ScreenshotCapturedEvent, ScreenshotCommand,
+    SelectorWaitSatisfiedEvent, SessionPingCommand, SessionPongEvent, SetFileChooserFilesCommand,
+    SetMobileFileChooserFilesCommand, SurfaceSessionClosedEvent, SurfaceSessionCommand,
+    SurfaceSessionErrorEvent, SurfaceSessionEvent, TextContentResolvedEvent,
+    UploadFileChunkCommand, WaitForHookCommand, WaitForSelectorCommand,
+    context_session_command::Command as ContextCommand,
     context_session_event::Event as ContextEvent,
     hook_completed_event::Result as HookCompletionResult,
     register_hook_command::Hook as RegisterHook,
@@ -114,12 +120,14 @@ struct StagedFile {
 enum EngineBrowserSessionHandle {
     Web(BrowserSessionHandle),
     Mobile(MobileBrowserSessionHandle),
+    Desktop(DesktopSessionHandle),
 }
 
 #[derive(Debug, Clone)]
 enum EnginePageSessionHandle {
     Web(PageSessionHandle),
     Mobile(MobilePageSessionHandle),
+    Desktop(DesktopAppSessionHandle),
 }
 
 struct EnginePageOpenResult {
@@ -518,6 +526,10 @@ async fn handle_browser_command(
                             .await
                             .map(EnginePageSessionHandle::from_mobile_page)
                     }
+                    EngineBrowserSessionHandle::Desktop(_) => Err(
+                        "desktop sessions do not create empty app contexts; launch an app instead"
+                            .to_string(),
+                    ),
                 }
             })
             .await
@@ -708,6 +720,135 @@ async fn handle_browser_command(
                 should_close: false,
             })
         }
+        Some(SurfaceCommand::ConnectDesktop(ConnectDesktopCommand {
+            platform,
+            agent_endpoint,
+            retry_options,
+        })) => {
+            let platform = ProtoDesktopPlatform::try_from(platform)
+                .unwrap_or(ProtoDesktopPlatform::Unspecified);
+            if platform != ProtoDesktopPlatform::Mac {
+                return Ok(CommandOutcome {
+                    event: browser_event(
+                        session_id,
+                        SurfaceEvent::Error(SurfaceSessionErrorEvent {
+                            message: "connect_desktop requires the macOS platform".to_string(),
+                        }),
+                    ),
+                    should_close: false,
+                });
+            }
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let connect = retry_with_timeout(retry_policy, || async {
+                web_lib::connect_desktop(DesktopConnectOptions {
+                    platform: DesktopPlatform::Mac,
+                    agent_endpoint: agent_endpoint.clone(),
+                    timeout_ms: retry_options
+                        .as_ref()
+                        .and_then(|options| options.timeout_ms),
+                })
+                .await
+            })
+            .await
+            .map_err(Status::internal)?;
+            let initial_app_session_id = next_context_session_id();
+            state.lock().await.browser_sessions.insert(
+                session_id.to_string(),
+                BrowserSessionState {
+                    launched: true,
+                    surface_session: Some(EngineBrowserSessionHandle::Desktop(
+                        connect.desktop_session.clone(),
+                    )),
+                    process_id: None,
+                    automation: None,
+                },
+            );
+            state.lock().await.tab_sessions.insert(
+                initial_app_session_id.clone(),
+                TabSessionState {
+                    surface_session_id: session_id.to_string(),
+                    page_session: EnginePageSessionHandle::Desktop(
+                        connect.initial_app.app_session.clone(),
+                    ),
+                    current_url: None,
+                },
+            );
+            Ok(CommandOutcome {
+                event: browser_event(
+                    session_id,
+                    SurfaceEvent::DesktopConnected(DesktopConnectedEvent {
+                        platform: ProtoDesktopPlatform::Mac as i32,
+                        host_name: connect.host_name,
+                        note: format!("{}; {}", connect.note, connect.initial_app.note),
+                        backend: "xctest".to_string(),
+                        desktop_session_id: connect.desktop_session.session_id,
+                        initial_app_session_id,
+                    }),
+                ),
+                should_close: false,
+            })
+        }
+        Some(SurfaceCommand::LaunchDesktopApp(LaunchDesktopAppCommand {
+            app_id,
+            terminate_running,
+            retry_options,
+        })) => {
+            let surface_session = {
+                let state = state.lock().await;
+                state
+                    .browser_sessions
+                    .get(session_id)
+                    .and_then(|session| session.surface_session.clone())
+            };
+            let Some(EngineBrowserSessionHandle::Desktop(surface_session)) = surface_session else {
+                return Ok(CommandOutcome {
+                    event: browser_event(
+                        session_id,
+                        SurfaceEvent::Error(SurfaceSessionErrorEvent {
+                            message: "launch_desktop_app requires a connected desktop session"
+                                .to_string(),
+                        }),
+                    ),
+                    should_close: false,
+                });
+            };
+            let retry_policy = command_retry_policy(retry_options.as_ref());
+            let app = retry_with_timeout(retry_policy, || async {
+                web_lib::launch_desktop_app(
+                    &surface_session,
+                    DesktopLaunchOptions {
+                        app_id: app_id.clone(),
+                        terminate_running,
+                        timeout_ms: retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    },
+                )
+                .await
+            })
+            .await
+            .map_err(Status::internal)?;
+            let context_session_id = next_context_session_id();
+            state.lock().await.tab_sessions.insert(
+                context_session_id.clone(),
+                TabSessionState {
+                    surface_session_id: session_id.to_string(),
+                    page_session: EnginePageSessionHandle::Desktop(app.app_session.clone()),
+                    current_url: None,
+                },
+            );
+            Ok(CommandOutcome {
+                event: browser_event(
+                    session_id,
+                    SurfaceEvent::DesktopAppLaunched(DesktopAppLaunchedEvent {
+                        app_session_id: context_session_id,
+                        app_id: app.app_session.app_id.unwrap_or_default(),
+                        note: app.note,
+                    }),
+                ),
+                should_close: false,
+            })
+        }
         Some(SurfaceCommand::Ping(SessionPingCommand { message })) => Ok(CommandOutcome {
             event: browser_event(
                 session_id,
@@ -734,6 +875,8 @@ async fn handle_browser_command(
                 web_lib::close_browser_process(process_id).map_err(Status::internal)?;
             } else if let Some(EngineBrowserSessionHandle::Mobile(_)) = surface_session {
                 // Mobile sessions currently have no process to tear down at the engine layer.
+            } else if let Some(EngineBrowserSessionHandle::Desktop(_)) = surface_session {
+                // The desktop agent lifecycle belongs to the loaded plugin.
             }
             Ok(CommandOutcome {
                 event: browser_event(
@@ -1742,6 +1885,14 @@ async fn handle_tab_command(
                         .await
                         .map_err(Status::internal)?;
                 }
+                (
+                    EngineBrowserSessionHandle::Desktop(surface_session),
+                    EnginePageSessionHandle::Desktop(page_session),
+                ) => {
+                    web_lib::close_desktop_app(surface_session, page_session)
+                        .await
+                        .map_err(Status::internal)?;
+                }
                 _ => {
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(
@@ -1827,6 +1978,19 @@ async fn handle_tab_command(
                     };
                     return Ok(TabCommandOutcome {
                         events: vec![tab_event(&context_session_id, event)],
+                        should_close: false,
+                    });
+                }
+                (EngineBrowserSessionHandle::Desktop(_), EnginePageSessionHandle::Desktop(_)) => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message:
+                                    "navigation is not supported for native macOS app sessions"
+                                        .to_string(),
+                            }),
+                        )],
                         should_close: false,
                     });
                 }
@@ -1924,6 +2088,19 @@ async fn handle_tab_command(
                     )
                     .await
                     .map(|click| (click.selector, click.note, click.session_id)),
+                    (
+                        EngineBrowserSessionHandle::Desktop(surface_session),
+                        EnginePageSessionHandle::Desktop(page_session),
+                    ) => web_lib::click_desktop_element(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|click| (click.selector, click.note, String::new())),
                     _ => Err("tab session backend metadata is inconsistent".to_string()),
                 }
             })
@@ -1965,6 +2142,19 @@ async fn handle_tab_command(
                         EngineBrowserSessionHandle::Mobile(surface_session),
                         EnginePageSessionHandle::Mobile(page_session),
                     ) => web_lib::count_mobile_elements(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|count| (count.selector, count.count, count.note)),
+                    (
+                        EngineBrowserSessionHandle::Desktop(surface_session),
+                        EnginePageSessionHandle::Desktop(page_session),
+                    ) => web_lib::count_desktop_elements(
                         surface_session,
                         page_session,
                         &css_selector,
@@ -2053,55 +2243,43 @@ async fn handle_tab_command(
             css_selector,
             retry_options,
         })) => {
-            let (surface_session, page_session) = match (&surface_session, &page_session) {
-                (
-                    EngineBrowserSessionHandle::Web(surface_session),
-                    EnginePageSessionHandle::Web(page_session),
-                ) => (surface_session, page_session),
-                (
-                    EngineBrowserSessionHandle::Mobile(surface_session),
-                    EnginePageSessionHandle::Mobile(page_session),
-                ) => {
-                    let retry_policy = command_retry_policy(retry_options.as_ref());
-                    let focus = retry_with_timeout(retry_policy, || async {
-                        web_lib::focus_mobile_element(
-                            surface_session,
-                            page_session,
-                            &css_selector,
-                            retry_options
-                                .as_ref()
-                                .and_then(|options| options.timeout_ms),
-                        )
-                        .await
-                    })
-                    .await
-                    .map_err(Status::internal)?;
-                    return Ok(TabCommandOutcome {
-                        events: vec![tab_event(
-                            &context_session_id,
-                            ContextEvent::ElementFocused(ElementFocusedEvent {
-                                css_selector: focus.selector,
-                                note: focus.note,
-                            }),
-                        )],
-                        should_close: false,
-                    });
-                }
-                _ => {
-                    return Ok(TabCommandOutcome {
-                        events: vec![tab_event(
-                            &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "tab session backend metadata is inconsistent".to_string(),
-                            }),
-                        )],
-                        should_close: false,
-                    });
-                }
-            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let focus = retry_with_timeout(retry_policy, || async {
-                web_lib::focus_element(&surface_session, &page_session, &css_selector).await
+                match (&surface_session, &page_session) {
+                    (
+                        EngineBrowserSessionHandle::Web(surface_session),
+                        EnginePageSessionHandle::Web(page_session),
+                    ) => web_lib::focus_element(surface_session, page_session, &css_selector)
+                        .await
+                        .map(|focus| (focus.css_selector, focus.note)),
+                    (
+                        EngineBrowserSessionHandle::Mobile(surface_session),
+                        EnginePageSessionHandle::Mobile(page_session),
+                    ) => web_lib::focus_mobile_element(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|focus| (focus.selector, focus.note)),
+                    (
+                        EngineBrowserSessionHandle::Desktop(surface_session),
+                        EnginePageSessionHandle::Desktop(page_session),
+                    ) => web_lib::focus_desktop_element(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|focus| (focus.selector, focus.note)),
+                    _ => Err("tab session backend metadata is inconsistent".to_string()),
+                }
             })
             .await
             .map_err(Status::internal)?;
@@ -2109,8 +2287,8 @@ async fn handle_tab_command(
                 events: vec![tab_event(
                     &context_session_id,
                     ContextEvent::ElementFocused(ElementFocusedEvent {
-                        css_selector: focus.css_selector,
-                        note: focus.note,
+                        css_selector: focus.0,
+                        note: focus.1,
                     }),
                 )],
                 should_close: false,
@@ -2146,6 +2324,20 @@ async fn handle_tab_command(
                     )
                     .await
                     .map(|fill| (fill.selector, fill.value, fill.note)),
+                    (
+                        EngineBrowserSessionHandle::Desktop(surface_session),
+                        EnginePageSessionHandle::Desktop(page_session),
+                    ) => web_lib::fill_desktop_element(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        &value,
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|fill| (fill.selector, value.clone(), fill.note)),
                     _ => Err("tab session backend metadata is inconsistent".to_string()),
                 }
             })
@@ -2250,6 +2442,34 @@ async fn handle_tab_command(
                             ContextEvent::KeyPressed(KeyPressedEvent {
                                 css_selector: press.selector,
                                 key: press.key,
+                                note: press.note,
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+                (
+                    EngineBrowserSessionHandle::Desktop(surface_session),
+                    EnginePageSessionHandle::Desktop(page_session),
+                ) => {
+                    let press = web_lib::press_desktop_key(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        &key,
+                        text.as_deref(),
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map_err(Status::internal)?;
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::KeyPressed(KeyPressedEvent {
+                                css_selector: press.selector,
+                                key,
                                 note: press.note,
                             }),
                         )],
@@ -2377,6 +2597,19 @@ async fn handle_tab_command(
                     )
                     .await
                     .map(|text| (text.selector, text.text, text.note)),
+                    (
+                        EngineBrowserSessionHandle::Desktop(surface_session),
+                        EnginePageSessionHandle::Desktop(page_session),
+                    ) => web_lib::get_desktop_text(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|text| (text.selector, text.text, text.note)),
                     _ => Err("tab session backend metadata is inconsistent".to_string()),
                 }
             })
@@ -2411,6 +2644,19 @@ async fn handle_tab_command(
                         EngineBrowserSessionHandle::Mobile(surface_session),
                         EnginePageSessionHandle::Mobile(page_session),
                     ) => web_lib::get_mobile_inner_text(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|text| (text.selector, text.text, text.note)),
+                    (
+                        EngineBrowserSessionHandle::Desktop(surface_session),
+                        EnginePageSessionHandle::Desktop(page_session),
+                    ) => web_lib::get_desktop_inner_text(
                         surface_session,
                         page_session,
                         &css_selector,
@@ -2470,6 +2716,20 @@ async fn handle_tab_command(
                     )
                     .await
                     .map(|wait| (wait.selector, wait.visible, wait.note)),
+                    (
+                        EngineBrowserSessionHandle::Desktop(surface_session),
+                        EnginePageSessionHandle::Desktop(page_session),
+                    ) => web_lib::wait_for_desktop_selector(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        visible.unwrap_or(false),
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
+                    )
+                    .await
+                    .map(|wait| (wait.selector, wait.visible, wait.note)),
                     _ => Err("tab session backend metadata is inconsistent".to_string()),
                 }
             })
@@ -2516,6 +2776,18 @@ async fn handle_tab_command(
                             )
                             .await
                         }
+                        (
+                            EngineBrowserSessionHandle::Desktop(surface),
+                            EnginePageSessionHandle::Desktop(page),
+                        ) => {
+                            web_lib::accessibility_snapshot_desktop(
+                                surface,
+                                page,
+                                &command.format,
+                                &command.mode,
+                            )
+                            .await
+                        }
                         _ => Err("inconsistent context backend for accessibility snapshot".into()),
                     }
                 },
@@ -2549,6 +2821,18 @@ async fn handle_tab_command(
                         surface_session,
                         page_session,
                         full_page.unwrap_or(false),
+                    )
+                    .await
+                    .map(|shot| (shot.png_data, shot.note)),
+                    (
+                        EngineBrowserSessionHandle::Desktop(surface_session),
+                        EnginePageSessionHandle::Desktop(page_session),
+                    ) => web_lib::screenshot_desktop(
+                        surface_session,
+                        page_session,
+                        retry_options
+                            .as_ref()
+                            .and_then(|options| options.timeout_ms),
                     )
                     .await
                     .map(|shot| (shot.png_data, shot.note)),

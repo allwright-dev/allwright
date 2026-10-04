@@ -16,6 +16,74 @@ pub struct CommandRetryOptions {
     pub retry_interval_ms: ::core::option::Option<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ConnectDesktopCommand {
+    #[prost(enumeration = "DesktopPlatform", tag = "1")]
+    pub platform: i32,
+    #[prost(string, optional, tag = "2")]
+    pub agent_endpoint: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(message, optional, tag = "3")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DesktopConnectedEvent {
+    #[prost(enumeration = "DesktopPlatform", tag = "1")]
+    pub platform: i32,
+    #[prost(string, tag = "2")]
+    pub host_name: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub backend: ::prost::alloc::string::String,
+    #[prost(string, tag = "5")]
+    pub desktop_session_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "6")]
+    pub initial_app_session_id: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LaunchDesktopAppCommand {
+    #[prost(string, tag = "1")]
+    pub app_id: ::prost::alloc::string::String,
+    #[prost(bool, tag = "2")]
+    pub terminate_running: bool,
+    #[prost(message, optional, tag = "3")]
+    pub retry_options: ::core::option::Option<CommandRetryOptions>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DesktopAppLaunchedEvent {
+    #[prost(string, tag = "1")]
+    pub app_session_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub app_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub note: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum DesktopPlatform {
+    Unspecified = 0,
+    Mac = 1,
+}
+impl DesktopPlatform {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "DESKTOP_PLATFORM_UNSPECIFIED",
+            Self::Mac => "DESKTOP_PLATFORM_MAC",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "DESKTOP_PLATFORM_UNSPECIFIED" => Some(Self::Unspecified),
+            "DESKTOP_PLATFORM_MAC" => Some(Self::Mac),
+            _ => None,
+        }
+    }
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ConnectMobileCommand {
     #[prost(enumeration = "MobilePlatform", tag = "1")]
     pub platform: i32,
@@ -386,7 +454,10 @@ impl BrowserKind {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SurfaceSessionCommand {
-    #[prost(oneof = "surface_session_command::Command", tags = "1, 2, 3, 4, 5, 6, 7")]
+    #[prost(
+        oneof = "surface_session_command::Command",
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9"
+    )]
     pub command: ::core::option::Option<surface_session_command::Command>,
 }
 /// Nested message and enum types in `SurfaceSessionCommand`.
@@ -407,6 +478,10 @@ pub mod surface_session_command {
         ConnectMobile(super::ConnectMobileCommand),
         #[prost(message, tag = "7")]
         LaunchApp(super::LaunchAppCommand),
+        #[prost(message, tag = "8")]
+        ConnectDesktop(super::ConnectDesktopCommand),
+        #[prost(message, tag = "9")]
+        LaunchDesktopApp(super::LaunchDesktopAppCommand),
     }
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
@@ -425,7 +500,10 @@ pub struct CloseSurfaceSessionCommand {}
 pub struct SurfaceSessionEvent {
     #[prost(string, tag = "1")]
     pub session_id: ::prost::alloc::string::String,
-    #[prost(oneof = "surface_session_event::Event", tags = "2, 3, 4, 5, 6, 7, 8, 9")]
+    #[prost(
+        oneof = "surface_session_event::Event",
+        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11"
+    )]
     pub event: ::core::option::Option<surface_session_event::Event>,
 }
 /// Nested message and enum types in `SurfaceSessionEvent`.
@@ -448,6 +526,10 @@ pub mod surface_session_event {
         MobileConnected(super::MobileConnectedEvent),
         #[prost(message, tag = "9")]
         AppLaunched(super::AppLaunchedEvent),
+        #[prost(message, tag = "10")]
+        DesktopConnected(super::DesktopConnectedEvent),
+        #[prost(message, tag = "11")]
+        DesktopAppLaunched(super::DesktopAppLaunchedEvent),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

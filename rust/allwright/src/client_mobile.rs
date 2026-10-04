@@ -14,14 +14,15 @@ use crate::proto::register_hook_command::Hook as RegisterHook;
 use crate::proto::surface_session_command::Command as SurfaceCommand;
 use crate::proto::surface_session_event::Event as SurfaceEvent;
 use crate::proto::{
-    AccessibilitySnapshotCommand, AppLaunchedEvent, ClickElementCommand, ConnectMobileCommand,
-    ContextSessionCommand, CountElementsCommand, FillElementCommand, FocusElementCommand,
-    GetInnerTextCommand, GetTextContentCommand, LaunchAppCommand, MobileConnectedEvent,
-    MobilePlatform as ProtoMobilePlatform, NavigatePageCommand, PressKeyCommand,
-    ReadFileChunkCommand, RegisterHookCommand, RegisterMobileDownloadHook,
-    RegisterMobileFileChooserHook, SaveMobileDownloadCommand, ScreenshotCommand,
-    SetMobileFileChooserFilesCommand, SurfaceSessionCommand, UploadFileChunkCommand,
-    WaitForHookCommand, WaitForSelectorCommand,
+    AccessibilitySnapshotCommand, AppLaunchedEvent, ClickElementCommand, ConnectDesktopCommand,
+    ConnectMobileCommand, ContextSessionCommand, CountElementsCommand, DesktopAppLaunchedEvent,
+    DesktopConnectedEvent, DesktopPlatform as ProtoDesktopPlatform, FillElementCommand,
+    FocusElementCommand, GetInnerTextCommand, GetTextContentCommand, LaunchAppCommand,
+    LaunchDesktopAppCommand, MobileConnectedEvent, MobilePlatform as ProtoMobilePlatform,
+    NavigatePageCommand, PressKeyCommand, ReadFileChunkCommand, RegisterHookCommand,
+    RegisterMobileDownloadHook, RegisterMobileFileChooserHook, SaveMobileDownloadCommand,
+    ScreenshotCommand, SetMobileFileChooserFilesCommand, SurfaceSessionCommand,
+    UploadFileChunkCommand, WaitForHookCommand, WaitForSelectorCommand,
 };
 
 use super::hook::{DownloadHook, FileChooserHook};
@@ -148,6 +149,27 @@ pub struct MobileIosLaunchOptions {
     pub app_id: Option<String>,
     pub stop_before_launch: bool,
     pub timeout_ms: Option<u32>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DesktopMacConnectOptions {
+    pub agent_endpoint: Option<String>,
+    pub timeout_ms: Option<u32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DesktopMacLaunchOptions {
+    pub app_id: String,
+    pub terminate_running: bool,
+    pub timeout_ms: Option<u32>,
+}
+
+pub type MacApp = AndroidApp;
+pub type MacLocator = AndroidLocator;
+
+#[derive(Clone)]
+pub struct MacDesktop {
+    inner: AndroidDevice,
 }
 
 pub type IosApp = AndroidApp;
@@ -352,6 +374,131 @@ pub mod ios {
                         error.message
                     )));
                 }
+                _ => {}
+            }
+        }
+    }
+}
+
+pub mod desktop {
+    use super::*;
+    pub use super::{
+        DesktopMacConnectOptions, DesktopMacLaunchOptions, MacApp, MacDesktop, MacLocator,
+    };
+
+    pub mod mac {
+        use super::*;
+
+        pub async fn connect(options: DesktopMacConnectOptions) -> Result<MacDesktop> {
+            let runtime = get_runtime().await?;
+            let mut engine = runtime.engine.clone();
+            let (command_tx, command_rx) = mpsc::channel(16);
+            let response = engine
+                .surface_session(tonic::Request::new(ReceiverStream::new(command_rx)))
+                .await?;
+            let mut events = response.into_inner();
+            command_tx
+                .send(SurfaceSessionCommand {
+                    command: Some(SurfaceCommand::ConnectDesktop(ConnectDesktopCommand {
+                        platform: ProtoDesktopPlatform::Mac as i32,
+                        agent_endpoint: options.agent_endpoint,
+                        retry_options: command_retry_options(options.timeout_ms),
+                    })),
+                })
+                .await
+                .map_err(|_| Error::new("failed to send ConnectDesktopCommand"))?;
+            loop {
+                let event = events.message().await?.ok_or_else(|| {
+                    Error::new("surface session closed before macOS desktop connect response")
+                })?;
+                match event.event {
+                    Some(SurfaceEvent::DesktopConnected(DesktopConnectedEvent {
+                        initial_app_session_id,
+                        desktop_session_id,
+                        ..
+                    })) => {
+                        let initial_app = AndroidApp {
+                            inner: Arc::new(AndroidAppInner {
+                                runtime: Arc::clone(&runtime),
+                                surface_session_id: event.session_id.clone(),
+                                session_id: initial_app_session_id,
+                                state: AsyncMutex::new(AndroidAppState::default()),
+                            }),
+                        };
+                        return Ok(MacDesktop {
+                            inner: AndroidDevice {
+                                inner: Arc::new(AndroidDeviceInner {
+                                    runtime,
+                                    state: AsyncMutex::new(AndroidDeviceState {
+                                        command_tx,
+                                        events,
+                                        closed: false,
+                                    }),
+                                    session_id: if desktop_session_id.is_empty() {
+                                        event.session_id
+                                    } else {
+                                        desktop_session_id
+                                    },
+                                    initial_app: initial_app.clone(),
+                                    current_app: Mutex::new(initial_app),
+                                }),
+                            },
+                        });
+                    }
+                    Some(SurfaceEvent::Error(error)) => return Err(Error::new(error.message)),
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+impl MacDesktop {
+    pub fn session_id(&self) -> &str {
+        self.inner.session_id()
+    }
+
+    pub fn app(&self) -> MacApp {
+        self.inner.app()
+    }
+
+    pub async fn launch(&self, options: DesktopMacLaunchOptions) -> Result<MacApp> {
+        let mut state = self.inner.inner.state.lock().await;
+        ensure_android_device_open(&state, &self.inner.inner.session_id)?;
+        state
+            .command_tx
+            .send(SurfaceSessionCommand {
+                command: Some(SurfaceCommand::LaunchDesktopApp(LaunchDesktopAppCommand {
+                    app_id: options.app_id,
+                    terminate_running: options.terminate_running,
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send LaunchDesktopAppCommand"))?;
+        loop {
+            let event = state.events.message().await?.ok_or_else(|| {
+                Error::new("surface session closed before macOS app launch response")
+            })?;
+            match event.event {
+                Some(SurfaceEvent::DesktopAppLaunched(DesktopAppLaunchedEvent {
+                    app_session_id,
+                    ..
+                })) => {
+                    let app = AndroidApp {
+                        inner: Arc::new(AndroidAppInner {
+                            runtime: Arc::clone(&self.inner.inner.runtime),
+                            surface_session_id: event.session_id,
+                            session_id: app_session_id,
+                            state: AsyncMutex::new(AndroidAppState::default()),
+                        }),
+                    };
+                    if let Ok(mut current_app) = self.inner.inner.current_app.lock() {
+                        *current_app = app.clone();
+                    }
+                    return Ok(app);
+                }
+                Some(SurfaceEvent::Error(error)) => return Err(Error::new(error.message)),
                 _ => {}
             }
         }

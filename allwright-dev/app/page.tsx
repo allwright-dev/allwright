@@ -31,8 +31,8 @@ const surfaces = [
   },
   {
     label: "Desktop",
-    description: "Full application automation for the tools your business runs on.",
-    status: "Not yet available",
+    description: "Native macOS application automation through an installable XCUITest plugin; Windows and Linux are next.",
+    status: "macOS available",
     position: { left: "6%", top: "90%" },
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">

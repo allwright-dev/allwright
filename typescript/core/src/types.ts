@@ -301,6 +301,32 @@ export interface MobileSurfaceNamespace {
   };
 }
 
+export interface DesktopMacConnectOptions {
+  agentEndpoint?: string;
+  timeoutMs?: number;
+}
+
+export interface DesktopMacLaunchOptions {
+  appId: string;
+  terminateRunning?: boolean;
+  timeoutMs?: number;
+}
+
+export type DesktopMacApp = MobileAndroidApp;
+export type DesktopMacLocator = MobileAndroidLocator;
+
+export interface DesktopMacDesktop {
+  readonly sessionId: string;
+  app(): DesktopMacApp;
+  launch(options: DesktopMacLaunchOptions): Promise<DesktopMacApp>;
+}
+
+export interface DesktopSurfaceNamespace {
+  mac: {
+    connect(options?: DesktopMacConnectOptions): Promise<DesktopMacDesktop>;
+  };
+}
+
 export interface Locator extends WebLocators {
   inputValue(options?: CommandOptions): Promise<string>;
   selectedOptions(options?: CommandOptions): Promise<CapturedOption[]>;
@@ -481,6 +507,19 @@ export interface SurfaceSessionEvent {
     packageName?: string;
     activityName?: string;
     webviewContext?: string;
+  };
+  desktopConnected?: {
+    platform?: number | string;
+    hostName?: string;
+    note?: string;
+    backend?: string;
+    desktopSessionId?: string;
+    initialAppSessionId?: string;
+  };
+  desktopAppLaunched?: {
+    appSessionId?: string;
+    appId?: string;
+    note?: string;
   };
   contextOpened?: {
     contextSessionId?: string;
@@ -772,6 +811,22 @@ export interface LaunchAppRequest {
   };
 }
 
+export interface ConnectDesktopRequest {
+  connectDesktop: {
+    platform: number;
+    agentEndpoint?: string;
+    retryOptions?: { timeoutMs?: number };
+  };
+}
+
+export interface LaunchDesktopAppRequest {
+  launchDesktopApp: {
+    appId: string;
+    terminateRunning?: boolean;
+    retryOptions?: { timeoutMs?: number };
+  };
+}
+
 export interface SurfacePingRequest {
   ping: {
     message: string;
@@ -945,6 +1000,8 @@ export type SurfaceSessionRequest =
   | OpenContextRequest
   | ConnectMobileRequest
   | LaunchAppRequest
+  | ConnectDesktopRequest
+  | LaunchDesktopAppRequest
   | SurfacePingRequest
   | CloseSurfaceRequest;
 

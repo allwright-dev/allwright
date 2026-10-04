@@ -36,7 +36,7 @@ const pluginCatalog = [
   { label: "Mobile — iOS", center: { x: 370, y: 285 }, status: "Available now" as const },
   { label: "Desktop — Windows", center: { x: 240, y: 360 }, status: "Not yet available" as const },
   { label: "Desktop — Linux", center: { x: 110, y: 285 }, status: "Not yet available" as const },
-  { label: "Desktop — macOS", center: { x: 110, y: 135 }, status: "Not yet available" as const },
+  { label: "Desktop — macOS", center: { x: 110, y: 135 }, status: "Available now" as const },
 ];
 
 const CORE = { x: 240, y: 210, r: 48 };
@@ -97,7 +97,7 @@ function WithEngineDiagram() {
       <svg
         viewBox="0 0 260 240"
         role="img"
-        aria-label="One small allwright core in the center, reaching web and mobile with solid lines for installed plugins, and desktop and API with dashed lines for not-yet-available plugins"
+        aria-label="One small allwright core in the center, reaching web, mobile, and macOS desktop with solid lines, while API and the remaining desktop platforms are still to come"
         className="h-auto w-full max-w-[280px] text-[var(--line)]"
       >
         <defs>
@@ -161,7 +161,7 @@ function PluginCatalogDiagram() {
       <svg
         viewBox="0 0 480 420"
         role="img"
-        aria-label="The allwright core in the center with today's plugin slots around it: Web, Mobile Android, and Mobile iOS are installed; Desktop Windows, Desktop Linux, and Desktop macOS remain reserved."
+        aria-label="The allwright core in the center with today's plugin slots around it: Web, Mobile Android, Mobile iOS, and Desktop macOS are installed; Desktop Windows and Desktop Linux remain reserved."
         className="h-auto w-full max-w-md text-[var(--line)]"
       >
         <defs>

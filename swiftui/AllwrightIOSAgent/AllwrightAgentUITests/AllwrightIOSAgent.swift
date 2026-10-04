@@ -1,6 +1,8 @@
 import Foundation
 import Network
+#if os(iOS)
 import UIKit
+#endif
 import XCTest
 
 /// Native XCTest bridge used by the `mobile-ios` surface plugin.
@@ -16,29 +18,55 @@ final class AllwrightIOSAgent {
     private var snapshotReferences: [String: [String: SnapshotReference]] = [:]
     private var snapshotGenerations: [String: Int] = [:]
 
+    private var platformLabel: String {
+#if os(macOS)
+        "macOS"
+#else
+        "iOS"
+#endif
+    }
+
     func start() throws {
-        let rawPort = ProcessInfo.processInfo.environment["ALLWRIGHT_IOS_AGENT_PORT"] ?? "8100"
+        let environment = ProcessInfo.processInfo.environment
+        let platformLabel = self.platformLabel
+#if os(macOS)
+        let defaultPort = "8200"
+#else
+        let defaultPort = "8100"
+#endif
+        let rawPort = environment["ALLWRIGHT_XCTEST_AGENT_PORT"]
+            ?? environment["ALLWRIGHT_IOS_AGENT_PORT"]
+            ?? defaultPort
         guard let portValue = UInt16(rawPort), let port = NWEndpoint.Port(rawValue: portValue) else {
             throw AgentError("ALLWRIGHT_IOS_AGENT_PORT must be a valid TCP port")
         }
 
-        let listener = try NWListener(using: .tcp, on: port)
+        let parameters = NWParameters.tcp
+#if os(macOS)
+        // Binding every interface causes macOS to gate the generated XCTest
+        // runner behind Local Network privacy. The desktop plugin is strictly
+        // local, so bind loopback explicitly and keep first use headless.
+        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: port)
+        let listener = try NWListener(using: parameters)
+#else
+        let listener = try NWListener(using: parameters, on: port)
+#endif
         listener.newConnectionHandler = { [weak self] connection in
             self?.accept(connection)
         }
         listener.stateUpdateHandler = { state in
             switch state {
             case .ready:
-                print("✅ Allwright iOS Agent listening on port \(portValue)")
+                print("✅ Allwright \(platformLabel) Agent listening on port \(portValue)")
             case .failed(let error):
-                print("❌ Allwright iOS Agent listener failed: \(error)")
+                print("❌ Allwright \(platformLabel) Agent listener failed: \(error)")
             default:
                 break
             }
         }
         self.listener = listener
         listener.start(queue: queue)
-        print("🚀 Allwright iOS Agent started")
+        print("🚀 Allwright \(platformLabel) Agent started")
     }
 
     func waitForever() {
@@ -97,6 +125,7 @@ final class AllwrightIOSAgent {
         switch command {
         case "status":
             let environment = ProcessInfo.processInfo.environment
+#if os(iOS)
             let identifier = environment["ALLWRIGHT_IOS_DEVICE_ID"]
                 ?? environment["SIMULATOR_UDID"]
                 ?? UIDevice.current.identifierForVendor?.uuidString
@@ -105,8 +134,18 @@ final class AllwrightIOSAgent {
                 "device_id": identifier,
                 "device_name": UIDevice.current.name,
                 "simulator": environment["SIMULATOR_UDID"] != nil,
+                "platform": "ios",
                 "protocol_version": 1,
             ])
+#else
+            return .success([
+                "device_id": Host.current().localizedName ?? "mac",
+                "device_name": Host.current().localizedName ?? "Mac",
+                "simulator": false,
+                "platform": "macos",
+                "protocol_version": 1,
+            ])
+#endif
 
         case "launch":
             let bundleID = try requiredString("bundle_id", in: request)
@@ -140,7 +179,11 @@ final class AllwrightIOSAgent {
 
         case "focus":
             let element = try resolvedElement(for: request, requiringActionability: true)
+#if os(macOS)
+            element.tap()
+#else
             if !element.hasFocus { element.tap() }
+#endif
             return .success(["performed": true])
 
         case "fill":
@@ -156,7 +199,11 @@ final class AllwrightIOSAgent {
         case "press":
             let element = try resolvedElement(for: request, requiringActionability: true)
             let key = try requiredString("key", in: request)
+#if os(macOS)
+            element.tap()
+#else
             if !element.hasFocus { element.tap() }
+#endif
             element.typeText(keyText(key, explicitText: request["text"] as? String))
             return .success(["performed": true])
 
@@ -257,14 +304,14 @@ final class AllwrightIOSAgent {
             return .success(["snapshot": String(decoding: data, as: UTF8.self)])
 
         default:
-            throw AgentError("unsupported iOS agent command `\(command)`")
+            throw AgentError("unsupported \(platformLabel) agent command `\(command)`")
         }
     }
 
     private func application(for request: [String: Any]) throws -> (String, XCUIApplication) {
         let sessionID = try requiredString("session_id", in: request)
         guard let application = applications[sessionID] else {
-            throw AgentError("unknown or closed iOS app session `\(sessionID)`")
+            throw AgentError("unknown or closed \(platformLabel) app session `\(sessionID)`")
         }
         return (sessionID, application)
     }
@@ -285,10 +332,10 @@ final class AllwrightIOSAgent {
                 object: element
             )
             guard XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed else {
-                throw AgentError("iOS element `\(selector)` did not become actionable before timeout")
+                throw AgentError("\(platformLabel) element `\(selector)` did not become actionable before timeout")
             }
         } else if !element.waitForExistence(timeout: timeout) {
-            throw AgentError("no iOS element matched `\(selector)` before timeout")
+            throw AgentError("no \(platformLabel) element matched `\(selector)` before timeout")
         }
         return element
     }
@@ -304,10 +351,10 @@ final class AllwrightIOSAgent {
         let referenceID = String(selector.dropFirst("ref=".count)).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
         guard let reference = snapshotReferences[sessionID]?[referenceID] else {
             let available = snapshotReferences[sessionID]?.keys.sorted().joined(separator: ",") ?? "none"
-            throw AgentError("stale or foreign iOS snapshot reference `\(referenceID)` (available: \(available)); capture a new AI accessibility snapshot")
+            throw AgentError("stale or foreign \(platformLabel) snapshot reference `\(referenceID)` (available: \(available)); capture a new AI accessibility snapshot")
         }
         guard debugHierarchySignature(application.debugDescription) == reference.hierarchySignature else {
-            throw AgentError("stale iOS snapshot reference: accessibility hierarchy changed; capture a new AI snapshot")
+            throw AgentError("stale \(platformLabel) snapshot reference: accessibility hierarchy changed; capture a new AI snapshot")
         }
         var query = application.descendants(matching: reference.type)
         if !reference.identifier.isEmpty {
@@ -320,7 +367,7 @@ final class AllwrightIOSAgent {
         }
         let element = query.element(boundBy: reference.matchIndex)
         guard element.exists else {
-            throw AgentError("stale iOS snapshot reference: referenced element disappeared")
+            throw AgentError("stale \(platformLabel) snapshot reference: referenced element disappeared")
         }
         return element
     }
@@ -386,10 +433,15 @@ final class AllwrightIOSAgent {
             ])
         }
         snapshotReferences[sessionID] = mode == "ai" ? references : [:]
+#if os(macOS)
+        let platform = "macos"
+#else
+        let platform = "ios"
+#endif
         var document: [String: Any] = [
             "contextId": sessionID,
             "parentContextId": NSNull(),
-            "platform": "ios",
+            "platform": platform,
             "root": [
                 "role": "application",
                 "name": application.label,
@@ -501,6 +553,9 @@ final class AllwrightIOSAgent {
     }
 
     private func fullPageScreenshot(_ application: XCUIApplication) -> Data {
+#if os(macOS)
+        return application.screenshot().pngRepresentation
+#else
         let scrollable = [application.scrollViews.firstMatch, application.tables.firstMatch, application.collectionViews.firstMatch]
             .first(where: { $0.exists && $0.isHittable })
         guard let scrollable else { return application.screenshot().pngRepresentation }
@@ -524,6 +579,7 @@ final class AllwrightIOSAgent {
                 y += image.size.height
             }
         }
+#endif
     }
 
     private func query(_ selector: String, in application: XCUIApplication) -> XCUIElementQuery {

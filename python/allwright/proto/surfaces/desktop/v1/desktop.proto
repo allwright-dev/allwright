@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package allwright.engine.v1;
+option go_package = "allwright.dev/gen/allwright/engine/v1;enginev1";
+option java_package = "dev.allwright.engine.v1";
+option java_multiple_files = true;
+
+import "core/v1/common.proto";
+
+enum DesktopPlatform {
+  DESKTOP_PLATFORM_UNSPECIFIED = 0;
+  DESKTOP_PLATFORM_MAC = 1;
+}
+
+message ConnectDesktopCommand {
+  DesktopPlatform platform = 1;
+  optional string agent_endpoint = 2;
+  optional CommandRetryOptions retry_options = 3;
+}
+
+message DesktopConnectedEvent {
+  DesktopPlatform platform = 1;
+  string host_name = 2;
+  string note = 3;
+  string backend = 4;
+  string desktop_session_id = 5;
+  string initial_app_session_id = 6;
+}
+
+message LaunchDesktopAppCommand {
+  string app_id = 1;
+  bool terminate_running = 2;
+  optional CommandRetryOptions retry_options = 3;
+}
+
+message DesktopAppLaunchedEvent {
+  string app_session_id = 1;
+  string app_id = 2;
+  string note = 3;
+}

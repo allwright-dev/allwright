@@ -3,6 +3,7 @@ import type { RetryExpectationOptions, PageExpectMatchers, LocatorExpectMatchers
 export type { RetryExpectationOptions, TextExpectationOptions, VisibleExpectationOptions, SelectedOptionExpectation, PageExpectMatchers, LocatorExpectMatchers, MobilePageExpectMatchers, MobileLocatorExpectMatchers } from "./expectations.js";
 import {
   launchConfiguredBrowser,
+  desktop,
   mobile,
   resolveConfig,
   setServerAddr,
@@ -14,6 +15,10 @@ import {
   type MobileIosDevice,
   type MobileIosLaunchOptions,
   type MobileIosApp,
+  type DesktopMacApp,
+  type DesktopMacConnectOptions,
+  type DesktopMacDesktop,
+  type DesktopMacLaunchOptions,
   type Browser,
   type BrowserKind,
   type CommandOptions,
@@ -45,6 +50,10 @@ export interface AllwrightVitestOptions {
     connectOptions?: MobileIosConnectOptions;
     launchOptions?: MobileIosLaunchOptions;
   };
+  macos?: {
+    connectOptions?: DesktopMacConnectOptions;
+    launchOptions?: DesktopMacLaunchOptions;
+  };
   configFile?: string;
   suite?: string;
 }
@@ -56,18 +65,23 @@ export interface AllwrightVitestFixtures {
   androidApp: MobileAndroidApp;
   ios: MobileIosDevice;
   iosApp: MobileIosApp;
+  macos: DesktopMacDesktop;
+  macosApp: DesktopMacApp;
 }
 
 const DEFAULT_ANDROID_CONNECT_TIMEOUT_MS = 30_000;
 const DEFAULT_ANDROID_LAUNCH_TIMEOUT_MS = 60_000;
 const DEFAULT_IOS_CONNECT_TIMEOUT_MS = 30_000;
 const DEFAULT_IOS_LAUNCH_TIMEOUT_MS = 60_000;
+const DEFAULT_MACOS_CONNECT_TIMEOUT_MS = 30_000;
+const DEFAULT_MACOS_LAUNCH_TIMEOUT_MS = 60_000;
 
 type AllwrightVitestContext = AllwrightVitestFixtures & {
   allwright: AllwrightVitestOptions;
   _browserResource: LazyResource<Browser>;
   _androidResource: LazyResource<MobileAndroidDevice>;
   _iosResource: LazyResource<MobileIosDevice>;
+  _macosResource: LazyResource<DesktopMacDesktop>;
 };
 
 type AsyncFactory<T> = () => Promise<T>;
@@ -595,6 +609,24 @@ function createLazyIosDevice(deviceResource: LazyResource<MobileIosDevice>): Mob
   } satisfies MobileIosDevice;
 }
 
+function createLazyMacosDesktop(
+  desktopResource: LazyResource<DesktopMacDesktop>,
+): DesktopMacDesktop {
+  const initialAppResource = createLazyResource(async () => (await desktopResource.get()).app());
+
+  return {
+    get sessionId() {
+      return getLazySyncProperty(desktopResource, "sessionId");
+    },
+    app() {
+      return createLazyMobileApp(initialAppResource);
+    },
+    async launch(options: DesktopMacLaunchOptions) {
+      return (await desktopResource.get()).launch(options);
+    },
+  } satisfies DesktopMacDesktop;
+}
+
 export const test = base.extend<AllwrightVitestContext>({
   allwright: async ({}, use) => {
     await use({});
@@ -647,6 +679,19 @@ export const test = base.extend<AllwrightVitestContext>({
     await use(iosResource);
   },
 
+  _macosResource: async ({ allwright }, use) => {
+    const config = resolveVitestConfig(allwright);
+    if (config.serverAddr) {
+      setServerAddr(config.serverAddr);
+    }
+
+    const macosResource = createLazyResource(async () =>
+      desktop.mac.connect(resolveMacosConnectOptions(config, allwright)),
+    );
+
+    await use(macosResource);
+  },
+
   browser: async ({ _browserResource }, use) => {
     try {
       await use(createLazyBrowser(_browserResource));
@@ -682,6 +727,20 @@ export const test = base.extend<AllwrightVitestContext>({
       const config = resolveVitestConfig(allwright);
       const launchOptions = resolveIosLaunchOptions(config, allwright);
       return (await _iosResource.get()).launch(launchOptions);
+    });
+
+    await use(createLazyMobileApp(appResource));
+  },
+
+  macos: async ({ _macosResource }, use) => {
+    await use(createLazyMacosDesktop(_macosResource));
+  },
+
+  macosApp: async ({ _macosResource, allwright }, use) => {
+    const appResource = createLazyResource(async () => {
+      const config = resolveVitestConfig(allwright);
+      const launchOptions = resolveMacosLaunchOptions(config, allwright);
+      return (await _macosResource.get()).launch(launchOptions);
     });
 
     await use(createLazyMobileApp(appResource));
@@ -808,6 +867,43 @@ function resolveIosLaunchOptions(
   }
 
   return launchOptions;
+}
+
+function resolveMacosConnectOptions(
+  config: ResolvedAllwrightConfig,
+  options: AllwrightVitestOptions,
+): DesktopMacConnectOptions {
+  return {
+    agentEndpoint:
+      options.macos?.connectOptions?.agentEndpoint ??
+      process.env.ALLWRIGHT_MAC_AGENT_ENDPOINT,
+    timeoutMs:
+      options.macos?.connectOptions?.timeoutMs ??
+      DEFAULT_MACOS_CONNECT_TIMEOUT_MS,
+  };
+}
+
+function resolveMacosLaunchOptions(
+  config: ResolvedAllwrightConfig,
+  options: AllwrightVitestOptions,
+): DesktopMacLaunchOptions {
+  const appId =
+    options.macos?.launchOptions?.appId ??
+    process.env.ALLWRIGHT_MAC_APP_ID ??
+    config.desktop.mac?.appId;
+  if (!appId) {
+    throw new Error(
+      "macosApp fixture requires macOS launch options with `appId`, or config.desktop.mac.app configured",
+    );
+  }
+
+  return {
+    appId,
+    terminateRunning: options.macos?.launchOptions?.terminateRunning ?? false,
+    timeoutMs:
+      options.macos?.launchOptions?.timeoutMs ??
+      DEFAULT_MACOS_LAUNCH_TIMEOUT_MS,
+  };
 }
 
 let activeExpectDefaults: RetryExpectationOptions = {};

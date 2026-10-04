@@ -36,6 +36,7 @@ public final class Allwright {
     private static final BrowserType CHROMIUM = new BrowserType(BrowserKind.BROWSER_KIND_CHROMIUM);
     private static final BrowserType FIREFOX = new BrowserType(BrowserKind.BROWSER_KIND_FIREFOX);
     private static final Mobile MOBILE = new Mobile();
+    private static final Desktop DESKTOP = new Desktop();
 
     private Allwright() {}
 
@@ -49,6 +50,10 @@ public final class Allwright {
 
     public static Mobile mobile() {
         return MOBILE;
+    }
+
+    public static Desktop desktop() {
+        return DESKTOP;
     }
 
     public static Browser launchChrome() {

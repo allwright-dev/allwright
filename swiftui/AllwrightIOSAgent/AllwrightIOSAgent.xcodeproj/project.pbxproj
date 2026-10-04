@@ -24,6 +24,7 @@
 		B10000000000000000000004 /* AllwrightAgentUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllwrightAgentUITests.swift; sourceTree = "<group>"; };
 		B10000000000000000000005 /* AllwrightAgentUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllwrightAgentUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000006 /* AllwrightIOSAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllwrightIOSAgent.swift; sourceTree = "<group>"; };
+		B10000000000000000000007 /* AllwrightAgentUITests.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AllwrightAgentUITests.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,6 +61,7 @@
 				B10000000000000000000004 /* AllwrightAgentUITests.swift */,
 				B10000000000000000000005 /* AllwrightAgentUITestsLaunchTests.swift */,
 				B10000000000000000000006 /* AllwrightIOSAgent.swift */,
+				B10000000000000000000007 /* AllwrightAgentUITests.entitlements */,
 			);
 			path = AllwrightAgentUITests;
 			sourceTree = "<group>";
@@ -379,6 +381,7 @@
 		282592573042DD6B002C8CF8 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = AllwrightAgentUITests/AllwrightAgentUITests.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -395,6 +398,7 @@
 		282592583042DD6B002C8CF8 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = AllwrightAgentUITests/AllwrightAgentUITests.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;

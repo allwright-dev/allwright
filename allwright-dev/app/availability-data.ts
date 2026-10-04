@@ -49,6 +49,10 @@ export const surfaceStatus = [
     detail: "Android plus iOS Simulators and registered physical devices are available with automatic runtime and app setup, using the same Playwright-style client shape.",
     status: "Available now" as const,
   },
-  { label: "Desktop", detail: "macOS, Windows, and Linux applications.", status: "Not yet available" as const },
+  {
+    label: "Desktop",
+    detail: "Native macOS applications are available through XCUITest. Windows and Linux remain planned.",
+    status: "macOS available" as const,
+  },
   { label: "API", detail: "Backend checks in the same test run.", status: "Not yet available" as const },
 ];

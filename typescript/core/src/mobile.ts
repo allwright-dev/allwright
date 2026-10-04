@@ -35,7 +35,7 @@ function retryOptions(timeoutMs?: number): { timeoutMs?: number } | undefined {
   return timeoutMs ? { timeoutMs } : undefined;
 }
 
-class MobileAndroidAppImpl implements MobileAndroidApp {
+export class MobileAndroidAppImpl implements MobileAndroidApp {
   #runtime: RuntimeClient;
   #surfaceSessionId: string;
   #handlePromise: Promise<PageHandle> | null = null;

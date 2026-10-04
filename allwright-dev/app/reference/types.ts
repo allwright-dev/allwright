@@ -30,7 +30,7 @@ export type ApiMember = {
 
 export type ApiModule = {
   /** Stable across all five languages — used for the in-page anchor and to keep the sidebar order identical when switching language tabs. */
-  slug: "browser" | "page" | "locator" | "hooks" | "mobile" | "config" | "vitest";
+  slug: "browser" | "page" | "locator" | "hooks" | "mobile" | "desktop" | "config" | "vitest";
   title: string;
   description: string;
   members: ApiMember[];

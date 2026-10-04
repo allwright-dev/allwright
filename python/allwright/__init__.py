@@ -8,6 +8,11 @@ from .client import (
     AndroidLocator,
     AndroidDevice,
     AndroidApp,
+    DesktopMacConnectOptions,
+    DesktopMacLaunchOptions,
+    MacApp,
+    MacDesktop,
+    MacLocator,
     IosLocator,
     IosDevice,
     IosApp,
@@ -51,6 +56,7 @@ from .client import (
     set_server_addr,
     shutdown,
     mobile,
+    desktop,
     hooks,
 )
 
@@ -64,6 +70,11 @@ __all__ = [
     "AndroidLocator",
     "AndroidDevice",
     "AndroidApp",
+    "DesktopMacConnectOptions",
+    "DesktopMacLaunchOptions",
+    "MacApp",
+    "MacDesktop",
+    "MacLocator",
     "IosLocator",
     "IosDevice",
     "IosApp",
@@ -107,5 +118,6 @@ __all__ = [
     "set_server_addr",
     "shutdown",
     "mobile",
+    "desktop",
     "hooks",
 ]

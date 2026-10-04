@@ -6,6 +6,7 @@ option java_package = "dev.allwright.engine.v1";
 option java_multiple_files = true;
 
 import "core/v1/common.proto";
+import "surfaces/desktop/v1/desktop.proto";
 import "surfaces/mobile/v1/mobile.proto";
 import "surfaces/web/v1/web.proto";
 
@@ -18,6 +19,8 @@ message SurfaceSessionCommand {
     LaunchBrowserCommand launch_browser = 5;
     ConnectMobileCommand connect_mobile = 6;
     LaunchAppCommand launch_app = 7;
+    ConnectDesktopCommand connect_desktop = 8;
+    LaunchDesktopAppCommand launch_desktop_app = 9;
   }
 }
 
@@ -43,6 +46,8 @@ message SurfaceSessionEvent {
     BrowserLaunchedEvent browser_launched = 7;
     MobileConnectedEvent mobile_connected = 8;
     AppLaunchedEvent app_launched = 9;
+    DesktopConnectedEvent desktop_connected = 10;
+    DesktopAppLaunchedEvent desktop_app_launched = 11;
   }
 }
 

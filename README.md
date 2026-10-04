@@ -12,7 +12,7 @@ The long-term direction is a single system that can cover web, mobile, desktop, 
 
 That direction also applies to extensibility: allwright should stay one engine at its core, while surface modules like `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, `desktop-windows`, and `desktop-linux` can be installed separately as plugins instead of fragmenting the runtime into multiple engines.
 
-Right now, allwright is being built in public and the browser automation engine is the first active layer. The current implementation is browser-first and driverless: Chromium runs through CDP plus Chromium BiDi, and Firefox runs through its native WebDriver BiDi Remote Agent, with high-level client libraries for Rust, Go, Java, Python, and TypeScript/JavaScript.
+Right now, allwright is being built in public with installable web, Android, iOS, and macOS desktop runtimes. Chromium runs through Chromium BiDi, Firefox through its native WebDriver BiDi Remote Agent, Android through native ADB integration, and Apple platforms through bundled XCUITest runners. High-level clients are available for Rust, Go, Java, Python, and TypeScript/JavaScript.
 
 ## Why allwright
 
@@ -30,10 +30,10 @@ allwright is under active development and not positioned as a finished multi-sur
 The current stage is:
 
 - the core product direction is broader than browser automation alone
-- the first shipped implementation work is centered on the browser engine and its future plugin boundary
+- web, Android, iOS, and macOS desktop automation use the same engine and lazy plugin boundary
 - the Rust workspace now separates a lightweight `allwright-core` from the installable `allwright` CLI and surface crates
-- the `web` surface now ships as a separately installable runtime plugin library
-- the other surface crates already exist as publishable boundaries, but only `web` is currently installable as a standalone runtime artifact
+- `web`, `mobile-android`, `mobile-ios`, and `desktop-mac` ship as separately installable runtime plugins
+- Windows and Linux desktop plus API automation remain planned
 - the public API and internal architecture are still evolving as the project grows toward wider surface coverage
 
 If you are evaluating the repo today, the clearest signal is the direction: allwright is aiming to become a unified automation engine, and browser automation is the first concrete step on that path.
@@ -77,17 +77,18 @@ Today, the plugin ecosystem looks like this:
 - `allwright`: installable CLI package that starts the engine server and manages plugin installation
 - `web` and `mobile-android`: installable runtime surface plugins loaded by the core at runtime
 - `mobile-ios`: an experimental installable macOS plugin with bundled, auto-started headless XCUITest runners for iOS Simulators and physical devices; device runners are re-signed locally from the user's Apple development credentials
-- `desktop-mac`, `desktop-windows`, and `desktop-linux`: planned surface plugins with publishable crate boundaries, but not yet installable runtime artifacts
+- `desktop-mac`: installable macOS plugin with a bundled, auto-started XCUITest runner
+- `desktop-windows` and `desktop-linux`: planned surface plugins with publishable crate boundaries, but not yet installable runtime artifacts
 
 What `plugin install` means today:
 
-- for `web`, it downloads the matching platform archive from GitHub Releases into the local allwright plugin directory and records the installed plugin in the manifest
+- for a supported plugin, it downloads the matching platform archive from GitHub Releases into the local allwright plugin directory and records it in the manifest
 - `allwright serve` always starts the engine server
-- when `web` is installed, the core engine loads the installed `web` plugin library at runtime for browser/web commands
-- when `web` is not installed, browser/web commands fail with a plugin-required error while the core server still runs
-- the non-web surface crates are still intentionally behind this installability switch until their runtime binaries are ready
+- the core loads a plugin library only when a command first needs that surface
+- when a required plugin is unavailable, its commands fail with a plugin-required error while the core server still runs
+- the iOS and macOS archives include their native XCUITest runner artifacts and require macOS with Xcode
 
-So the user-facing install model is now real for `web`, while the broader multi-surface plugin ecosystem is still being completed.
+Windows, Linux, and API support are still being completed; the shipped surfaces share one server-only client transport.
 
 Release automation today:
 
@@ -96,7 +97,7 @@ Release automation today:
 - that workflow publishes the Java client to Maven Central as `dev.allwright:allwright` using the checked-in Gradle wrapper, a Central Portal user token, and a follow-up transfer call through Sonatype's Central Portal OSSRH Staging API compatibility service
 - that workflow publishes the Python client to PyPI as `allwright` using PyPI Trusted Publishing via GitHub Actions OIDC
 - that workflow publishes the npm workspace packages `@allwright.dev/core`, `@allwright.dev/vitest`, and `create-allwright` using npm Trusted Publishing via GitHub Actions OIDC
-- that workflow builds both the `allwright` CLI and `allwright-surface-web` plugin for the current release matrix and uploads the archives to the matching GitHub Release
+- that workflow builds the `allwright` CLI and installable web, Android, iOS, and macOS desktop plugin archives and uploads them to the matching GitHub Release
 - `allwright plugin install web` resolves the local OS and architecture, then downloads the matching release asset
 - the Rust, Go, Java, Python, and TypeScript clients now auto-bootstrap the matching `allwright` CLI and `web` plugin for their own version when they target a local server address and nothing is running yet
 - those clients also reuse an already-healthy local server when one exists, and only tear down the server process if that specific client started it
@@ -152,6 +153,7 @@ List or install plugins:
 ```bash
 allwright plugin list
 allwright plugin install web
+allwright plugin install desktop-mac
 ```
 
 If you are working from the repo checkout instead:
@@ -176,15 +178,51 @@ cargo run -p allwright-core --example playground -- --server-addr http://127.0.0
 
 ## What You Can Try Today
 
-Today’s working path is browser-focused, with a Rust-powered engine and high-level client libraries layered on top.
+Today’s working paths cover web, Android, iOS, and native macOS applications through one Rust-powered engine and five high-level client libraries.
 
 The practical path today is:
 
 - use the `allwright` CLI as the installable entrypoint
-- install the `web` plugin
+- install the surface plugin you need (`web`, `mobile-android`, `mobile-ios`, or `desktop-mac` on macOS)
 - use the Rust, Go, Java, Python, or TypeScript clients against the running engine server, or let the client auto-start a matching local server on first use
 
-At the moment, the `web` runtime path is wired through the installable plugin model and loaded into the core at runtime. The other surface crates and split proto ownership are in place, while additional plugin runtime activation is still follow-up work.
+Each working surface is loaded into core only when used. Clients always talk to the engine server; they never invoke plugin libraries or native agents directly.
+
+macOS desktop automation uses the same app/locator shape as native mobile:
+
+```ts
+import { desktop } from "@allwright.dev/core";
+
+const mac = await desktop.mac.connect();
+const app = await mac.launch({ appId: "com.apple.TextEdit" });
+await app.getByRole("button", { name: "New Document" }).click();
+await app.screenshot({ path: "textedit.png" });
+```
+
+Vitest can own the same startup path lazily through the `macosApp` fixture:
+
+```yaml
+desktop:
+  mac:
+    app:
+      id: com.apple.TextEdit
+```
+
+```ts
+import { test } from "@allwright.dev/vitest";
+
+test("creates a document", async ({ macosApp }) => {
+  await macosApp.getByRole("button", { name: "New Document" }).click();
+});
+```
+
+The `desktop-mac` plugin copies its bundled unsigned XCUITest runner to a local
+cache, ad-hoc signs that copy without selecting a certificate, and auto-starts
+it. It supports
+native selectors, semantic role/text/label/test-id locators, click, count,
+focus, fill, key input, text reads, waits, screenshots, and accessibility
+snapshots. It requires macOS 14 or newer with Xcode installed and UI automation
+permission enabled for the process running Xcode.
 
 Web pages support accessibility snapshots in JSON (default) or standard YAML:
 
@@ -364,7 +402,7 @@ browser.close()
 - `rust/allwright-surface-mobile-android`: publishable `mobile-android` surface crate
 - `rust/allwright-surface-mobile-ios`: publishable `mobile-ios` surface crate
 - `rust/allwright-surface-desktop`: shared desktop surface abstractions
-- `rust/allwright-surface-desktop-mac`: publishable `desktop-mac` surface crate
+- `rust/allwright-surface-desktop-mac`: runtime-loaded macOS plugin backed by a bundled XCUITest runner
 - `rust/allwright-surface-desktop-windows`: publishable `desktop-windows` surface crate
 - `rust/allwright-surface-desktop-linux`: publishable `desktop-linux` surface crate
 - `go/`: published Go client `allwright.dev` and Go playground
@@ -379,11 +417,11 @@ browser.close()
 ## Development Notes
 
 - The engine currently runs as a gRPC server.
-- The current implementation focus is browser automation, but the product direction is wider.
+- Web, Android, iOS, and macOS desktop runtimes are implemented; Windows, Linux, and API support remain future work.
 - Installing the `allwright` package is intended to deliver the CLI plus the lightweight engine core together.
 - The project should keep a single engine core even as surface modules become separately installable plugins.
-- The `web` surface plugin is now installable through the CLI via GitHub Release downloads and is loaded by the core engine at runtime.
-- The remaining surface plugins are still intentionally disabled as install targets until their runtime binaries exist.
+- The `web`, `mobile-android`, `mobile-ios`, and `desktop-mac` plugins are installed through GitHub Release downloads and loaded by core at runtime.
+- Desktop Windows and Linux remain disabled as install targets until their runtime binaries exist.
 - The Rust workspace version is synced from the release tag during GitHub release builds.
 - The browser control path is intended to stay driverless.
 - The repo uses shared proto contracts across all supported client stacks.
@@ -406,7 +444,7 @@ git tag vX.Y.Z
 git push origin vX.Y.Z
 ```
 
-That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds and uploads the current web plugin archives for:
+That tag triggers `.github/workflows/release-surface-plugins.yml`, which publishes clients and builds the current CLI and plugin archives:
 
 - `allwright.dev` Go module publish by creating `go/vX.Y.Z`, verifying the `go/` module, and warming `proxy.golang.org`
 - `allwright` publish to PyPI after syncing `python/pyproject.toml` from the tag
@@ -414,6 +452,9 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which builds 
 - `@allwright.dev/vitest` publish to npm after syncing `typescript/vitest/package.json` and its dependency on `@allwright.dev/core` from the tag
 - `allwright` CLI archives for the current OS matrix
 - `allwright-surface-web` plugin archives for the current OS matrix
+- `allwright-surface-mobile-android` plugin archives for the current OS matrix
+- `allwright-surface-mobile-ios` plugin archives with Simulator and physical-device XCUITest runners for both macOS architectures
+- `allwright-surface-desktop-mac` plugin archives with a macOS XCUITest runner for both macOS architectures
 - crates.io publish for every Rust core, CLI, and surface-plugin crate after syncing and verifying every crate version from the tag
 
 - Linux `x86_64-unknown-linux-gnu`

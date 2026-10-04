@@ -31,7 +31,7 @@ import dev.allwright.engine.v1.SaveMobileDownloadCommand;
 import dev.allwright.engine.v1.UploadFileChunkCommand;
 import dev.allwright.engine.v1.ReadFileChunkCommand;
 
-public final class AndroidApp implements HookContext {
+public class AndroidApp implements HookContext {
     private final RuntimeSupport.RuntimeClient runtime;
     private final String surfaceSessionId;
     private final String sessionId;

@@ -29,5 +29,6 @@ PATH="$bin_dir:$PATH" protoc \
   "$proto_root/core/v1/common.proto" \
   "$proto_root/core/v1/context.proto" \
   "$proto_root/engine/v1/engine.proto" \
+  "$proto_root/surfaces/desktop/v1/desktop.proto" \
   "$proto_root/surfaces/mobile/v1/mobile.proto" \
   "$proto_root/surfaces/web/v1/web.proto"

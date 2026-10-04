@@ -39,6 +39,7 @@ pub use hook::{
     FileChooserHook, Hook, HookType, NEW_PAGE, NewPage,
 };
 pub use launch::{chromium, firefox, launch_browser, launch_chrome, launch_firefox};
+pub use mobile::desktop;
 pub use runtime::{ping, set_server_addr, shutdown};
 pub use types::*;
 

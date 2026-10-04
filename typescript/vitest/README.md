@@ -1,7 +1,7 @@
 # @allwright.dev/vitest
 
 Vitest fixtures for allwright with Playwright-style `browser` and `page`
-injection, plus Android and iOS mobile fixtures for native and hybrid tests.
+injection, plus Android, iOS, and macOS app fixtures for native and hybrid tests.
 
 Wrap the Vitest configuration with `allwrightVitestConfig`. It starts Allwright once before workers run and shuts it down once after the complete test run. Existing user global setup files remain supported and run after Allwright starts, then tear down before Allwright stops.
 
@@ -39,6 +39,10 @@ test("opens an Android app", async ({ androidApp }) => {
 
 test("opens an iOS app", async ({ iosApp }) => {
   await iosApp.getByRole("button", { name: "Login", exact: true }).click();
+});
+
+test("opens a macOS app", async ({ macosApp }) => {
+  await macosApp.getByRole("button", { name: "New Document", exact: true }).click();
 });
 ```
 
@@ -140,11 +144,34 @@ test("logs in", async ({ iosApp }) => {
 });
 ```
 
+macOS apps use an installed application bundle identifier. The fixture starts
+the bundled desktop XCUITest runner and launches the configured app lazily:
+
+```yaml
+# allwright.config.yaml
+desktop:
+  mac:
+    app:
+      id: com.apple.TextEdit
+```
+
+```ts
+import { expect, test } from "@allwright.dev/vitest";
+
+test("opens a document window", async ({ macosApp }) => {
+  await macosApp.getByRole("button", { name: "New Document", exact: true }).click();
+  await expect(macosApp.getByRole("textField")).toBeVisible();
+});
+```
+
+Use `ALLWRIGHT_MAC_AGENT_ENDPOINT` for an external agent or
+`ALLWRIGHT_MAC_APP_ID` to override the configured bundle identifier.
+
 Fixtures are lazy on first use. Injecting `browser`, `page`, `android`,
-`androidApp`, `ios`, or `iosApp` does not launch or connect immediately; the
-underlying session is created only when the test first performs an action
-through that fixture. Sync metadata properties are only available after the
-lazy fixture has been realized by a prior awaited call.
+`androidApp`, `ios`, `iosApp`, `macos`, or `macosApp` does not launch or connect
+immediately; the underlying session is created only when the test first
+performs an action through that fixture. Sync metadata properties are only
+available after the lazy fixture has been realized by a prior awaited call.
 
 Available fixtures:
 
@@ -154,11 +181,14 @@ Available fixtures:
 - `androidApp`: launched Android app page
 - `ios`: connected iOS device session
 - `iosApp`: launched iOS app page
+- `macos`: connected macOS desktop session
+- `macosApp`: launched macOS app page
 
 `androidApp` launches using `allwright.android.launchOptions` first, then falls back to `config.mobile.android`.
 `iosApp` does the same with `allwright.ios.launchOptions` and `config.mobile.ios`.
+`macosApp` does the same with `allwright.macos.launchOptions` and `config.desktop.mac`.
 
-Android and iOS apps and locators support the mobile action and expectation
+Android, iOS, and macOS apps and locators support the native action and expectation
 subset: `click`, `count`, `focus`, `fill`, `press`, `textContent`, `innerText`,
 `waitForSelector`, and `screenshot`. Mobile expectations provide `toHaveText`,
 `toContainText`, `toHaveCount`, and `toBeVisible` with the same retry controls

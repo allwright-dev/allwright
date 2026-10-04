@@ -32,6 +32,8 @@ type SurfaceSessionCommand struct {
 	//	*SurfaceSessionCommand_LaunchBrowser
 	//	*SurfaceSessionCommand_ConnectMobile
 	//	*SurfaceSessionCommand_LaunchApp
+	//	*SurfaceSessionCommand_ConnectDesktop
+	//	*SurfaceSessionCommand_LaunchDesktopApp
 	Command       isSurfaceSessionCommand_Command `protobuf_oneof:"command"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -137,6 +139,24 @@ func (x *SurfaceSessionCommand) GetLaunchApp() *LaunchAppCommand {
 	return nil
 }
 
+func (x *SurfaceSessionCommand) GetConnectDesktop() *ConnectDesktopCommand {
+	if x != nil {
+		if x, ok := x.Command.(*SurfaceSessionCommand_ConnectDesktop); ok {
+			return x.ConnectDesktop
+		}
+	}
+	return nil
+}
+
+func (x *SurfaceSessionCommand) GetLaunchDesktopApp() *LaunchDesktopAppCommand {
+	if x != nil {
+		if x, ok := x.Command.(*SurfaceSessionCommand_LaunchDesktopApp); ok {
+			return x.LaunchDesktopApp
+		}
+	}
+	return nil
+}
+
 type isSurfaceSessionCommand_Command interface {
 	isSurfaceSessionCommand_Command()
 }
@@ -169,6 +189,14 @@ type SurfaceSessionCommand_LaunchApp struct {
 	LaunchApp *LaunchAppCommand `protobuf:"bytes,7,opt,name=launch_app,json=launchApp,proto3,oneof"`
 }
 
+type SurfaceSessionCommand_ConnectDesktop struct {
+	ConnectDesktop *ConnectDesktopCommand `protobuf:"bytes,8,opt,name=connect_desktop,json=connectDesktop,proto3,oneof"`
+}
+
+type SurfaceSessionCommand_LaunchDesktopApp struct {
+	LaunchDesktopApp *LaunchDesktopAppCommand `protobuf:"bytes,9,opt,name=launch_desktop_app,json=launchDesktopApp,proto3,oneof"`
+}
+
 func (*SurfaceSessionCommand_LaunchChrome) isSurfaceSessionCommand_Command() {}
 
 func (*SurfaceSessionCommand_OpenContext) isSurfaceSessionCommand_Command() {}
@@ -182,6 +210,10 @@ func (*SurfaceSessionCommand_LaunchBrowser) isSurfaceSessionCommand_Command() {}
 func (*SurfaceSessionCommand_ConnectMobile) isSurfaceSessionCommand_Command() {}
 
 func (*SurfaceSessionCommand_LaunchApp) isSurfaceSessionCommand_Command() {}
+
+func (*SurfaceSessionCommand_ConnectDesktop) isSurfaceSessionCommand_Command() {}
+
+func (*SurfaceSessionCommand_LaunchDesktopApp) isSurfaceSessionCommand_Command() {}
 
 type OpenContextCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -320,6 +352,8 @@ type SurfaceSessionEvent struct {
 	//	*SurfaceSessionEvent_BrowserLaunched
 	//	*SurfaceSessionEvent_MobileConnected
 	//	*SurfaceSessionEvent_AppLaunched
+	//	*SurfaceSessionEvent_DesktopConnected
+	//	*SurfaceSessionEvent_DesktopAppLaunched
 	Event         isSurfaceSessionEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -441,6 +475,24 @@ func (x *SurfaceSessionEvent) GetAppLaunched() *AppLaunchedEvent {
 	return nil
 }
 
+func (x *SurfaceSessionEvent) GetDesktopConnected() *DesktopConnectedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*SurfaceSessionEvent_DesktopConnected); ok {
+			return x.DesktopConnected
+		}
+	}
+	return nil
+}
+
+func (x *SurfaceSessionEvent) GetDesktopAppLaunched() *DesktopAppLaunchedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*SurfaceSessionEvent_DesktopAppLaunched); ok {
+			return x.DesktopAppLaunched
+		}
+	}
+	return nil
+}
+
 type isSurfaceSessionEvent_Event interface {
 	isSurfaceSessionEvent_Event()
 }
@@ -477,6 +529,14 @@ type SurfaceSessionEvent_AppLaunched struct {
 	AppLaunched *AppLaunchedEvent `protobuf:"bytes,9,opt,name=app_launched,json=appLaunched,proto3,oneof"`
 }
 
+type SurfaceSessionEvent_DesktopConnected struct {
+	DesktopConnected *DesktopConnectedEvent `protobuf:"bytes,10,opt,name=desktop_connected,json=desktopConnected,proto3,oneof"`
+}
+
+type SurfaceSessionEvent_DesktopAppLaunched struct {
+	DesktopAppLaunched *DesktopAppLaunchedEvent `protobuf:"bytes,11,opt,name=desktop_app_launched,json=desktopAppLaunched,proto3,oneof"`
+}
+
 func (*SurfaceSessionEvent_ChromeLaunched) isSurfaceSessionEvent_Event() {}
 
 func (*SurfaceSessionEvent_ContextOpened) isSurfaceSessionEvent_Event() {}
@@ -492,6 +552,10 @@ func (*SurfaceSessionEvent_BrowserLaunched) isSurfaceSessionEvent_Event() {}
 func (*SurfaceSessionEvent_MobileConnected) isSurfaceSessionEvent_Event() {}
 
 func (*SurfaceSessionEvent_AppLaunched) isSurfaceSessionEvent_Event() {}
+
+func (*SurfaceSessionEvent_DesktopConnected) isSurfaceSessionEvent_Event() {}
+
+func (*SurfaceSessionEvent_DesktopAppLaunched) isSurfaceSessionEvent_Event() {}
 
 type ContextOpenedEvent struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
@@ -681,7 +745,7 @@ var File_core_v1_surface_proto protoreflect.FileDescriptor
 
 const file_core_v1_surface_proto_rawDesc = "" +
 	"\n" +
-	"\x15core/v1/surface.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x1fsurfaces/mobile/v1/mobile.proto\x1a\x19surfaces/web/v1/web.proto\"\xb9\x04\n" +
+	"\x15core/v1/surface.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a!surfaces/desktop/v1/desktop.proto\x1a\x1fsurfaces/mobile/v1/mobile.proto\x1a\x19surfaces/web/v1/web.proto\"\xee\x05\n" +
 	"\x15SurfaceSessionCommand\x12O\n" +
 	"\rlaunch_chrome\x18\x01 \x01(\v2(.allwright.engine.v1.LaunchChromeCommandH\x00R\flaunchChrome\x12L\n" +
 	"\fopen_context\x18\x02 \x01(\v2'.allwright.engine.v1.OpenContextCommandH\x00R\vopenContext\x12=\n" +
@@ -690,14 +754,16 @@ const file_core_v1_surface_proto_rawDesc = "" +
 	"\x0elaunch_browser\x18\x05 \x01(\v2).allwright.engine.v1.LaunchBrowserCommandH\x00R\rlaunchBrowser\x12R\n" +
 	"\x0econnect_mobile\x18\x06 \x01(\v2).allwright.engine.v1.ConnectMobileCommandH\x00R\rconnectMobile\x12F\n" +
 	"\n" +
-	"launch_app\x18\a \x01(\v2%.allwright.engine.v1.LaunchAppCommandH\x00R\tlaunchAppB\t\n" +
+	"launch_app\x18\a \x01(\v2%.allwright.engine.v1.LaunchAppCommandH\x00R\tlaunchApp\x12U\n" +
+	"\x0fconnect_desktop\x18\b \x01(\v2*.allwright.engine.v1.ConnectDesktopCommandH\x00R\x0econnectDesktop\x12\\\n" +
+	"\x12launch_desktop_app\x18\t \x01(\v2,.allwright.engine.v1.LaunchDesktopAppCommandH\x00R\x10launchDesktopAppB\t\n" +
 	"\acommand\"z\n" +
 	"\x12OpenContextCommand\x12R\n" +
 	"\rretry_options\x18\x01 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
 	"\x0e_retry_options\".\n" +
 	"\x12SessionPingCommand\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"\x1c\n" +
-	"\x1aCloseSurfaceSessionCommand\"\xae\x05\n" +
+	"\x1aCloseSurfaceSessionCommand\"\xeb\x06\n" +
 	"\x13SurfaceSessionEvent\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12S\n" +
@@ -708,7 +774,10 @@ const file_core_v1_surface_proto_rawDesc = "" +
 	"\x05error\x18\x06 \x01(\v2-.allwright.engine.v1.SurfaceSessionErrorEventH\x00R\x05error\x12V\n" +
 	"\x10browser_launched\x18\a \x01(\v2).allwright.engine.v1.BrowserLaunchedEventH\x00R\x0fbrowserLaunched\x12V\n" +
 	"\x10mobile_connected\x18\b \x01(\v2).allwright.engine.v1.MobileConnectedEventH\x00R\x0fmobileConnected\x12J\n" +
-	"\fapp_launched\x18\t \x01(\v2%.allwright.engine.v1.AppLaunchedEventH\x00R\vappLaunchedB\a\n" +
+	"\fapp_launched\x18\t \x01(\v2%.allwright.engine.v1.AppLaunchedEventH\x00R\vappLaunched\x12Y\n" +
+	"\x11desktop_connected\x18\n" +
+	" \x01(\v2*.allwright.engine.v1.DesktopConnectedEventH\x00R\x10desktopConnected\x12`\n" +
+	"\x14desktop_app_launched\x18\v \x01(\v2,.allwright.engine.v1.DesktopAppLaunchedEventH\x00R\x12desktopAppLaunchedB\a\n" +
 	"\x05event\"V\n" +
 	"\x12ContextOpenedEvent\x12,\n" +
 	"\x12context_session_id\x18\x01 \x01(\tR\x10contextSessionId\x12\x12\n" +
@@ -748,11 +817,15 @@ var file_core_v1_surface_proto_goTypes = []any{
 	(*LaunchBrowserCommand)(nil),       // 10: allwright.engine.v1.LaunchBrowserCommand
 	(*ConnectMobileCommand)(nil),       // 11: allwright.engine.v1.ConnectMobileCommand
 	(*LaunchAppCommand)(nil),           // 12: allwright.engine.v1.LaunchAppCommand
-	(*CommandRetryOptions)(nil),        // 13: allwright.engine.v1.CommandRetryOptions
-	(*ChromeLaunchedEvent)(nil),        // 14: allwright.engine.v1.ChromeLaunchedEvent
-	(*BrowserLaunchedEvent)(nil),       // 15: allwright.engine.v1.BrowserLaunchedEvent
-	(*MobileConnectedEvent)(nil),       // 16: allwright.engine.v1.MobileConnectedEvent
-	(*AppLaunchedEvent)(nil),           // 17: allwright.engine.v1.AppLaunchedEvent
+	(*ConnectDesktopCommand)(nil),      // 13: allwright.engine.v1.ConnectDesktopCommand
+	(*LaunchDesktopAppCommand)(nil),    // 14: allwright.engine.v1.LaunchDesktopAppCommand
+	(*CommandRetryOptions)(nil),        // 15: allwright.engine.v1.CommandRetryOptions
+	(*ChromeLaunchedEvent)(nil),        // 16: allwright.engine.v1.ChromeLaunchedEvent
+	(*BrowserLaunchedEvent)(nil),       // 17: allwright.engine.v1.BrowserLaunchedEvent
+	(*MobileConnectedEvent)(nil),       // 18: allwright.engine.v1.MobileConnectedEvent
+	(*AppLaunchedEvent)(nil),           // 19: allwright.engine.v1.AppLaunchedEvent
+	(*DesktopConnectedEvent)(nil),      // 20: allwright.engine.v1.DesktopConnectedEvent
+	(*DesktopAppLaunchedEvent)(nil),    // 21: allwright.engine.v1.DesktopAppLaunchedEvent
 }
 var file_core_v1_surface_proto_depIdxs = []int32{
 	9,  // 0: allwright.engine.v1.SurfaceSessionCommand.launch_chrome:type_name -> allwright.engine.v1.LaunchChromeCommand
@@ -762,20 +835,24 @@ var file_core_v1_surface_proto_depIdxs = []int32{
 	10, // 4: allwright.engine.v1.SurfaceSessionCommand.launch_browser:type_name -> allwright.engine.v1.LaunchBrowserCommand
 	11, // 5: allwright.engine.v1.SurfaceSessionCommand.connect_mobile:type_name -> allwright.engine.v1.ConnectMobileCommand
 	12, // 6: allwright.engine.v1.SurfaceSessionCommand.launch_app:type_name -> allwright.engine.v1.LaunchAppCommand
-	13, // 7: allwright.engine.v1.OpenContextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	14, // 8: allwright.engine.v1.SurfaceSessionEvent.chrome_launched:type_name -> allwright.engine.v1.ChromeLaunchedEvent
-	5,  // 9: allwright.engine.v1.SurfaceSessionEvent.context_opened:type_name -> allwright.engine.v1.ContextOpenedEvent
-	6,  // 10: allwright.engine.v1.SurfaceSessionEvent.pong:type_name -> allwright.engine.v1.SessionPongEvent
-	7,  // 11: allwright.engine.v1.SurfaceSessionEvent.closed:type_name -> allwright.engine.v1.SurfaceSessionClosedEvent
-	8,  // 12: allwright.engine.v1.SurfaceSessionEvent.error:type_name -> allwright.engine.v1.SurfaceSessionErrorEvent
-	15, // 13: allwright.engine.v1.SurfaceSessionEvent.browser_launched:type_name -> allwright.engine.v1.BrowserLaunchedEvent
-	16, // 14: allwright.engine.v1.SurfaceSessionEvent.mobile_connected:type_name -> allwright.engine.v1.MobileConnectedEvent
-	17, // 15: allwright.engine.v1.SurfaceSessionEvent.app_launched:type_name -> allwright.engine.v1.AppLaunchedEvent
-	16, // [16:16] is the sub-list for method output_type
-	16, // [16:16] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	13, // 7: allwright.engine.v1.SurfaceSessionCommand.connect_desktop:type_name -> allwright.engine.v1.ConnectDesktopCommand
+	14, // 8: allwright.engine.v1.SurfaceSessionCommand.launch_desktop_app:type_name -> allwright.engine.v1.LaunchDesktopAppCommand
+	15, // 9: allwright.engine.v1.OpenContextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	16, // 10: allwright.engine.v1.SurfaceSessionEvent.chrome_launched:type_name -> allwright.engine.v1.ChromeLaunchedEvent
+	5,  // 11: allwright.engine.v1.SurfaceSessionEvent.context_opened:type_name -> allwright.engine.v1.ContextOpenedEvent
+	6,  // 12: allwright.engine.v1.SurfaceSessionEvent.pong:type_name -> allwright.engine.v1.SessionPongEvent
+	7,  // 13: allwright.engine.v1.SurfaceSessionEvent.closed:type_name -> allwright.engine.v1.SurfaceSessionClosedEvent
+	8,  // 14: allwright.engine.v1.SurfaceSessionEvent.error:type_name -> allwright.engine.v1.SurfaceSessionErrorEvent
+	17, // 15: allwright.engine.v1.SurfaceSessionEvent.browser_launched:type_name -> allwright.engine.v1.BrowserLaunchedEvent
+	18, // 16: allwright.engine.v1.SurfaceSessionEvent.mobile_connected:type_name -> allwright.engine.v1.MobileConnectedEvent
+	19, // 17: allwright.engine.v1.SurfaceSessionEvent.app_launched:type_name -> allwright.engine.v1.AppLaunchedEvent
+	20, // 18: allwright.engine.v1.SurfaceSessionEvent.desktop_connected:type_name -> allwright.engine.v1.DesktopConnectedEvent
+	21, // 19: allwright.engine.v1.SurfaceSessionEvent.desktop_app_launched:type_name -> allwright.engine.v1.DesktopAppLaunchedEvent
+	20, // [20:20] is the sub-list for method output_type
+	20, // [20:20] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_core_v1_surface_proto_init() }
@@ -784,6 +861,7 @@ func file_core_v1_surface_proto_init() {
 		return
 	}
 	file_core_v1_common_proto_init()
+	file_surfaces_desktop_v1_desktop_proto_init()
 	file_surfaces_mobile_v1_mobile_proto_init()
 	file_surfaces_web_v1_web_proto_init()
 	file_core_v1_surface_proto_msgTypes[0].OneofWrappers = []any{
@@ -794,6 +872,8 @@ func file_core_v1_surface_proto_init() {
 		(*SurfaceSessionCommand_LaunchBrowser)(nil),
 		(*SurfaceSessionCommand_ConnectMobile)(nil),
 		(*SurfaceSessionCommand_LaunchApp)(nil),
+		(*SurfaceSessionCommand_ConnectDesktop)(nil),
+		(*SurfaceSessionCommand_LaunchDesktopApp)(nil),
 	}
 	file_core_v1_surface_proto_msgTypes[1].OneofWrappers = []any{}
 	file_core_v1_surface_proto_msgTypes[4].OneofWrappers = []any{
@@ -805,6 +885,8 @@ func file_core_v1_surface_proto_init() {
 		(*SurfaceSessionEvent_BrowserLaunched)(nil),
 		(*SurfaceSessionEvent_MobileConnected)(nil),
 		(*SurfaceSessionEvent_AppLaunched)(nil),
+		(*SurfaceSessionEvent_DesktopConnected)(nil),
+		(*SurfaceSessionEvent_DesktopAppLaunched)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

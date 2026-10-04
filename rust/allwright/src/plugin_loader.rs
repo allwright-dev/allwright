@@ -5,6 +5,12 @@ use allwright_plugin_sdk::{
     HighlightElementsInfo, HoverInfo, PageInfo, PageSessionHandle, PluginCommand, PluginEnvelope,
     PluginResult, PressKeyInfo, ScreenshotInfo, TabNavigationInfo, TextInfo, WaitForSelectorInfo,
 };
+use allwright_surface_desktop::{
+    ConnectOptions as DesktopConnectOptions, DesktopActionInfo, DesktopAppInfo,
+    DesktopAppSessionHandle, DesktopCommand, DesktopCommandResult, DesktopConnectInfo,
+    DesktopElementCountInfo, DesktopScreenshotInfo, DesktopSessionHandle, DesktopTextInfo,
+    DesktopWaitInfo, LaunchOptions as DesktopLaunchOptions,
+};
 use allwright_surface_mobile::{
     ConnectOptions as MobileConnectOptions, MobileBrowserSessionHandle, MobileClickInfo,
     MobileCommand, MobileCommandResult, MobileConnectInfo, MobileDownloadSavedInfo,
@@ -19,6 +25,224 @@ struct MobilePluginEnvelope {
     ok: bool,
     result: Option<MobileCommandResult>,
     error: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct DesktopPluginEnvelope {
+    ok: bool,
+    result: Option<DesktopCommandResult>,
+    error: Option<String>,
+}
+
+fn invoke_desktop(command: DesktopCommand) -> Result<DesktopCommandResult, String> {
+    let request_json = serde_json::to_string(&command)
+        .map_err(|error| format!("failed to encode desktop plugin request: {error}"))?;
+    let response_json = invoke_plugin("desktop-mac", &request_json)?;
+    let envelope: DesktopPluginEnvelope = serde_json::from_str(&response_json)
+        .map_err(|error| format!("failed to decode desktop plugin response: {error}"))?;
+    if envelope.ok {
+        envelope
+            .result
+            .ok_or_else(|| "desktop plugin returned success without a result payload".to_string())
+    } else {
+        Err(envelope
+            .error
+            .unwrap_or_else(|| "desktop plugin returned an unknown error".to_string()))
+    }
+}
+
+async fn invoke_desktop_expected(command: DesktopCommand) -> Result<DesktopCommandResult, String> {
+    tokio::task::block_in_place(move || invoke_desktop(command))
+}
+
+pub async fn connect_desktop(options: DesktopConnectOptions) -> Result<DesktopConnectInfo, String> {
+    match invoke_desktop_expected(DesktopCommand::Connect(options)).await? {
+        DesktopCommandResult::Connect(result) => Ok(result),
+        _ => Err("desktop plugin returned an unexpected connect response".to_string()),
+    }
+}
+
+pub async fn launch_desktop_app(
+    desktop_session: &DesktopSessionHandle,
+    options: DesktopLaunchOptions,
+) -> Result<DesktopAppInfo, String> {
+    match invoke_desktop_expected(DesktopCommand::LaunchApp {
+        desktop_session: desktop_session.clone(),
+        options,
+    })
+    .await?
+    {
+        DesktopCommandResult::LaunchApp(result) => Ok(result),
+        _ => Err("desktop plugin returned an unexpected launch response".to_string()),
+    }
+}
+
+pub async fn close_desktop_app(
+    desktop_session: &DesktopSessionHandle,
+    app_session: &DesktopAppSessionHandle,
+) -> Result<(), String> {
+    match invoke_desktop_expected(DesktopCommand::CloseApp {
+        desktop_session: desktop_session.clone(),
+        app_session: app_session.clone(),
+    })
+    .await?
+    {
+        DesktopCommandResult::CloseApp => Ok(()),
+        _ => Err("desktop plugin returned an unexpected close response".to_string()),
+    }
+}
+
+macro_rules! desktop_operation {
+    ($name:ident, $variant:ident, $result:ident, $output:ty) => {
+        pub async fn $name(
+            desktop_session: &DesktopSessionHandle,
+            app_session: &DesktopAppSessionHandle,
+            selector: &str,
+            timeout_ms: Option<u32>,
+        ) -> Result<$output, String> {
+            match invoke_desktop_expected(DesktopCommand::$variant {
+                desktop_session: desktop_session.clone(),
+                app_session: app_session.clone(),
+                selector: selector.to_string(),
+                timeout_ms,
+            })
+            .await?
+            {
+                DesktopCommandResult::$result(value) => Ok(value),
+                _ => Err(format!(
+                    "desktop plugin returned an unexpected {} response",
+                    stringify!($variant)
+                )),
+            }
+        }
+    };
+}
+
+desktop_operation!(
+    click_desktop_element,
+    ClickElement,
+    ClickElement,
+    DesktopActionInfo
+);
+desktop_operation!(
+    count_desktop_elements,
+    CountElements,
+    CountElements,
+    DesktopElementCountInfo
+);
+desktop_operation!(
+    focus_desktop_element,
+    FocusElement,
+    FocusElement,
+    DesktopActionInfo
+);
+desktop_operation!(get_desktop_text, GetText, GetText, DesktopTextInfo);
+desktop_operation!(
+    get_desktop_inner_text,
+    GetInnerText,
+    GetInnerText,
+    DesktopTextInfo
+);
+
+pub async fn fill_desktop_element(
+    desktop_session: &DesktopSessionHandle,
+    app_session: &DesktopAppSessionHandle,
+    selector: &str,
+    value: &str,
+    timeout_ms: Option<u32>,
+) -> Result<DesktopActionInfo, String> {
+    match invoke_desktop_expected(DesktopCommand::FillElement {
+        desktop_session: desktop_session.clone(),
+        app_session: app_session.clone(),
+        selector: selector.to_string(),
+        value: value.to_string(),
+        timeout_ms,
+    })
+    .await?
+    {
+        DesktopCommandResult::FillElement(value) => Ok(value),
+        _ => Err("desktop plugin returned an unexpected fill response".to_string()),
+    }
+}
+
+pub async fn press_desktop_key(
+    desktop_session: &DesktopSessionHandle,
+    app_session: &DesktopAppSessionHandle,
+    selector: &str,
+    key: &str,
+    text: Option<&str>,
+    timeout_ms: Option<u32>,
+) -> Result<DesktopActionInfo, String> {
+    match invoke_desktop_expected(DesktopCommand::PressKey {
+        desktop_session: desktop_session.clone(),
+        app_session: app_session.clone(),
+        selector: selector.to_string(),
+        key: key.to_string(),
+        text: text.map(str::to_string),
+        timeout_ms,
+    })
+    .await?
+    {
+        DesktopCommandResult::PressKey(value) => Ok(value),
+        _ => Err("desktop plugin returned an unexpected press response".to_string()),
+    }
+}
+
+pub async fn wait_for_desktop_selector(
+    desktop_session: &DesktopSessionHandle,
+    app_session: &DesktopAppSessionHandle,
+    selector: &str,
+    visible: bool,
+    timeout_ms: Option<u32>,
+) -> Result<DesktopWaitInfo, String> {
+    match invoke_desktop_expected(DesktopCommand::WaitForSelector {
+        desktop_session: desktop_session.clone(),
+        app_session: app_session.clone(),
+        selector: selector.to_string(),
+        visible,
+        timeout_ms,
+    })
+    .await?
+    {
+        DesktopCommandResult::WaitForSelector(value) => Ok(value),
+        _ => Err("desktop plugin returned an unexpected wait response".to_string()),
+    }
+}
+
+pub async fn screenshot_desktop(
+    desktop_session: &DesktopSessionHandle,
+    app_session: &DesktopAppSessionHandle,
+    timeout_ms: Option<u32>,
+) -> Result<DesktopScreenshotInfo, String> {
+    match invoke_desktop_expected(DesktopCommand::Screenshot {
+        desktop_session: desktop_session.clone(),
+        app_session: app_session.clone(),
+        timeout_ms,
+    })
+    .await?
+    {
+        DesktopCommandResult::Screenshot(value) => Ok(value),
+        _ => Err("desktop plugin returned an unexpected screenshot response".to_string()),
+    }
+}
+
+pub async fn accessibility_snapshot_desktop(
+    desktop_session: &DesktopSessionHandle,
+    app_session: &DesktopAppSessionHandle,
+    format: &str,
+    mode: &str,
+) -> Result<allwright_plugin_sdk::AccessibilitySnapshotInfo, String> {
+    match invoke_desktop_expected(DesktopCommand::AccessibilitySnapshot {
+        desktop_session: desktop_session.clone(),
+        app_session: app_session.clone(),
+        format: format.to_string(),
+        mode: mode.to_string(),
+    })
+    .await?
+    {
+        DesktopCommandResult::AccessibilitySnapshot(value) => Ok(value),
+        _ => Err("desktop plugin returned an unexpected accessibility response".to_string()),
+    }
 }
 
 fn invoke_web(command: PluginCommand) -> Result<PluginResult, String> {

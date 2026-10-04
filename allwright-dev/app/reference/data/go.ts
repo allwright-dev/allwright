@@ -397,6 +397,36 @@ export const goReference: LanguageReference = {
       ],
     },
     {
+      slug: "desktop",
+      title: "Desktop",
+      description: "Native macOS application automation through the installable desktop-mac XCUITest plugin. Windows and Linux are not available yet.",
+      members: [
+        {
+          name: "Desktop.Mac.Connect",
+          kind: "method",
+          signature: "func (MacSurface) Connect(ctx context.Context, options DesktopMacConnectOptions) (*MacDesktop, error)",
+          description: "Connects to the local macOS desktop and starts the bundled XCUITest runner automatically. Requires macOS 14 or newer, Xcode, and UI automation permission for the process running Xcode.",
+          since: "v0.1.21",
+          example: "mac, err := allwright.Desktop.Mac.Connect(ctx, allwright.DesktopMacConnectOptions{})",
+        },
+        {
+          name: "MacDesktop.Launch",
+          kind: "method",
+          signature: "func (d *MacDesktop) Launch(ctx context.Context, options DesktopMacLaunchOptions) (*MacApp, error)",
+          description: "Launches an installed macOS application by bundle identifier. The returned app supports native locators, actions, text reads, waits, screenshots, and accessibility snapshots.",
+          since: "v0.1.21",
+          example: 'app, err := mac.Launch(ctx, allwright.DesktopMacLaunchOptions{AppID: "com.apple.TextEdit"})',
+        },
+        {
+          name: "MacApp locators and actions",
+          kind: "method",
+          signature: "func (p *MacApp) Locator(selector string) *MacLocator\nfunc (p *MacApp) GetByRole(role string, options ...RoleOptions) *MacLocator",
+          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include Click, Fill, Focus, Press, Count, TextContent, InnerText, WaitForSelector, Screenshot, and AccessibilitySnapshot.",
+          since: "v0.1.21",
+        },
+      ],
+    },
+    {
       slug: "config",
       title: "Config",
       description:

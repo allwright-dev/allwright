@@ -2,6 +2,7 @@ import { BrowserImpl, BrowserTypeImpl } from "./browser.js";
 import { formatActionError } from "./errors.js";
 import { findConfigFile, loadConfigFile, resolveConfig } from "./config.js";
 import { mobile } from "./mobile.js";
+import { desktop } from "./desktop.js";
 import { PageImpl } from "./page.js";
 import {
   createBrowserSessionHandle,
@@ -18,6 +19,7 @@ import type {
   BrowserType,
   LaunchOptions,
   MobileSurfaceNamespace,
+  DesktopSurfaceNamespace,
   Page,
   Dialog,
   FileChooser,
@@ -64,6 +66,12 @@ export type {
   Locator,
   LocatorInfo,
   MobileSurfaceNamespace,
+  DesktopMacApp,
+  DesktopMacConnectOptions,
+  DesktopMacDesktop,
+  DesktopMacLaunchOptions,
+  DesktopMacLocator,
+  DesktopSurfaceNamespace,
   NavigateResult,
   Page,
   PageInfo,
@@ -88,6 +96,7 @@ export const hooks = {
   download: Object.freeze({ name: "download" }) as HookType<Download>,
 };
 export { mobile };
+export { desktop };
 
 export type Tab = Page;
 

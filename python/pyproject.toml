@@ -22,5 +22,7 @@ packages = ["allwright"]
 allwright = [
   "proto/core/v1/*.proto",
   "proto/engine/v1/*.proto",
+  "proto/surfaces/desktop/v1/*.proto",
+  "proto/surfaces/mobile/v1/*.proto",
   "proto/surfaces/web/v1/*.proto",
 ]

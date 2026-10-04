@@ -737,6 +737,7 @@ fn plugin_library_filename(plugin_id: &str) -> Result<&'static str> {
         ("mobile-android", "linux") => Ok("liballwright_surface_mobile_android.so"),
         ("mobile-android", "windows") => Ok("allwright_surface_mobile_android.dll"),
         ("mobile-ios", "macos") => Ok("liballwright_surface_mobile_ios.dylib"),
+        ("desktop-mac", "macos") => Ok("liballwright_surface_desktop_mac.dylib"),
         _ => Err(Error::new(format!(
             "automatic install is not supported for allwright plugin `{plugin_id}` on {}",
             env::consts::OS

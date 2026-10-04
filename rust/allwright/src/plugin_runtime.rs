@@ -284,6 +284,7 @@ fn install_plugin_package(
     })?;
 
     if plugin_id != "mobile-ios"
+        && plugin_id != "desktop-mac"
         && let Some(local_artifact) = repo_local_plugin_artifact_path(plugin_id, version)
     {
         println!(
@@ -326,6 +327,11 @@ fn install_plugin_package(
             "downloaded plugin `mobile-ios` from {package_name}@{version} but its bundled XCUITest runner is incomplete"
         ));
     }
+    if plugin_id == "desktop-mac" && !bundled_mac_agent_is_complete(&install_root) {
+        return Err(format!(
+            "downloaded plugin `desktop-mac` from {package_name}@{version} but its bundled XCUITest runner is incomplete"
+        ));
+    }
     println!("Verified runtime artifact `{runtime_artifact}`.");
     Ok(())
 }
@@ -334,11 +340,36 @@ fn plugin_install_is_complete(plugin_id: &str, runtime_artifact: &Path) -> bool 
     if !runtime_artifact.is_file() {
         return false;
     }
-    plugin_id != "mobile-ios"
-        || runtime_artifact
-            .parent()
-            .and_then(Path::parent)
-            .is_some_and(bundled_ios_agent_is_complete)
+    let Some(install_root) = runtime_artifact.parent().and_then(Path::parent) else {
+        return false;
+    };
+    match plugin_id {
+        "mobile-ios" => bundled_ios_agent_is_complete(install_root),
+        "desktop-mac" => bundled_mac_agent_is_complete(install_root),
+        _ => true,
+    }
+}
+
+fn bundled_mac_agent_is_complete(install_root: &Path) -> bool {
+    let agent_root = install_root.join("agent");
+    let has_xctestrun = fs::read_dir(&agent_root)
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .any(|entry| {
+            entry
+                .path()
+                .extension()
+                .is_some_and(|value| value == "xctestrun")
+        });
+    let has_runner = agent_root
+        .join("Release/AllwrightAgentUITests-Runner.app")
+        .is_dir();
+    let has_entitlements = agent_root
+        .join("AllwrightAgentUITests.mac-runtime.entitlements")
+        .is_file();
+    has_xctestrun && has_runner && has_entitlements
 }
 
 fn bundled_ios_agent_is_complete(install_root: &Path) -> bool {
@@ -653,9 +684,9 @@ fn repo_local_plugin_artifact_path(plugin_id: &str, version: &str) -> Option<Pat
 
 fn ensure_plugin_install_supported(plugin_id: &str) -> Result<(), String> {
     match (plugin_id, env::consts::OS) {
-        ("web" | "mobile-android", _) | ("mobile-ios", "macos") => Ok(()),
+        ("web" | "mobile-android", _) | ("mobile-ios" | "desktop-mac", "macos") => Ok(()),
         _ => Err(format!(
-            "plugin `{plugin_id}` is not installable on this platform. Runtime artifacts ship for `web`, `mobile-android`, and `mobile-ios` on macOS."
+            "plugin `{plugin_id}` is not installable on this platform. Runtime artifacts ship for `web`, `mobile-android`, `mobile-ios`, and `desktop-mac` on macOS."
         )),
     }
 }
@@ -690,6 +721,7 @@ fn plugin_runtime_artifact_stem(plugin_id: &str) -> Result<&'static str, String>
         "web" => Ok("allwright-surface-web"),
         "mobile-android" => Ok("allwright-surface-mobile-android"),
         "mobile-ios" => Ok("allwright-surface-mobile-ios"),
+        "desktop-mac" => Ok("allwright-surface-desktop-mac"),
         _ => Err(format!(
             "automatic install is not supported for allwright plugin `{plugin_id}`"
         )),
@@ -745,6 +777,35 @@ mod tests {
         fs::write(device.join("AllwrightIOSAgent.xctestrun"), b"plist").unwrap();
         fs::create_dir(device_products.join("AllwrightAgentUITests-Runner.app")).unwrap();
         assert!(bundled_ios_agent_is_complete(&root));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn mac_install_requires_xctestrun_runner_and_signing_entitlements() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = env::temp_dir().join(format!(
+            "allwright-mac-install-test-{}-{unique}",
+            std::process::id()
+        ));
+        let agent = root.join("agent");
+        let products = agent.join("Release");
+        fs::create_dir_all(&products).unwrap();
+
+        assert!(!bundled_mac_agent_is_complete(&root));
+        fs::write(agent.join("AllwrightMacAgent.xctestrun"), b"plist").unwrap();
+        assert!(!bundled_mac_agent_is_complete(&root));
+        fs::create_dir(products.join("AllwrightAgentUITests-Runner.app")).unwrap();
+        assert!(!bundled_mac_agent_is_complete(&root));
+        fs::write(
+            agent.join("AllwrightAgentUITests.mac-runtime.entitlements"),
+            b"plist",
+        )
+        .unwrap();
+        assert!(bundled_mac_agent_is_complete(&root));
 
         fs::remove_dir_all(root).unwrap();
     }

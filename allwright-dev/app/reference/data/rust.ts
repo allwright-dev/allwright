@@ -403,6 +403,36 @@ export const rustReference: LanguageReference = {
       ],
     },
     {
+      slug: "desktop",
+      title: "Desktop",
+      description: "Native macOS application automation through the installable desktop-mac XCUITest plugin. Windows and Linux are not available yet.",
+      members: [
+        {
+          name: "desktop::mac::connect",
+          kind: "function",
+          signature: "pub async fn connect(options: DesktopMacConnectOptions) -> Result<MacDesktop>",
+          description: "Connects to the local macOS desktop and starts the bundled XCUITest runner automatically. Requires macOS 14 or newer, Xcode, and UI automation permission for the process running Xcode.",
+          since: "v0.1.21",
+          example: "let mac = desktop::mac::connect(DesktopMacConnectOptions::default()).await?;",
+        },
+        {
+          name: "MacDesktop::launch",
+          kind: "method",
+          signature: "pub async fn launch(&self, options: DesktopMacLaunchOptions) -> Result<MacApp>",
+          description: "Launches an installed macOS application by bundle identifier. The returned app supports native locators, actions, text reads, waits, screenshots, and accessibility snapshots.",
+          since: "v0.1.21",
+          example: 'let app = mac.launch(DesktopMacLaunchOptions { app_id: "com.apple.TextEdit".into(), terminate_running: false, timeout_ms: None }).await?;',
+        },
+        {
+          name: "MacApp locators and actions",
+          kind: "method",
+          signature: "pub fn locator(&self, selector: impl Into<String>) -> MacLocator\npub fn get_by_role(&self, role: &str, options: RoleOptions) -> MacLocator",
+          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, text_content, inner_text, wait_for_selector, screenshot, and accessibility_snapshot.",
+          since: "v0.1.21",
+        },
+      ],
+    },
+    {
       slug: "config",
       title: "Config",
       description:

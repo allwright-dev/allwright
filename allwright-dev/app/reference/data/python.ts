@@ -420,6 +420,36 @@ export const pythonReference: LanguageReference = {
       ],
     },
     {
+      slug: "desktop",
+      title: "Desktop",
+      description: "Native macOS application automation through the installable desktop-mac XCUITest plugin. Windows and Linux are not available yet.",
+      members: [
+        {
+          name: "desktop.mac.connect",
+          kind: "method",
+          signature: "def connect(self, options: DesktopMacConnectOptions | None = None) -> MacDesktop",
+          description: "Connects to the local macOS desktop and starts the bundled XCUITest runner automatically. Requires macOS 14 or newer, Xcode, and UI automation permission for the process running Xcode.",
+          since: "v0.1.21",
+          example: "mac = desktop.mac.connect()",
+        },
+        {
+          name: "MacDesktop.launch",
+          kind: "method",
+          signature: "def launch(self, options: DesktopMacLaunchOptions) -> MacApp",
+          description: "Launches an installed macOS application by bundle identifier. The returned app supports native locators, actions, text reads, waits, screenshots, and accessibility snapshots.",
+          since: "v0.1.21",
+          example: 'app = mac.launch(DesktopMacLaunchOptions(app_id="com.apple.TextEdit"))',
+        },
+        {
+          name: "MacApp locators and actions",
+          kind: "method",
+          signature: "def locator(self, selector: str) -> MacLocator\ndef get_by_role(self, role: str, options: RoleOptions | None = None) -> MacLocator",
+          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, text_content, inner_text, wait_for_selector, screenshot, and accessibility_snapshot.",
+          since: "v0.1.21",
+        },
+      ],
+    },
+    {
       slug: "config",
       title: "Config",
       description:
