@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "allwright"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",
@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-core"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -57,7 +57,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-plugin-sdk"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "serde",
  "serde_json",
@@ -66,7 +66,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "allwright-plugin-sdk",
  "serde",
@@ -76,7 +76,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-linux"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -85,7 +85,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-mac"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -98,7 +98,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-windows"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -107,7 +107,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "allwright-plugin-sdk",
  "serde",
@@ -117,7 +117,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile-android"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
@@ -132,7 +132,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile-ios"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-web"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",
@@ -1134,9 +1134,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "1.2.3"
+version = "1.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b18443e9c262bfe8fa82f51666e2642c53393f7e5c27b3e1aeab922cff5b9d8"
+checksum = "1788edb87fdc09c7e26304471e2f5be8cdefb1b6930d6e3985fc02ff53bf86ee"
 dependencies = [
  "libc",
  "wasi",
