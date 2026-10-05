@@ -9,7 +9,7 @@ public final class IosDevice {
     private final RuntimeSupport.StreamHandle<SurfaceSessionCommand, SurfaceSessionEvent> stream;
     private final String sessionId;
     private final String surfaceSessionId;
-    private AndroidApp app;
+    private NativeApp app;
     private boolean closed;
 
     IosDevice(RuntimeSupport.RuntimeClient runtime,
@@ -19,15 +19,15 @@ public final class IosDevice {
         this.stream = stream;
         this.sessionId = sessionId;
         this.surfaceSessionId = surfaceSessionId;
-        this.app = new AndroidApp(runtime, surfaceSessionId, initialAppSessionId);
+        this.app = new NativeApp(runtime, surfaceSessionId, initialAppSessionId);
     }
 
     public String sessionId() { return sessionId; }
-    public AndroidApp app() { return app; }
-    public AndroidApp initialApp() { return app; }
-    public synchronized AndroidApp launch() { return launch(new MobileIosLaunchOptions()); }
+    public NativeApp app() { return app; }
+    public NativeApp initialApp() { return app; }
+    public synchronized NativeApp launch() { return launch(new MobileIosLaunchOptions()); }
 
-    public synchronized AndroidApp launch(MobileIosLaunchOptions options) {
+    public synchronized NativeApp launch(MobileIosLaunchOptions options) {
         if (closed) throw new AllwrightException("ios device session " + sessionId + " is closed");
         MobileIosLaunchOptions resolved = options == null ? new MobileIosLaunchOptions() : options;
         LaunchAppCommand.Builder launch = LaunchAppCommand.newBuilder()
@@ -42,7 +42,7 @@ public final class IosDevice {
             SurfaceSessionEvent event = stream.recv("receive event while launching iOS app");
             switch (event.getEventCase()) {
                 case APP_LAUNCHED -> {
-                    app = new AndroidApp(runtime, surfaceSessionId, event.getAppLaunched().getAppSessionId());
+                    app = new NativeApp(runtime, surfaceSessionId, event.getAppLaunched().getAppSessionId());
                     return app;
                 }
                 case CLOSED -> {

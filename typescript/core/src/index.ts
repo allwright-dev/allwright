@@ -53,6 +53,8 @@ export type {
   HighlightOptions,
   HighlightResult,
   LaunchOptions,
+  NativeApp,
+  NativeAppLocator,
   MobileAndroidConnectOptions,
   MobileAndroidDevice,
   MobileAndroidLaunchOptions,

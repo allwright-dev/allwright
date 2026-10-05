@@ -190,6 +190,10 @@ Each working surface is loaded into core only when used. Clients always talk to 
 
 macOS desktop automation uses the same app/locator shape as native mobile:
 
+Across the client libraries, that shared shape is exposed as `NativeApp` and
+`NativeLocator` (`NativeAppLocator` in TypeScript). Existing platform-specific
+type names remain available as compatibility aliases or wrappers.
+
 ```ts
 import { desktop } from "@allwright.dev/core";
 

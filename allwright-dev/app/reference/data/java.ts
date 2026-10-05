@@ -391,8 +391,8 @@ export const javaReference: LanguageReference = {
         {
           name: "AndroidApp.locator",
           kind: "method",
-          signature: "public AndroidLocator locator(String selector)",
-          description: "Builds a chainable locator scoped to the app. Android and iOS apps/locators also expose getByRole, getByText, getByLabel, and getByTestId with native accessibility semantics and automatic retries.",
+          signature: "public NativeLocator locator(String selector)",
+          description: "Builds a chainable locator scoped to the app. Native apps and locators expose getByRole, getByText, getByLabel, and getByTestId with native accessibility semantics and automatic retries.",
           since: "v0.0.45 – v0.0.52",
         },
         {
@@ -406,8 +406,8 @@ export const javaReference: LanguageReference = {
         {
           name: "iOS device launch",
           kind: "method",
-          signature: "public synchronized AndroidApp launch()\npublic synchronized AndroidApp launch(MobileIosLaunchOptions options)",
-          description: "Downloads or unpacks an app (local .app, .zip/.ipa, or URL), installs it on the connected Simulator or device, and launches it. app_id is optional when an app path is given. The returned app uses the same locator and action set as Android.",
+          signature: "public synchronized NativeApp launch()\npublic synchronized NativeApp launch(MobileIosLaunchOptions options)",
+          description: "Downloads or unpacks an app (local .app, .zip/.ipa, or URL), installs it on the connected Simulator or device, and launches it. app_id is optional when an app path is given. The returned app implements the shared NativeApp/NativeLocator contract.",
           since: "v0.1.18",
           example: "var app = device.launch(new MobileIosLaunchOptions(\"https://allwright.dev/Flights-simulator.ipa\", null, false, null));",
         },
@@ -437,7 +437,7 @@ export const javaReference: LanguageReference = {
         {
           name: "MacApp locators and actions",
           kind: "method",
-          signature: "public AndroidLocator locator(String selector)\npublic AndroidLocator getByRole(String role, RoleOptions options)",
+          signature: "public NativeLocator locator(String selector)\npublic NativeLocator getByRole(String role, RoleOptions options)",
           description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, textContent, innerText, waitForSelector, screenshot, and accessibilitySnapshot.",
           since: "v0.1.21",
         },

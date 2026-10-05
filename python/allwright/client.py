@@ -7,8 +7,10 @@ from ._config import find_config_file, load_config_file, resolve_config
 from ._locator import Locator
 from ._hooks import Dialog, Download, FileChooser, Hook, HookType, hooks
 from ._mobile import (
+    NativeLocator,
     AndroidLocator,
     AndroidDevice,
+    NativeApp,
     AndroidApp,
     MobileAndroidConnectOptions,
     MobileAndroidLaunchOptions,

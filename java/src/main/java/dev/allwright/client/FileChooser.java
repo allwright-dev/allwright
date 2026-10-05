@@ -5,7 +5,7 @@ import java.util.List;
 
 public final class FileChooser {
     private final Page page;
-    private final AndroidApp app;
+    private final NativeApp app;
     private final HookContext context;
     private final String id;
     private final boolean multiple;
@@ -18,7 +18,7 @@ public final class FileChooser {
         this.multiple = multiple;
     }
 
-    FileChooser(AndroidApp app, String id, boolean multiple) {
+    FileChooser(NativeApp app, String id, boolean multiple) {
         this.page = null;
         this.app = app;
         this.context = app;
@@ -34,7 +34,7 @@ public final class FileChooser {
         return page;
     }
 
-    public AndroidApp app() {
+    public NativeApp app() {
         return app;
     }
 

@@ -72,7 +72,7 @@ class MobileIosLaunchOptions:
         self.app_path = app_path
 
 
-class AndroidApp:
+class NativeApp:
     def __init__(self, runtime: RuntimeClient, surface_session_id: str, session_id: str) -> None:
         self._runtime = runtime
         self._surface_session_id = surface_session_id
@@ -85,26 +85,26 @@ class AndroidApp:
     def session_id(self) -> str:
         return self._session_id
 
-    def locator(self, selector: str) -> AndroidLocator:
-        return AndroidLocator(
+    def locator(self, selector: str) -> NativeLocator:
+        return NativeLocator(
             page=self,
             selector=normalize_mobile_selector_for_transport(selector),
         )
 
     def get_by_role(self, role: str, *, name: TextMatcher | None = None, exact: bool = False,
                     checked: bool | None = None, disabled: bool | None = None,
-                    selected: bool | None = None) -> AndroidLocator:
+                    selected: bool | None = None) -> NativeLocator:
         spec = dict(kind="role", role=role, name=name, exact=exact, checked=checked,
                     disabled=disabled, selected=selected)
         return self.locator(semantic_selector({key: value for key, value in spec.items() if value is not None}))
 
-    def get_by_text(self, text: TextMatcher, *, exact: bool = False) -> AndroidLocator:
+    def get_by_text(self, text: TextMatcher, *, exact: bool = False) -> NativeLocator:
         return self.locator(semantic_selector(dict(kind="text", text=text, exact=exact)))
 
-    def get_by_label(self, text: TextMatcher, *, exact: bool = False) -> AndroidLocator:
+    def get_by_label(self, text: TextMatcher, *, exact: bool = False) -> NativeLocator:
         return self.locator(semantic_selector(dict(kind="label", text=text, exact=exact)))
 
-    def get_by_test_id(self, text: TextMatcher) -> AndroidLocator:
+    def get_by_test_id(self, text: TextMatcher) -> NativeLocator:
         return self.locator(semantic_selector(dict(kind="testId", text=text)))
 
     def register_hook(self, hook_type: HookType[T]) -> Hook[T]:
@@ -610,31 +610,31 @@ class AndroidApp:
             raise AllwrightError(f"android app session {self._session_id} is closed")
 
 
-class AndroidLocator:
-    def __init__(self, page: AndroidApp, selector: str) -> None:
+class NativeLocator:
+    def __init__(self, page: NativeApp, selector: str) -> None:
         self.page = page
         self.selector = selector
 
-    def locator(self, selector: str) -> AndroidLocator:
-        return AndroidLocator(
+    def locator(self, selector: str) -> NativeLocator:
+        return NativeLocator(
             page=self.page,
             selector=chain_mobile_selector_for_transport(self.selector, selector),
         )
 
     def get_by_role(self, role: str, *, name: TextMatcher | None = None, exact: bool = False,
                     checked: bool | None = None, disabled: bool | None = None,
-                    selected: bool | None = None) -> AndroidLocator:
+                    selected: bool | None = None) -> NativeLocator:
         spec = dict(kind="role", role=role, name=name, exact=exact, checked=checked,
                     disabled=disabled, selected=selected)
         return self.locator(semantic_selector({key: value for key, value in spec.items() if value is not None}))
 
-    def get_by_text(self, text: TextMatcher, *, exact: bool = False) -> AndroidLocator:
+    def get_by_text(self, text: TextMatcher, *, exact: bool = False) -> NativeLocator:
         return self.locator(semantic_selector(dict(kind="text", text=text, exact=exact)))
 
-    def get_by_label(self, text: TextMatcher, *, exact: bool = False) -> AndroidLocator:
+    def get_by_label(self, text: TextMatcher, *, exact: bool = False) -> NativeLocator:
         return self.locator(semantic_selector(dict(kind="label", text=text, exact=exact)))
 
-    def get_by_test_id(self, text: TextMatcher) -> AndroidLocator:
+    def get_by_test_id(self, text: TextMatcher) -> NativeLocator:
         return self.locator(semantic_selector(dict(kind="testId", text=text)))
 
     def click(self, options: CommandOptions | None = None) -> None:
@@ -662,6 +662,11 @@ class AndroidLocator:
         return self.page.wait_for_selector(self.selector, options)
 
 
+# Platform names remain aliases for source compatibility.
+AndroidApp = NativeApp
+AndroidLocator = NativeLocator
+
+
 class AndroidDevice:
     def __init__(
         self,
@@ -677,19 +682,19 @@ class AndroidDevice:
         self._closed = False
         self._session_id = session_id
         self._surface_session_id = surface_session_id
-        self._app = AndroidApp(runtime, surface_session_id, initial_app_session_id)
+        self._app = NativeApp(runtime, surface_session_id, initial_app_session_id)
 
     @property
     def session_id(self) -> str:
         return self._session_id
 
-    def app(self) -> AndroidApp:
+    def app(self) -> NativeApp:
         return self._app
 
-    def initial_app(self) -> AndroidApp:
+    def initial_app(self) -> NativeApp:
         return self._app
 
-    def launch(self, options: MobileAndroidLaunchOptions | None = None) -> AndroidApp:
+    def launch(self, options: MobileAndroidLaunchOptions | None = None) -> NativeApp:
         from ._runtime import retry_options
 
         with self._lock:
@@ -711,7 +716,7 @@ class AndroidDevice:
                 event = self._stream.recv("receive browser session event while launching Android app")
                 match event.WhichOneof("event"):
                     case "app_launched":
-                        self._app = AndroidApp(
+                        self._app = NativeApp(
                             self._runtime,
                             self._surface_session_id,
                             event.app_launched.app_session_id,
@@ -770,8 +775,8 @@ class AndroidSurface:
                     )
 
 
-IosApp = AndroidApp
-IosLocator = AndroidLocator
+IosApp = NativeApp
+IosLocator = NativeLocator
 
 
 class IosDevice(AndroidDevice):

@@ -20,7 +20,7 @@ public final class Hooks {
                     event.getFileChooser().getIsMultiple());
         }
         if (event.hasMobileFileChooser() && !event.getMobileFileChooser().getFileChooserId().isBlank()) {
-            return new FileChooser((AndroidApp) page, event.getMobileFileChooser().getFileChooserId(),
+            return new FileChooser((NativeApp) page, event.getMobileFileChooser().getFileChooserId(),
                     event.getMobileFileChooser().getIsMultiple());
         }
         throw new AllwrightException("file chooser hook completed with an invalid result");
@@ -31,7 +31,7 @@ public final class Hooks {
                     event.getDownload().getUrl(), event.getDownload().getSuggestedFilename());
         }
         if (event.hasMobileDownload() && !event.getMobileDownload().getDownloadId().isBlank()) {
-            return new Download((AndroidApp) page, event.getMobileDownload().getDownloadId(), "",
+            return new Download((NativeApp) page, event.getMobileDownload().getDownloadId(), "",
                     event.getMobileDownload().getSuggestedFilename());
         }
         throw new AllwrightException("download hook completed with an invalid result");

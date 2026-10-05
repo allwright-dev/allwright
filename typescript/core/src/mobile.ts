@@ -17,12 +17,14 @@ import type {
   MobileAndroidConnectOptions,
   MobileAndroidDevice,
   MobileAndroidLaunchOptions,
-  MobileAndroidLocator,
   MobileAndroidApp,
+  MobileIosApp,
   MobileIosConnectOptions,
   MobileIosDevice,
   MobileIosLaunchOptions,
   MobileSurfaceNamespace,
+  NativeApp,
+  NativeAppLocator,
   PageHandle,
   PressOptions,
   RuntimeClient,
@@ -35,7 +37,7 @@ function retryOptions(timeoutMs?: number): { timeoutMs?: number } | undefined {
   return timeoutMs ? { timeoutMs } : undefined;
 }
 
-export class MobileAndroidAppImpl implements MobileAndroidApp {
+export class NativeAppImpl implements NativeApp {
   #runtime: RuntimeClient;
   #surfaceSessionId: string;
   #handlePromise: Promise<PageHandle> | null = null;
@@ -45,29 +47,29 @@ export class MobileAndroidAppImpl implements MobileAndroidApp {
     this.#surfaceSessionId = surfaceSessionId;
   }
 
-  locator(selector: string): MobileAndroidLocator {
-    return new MobileAndroidLocatorImpl(this, normalizeMobileSelectorForTransport(selector));
+  locator(selector: string): NativeAppLocator {
+    return new NativeAppLocatorImpl(this, normalizeMobileSelectorForTransport(selector));
   }
 
-  getByRole(role: string, options: RoleOptions = {}): MobileAndroidLocator {
+  getByRole(role: string, options: RoleOptions = {}): NativeAppLocator {
     return this.locator(semanticSelector({ ...options, kind: "role", role }));
   }
 
-  getByText(text: TextMatcher, options: TextOptions = {}): MobileAndroidLocator {
+  getByText(text: TextMatcher, options: TextOptions = {}): NativeAppLocator {
     return this.locator(semanticSelector({ ...options, kind: "text", text }));
   }
 
-  getByLabel(text: TextMatcher, options: TextOptions = {}): MobileAndroidLocator {
+  getByLabel(text: TextMatcher, options: TextOptions = {}): NativeAppLocator {
     return this.locator(semanticSelector({ ...options, kind: "label", text }));
   }
 
-  getByTestId(text: TextMatcher): MobileAndroidLocator {
+  getByTestId(text: TextMatcher): NativeAppLocator {
     return this.locator(semanticSelector({ kind: "testId", text }));
   }
 
   async registerHook<T>(type: HookType<T>): Promise<Hook<T>> {
     if (type.name !== "fileChooser" && type.name !== "download") {
-      throw new Error(`hook type ${type.name} is not supported by Android apps`);
+      throw new Error(`hook type ${type.name} is not supported by native apps`);
     }
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
@@ -570,7 +572,7 @@ export class MobileAndroidAppImpl implements MobileAndroidApp {
 
 class MobileFileChooserImpl implements FileChooser {
   constructor(
-    readonly page: MobileAndroidAppImpl,
+    readonly page: NativeAppImpl,
     readonly id: string,
     private readonly multiple: boolean,
   ) {}
@@ -592,7 +594,7 @@ class MobileDownloadImpl implements Download {
   readonly url = "";
 
   constructor(
-    readonly page: MobileAndroidAppImpl,
+    readonly page: NativeAppImpl,
     readonly id: string,
     readonly suggestedFilename: string,
   ) {}
@@ -602,9 +604,9 @@ class MobileDownloadImpl implements Download {
   }
 }
 
-class MobileAndroidLocatorImpl implements MobileAndroidLocator {
+class NativeAppLocatorImpl implements NativeAppLocator {
   constructor(
-    readonly page: MobileAndroidApp,
+    readonly page: NativeApp,
     readonly selector: string,
   ) {}
 
@@ -640,23 +642,23 @@ class MobileAndroidLocatorImpl implements MobileAndroidLocator {
     return this.page.waitForSelector(this.selector, options);
   }
 
-  locator(selector: string): MobileAndroidLocator {
-    return new MobileAndroidLocatorImpl(this.page, chainMobileSelectorForTransport(this.selector, selector));
+  locator(selector: string): NativeAppLocator {
+    return new NativeAppLocatorImpl(this.page, chainMobileSelectorForTransport(this.selector, selector));
   }
 
-  getByRole(role: string, options: RoleOptions = {}): MobileAndroidLocator {
+  getByRole(role: string, options: RoleOptions = {}): NativeAppLocator {
     return this.locator(semanticSelector({ ...options, kind: "role", role }));
   }
 
-  getByText(text: TextMatcher, options: TextOptions = {}): MobileAndroidLocator {
+  getByText(text: TextMatcher, options: TextOptions = {}): NativeAppLocator {
     return this.locator(semanticSelector({ ...options, kind: "text", text }));
   }
 
-  getByLabel(text: TextMatcher, options: TextOptions = {}): MobileAndroidLocator {
+  getByLabel(text: TextMatcher, options: TextOptions = {}): NativeAppLocator {
     return this.locator(semanticSelector({ ...options, kind: "label", text }));
   }
 
-  getByTestId(text: TextMatcher): MobileAndroidLocator {
+  getByTestId(text: TextMatcher): NativeAppLocator {
     return this.locator(semanticSelector({ kind: "testId", text }));
   }
 }
@@ -677,7 +679,7 @@ class MobileAndroidDeviceImpl implements MobileAndroidDevice {
   ) {
     this.#stream = stream;
     this.#queue = queue;
-    this.#currentApp = new MobileAndroidAppImpl(runtime, surfaceSessionId, initialAppSessionId);
+    this.#currentApp = new NativeAppImpl(runtime, surfaceSessionId, initialAppSessionId);
   }
 
   app(): MobileAndroidApp {
@@ -703,7 +705,7 @@ class MobileAndroidDeviceImpl implements MobileAndroidDevice {
     while (true) {
       const event = await this.#queue.next();
       if (event.appLaunched?.appSessionId) {
-        this.#currentApp = new MobileAndroidAppImpl(
+        this.#currentApp = new NativeAppImpl(
           this.runtime,
           this.surfaceSessionId,
           event.appLaunched.appSessionId,
@@ -731,7 +733,7 @@ class MobileIosDeviceImpl implements MobileIosDevice {
   #stream: SurfaceSessionStream;
   #queue: EventQueue<SurfaceSessionEvent>;
   #closed = false;
-  #currentApp: MobileAndroidApp;
+  #currentApp: MobileIosApp;
 
   constructor(
     readonly sessionId: string,
@@ -743,13 +745,13 @@ class MobileIosDeviceImpl implements MobileIosDevice {
   ) {
     this.#stream = stream;
     this.#queue = queue;
-    this.#currentApp = new MobileAndroidAppImpl(runtime, surfaceSessionId, initialAppSessionId);
+    this.#currentApp = new NativeAppImpl(runtime, surfaceSessionId, initialAppSessionId);
   }
 
-  app(): MobileAndroidApp { return this.#currentApp; }
-  initialApp(): MobileAndroidApp { return this.#currentApp; }
+  app(): MobileIosApp { return this.#currentApp; }
+  initialApp(): MobileIosApp { return this.#currentApp; }
 
-  async launch(options: MobileIosLaunchOptions = {}): Promise<MobileAndroidApp> {
+  async launch(options: MobileIosLaunchOptions = {}): Promise<MobileIosApp> {
     if (this.#closed) throw new Error(`ios device session ${this.sessionId} is closed`);
     this.#stream.write({
       launchApp: {
@@ -762,7 +764,7 @@ class MobileIosDeviceImpl implements MobileIosDevice {
     while (true) {
       const event = await this.#queue.next();
       if (event.appLaunched?.appSessionId) {
-        this.#currentApp = new MobileAndroidAppImpl(this.runtime, this.surfaceSessionId, event.appLaunched.appSessionId);
+        this.#currentApp = new NativeAppImpl(this.runtime, this.surfaceSessionId, event.appLaunched.appSessionId);
         return this.#currentApp;
       }
       if (event.error?.message) throw new Error(event.error.message);

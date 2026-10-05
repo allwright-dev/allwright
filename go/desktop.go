@@ -18,8 +18,8 @@ type DesktopMacLaunchOptions struct {
 	Timeout          uint32
 }
 
-type MacApp = AndroidApp
-type MacLocator = AndroidLocator
+type MacApp = NativeApp
+type MacLocator = NativeLocator
 
 type MacDesktop struct {
 	runtime          *runtimeClient

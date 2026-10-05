@@ -11,6 +11,8 @@ import {
   type MobileAndroidDevice,
   type MobileAndroidLaunchOptions,
   type MobileAndroidApp,
+  type NativeApp,
+  type NativeAppLocator,
   type MobileIosConnectOptions,
   type MobileIosDevice,
   type MobileIosLaunchOptions,
@@ -26,7 +28,6 @@ import {
   type HookType,
   type LaunchOptions,
   type Locator,
-  type MobileAndroidLocator,
   type Page,
   type RoleOptions,
   type ResolvedAllwrightConfig,
@@ -438,7 +439,7 @@ function createLazyBrowser(browserResource: LazyResource<Browser>): Browser {
   return lazyBrowser;
 }
 
-function createLazyMobileApp(appResource: LazyResource<MobileAndroidApp>): MobileAndroidApp {
+function createLazyMobileApp(appResource: LazyResource<NativeApp>): NativeApp {
   const lazyApp = {
     get sessionId() {
       return getLazySyncProperty(appResource, "sessionId");
@@ -479,7 +480,7 @@ function createLazyMobileApp(appResource: LazyResource<MobileAndroidApp>): Mobil
     async fill(selector: string, value: string, options?: CommandOptions) {
       return (await appResource.get()).fill(selector, value, options);
     },
-    async press(selector: string, key: string, options?: Parameters<MobileAndroidApp["press"]>[2]) {
+    async press(selector: string, key: string, options?: Parameters<NativeApp["press"]>[2]) {
       return (await appResource.get()).press(selector, key, options);
     },
     async textContent(selector: string, options?: CommandOptions) {
@@ -491,21 +492,21 @@ function createLazyMobileApp(appResource: LazyResource<MobileAndroidApp>): Mobil
     async waitForSelector(selector: string, options?: WaitForSelectorOptions) {
       return (await appResource.get()).waitForSelector(selector, options);
     },
-    async accessibilitySnapshot(options?: Parameters<MobileAndroidApp["accessibilitySnapshot"]>[0]) {
+    async accessibilitySnapshot(options?: Parameters<NativeApp["accessibilitySnapshot"]>[0]) {
       return (await appResource.get()).accessibilitySnapshot(options);
     },
     async screenshot(options?: ScreenshotOptions) {
       return (await appResource.get()).screenshot(options);
     },
-  } satisfies MobileAndroidApp;
+  } satisfies NativeApp;
 
   return lazyApp;
 }
 
 function createLazyMobileLocator(
-  appResource: LazyResource<MobileAndroidApp>,
+  appResource: LazyResource<NativeApp>,
   selectorFactory: () => Promise<string>,
-): MobileAndroidLocator {
+): NativeAppLocator {
   const lazyLocator = {
     get page() {
       return createLazyMobileApp(appResource);
@@ -516,25 +517,25 @@ function createLazyMobileLocator(
     async click(options?: CommandOptions) {
       return (await appResource.get()).locator(await selectorFactory()).click(options);
     },
-    async count(options?: Parameters<MobileAndroidLocator["count"]>[0]) {
+    async count(options?: Parameters<NativeAppLocator["count"]>[0]) {
       return (await appResource.get()).locator(await selectorFactory()).count(options);
     },
-    async focus(options?: Parameters<MobileAndroidLocator["focus"]>[0]) {
+    async focus(options?: Parameters<NativeAppLocator["focus"]>[0]) {
       return (await appResource.get()).locator(await selectorFactory()).focus(options);
     },
     async fill(value: string, options?: CommandOptions) {
       return (await appResource.get()).locator(await selectorFactory()).fill(value, options);
     },
-    async press(key: string, options?: Parameters<MobileAndroidLocator["press"]>[1]) {
+    async press(key: string, options?: Parameters<NativeAppLocator["press"]>[1]) {
       return (await appResource.get()).locator(await selectorFactory()).press(key, options);
     },
-    async textContent(options?: Parameters<MobileAndroidLocator["textContent"]>[0]) {
+    async textContent(options?: Parameters<NativeAppLocator["textContent"]>[0]) {
       return (await appResource.get()).locator(await selectorFactory()).textContent(options);
     },
-    async innerText(options?: Parameters<MobileAndroidLocator["innerText"]>[0]) {
+    async innerText(options?: Parameters<NativeAppLocator["innerText"]>[0]) {
       return (await appResource.get()).locator(await selectorFactory()).innerText(options);
     },
-    async waitFor(options?: Parameters<MobileAndroidLocator["waitFor"]>[0]) {
+    async waitFor(options?: Parameters<NativeAppLocator["waitFor"]>[0]) {
       return (await appResource.get()).locator(await selectorFactory()).waitFor(options);
     },
     locator(selector: string) {
@@ -562,7 +563,7 @@ function createLazyMobileLocator(
         (await appResource.get()).locator(await selectorFactory()).getByTestId(text).selector,
       );
     },
-  } satisfies MobileAndroidLocator;
+  } satisfies NativeAppLocator;
 
   return lazyLocator;
 }
@@ -917,8 +918,8 @@ type VitestExpect = typeof vitestExpect;
 interface AllwrightExpect extends VitestExpect {
   (actual: Page): PageExpectMatchers;
   (actual: Locator): LocatorExpectMatchers;
-  (actual: MobileAndroidApp): MobilePageExpectMatchers;
-  (actual: MobileAndroidLocator): MobileLocatorExpectMatchers;
+  (actual: NativeApp): MobilePageExpectMatchers;
+  (actual: NativeAppLocator): MobileLocatorExpectMatchers;
   <T>(actual: T): Assertion<T>;
 }
 

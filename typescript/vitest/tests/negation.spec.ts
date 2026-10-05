@@ -1,6 +1,6 @@
 import { describe, expect as check, test, vi } from 'vitest';
 import { expect } from '../src/index.js';
-import type { Locator, MobileAndroidLocator, Page, MobileAndroidApp } from '@allwright.dev/core';
+import type { Locator, NativeAppLocator, Page, NativeApp } from '@allwright.dev/core';
 
 function fixture(web = true) {
   const count = vi.fn(async (_options?: unknown) => 1);
@@ -29,8 +29,8 @@ for (const web of [true, false]) describe(web ? 'web' : 'Android', () => {
     await expect(f.page).not.toHaveCount('ignored selector', 0, once);
     // These assignments also exercise the public mobile matcher overloads.
     if (!web) {
-      await expect(f.locator as unknown as MobileAndroidLocator).not().toHaveText('Loading', once);
-      await expect(f.page as unknown as MobileAndroidApp).not.toHaveCount('ignored', 0, once);
+      await expect(f.locator as unknown as NativeAppLocator).not().toHaveText('Loading', once);
+      await expect(f.page as unknown as NativeApp).not.toHaveCount('ignored', 0, once);
     }
   });
   test('negative text retries the inverted predicate', async () => {

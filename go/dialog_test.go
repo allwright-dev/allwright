@@ -20,7 +20,7 @@ func TestDialogHookDecodesTypedResult(t *testing.T) {
 	if _, err := Hooks.Dialog.decode(page, &enginev1.HookCompletedEvent{}); err == nil {
 		t.Fatal("expected invalid result error")
 	}
-	if _, err := Hooks.Dialog.decode(&AndroidApp{}, result); err == nil {
+	if _, err := Hooks.Dialog.decode(&NativeApp{}, result); err == nil {
 		t.Fatal("expected unsupported owner error")
 	}
 }

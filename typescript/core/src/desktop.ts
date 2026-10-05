@@ -1,12 +1,12 @@
 import { createBrowserSessionHandle, getRuntime } from "./runtime.js";
-import { MobileAndroidAppImpl } from "./mobile.js";
+import { NativeAppImpl } from "./mobile.js";
 import type {
   DesktopMacConnectOptions,
   DesktopMacDesktop,
   DesktopMacLaunchOptions,
   DesktopSurfaceNamespace,
   EventQueue,
-  MobileAndroidApp,
+  NativeApp,
   RuntimeClient,
   SurfaceSessionEvent,
   SurfaceSessionStream,
@@ -18,7 +18,7 @@ function retryOptions(timeoutMs?: number): { timeoutMs?: number } | undefined {
 
 class DesktopMacImpl implements DesktopMacDesktop {
   #closed = false;
-  #currentApp: MobileAndroidApp;
+  #currentApp: NativeApp;
 
   constructor(
     readonly sessionId: string,
@@ -28,14 +28,14 @@ class DesktopMacImpl implements DesktopMacDesktop {
     private readonly queue: EventQueue<SurfaceSessionEvent>,
     initialAppSessionId: string,
   ) {
-    this.#currentApp = new MobileAndroidAppImpl(runtime, surfaceSessionId, initialAppSessionId);
+    this.#currentApp = new NativeAppImpl(runtime, surfaceSessionId, initialAppSessionId);
   }
 
-  app(): MobileAndroidApp {
+  app(): NativeApp {
     return this.#currentApp;
   }
 
-  async launch(options: DesktopMacLaunchOptions): Promise<MobileAndroidApp> {
+  async launch(options: DesktopMacLaunchOptions): Promise<NativeApp> {
     if (this.#closed) throw new Error(`macOS desktop session ${this.sessionId} is closed`);
     this.stream.write({
       launchDesktopApp: {
@@ -47,7 +47,7 @@ class DesktopMacImpl implements DesktopMacDesktop {
     while (true) {
       const event = await this.queue.next();
       if (event.desktopAppLaunched?.appSessionId) {
-        this.#currentApp = new MobileAndroidAppImpl(
+        this.#currentApp = new NativeAppImpl(
           this.runtime,
           this.surfaceSessionId,
           event.desktopAppLaunched.appSessionId,

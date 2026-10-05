@@ -4,7 +4,7 @@ import java.nio.file.Path;
 
 public final class Download {
     private final Page page;
-    private final AndroidApp app;
+    private final NativeApp app;
     private final HookContext context;
     private final String id;
     private final String url;
@@ -19,7 +19,7 @@ public final class Download {
         this.suggestedFilename = suggestedFilename;
     }
 
-    Download(AndroidApp app, String id, String url, String suggestedFilename) {
+    Download(NativeApp app, String id, String url, String suggestedFilename) {
         this.page = null;
         this.app = app;
         this.context = app;
@@ -36,7 +36,7 @@ public final class Download {
         return page;
     }
 
-    public AndroidApp app() {
+    public NativeApp app() {
         return app;
     }
 

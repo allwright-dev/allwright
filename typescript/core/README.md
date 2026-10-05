@@ -53,6 +53,11 @@ the Allwright server is remote. Android apps support the same `fileChooser` and
 
 Runnable examples live in [examples/web-basic.ts](./examples/web-basic.ts), [examples/android-basic.ts](./examples/android-basic.ts), and [examples/ios-basic.ts](./examples/ios-basic.ts).
 
+Android, iOS, and macOS applications implement the shared `NativeApp` and
+`NativeAppLocator` interfaces. Platform-specific type names such as
+`MobileAndroidApp`, `MobileIosLocator`, and `DesktopMacLocator` remain exported
+as aliases for compatibility and platform-oriented annotations.
+
 Shared config files are stack-agnostic and can live in `allwright.config.yaml` or `allwright.config.json`.
 The shared schema lives at the repo root in `allwright.schema.json`.
 

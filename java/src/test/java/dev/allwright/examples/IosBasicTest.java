@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import dev.allwright.client.Allwright;
-import dev.allwright.client.AndroidApp;
+import dev.allwright.client.NativeApp;
 import dev.allwright.client.IosDevice;
 import dev.allwright.client.MobileIosConnectOptions;
 import dev.allwright.client.MobileIosLaunchOptions;
@@ -34,7 +34,7 @@ final class IosBasicTest {
                             60_000
                     )
             );
-            AndroidApp app = device.launch(
+            NativeApp app = device.launch(
                     new MobileIosLaunchOptions(
                             System.getenv().getOrDefault("ALLWRIGHT_IOS_APP_PATH", DEFAULT_IOS_APP_PATH),
                             System.getenv("ALLWRIGHT_IOS_APP_ID"),

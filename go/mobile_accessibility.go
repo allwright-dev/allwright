@@ -7,7 +7,7 @@ import (
 	enginev1 "allwright.dev/gen/allwright/engine/v1"
 )
 
-func (t *AndroidApp) AccessibilitySnapshot(ctx context.Context, options ...AccessibilitySnapshotOptions) (string, error) {
+func (t *NativeApp) AccessibilitySnapshot(ctx context.Context, options ...AccessibilitySnapshotOptions) (string, error) {
 	if t == nil {
 		return "", fmt.Errorf("android app is nil")
 	}

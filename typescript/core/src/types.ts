@@ -147,14 +147,14 @@ export interface Dialog {
 
 export interface FileChooser {
   readonly id: string;
-  readonly page: Page | MobileAndroidApp;
+  readonly page: Page | NativeApp;
   isMultiple(): boolean;
   setFiles(files: string | string[], options?: CommandOptions): Promise<void>;
 }
 
 export interface Download {
   readonly id: string;
-  readonly page: Page | MobileAndroidApp;
+  readonly page: Page | NativeApp;
   readonly url: string;
   readonly suggestedFilename: string;
   saveAs(path: string, options?: CommandOptions): Promise<void>;
@@ -218,8 +218,8 @@ export interface MobileAndroidLaunchOptions {
   timeoutMs?: number;
 }
 
-export interface MobileAndroidLocator {
-  readonly page: MobileAndroidApp;
+export interface NativeAppLocator {
+  readonly page: NativeApp;
   readonly selector: string;
   click(options?: CommandOptions): Promise<void>;
   count(options?: CommandOptions): Promise<number>;
@@ -229,23 +229,23 @@ export interface MobileAndroidLocator {
   textContent(options?: CommandOptions): Promise<string | null>;
   innerText(options?: CommandOptions): Promise<string>;
   waitFor(options?: WaitForSelectorOptions): Promise<void>;
-  locator(selector: string): MobileAndroidLocator;
-  getByRole(role: string, options?: RoleOptions): MobileAndroidLocator;
-  getByText(text: TextMatcher, options?: TextOptions): MobileAndroidLocator;
-  getByLabel(text: TextMatcher, options?: TextOptions): MobileAndroidLocator;
-  getByTestId(text: TextMatcher): MobileAndroidLocator;
+  locator(selector: string): NativeAppLocator;
+  getByRole(role: string, options?: RoleOptions): NativeAppLocator;
+  getByText(text: TextMatcher, options?: TextOptions): NativeAppLocator;
+  getByLabel(text: TextMatcher, options?: TextOptions): NativeAppLocator;
+  getByTestId(text: TextMatcher): NativeAppLocator;
 }
 
-export interface MobileAndroidApp {
+export interface NativeApp {
   accessibilitySnapshot(options?: AccessibilitySnapshotOptions): Promise<string>;
   readonly sessionId: string;
   goto(url: string, options?: CommandOptions): Promise<void>;
   navigate(url: string, options?: CommandOptions): Promise<void>;
-  locator(selector: string): MobileAndroidLocator;
-  getByRole(role: string, options?: RoleOptions): MobileAndroidLocator;
-  getByText(text: TextMatcher, options?: TextOptions): MobileAndroidLocator;
-  getByLabel(text: TextMatcher, options?: TextOptions): MobileAndroidLocator;
-  getByTestId(text: TextMatcher): MobileAndroidLocator;
+  locator(selector: string): NativeAppLocator;
+  getByRole(role: string, options?: RoleOptions): NativeAppLocator;
+  getByText(text: TextMatcher, options?: TextOptions): NativeAppLocator;
+  getByLabel(text: TextMatcher, options?: TextOptions): NativeAppLocator;
+  getByTestId(text: TextMatcher): NativeAppLocator;
   click(selector: string, options?: CommandOptions): Promise<void>;
   count(selector: string, options?: CommandOptions): Promise<number>;
   focus(selector: string, options?: CommandOptions): Promise<void>;
@@ -257,6 +257,11 @@ export interface MobileAndroidApp {
   screenshot(options?: ScreenshotOptions): Promise<Uint8Array>;
   registerHook<T>(type: HookType<T>): Promise<Hook<T>>;
 }
+
+// Platform names remain aliases for source compatibility while the common
+// native app contract stays independent of whichever surface implemented it first.
+export type MobileAndroidLocator = NativeAppLocator;
+export type MobileAndroidApp = NativeApp;
 
 export interface MobileAndroidDevice {
   readonly sessionId: string;
@@ -279,11 +284,9 @@ export interface MobileIosLaunchOptions {
   timeoutMs?: number;
 }
 
-// Mobile contexts intentionally expose one cross-surface action shape. These
-// aliases keep existing Android names source-compatible while iOS uses the
-// same locator/app contract.
-export type MobileIosLocator = MobileAndroidLocator;
-export type MobileIosApp = MobileAndroidApp;
+// Native contexts intentionally expose one cross-surface action shape.
+export type MobileIosLocator = NativeAppLocator;
+export type MobileIosApp = NativeApp;
 
 export interface MobileIosDevice {
   readonly sessionId: string;
@@ -312,8 +315,8 @@ export interface DesktopMacLaunchOptions {
   timeoutMs?: number;
 }
 
-export type DesktopMacApp = MobileAndroidApp;
-export type DesktopMacLocator = MobileAndroidLocator;
+export type DesktopMacApp = NativeApp;
+export type DesktopMacLocator = NativeAppLocator;
 
 export interface DesktopMacDesktop {
   readonly sessionId: string;

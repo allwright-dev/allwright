@@ -21,8 +21,8 @@ type HookOwner interface {
 	hookOwner()
 }
 
-func (*Tab) hookOwner()        {}
-func (*AndroidApp) hookOwner() {}
+func (*Tab) hookOwner()       {}
+func (*NativeApp) hookOwner() {}
 
 type Hook[T any] struct {
 	page     *Tab
@@ -33,14 +33,14 @@ type Hook[T any] struct {
 
 type FileChooser struct {
 	page       *Tab
-	app        *AndroidApp
+	app        *NativeApp
 	id         string
 	isMultiple bool
 }
 
 type Download struct {
 	page              *Tab
-	app               *AndroidApp
+	app               *NativeApp
 	id                string
 	url               string
 	suggestedFilename string
@@ -50,7 +50,7 @@ func (d *Download) ID() string { return d.id }
 
 func (d *Download) Page() *Page { return d.page }
 
-func (d *Download) App() *AndroidApp { return d.app }
+func (d *Download) App() *NativeApp { return d.app }
 
 func (d *Download) URL() string { return d.url }
 
@@ -102,7 +102,7 @@ func (f *FileChooser) ID() string { return f.id }
 
 func (f *FileChooser) Page() *Page { return f.page }
 
-func (f *FileChooser) App() *AndroidApp { return f.app }
+func (f *FileChooser) App() *NativeApp { return f.app }
 
 func (f *FileChooser) IsMultiple() bool { return f.isMultiple }
 
@@ -284,7 +284,7 @@ func downloadFileToClient(ctx context.Context, page *Tab, fileID, path string) e
 	}
 }
 
-func (app *AndroidApp) setHookFileChooserFiles(ctx context.Context, chooserID string, files []string, options ...CommandOptions) error {
+func (app *NativeApp) setHookFileChooserFiles(ctx context.Context, chooserID string, files []string, options ...CommandOptions) error {
 	if err := app.ensureStream(ctx); err != nil {
 		return err
 	}
@@ -323,7 +323,7 @@ func (app *AndroidApp) setHookFileChooserFiles(ctx context.Context, chooserID st
 	}
 }
 
-func (app *AndroidApp) saveHookDownload(ctx context.Context, downloadID, path string, options ...CommandOptions) error {
+func (app *NativeApp) saveHookDownload(ctx context.Context, downloadID, path string, options ...CommandOptions) error {
 	if err := app.ensureStream(ctx); err != nil {
 		return err
 	}
@@ -352,7 +352,7 @@ func (app *AndroidApp) saveHookDownload(ctx context.Context, downloadID, path st
 	}
 }
 
-func uploadAndroidClientFile(app *AndroidApp, path string) (string, error) {
+func uploadAndroidClientFile(app *NativeApp, path string) (string, error) {
 	source, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -403,7 +403,7 @@ func uploadAndroidClientFile(app *AndroidApp, path string) (string, error) {
 	}
 }
 
-func downloadAndroidFileToClient(app *AndroidApp, fileID, path string) error {
+func downloadAndroidFileToClient(app *NativeApp, fileID, path string) error {
 	id, err := transferID()
 	if err != nil {
 		return err
@@ -510,7 +510,7 @@ var Hooks = struct {
 				}
 				return &FileChooser{page: page, id: result.FileChooser.GetFileChooserId(), isMultiple: result.FileChooser.GetIsMultiple()}, nil
 			case *enginev1.HookCompletedEvent_MobileFileChooser:
-				app, ok := context.(*AndroidApp)
+				app, ok := context.(*NativeApp)
 				if !ok || result.MobileFileChooser.GetFileChooserId() == "" {
 					break
 				}
@@ -530,7 +530,7 @@ var Hooks = struct {
 				}
 				return &Download{page: page, id: result.Download.GetDownloadId(), url: result.Download.GetUrl(), suggestedFilename: result.Download.GetSuggestedFilename()}, nil
 			case *enginev1.HookCompletedEvent_MobileDownload:
-				app, ok := context.(*AndroidApp)
+				app, ok := context.(*NativeApp)
 				if !ok || result.MobileDownload.GetDownloadId() == "" {
 					break
 				}
@@ -542,7 +542,7 @@ var Hooks = struct {
 }
 
 func RegisterHook[T any](ctx context.Context, owner HookOwner, hookType HookType[T]) (*Hook[T], error) {
-	if app, ok := owner.(*AndroidApp); ok {
+	if app, ok := owner.(*NativeApp); ok {
 		return registerAndroidHook(ctx, app, hookType)
 	}
 	page, ok := owner.(*Page)
@@ -606,7 +606,7 @@ func RegisterHook[T any](ctx context.Context, owner HookOwner, hookType HookType
 	}
 }
 
-func registerAndroidHook[T any](ctx context.Context, app *AndroidApp, hookType HookType[T]) (*Hook[T], error) {
+func registerAndroidHook[T any](ctx context.Context, app *NativeApp, hookType HookType[T]) (*Hook[T], error) {
 	if app == nil {
 		return nil, fmt.Errorf("android app is nil")
 	}
@@ -646,7 +646,7 @@ func registerAndroidHook[T any](ctx context.Context, app *AndroidApp, hookType H
 	}
 }
 
-func waitAndroidHook[T any](ctx context.Context, app *AndroidApp, hookID string, hookType HookType[T], options ...CommandOptions) (T, error) {
+func waitAndroidHook[T any](ctx context.Context, app *NativeApp, hookID string, hookType HookType[T], options ...CommandOptions) (T, error) {
 	var zero T
 	if err := app.ensureStream(ctx); err != nil {
 		return zero, err

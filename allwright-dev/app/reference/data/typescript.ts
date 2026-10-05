@@ -397,8 +397,8 @@ export const typescriptReference: LanguageReference = {
         {
           name: "androidApp.locator",
           kind: "method",
-          signature: "locator(selector: string): MobileAndroidLocator",
-          description: "Builds a chainable locator scoped to the app. Android and iOS apps/locators also expose getByRole, getByText, getByLabel, and getByTestId with native accessibility semantics and automatic retries.",
+          signature: "locator(selector: string): NativeAppLocator",
+          description: "Builds a chainable locator scoped to the app. Android, iOS, and macOS use the shared NativeApp/NativeAppLocator contract and expose getByRole, getByText, getByLabel, and getByTestId with native accessibility semantics and automatic retries.",
           since: "v0.0.45 – v0.0.52",
         },
         {
@@ -413,7 +413,7 @@ export const typescriptReference: LanguageReference = {
           name: "iOS device launch",
           kind: "method",
           signature: "launch(options?: MobileIosLaunchOptions): Promise<MobileIosApp>",
-          description: "Downloads or unpacks an app (local .app, .zip/.ipa, or URL), installs it on the connected Simulator or device, and launches it. app_id is optional when an app path is given. The returned app uses the same locator and action set as Android.",
+          description: "Downloads or unpacks an app (local .app, .zip/.ipa, or URL), installs it on the connected Simulator or device, and launches it. app_id is optional when an app path is given. The returned app implements the shared native app and locator contract.",
           since: "v0.1.18",
           example: "const app = await device.launch({ appPath: \"https://allwright.dev/Flights-simulator.ipa\" });\nawait app.getByRole(\"button\", { name: \"Login\", exact: true }).click();",
         },
@@ -494,16 +494,16 @@ export const typescriptReference: LanguageReference = {
         {
           name: "test",
           kind: "function",
-          signature: "test(name: string, fn: (ctx: { page: Page; browser: Browser; android: MobileAndroidDevice; androidApp: MobileAndroidApp }) => Promise<void>): void",
-          description: "A Vitest test extended with lazy page/browser/android/androidApp fixtures — nothing launches or connects until a fixture's method is first awaited.",
+          signature: "test(name: string, fn: (ctx: { page: Page; browser: Browser; android: MobileAndroidDevice; androidApp: MobileAndroidApp; ios: MobileIosDevice; iosApp: MobileIosApp; macos: DesktopMacDesktop; macosApp: DesktopMacApp }) => Promise<void>): void",
+          description: "A Vitest test extended with lazy web, Android, iOS, and macOS fixtures — nothing launches or connects until a fixture's method is first awaited.",
           since: "v0.0.24",
           example: 'import { expect, test } from "@allwright.dev/vitest";\n\ntest("opens a page", async ({ page }) => {\n  await page.goto("https://themoderninternet.vercel.app");\n});',
         },
         {
           name: "expect",
           kind: "function",
-          signature: "expect(actual: Page | MobileAndroidApp): PageExpectMatchers\nexpect(actual: Locator | MobileAndroidLocator): LocatorExpectMatchers",
-          description: "Vitest's expect, augmented: called with a Page/Locator (web or Android) it returns retrying matchers — toHaveText, toContainText, toHaveCount, toBeVisible, plus the web-only state matchers below — instead of the plain-value assertions it returns for anything else.",
+          signature: "expect(actual: Page | NativeApp): PageExpectMatchers\nexpect(actual: Locator | NativeAppLocator): LocatorExpectMatchers",
+          description: "Vitest's expect, augmented: called with a web page/locator or native app/locator it returns retrying matchers — toHaveText, toContainText, toHaveCount, toBeVisible, plus the web-only state matchers below — instead of the plain-value assertions it returns for anything else.",
           since: "v0.0.24",
         },
         {

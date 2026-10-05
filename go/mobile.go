@@ -61,7 +61,7 @@ var uiAutomatorSelectorKeys = map[string]struct{}{
 	"index": {}, "instance": {},
 }
 
-type AndroidApp struct {
+type NativeApp struct {
 	runtime          *runtimeClient
 	stream           tabSessionStream
 	surfaceSessionID string
@@ -70,17 +70,20 @@ type AndroidApp struct {
 	closed           bool
 }
 
-type AndroidLocator struct {
-	page     *AndroidApp
+type NativeLocator struct {
+	page     *NativeApp
 	selector string
 }
+
+type AndroidApp = NativeApp
+type AndroidLocator = NativeLocator
 
 type AndroidDevice struct {
 	runtime          *runtimeClient
 	stream           browserSessionStream
 	sessionID        string
 	surfaceSessionID string
-	app              *AndroidApp
+	app              *NativeApp
 	closed           bool
 }
 
@@ -88,8 +91,8 @@ type AndroidSurface struct{}
 type IOSSurface struct{}
 
 type IOSDevice struct{ android *AndroidDevice }
-type IOSApp = AndroidApp
-type IOSLocator = AndroidLocator
+type IOSApp = NativeApp
+type IOSLocator = NativeLocator
 
 type mobileNamespace struct {
 	Android AndroidSurface
@@ -101,24 +104,24 @@ var Mobile = mobileNamespace{
 	IOS:     IOSSurface{},
 }
 
-func (p *AndroidApp) SessionID() string {
+func (p *NativeApp) SessionID() string {
 	if p == nil {
 		return ""
 	}
 	return p.sessionID
 }
 
-func (p *AndroidApp) Locator(selector string) *AndroidLocator {
+func (p *NativeApp) Locator(selector string) *NativeLocator {
 	if p == nil {
 		return nil
 	}
-	return &AndroidLocator{
+	return &NativeLocator{
 		page:     p,
 		selector: normalizeMobileSelectorForTransport(selector),
 	}
 }
 
-func (p *AndroidApp) GetByRole(role string, options ...RoleOptions) *AndroidLocator {
+func (p *NativeApp) GetByRole(role string, options ...RoleOptions) *NativeLocator {
 	o := RoleOptions{}
 	if len(options) > 0 {
 		o = options[0]
@@ -126,7 +129,7 @@ func (p *AndroidApp) GetByRole(role string, options ...RoleOptions) *AndroidLoca
 	return p.Locator(roleSelector(role, o))
 }
 
-func (p *AndroidApp) GetByText(value any, options ...TextOptions) *AndroidLocator {
+func (p *NativeApp) GetByText(value any, options ...TextOptions) *NativeLocator {
 	o := TextOptions{}
 	if len(options) > 0 {
 		o = options[0]
@@ -134,7 +137,7 @@ func (p *AndroidApp) GetByText(value any, options ...TextOptions) *AndroidLocato
 	return p.Locator(semanticSelector(map[string]any{"kind": "text", "text": value, "exact": o.Exact}))
 }
 
-func (p *AndroidApp) GetByLabel(value any, options ...TextOptions) *AndroidLocator {
+func (p *NativeApp) GetByLabel(value any, options ...TextOptions) *NativeLocator {
 	o := TextOptions{}
 	if len(options) > 0 {
 		o = options[0]
@@ -142,11 +145,11 @@ func (p *AndroidApp) GetByLabel(value any, options ...TextOptions) *AndroidLocat
 	return p.Locator(semanticSelector(map[string]any{"kind": "label", "text": value, "exact": o.Exact}))
 }
 
-func (p *AndroidApp) GetByTestId(value any, _ ...TextOptions) *AndroidLocator {
+func (p *NativeApp) GetByTestId(value any, _ ...TextOptions) *NativeLocator {
 	return p.Locator(semanticSelector(map[string]any{"kind": "testId", "text": value}))
 }
 
-func (p *AndroidApp) ensureStream(ctx context.Context) error {
+func (p *NativeApp) ensureStream(ctx context.Context) error {
 	if p.stream != nil {
 		return nil
 	}
@@ -161,11 +164,11 @@ func (p *AndroidApp) ensureStream(ctx context.Context) error {
 	return nil
 }
 
-func (p *AndroidApp) Goto(ctx context.Context, url string, options ...CommandOptions) error {
+func (p *NativeApp) Goto(ctx context.Context, url string, options ...CommandOptions) error {
 	return p.Navigate(ctx, url, options...)
 }
 
-func (p *AndroidApp) Navigate(ctx context.Context, url string, options ...CommandOptions) error {
+func (p *NativeApp) Navigate(ctx context.Context, url string, options ...CommandOptions) error {
 	if p == nil {
 		return fmt.Errorf("mobile app is nil")
 	}
@@ -206,12 +209,12 @@ func (p *AndroidApp) Navigate(ctx context.Context, url string, options ...Comman
 	}
 }
 
-func (p *AndroidApp) Click(ctx context.Context, selector string, options ...CommandOptions) error {
+func (p *NativeApp) Click(ctx context.Context, selector string, options ...CommandOptions) error {
 	_, err := p.clickResult(ctx, selector, options...)
 	return err
 }
 
-func (p *AndroidApp) Count(ctx context.Context, selector string, options ...CommandOptions) (int, error) {
+func (p *NativeApp) Count(ctx context.Context, selector string, options ...CommandOptions) (int, error) {
 	result, err := p.countResult(ctx, selector, options...)
 	if err != nil {
 		return 0, err
@@ -219,22 +222,22 @@ func (p *AndroidApp) Count(ctx context.Context, selector string, options ...Comm
 	return int(result.Count), nil
 }
 
-func (p *AndroidApp) Focus(ctx context.Context, selector string, options ...CommandOptions) error {
+func (p *NativeApp) Focus(ctx context.Context, selector string, options ...CommandOptions) error {
 	_, err := p.focusResult(ctx, selector, options...)
 	return err
 }
 
-func (p *AndroidApp) Fill(ctx context.Context, selector, value string, options ...CommandOptions) error {
+func (p *NativeApp) Fill(ctx context.Context, selector, value string, options ...CommandOptions) error {
 	_, err := p.fillResult(ctx, selector, value, options...)
 	return err
 }
 
-func (p *AndroidApp) Press(ctx context.Context, selector, key string, options ...PressOptions) error {
+func (p *NativeApp) Press(ctx context.Context, selector, key string, options ...PressOptions) error {
 	_, err := p.pressResult(ctx, selector, key, options...)
 	return err
 }
 
-func (p *AndroidApp) TextContent(ctx context.Context, selector string, options ...CommandOptions) (string, error) {
+func (p *NativeApp) TextContent(ctx context.Context, selector string, options ...CommandOptions) (string, error) {
 	result, err := p.textContentResult(ctx, selector, options...)
 	if err != nil {
 		return "", err
@@ -242,7 +245,7 @@ func (p *AndroidApp) TextContent(ctx context.Context, selector string, options .
 	return result.Text, nil
 }
 
-func (p *AndroidApp) InnerText(ctx context.Context, selector string, options ...CommandOptions) (string, error) {
+func (p *NativeApp) InnerText(ctx context.Context, selector string, options ...CommandOptions) (string, error) {
 	result, err := p.innerTextResult(ctx, selector, options...)
 	if err != nil {
 		return "", err
@@ -250,12 +253,12 @@ func (p *AndroidApp) InnerText(ctx context.Context, selector string, options ...
 	return result.Text, nil
 }
 
-func (p *AndroidApp) WaitForSelector(ctx context.Context, selector string, options ...WaitForSelectorOptions) error {
+func (p *NativeApp) WaitForSelector(ctx context.Context, selector string, options ...WaitForSelectorOptions) error {
 	_, err := p.waitForSelectorResult(ctx, selector, options...)
 	return err
 }
 
-func (p *AndroidApp) Screenshot(ctx context.Context, options ...ScreenshotOptions) ([]byte, error) {
+func (p *NativeApp) Screenshot(ctx context.Context, options ...ScreenshotOptions) ([]byte, error) {
 	result, err := p.screenshotResult(ctx, options...)
 	if err != nil {
 		return nil, err
@@ -263,7 +266,7 @@ func (p *AndroidApp) Screenshot(ctx context.Context, options ...ScreenshotOption
 	return result.PNGData, nil
 }
 
-func (p *AndroidApp) clickResult(ctx context.Context, selector string, options ...CommandOptions) (*ClickResult, error) {
+func (p *NativeApp) clickResult(ctx context.Context, selector string, options ...CommandOptions) (*ClickResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("android app is nil")
 	}
@@ -313,7 +316,7 @@ func (p *AndroidApp) clickResult(ctx context.Context, selector string, options .
 	}
 }
 
-func (p *AndroidApp) fillResult(ctx context.Context, selector string, value string, options ...CommandOptions) (*FillResult, error) {
+func (p *NativeApp) fillResult(ctx context.Context, selector string, value string, options ...CommandOptions) (*FillResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("android app is nil")
 	}
@@ -364,7 +367,7 @@ func (p *AndroidApp) fillResult(ctx context.Context, selector string, value stri
 	}
 }
 
-func (p *AndroidApp) countResult(ctx context.Context, selector string, options ...CommandOptions) (*CountResult, error) {
+func (p *NativeApp) countResult(ctx context.Context, selector string, options ...CommandOptions) (*CountResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("android app is nil")
 	}
@@ -414,7 +417,7 @@ func (p *AndroidApp) countResult(ctx context.Context, selector string, options .
 	}
 }
 
-func (p *AndroidApp) focusResult(ctx context.Context, selector string, options ...CommandOptions) (*ElementResult, error) {
+func (p *NativeApp) focusResult(ctx context.Context, selector string, options ...CommandOptions) (*ElementResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("android app is nil")
 	}
@@ -463,7 +466,7 @@ func (p *AndroidApp) focusResult(ctx context.Context, selector string, options .
 	}
 }
 
-func (p *AndroidApp) pressResult(ctx context.Context, selector string, key string, options ...PressOptions) (*PressResult, error) {
+func (p *NativeApp) pressResult(ctx context.Context, selector string, key string, options ...PressOptions) (*PressResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("android app is nil")
 	}
@@ -518,15 +521,15 @@ func (p *AndroidApp) pressResult(ctx context.Context, selector string, key strin
 	}
 }
 
-func (p *AndroidApp) textContentResult(ctx context.Context, selector string, options ...CommandOptions) (*TextResult, error) {
+func (p *NativeApp) textContentResult(ctx context.Context, selector string, options ...CommandOptions) (*TextResult, error) {
 	return p.readText(ctx, selector, true, options...)
 }
 
-func (p *AndroidApp) innerTextResult(ctx context.Context, selector string, options ...CommandOptions) (*TextResult, error) {
+func (p *NativeApp) innerTextResult(ctx context.Context, selector string, options ...CommandOptions) (*TextResult, error) {
 	return p.readText(ctx, selector, false, options...)
 }
 
-func (p *AndroidApp) waitForSelectorResult(ctx context.Context, selector string, options ...WaitForSelectorOptions) (*WaitForSelectorResult, error) {
+func (p *NativeApp) waitForSelectorResult(ctx context.Context, selector string, options ...WaitForSelectorOptions) (*WaitForSelectorResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("android app is nil")
 	}
@@ -580,7 +583,7 @@ func (p *AndroidApp) waitForSelectorResult(ctx context.Context, selector string,
 	}
 }
 
-func (p *AndroidApp) screenshotResult(ctx context.Context, options ...ScreenshotOptions) (*ScreenshotResult, error) {
+func (p *NativeApp) screenshotResult(ctx context.Context, options ...ScreenshotOptions) (*ScreenshotResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("android app is nil")
 	}
@@ -634,7 +637,7 @@ func (p *AndroidApp) screenshotResult(ctx context.Context, options ...Screenshot
 	}
 }
 
-func (p *AndroidApp) readText(ctx context.Context, selector string, textContent bool, options ...CommandOptions) (*TextResult, error) {
+func (p *NativeApp) readText(ctx context.Context, selector string, textContent bool, options ...CommandOptions) (*TextResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("android app is nil")
 	}
@@ -707,18 +710,18 @@ func (d *AndroidDevice) SessionID() string {
 	return d.sessionID
 }
 
-func (d *AndroidDevice) App() *AndroidApp {
+func (d *AndroidDevice) App() *NativeApp {
 	if d == nil {
 		return nil
 	}
 	return d.app
 }
 
-func (d *AndroidDevice) InitialApp() *AndroidApp {
+func (d *AndroidDevice) InitialApp() *NativeApp {
 	return d.App()
 }
 
-func (d *AndroidDevice) Launch(ctx context.Context, options MobileAndroidLaunchOptions) (*AndroidApp, error) {
+func (d *AndroidDevice) Launch(ctx context.Context, options MobileAndroidLaunchOptions) (*NativeApp, error) {
 	if d == nil {
 		return nil, fmt.Errorf("android device is nil")
 	}
@@ -747,7 +750,7 @@ func (d *AndroidDevice) Launch(ctx context.Context, options MobileAndroidLaunchO
 		}
 		switch payload := event.GetEvent().(type) {
 		case *enginev1.SurfaceSessionEvent_AppLaunched:
-			d.app = &AndroidApp{
+			d.app = &NativeApp{
 				runtime:          d.runtime,
 				surfaceSessionID: d.surfaceSessionID,
 				sessionID:        payload.AppLaunched.GetAppSessionId(),
@@ -803,7 +806,7 @@ func (AndroidSurface) Connect(ctx context.Context, options MobileAndroidConnectO
 				stream:           stream,
 				sessionID:        sessionID,
 				surfaceSessionID: event.GetSessionId(),
-				app: &AndroidApp{
+				app: &NativeApp{
 					runtime:          runtime,
 					surfaceSessionID: event.GetSessionId(),
 					sessionID:        payload.MobileConnected.GetInitialAppSessionId(),
@@ -851,7 +854,7 @@ func (IOSSurface) Connect(ctx context.Context, options MobileIOSConnectOptions) 
 			return &IOSDevice{android: &AndroidDevice{
 				runtime: runtime, stream: stream, sessionID: sessionID,
 				surfaceSessionID: event.GetSessionId(),
-				app:              &AndroidApp{runtime: runtime, surfaceSessionID: event.GetSessionId(), sessionID: payload.MobileConnected.GetInitialAppSessionId()},
+				app:              &NativeApp{runtime: runtime, surfaceSessionID: event.GetSessionId(), sessionID: payload.MobileConnected.GetInitialAppSessionId()},
 			}}, nil
 		case *enginev1.SurfaceSessionEvent_Error:
 			return nil, fmt.Errorf("iOS device session error: %s", payload.Error.GetMessage())
@@ -881,31 +884,31 @@ func (d *IOSDevice) Launch(ctx context.Context, options MobileIOSLaunchOptions) 
 	})
 }
 
-func (l *AndroidLocator) App() *AndroidApp {
+func (l *NativeLocator) App() *NativeApp {
 	if l == nil {
 		return nil
 	}
 	return l.page
 }
 
-func (l *AndroidLocator) Selector() string {
+func (l *NativeLocator) Selector() string {
 	if l == nil {
 		return ""
 	}
 	return l.selector
 }
 
-func (l *AndroidLocator) Locator(selector string) *AndroidLocator {
+func (l *NativeLocator) Locator(selector string) *NativeLocator {
 	if l == nil {
 		return nil
 	}
-	return &AndroidLocator{
+	return &NativeLocator{
 		page:     l.page,
 		selector: chainMobileSelectorForTransport(l.selector, selector),
 	}
 }
 
-func (l *AndroidLocator) GetByRole(role string, options ...RoleOptions) *AndroidLocator {
+func (l *NativeLocator) GetByRole(role string, options ...RoleOptions) *NativeLocator {
 	o := RoleOptions{}
 	if len(options) > 0 {
 		o = options[0]
@@ -913,7 +916,7 @@ func (l *AndroidLocator) GetByRole(role string, options ...RoleOptions) *Android
 	return l.Locator(roleSelector(role, o))
 }
 
-func (l *AndroidLocator) GetByText(value any, options ...TextOptions) *AndroidLocator {
+func (l *NativeLocator) GetByText(value any, options ...TextOptions) *NativeLocator {
 	o := TextOptions{}
 	if len(options) > 0 {
 		o = options[0]
@@ -921,7 +924,7 @@ func (l *AndroidLocator) GetByText(value any, options ...TextOptions) *AndroidLo
 	return l.Locator(semanticSelector(map[string]any{"kind": "text", "text": value, "exact": o.Exact}))
 }
 
-func (l *AndroidLocator) GetByLabel(value any, options ...TextOptions) *AndroidLocator {
+func (l *NativeLocator) GetByLabel(value any, options ...TextOptions) *NativeLocator {
 	o := TextOptions{}
 	if len(options) > 0 {
 		o = options[0]
@@ -929,60 +932,60 @@ func (l *AndroidLocator) GetByLabel(value any, options ...TextOptions) *AndroidL
 	return l.Locator(semanticSelector(map[string]any{"kind": "label", "text": value, "exact": o.Exact}))
 }
 
-func (l *AndroidLocator) GetByTestId(value any, _ ...TextOptions) *AndroidLocator {
+func (l *NativeLocator) GetByTestId(value any, _ ...TextOptions) *NativeLocator {
 	return l.Locator(semanticSelector(map[string]any{"kind": "testId", "text": value}))
 }
 
-func (l *AndroidLocator) Click(ctx context.Context, options ...CommandOptions) error {
+func (l *NativeLocator) Click(ctx context.Context, options ...CommandOptions) error {
 	if l == nil || l.page == nil {
 		return fmt.Errorf("android locator page is nil")
 	}
 	return l.page.Click(ctx, l.selector, options...)
 }
 
-func (l *AndroidLocator) Count(ctx context.Context, options ...CommandOptions) (int, error) {
+func (l *NativeLocator) Count(ctx context.Context, options ...CommandOptions) (int, error) {
 	if l == nil || l.page == nil {
 		return 0, fmt.Errorf("android locator page is nil")
 	}
 	return l.page.Count(ctx, l.selector, options...)
 }
 
-func (l *AndroidLocator) Focus(ctx context.Context, options ...CommandOptions) error {
+func (l *NativeLocator) Focus(ctx context.Context, options ...CommandOptions) error {
 	if l == nil || l.page == nil {
 		return fmt.Errorf("android locator page is nil")
 	}
 	return l.page.Focus(ctx, l.selector, options...)
 }
 
-func (l *AndroidLocator) Fill(ctx context.Context, value string, options ...CommandOptions) error {
+func (l *NativeLocator) Fill(ctx context.Context, value string, options ...CommandOptions) error {
 	if l == nil || l.page == nil {
 		return fmt.Errorf("android locator page is nil")
 	}
 	return l.page.Fill(ctx, l.selector, value, options...)
 }
 
-func (l *AndroidLocator) Press(ctx context.Context, key string, options ...PressOptions) error {
+func (l *NativeLocator) Press(ctx context.Context, key string, options ...PressOptions) error {
 	if l == nil || l.page == nil {
 		return fmt.Errorf("android locator page is nil")
 	}
 	return l.page.Press(ctx, l.selector, key, options...)
 }
 
-func (l *AndroidLocator) TextContent(ctx context.Context, options ...CommandOptions) (string, error) {
+func (l *NativeLocator) TextContent(ctx context.Context, options ...CommandOptions) (string, error) {
 	if l == nil || l.page == nil {
 		return "", fmt.Errorf("android locator page is nil")
 	}
 	return l.page.TextContent(ctx, l.selector, options...)
 }
 
-func (l *AndroidLocator) InnerText(ctx context.Context, options ...CommandOptions) (string, error) {
+func (l *NativeLocator) InnerText(ctx context.Context, options ...CommandOptions) (string, error) {
 	if l == nil || l.page == nil {
 		return "", fmt.Errorf("android locator page is nil")
 	}
 	return l.page.InnerText(ctx, l.selector, options...)
 }
 
-func (l *AndroidLocator) WaitFor(ctx context.Context, options ...WaitForSelectorOptions) error {
+func (l *NativeLocator) WaitFor(ctx context.Context, options ...WaitForSelectorOptions) error {
 	if l == nil || l.page == nil {
 		return fmt.Errorf("android locator page is nil")
 	}

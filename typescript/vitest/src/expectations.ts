@@ -1,4 +1,4 @@
-import type { BoundingBox, CommandOptions, Locator, MobileAndroidApp, MobileAndroidLocator, Page, WaitForSelectorOptions } from "@allwright.dev/core";
+import type { BoundingBox, CommandOptions, Locator, NativeApp, NativeAppLocator, Page, WaitForSelectorOptions } from "@allwright.dev/core";
 import { expect as vitestExpect } from "vitest";
 
 export interface RetryExpectationOptions { timeoutMs?: number; intervalMs?: number }
@@ -39,7 +39,7 @@ export interface PageExpectMatchers extends MobilePageExpectMatchers {
   toHaveBoundingBox(selector: string, expected: Partial<BoundingBox> | null, options?: TextExpectationOptions): Promise<void>;
 }
 type Defaults = () => RetryExpectationOptions;
-type AnyLocator = Locator | MobileAndroidLocator;
+type AnyLocator = Locator | NativeAppLocator;
 
 function callableMatchers<T extends object>(matchers: T): T & (() => T) {
   return Object.defineProperties(() => matchers, Object.getOwnPropertyDescriptors(matchers)) as T & (() => T);
@@ -103,7 +103,7 @@ async function isVisible(locator: AnyLocator, command: CommandOptions): Promise<
 }
 
 export function createLocatorExpect(locator: Locator, defaults: Defaults, negated?: boolean): LocatorExpectMatchers;
-export function createLocatorExpect(locator: MobileAndroidLocator, defaults: Defaults, negated?: boolean): MobileLocatorExpectMatchers;
+export function createLocatorExpect(locator: NativeAppLocator, defaults: Defaults, negated?: boolean): MobileLocatorExpectMatchers;
 export function createLocatorExpect(locator: AnyLocator, defaults: Defaults, negated?: boolean): MobileLocatorExpectMatchers;
 export function createLocatorExpect(locator: AnyLocator, defaults: Defaults, negated = false): MobileLocatorExpectMatchers {
   const assertion = (value: unknown) => negated ? vitestExpect(value).not : vitestExpect(value);
@@ -174,9 +174,9 @@ export function createLocatorExpect(locator: AnyLocator, defaults: Defaults, neg
 }
 
 export function createPageExpect(page: Page, defaults: Defaults, negated?: boolean): PageExpectMatchers;
-export function createPageExpect(page: MobileAndroidApp, defaults: Defaults, negated?: boolean): MobilePageExpectMatchers;
-export function createPageExpect(page: Page | MobileAndroidApp, defaults: Defaults, negated?: boolean): MobilePageExpectMatchers;
-export function createPageExpect(page: Page | MobileAndroidApp, defaults: Defaults, negated = false): MobilePageExpectMatchers {
+export function createPageExpect(page: NativeApp, defaults: Defaults, negated?: boolean): MobilePageExpectMatchers;
+export function createPageExpect(page: Page | NativeApp, defaults: Defaults, negated?: boolean): MobilePageExpectMatchers;
+export function createPageExpect(page: Page | NativeApp, defaults: Defaults, negated = false): MobilePageExpectMatchers {
   const matcher = (selector: string) => createLocatorExpect(page.locator(selector), defaults, negated);
   const common: MobilePageExpectMatchers = {
     get not() { return callableMatchers(createPageExpect(page, defaults, !negated)); },

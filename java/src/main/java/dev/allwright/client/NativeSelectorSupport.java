@@ -1,7 +1,7 @@
 package dev.allwright.client;
 
-final class AndroidSelectorSupport {
-    private AndroidSelectorSupport() {}
+final class NativeSelectorSupport {
+    private NativeSelectorSupport() {}
 
     private static final String[] UIAUTOMATOR_SELECTOR_KEYS = {
             "text",

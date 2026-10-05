@@ -38,7 +38,7 @@ mod private {
     pub trait Sealed {
         fn name() -> &'static str;
         fn decode(
-            app: &AndroidApp,
+            app: &NativeApp,
             result: HookCompletionResult,
         ) -> Result<<Self as AndroidHookType>::Output>
         where
@@ -53,7 +53,7 @@ impl private::Sealed for FileChooserHook {
     fn name() -> &'static str {
         "file_chooser"
     }
-    fn decode(app: &AndroidApp, result: HookCompletionResult) -> Result<AndroidFileChooser> {
+    fn decode(app: &NativeApp, result: HookCompletionResult) -> Result<AndroidFileChooser> {
         let HookCompletionResult::MobileFileChooser(result) = result else {
             return Err(Error::new(
                 "Android file chooser hook returned an invalid result",
@@ -73,7 +73,7 @@ impl private::Sealed for DownloadHook {
     fn name() -> &'static str {
         "download"
     }
-    fn decode(app: &AndroidApp, result: HookCompletionResult) -> Result<AndroidDownload> {
+    fn decode(app: &NativeApp, result: HookCompletionResult) -> Result<AndroidDownload> {
         let HookCompletionResult::MobileDownload(result) = result else {
             return Err(Error::new(
                 "Android download hook returned an invalid result",
@@ -88,21 +88,21 @@ impl private::Sealed for DownloadHook {
 }
 
 pub struct AndroidHook<T: AndroidHookType> {
-    app: AndroidApp,
+    app: NativeApp,
     id: String,
     _type: PhantomData<T>,
 }
 
 #[derive(Clone)]
 pub struct AndroidFileChooser {
-    app: AndroidApp,
+    app: NativeApp,
     id: String,
     is_multiple: bool,
 }
 
 #[derive(Clone)]
 pub struct AndroidDownload {
-    app: AndroidApp,
+    app: NativeApp,
     id: String,
     suggested_filename: String,
 }
@@ -164,16 +164,16 @@ pub struct DesktopMacLaunchOptions {
     pub timeout_ms: Option<u32>,
 }
 
-pub type MacApp = AndroidApp;
-pub type MacLocator = AndroidLocator;
+pub type MacApp = NativeApp;
+pub type MacLocator = NativeLocator;
 
 #[derive(Clone)]
 pub struct MacDesktop {
     inner: AndroidDevice,
 }
 
-pub type IosApp = AndroidApp;
-pub type IosLocator = AndroidLocator;
+pub type IosApp = NativeApp;
+pub type IosLocator = NativeLocator;
 
 #[derive(Clone)]
 pub struct IosDevice {
@@ -181,15 +181,18 @@ pub struct IosDevice {
 }
 
 #[derive(Clone)]
-pub struct AndroidLocator {
-    page: AndroidApp,
+pub struct NativeLocator {
+    page: NativeApp,
     selector: String,
 }
 
 #[derive(Clone)]
-pub struct AndroidApp {
-    inner: Arc<AndroidAppInner>,
+pub struct NativeApp {
+    inner: Arc<NativeAppInner>,
 }
+
+pub type AndroidApp = NativeApp;
+pub type AndroidLocator = NativeLocator;
 
 #[derive(Clone)]
 pub struct AndroidDevice {
@@ -200,8 +203,8 @@ struct AndroidDeviceInner {
     runtime: Arc<RuntimeClient>,
     state: AsyncMutex<AndroidDeviceState>,
     session_id: String,
-    initial_app: AndroidApp,
-    current_app: Mutex<AndroidApp>,
+    initial_app: NativeApp,
+    current_app: Mutex<NativeApp>,
 }
 
 struct AndroidDeviceState {
@@ -210,15 +213,15 @@ struct AndroidDeviceState {
     closed: bool,
 }
 
-struct AndroidAppInner {
+struct NativeAppInner {
     runtime: Arc<RuntimeClient>,
     surface_session_id: String,
     session_id: String,
-    state: AsyncMutex<AndroidAppState>,
+    state: AsyncMutex<NativeAppState>,
 }
 
 #[derive(Default)]
-struct AndroidAppState {
+struct NativeAppState {
     handle: Option<AndroidTabHandle>,
 }
 
@@ -264,12 +267,12 @@ pub mod android {
                     device_session_id,
                     ..
                 })) => {
-                    let initial_app = AndroidApp {
-                        inner: Arc::new(AndroidAppInner {
+                    let initial_app = NativeApp {
+                        inner: Arc::new(NativeAppInner {
                             runtime: Arc::clone(&runtime),
                             surface_session_id: event.session_id.clone(),
                             session_id: initial_app_session_id,
-                            state: AsyncMutex::new(AndroidAppState::default()),
+                            state: AsyncMutex::new(NativeAppState::default()),
                         }),
                     };
                     return Ok(AndroidDevice {
@@ -340,12 +343,12 @@ pub mod ios {
                     device_session_id,
                     ..
                 })) => {
-                    let initial_app = AndroidApp {
-                        inner: Arc::new(AndroidAppInner {
+                    let initial_app = NativeApp {
+                        inner: Arc::new(NativeAppInner {
                             runtime: Arc::clone(&runtime),
                             surface_session_id: event.session_id.clone(),
                             session_id: initial_app_session_id,
-                            state: AsyncMutex::new(AndroidAppState::default()),
+                            state: AsyncMutex::new(NativeAppState::default()),
                         }),
                     };
                     return Ok(IosDevice {
@@ -417,12 +420,12 @@ pub mod desktop {
                         desktop_session_id,
                         ..
                     })) => {
-                        let initial_app = AndroidApp {
-                            inner: Arc::new(AndroidAppInner {
+                        let initial_app = NativeApp {
+                            inner: Arc::new(NativeAppInner {
                                 runtime: Arc::clone(&runtime),
                                 surface_session_id: event.session_id.clone(),
                                 session_id: initial_app_session_id,
-                                state: AsyncMutex::new(AndroidAppState::default()),
+                                state: AsyncMutex::new(NativeAppState::default()),
                             }),
                         };
                         return Ok(MacDesktop {
@@ -485,12 +488,12 @@ impl MacDesktop {
                     app_session_id,
                     ..
                 })) => {
-                    let app = AndroidApp {
-                        inner: Arc::new(AndroidAppInner {
+                    let app = NativeApp {
+                        inner: Arc::new(NativeAppInner {
                             runtime: Arc::clone(&self.inner.inner.runtime),
                             surface_session_id: event.session_id,
                             session_id: app_session_id,
-                            state: AsyncMutex::new(AndroidAppState::default()),
+                            state: AsyncMutex::new(NativeAppState::default()),
                         }),
                     };
                     if let Ok(mut current_app) = self.inner.inner.current_app.lock() {
@@ -536,7 +539,7 @@ impl AndroidDevice {
         &self.inner.session_id
     }
 
-    pub fn app(&self) -> AndroidApp {
+    pub fn app(&self) -> NativeApp {
         self.inner
             .current_app
             .lock()
@@ -544,11 +547,11 @@ impl AndroidDevice {
             .unwrap_or_else(|_| self.inner.initial_app.clone())
     }
 
-    pub fn initial_app(&self) -> AndroidApp {
+    pub fn initial_app(&self) -> NativeApp {
         self.inner.initial_app.clone()
     }
 
-    pub async fn launch(&self, options: MobileAndroidLaunchOptions) -> Result<AndroidApp> {
+    pub async fn launch(&self, options: MobileAndroidLaunchOptions) -> Result<NativeApp> {
         let mut state = self.inner.state.lock().await;
         ensure_android_device_open(&state, &self.inner.session_id)?;
 
@@ -574,12 +577,12 @@ impl AndroidDevice {
 
             match event.event {
                 Some(SurfaceEvent::AppLaunched(AppLaunchedEvent { app_session_id, .. })) => {
-                    let app = AndroidApp {
-                        inner: Arc::new(AndroidAppInner {
+                    let app = NativeApp {
+                        inner: Arc::new(NativeAppInner {
                             runtime: Arc::clone(&self.inner.runtime),
                             surface_session_id: event.session_id,
                             session_id: app_session_id,
-                            state: AsyncMutex::new(AndroidAppState::default()),
+                            state: AsyncMutex::new(NativeAppState::default()),
                         }),
                     };
                     if let Ok(mut current_app) = self.inner.current_app.lock() {
@@ -605,7 +608,7 @@ impl AndroidDevice {
     }
 }
 
-impl AndroidApp {
+impl NativeApp {
     pub fn session_id(&self) -> &str {
         &self.inner.session_id
     }
@@ -649,14 +652,14 @@ impl AndroidApp {
         }
     }
 
-    pub fn locator(&self, selector: impl Into<String>) -> AndroidLocator {
-        AndroidLocator {
+    pub fn locator(&self, selector: impl Into<String>) -> NativeLocator {
+        NativeLocator {
             page: self.clone(),
             selector: normalize_mobile_selector_for_transport(&selector.into()),
         }
     }
 
-    pub fn get_by_role(&self, role: impl Into<String>) -> AndroidLocator {
+    pub fn get_by_role(&self, role: impl Into<String>) -> NativeLocator {
         self.get_by_role_with_options(role, RoleOptions::default())
     }
 
@@ -664,14 +667,14 @@ impl AndroidApp {
         &self,
         role: impl Into<String>,
         options: RoleOptions,
-    ) -> AndroidLocator {
+    ) -> NativeLocator {
         let mut spec = serde_json::to_value(options).expect("role options");
         spec["kind"] = serde_json::json!("role");
         spec["role"] = serde_json::json!(role.into());
         self.locator(mobile_semantic_selector(spec))
     }
 
-    pub fn get_by_text(&self, text: impl Into<TextMatcher>) -> AndroidLocator {
+    pub fn get_by_text(&self, text: impl Into<TextMatcher>) -> NativeLocator {
         self.get_by_text_with_options(text, TextOptions::default())
     }
 
@@ -679,11 +682,11 @@ impl AndroidApp {
         &self,
         text: impl Into<TextMatcher>,
         options: TextOptions,
-    ) -> AndroidLocator {
+    ) -> NativeLocator {
         self.locator(mobile_text_selector("text", text.into(), options))
     }
 
-    pub fn get_by_label(&self, text: impl Into<TextMatcher>) -> AndroidLocator {
+    pub fn get_by_label(&self, text: impl Into<TextMatcher>) -> NativeLocator {
         self.get_by_label_with_options(text, TextOptions::default())
     }
 
@@ -691,11 +694,11 @@ impl AndroidApp {
         &self,
         text: impl Into<TextMatcher>,
         options: TextOptions,
-    ) -> AndroidLocator {
+    ) -> NativeLocator {
         self.locator(mobile_text_selector("label", text.into(), options))
     }
 
-    pub fn get_by_test_id(&self, text: impl Into<TextMatcher>) -> AndroidLocator {
+    pub fn get_by_test_id(&self, text: impl Into<TextMatcher>) -> NativeLocator {
         self.locator(mobile_semantic_selector(
             serde_json::json!({"kind":"testId", "text":text.into()}),
         ))
@@ -1097,7 +1100,7 @@ impl AndroidApp {
 
     async fn ensure_handle<'a>(
         &self,
-        state: &'a mut AndroidAppState,
+        state: &'a mut NativeAppState,
     ) -> Result<&'a mut AndroidTabHandle> {
         if state.handle.is_none() {
             let mut engine = self.inner.runtime.engine.clone();
@@ -1241,7 +1244,7 @@ impl AndroidFileChooser {
     pub fn id(&self) -> &str {
         &self.id
     }
-    pub fn app(&self) -> &AndroidApp {
+    pub fn app(&self) -> &NativeApp {
         &self.app
     }
     pub fn is_multiple(&self) -> bool {
@@ -1306,7 +1309,7 @@ impl AndroidDownload {
     pub fn id(&self) -> &str {
         &self.id
     }
-    pub fn app(&self) -> &AndroidApp {
+    pub fn app(&self) -> &NativeApp {
         &self.app
     }
     pub fn suggested_filename(&self) -> &str {
@@ -1354,7 +1357,7 @@ impl AndroidDownload {
 }
 
 async fn upload_android_client_file(
-    app: &AndroidApp,
+    app: &NativeApp,
     handle: &mut AndroidTabHandle,
     path: &Path,
 ) -> Result<String> {
@@ -1419,7 +1422,7 @@ async fn upload_android_client_file(
 }
 
 async fn download_android_client_file(
-    app: &AndroidApp,
+    app: &NativeApp,
     handle: &mut AndroidTabHandle,
     file_id: &str,
     path: &Path,
@@ -1476,8 +1479,8 @@ async fn download_android_client_file(
     }
 }
 
-impl AndroidLocator {
-    pub fn app(&self) -> &AndroidApp {
+impl NativeLocator {
+    pub fn app(&self) -> &NativeApp {
         &self.page
     }
 
@@ -1485,14 +1488,14 @@ impl AndroidLocator {
         &self.selector
     }
 
-    pub fn locator(&self, selector: impl Into<String>) -> AndroidLocator {
-        AndroidLocator {
+    pub fn locator(&self, selector: impl Into<String>) -> NativeLocator {
+        NativeLocator {
             page: self.page.clone(),
             selector: chain_mobile_selector_for_transport(&self.selector, &selector.into()),
         }
     }
 
-    pub fn get_by_role(&self, role: impl Into<String>) -> AndroidLocator {
+    pub fn get_by_role(&self, role: impl Into<String>) -> NativeLocator {
         self.get_by_role_with_options(role, RoleOptions::default())
     }
 
@@ -1500,14 +1503,14 @@ impl AndroidLocator {
         &self,
         role: impl Into<String>,
         options: RoleOptions,
-    ) -> AndroidLocator {
+    ) -> NativeLocator {
         let mut spec = serde_json::to_value(options).expect("role options");
         spec["kind"] = serde_json::json!("role");
         spec["role"] = serde_json::json!(role.into());
         self.locator(mobile_semantic_selector(spec))
     }
 
-    pub fn get_by_text(&self, text: impl Into<TextMatcher>) -> AndroidLocator {
+    pub fn get_by_text(&self, text: impl Into<TextMatcher>) -> NativeLocator {
         self.get_by_text_with_options(text, TextOptions::default())
     }
 
@@ -1515,11 +1518,11 @@ impl AndroidLocator {
         &self,
         text: impl Into<TextMatcher>,
         options: TextOptions,
-    ) -> AndroidLocator {
+    ) -> NativeLocator {
         self.locator(mobile_text_selector("text", text.into(), options))
     }
 
-    pub fn get_by_label(&self, text: impl Into<TextMatcher>) -> AndroidLocator {
+    pub fn get_by_label(&self, text: impl Into<TextMatcher>) -> NativeLocator {
         self.get_by_label_with_options(text, TextOptions::default())
     }
 
@@ -1527,11 +1530,11 @@ impl AndroidLocator {
         &self,
         text: impl Into<TextMatcher>,
         options: TextOptions,
-    ) -> AndroidLocator {
+    ) -> NativeLocator {
         self.locator(mobile_text_selector("label", text.into(), options))
     }
 
-    pub fn get_by_test_id(&self, text: impl Into<TextMatcher>) -> AndroidLocator {
+    pub fn get_by_test_id(&self, text: impl Into<TextMatcher>) -> NativeLocator {
         self.locator(mobile_semantic_selector(
             serde_json::json!({"kind":"testId", "text":text.into()}),
         ))
@@ -1864,7 +1867,7 @@ fn chain_mobile_selector_for_transport(parent: &str, child: &str) -> String {
     format!("{parent} {child}")
 }
 
-impl AndroidApp {
+impl NativeApp {
     pub async fn accessibility_snapshot(&self) -> Result<String> {
         self.accessibility_snapshot_with_options(AccessibilitySnapshotOptions::default())
             .await

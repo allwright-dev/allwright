@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 
-from ._mobile import AndroidApp, AndroidLocator
+from ._mobile import NativeApp, NativeLocator
 from ._proto import engine_pb2
 from ._transport import RuntimeClient, StreamHandle
 from ._types import AllwrightError
@@ -26,8 +26,8 @@ class DesktopMacLaunchOptions:
         self.timeout_ms = timeout_ms
 
 
-MacApp = AndroidApp
-MacLocator = AndroidLocator
+MacApp = NativeApp
+MacLocator = NativeLocator
 
 
 class MacDesktop:
@@ -45,7 +45,7 @@ class MacDesktop:
         self._closed = False
         self._session_id = session_id
         self._surface_session_id = surface_session_id
-        self._app = AndroidApp(runtime, surface_session_id, initial_app_session_id)
+        self._app = NativeApp(runtime, surface_session_id, initial_app_session_id)
 
     @property
     def session_id(self) -> str:
@@ -71,7 +71,7 @@ class MacDesktop:
                 event = self._stream.recv("receive macOS app launch event")
                 match event.WhichOneof("event"):
                     case "desktop_app_launched":
-                        self._app = AndroidApp(
+                        self._app = NativeApp(
                             self._runtime,
                             self._surface_session_id,
                             event.desktop_app_launched.app_session_id,
