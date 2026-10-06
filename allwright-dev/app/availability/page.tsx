@@ -48,7 +48,7 @@ const webAvailable = [
   "Read visible or raw text from an element",
   "Capture the current page URL, live input values, selected options and text, checkbox/radio state, attributes, and element bounding boxes",
   "Wait for an element to appear or become visible",
-  "Capture screenshots",
+  "Capture viewport or full-page screenshots",
   "Read page accessibility snapshots as JSON or standard YAML, with queryable element references in AI mode",
   "Retrying URL, value, selection, checked state, text, attribute, bounding-box, count, and visibility assertions, including negation (via @allwright.dev/vitest)",
 ];
@@ -58,14 +58,17 @@ const webNotYetAvailable = [
   "Cookies and saved session state",
   "Geolocation and other device permissions",
   "Mobile viewport and device emulation",
+  "Double-click, right-click, and configurable pointer-button actions",
   "Drag and drop",
   "Multiple isolated browser profiles per session",
+  "Video recording, tracing, coverage, or PDF export",
   "Safari / WebKit (Chromium and Firefox only today)",
 ];
 
 const androidAvailable = [
   "Connect to a running emulator or a real device over adb — no separate driver server to run",
   "Install and launch a real app from a local APK or a URL",
+  "Open universal links and custom URL schemes with app.goto / app.navigate",
   "Click an element",
   "Type into a field",
   "Focus an element",
@@ -83,7 +86,12 @@ const androidAvailable = [
 
 const androidNotYetAvailable = [
   "Hover and highlight (web-only for now)",
-  "Broader session and state management as the surface matures",
+  "Explicit swipe, scroll, drag-and-drop, pinch, and multi-touch gesture APIs",
+  "Input-value, selected-option, checked-state, attribute, and bounding-box reads",
+  "Typed dialog and newly opened app-context hooks (file chooser and download hooks are available)",
+  "Multiple isolated app sessions or switching among several foreground app contexts",
+  "General CSS/DOM, iframe, or arbitrary in-app JavaScript sessions for WebViews",
+  "Network mocking, request interception, cookies, permissions, tracing, and video recording",
 ];
 
 const iosAvailable = [
@@ -104,7 +112,13 @@ const iosAvailable = [
 ];
 
 const iosNotYetAvailable = [
+  "Hover and highlight (web-only for now)",
+  "Explicit swipe, scroll, drag-and-drop, pinch, and multi-touch gesture APIs",
+  "Input-value, selected-option, checked-state, attribute, and bounding-box reads",
+  "Typed dialog and newly opened app-context hooks (file chooser and download hooks are available)",
+  "Multiple isolated app sessions or switching among several foreground app contexts",
   "Arbitrary in-page JavaScript and general CSS/DOM sessions inside WebViews",
+  "Network mocking, request interception, cookies, permissions, tracing, and video recording",
 ];
 
 const macAvailable = [
@@ -114,13 +128,19 @@ const macAvailable = [
   "Capture native application screenshots",
   "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
   "Use accessibility-id, text, XCTest element type, basic XPath, and Playwright-style semantic locators",
+  "Use retrying text, count, and visibility assertions through @allwright.dev/vitest",
   "Use the same Rust, Go, Java, Python, and TypeScript server-only client shape as the other surfaces",
 ];
 
 const macNotYetAvailable = [
-  "Linux desktop applications",
   "Application installation or distribution — launch targets must already be installed",
-  "Web-style DOM, JavaScript, navigation, hooks, and browser state APIs",
+  "Deep-link or URL-scheme navigation",
+  "Full-page or scroll-and-stitch screenshots",
+  "File-chooser, download, dialog, and newly opened window hooks",
+  "Input-value, selected-option, checked-state, attribute, and bounding-box reads",
+  "Hover, highlight, drag-and-drop, multi-click, and other pointer gesture APIs",
+  "Multiple isolated desktop sessions or switching among several application windows",
+  "Web-style DOM, iframe, arbitrary JavaScript, network, cookie, permission, tracing, and video APIs",
 ];
 
 const winAvailable = [
@@ -131,18 +151,145 @@ const winAvailable = [
   "Capture native application screenshots",
   "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
   "Use native UI Automation selectors and Playwright-style semantic locators",
+  "Use retrying text, count, and visibility assertions through @allwright.dev/vitest",
   "Use the same Rust, Go, Java, Python, and TypeScript server-only client shape as the other surfaces",
 ];
 
 const winNotYetAvailable = [
   "Windows on ARM and 32-bit Windows",
   "Application installation or distribution — launch targets must already be installed",
-  "Web-style DOM, JavaScript, navigation, hooks, and browser state APIs",
+  "Deep-link or URL-scheme navigation",
+  "Full-page or scroll-and-stitch screenshots",
+  "File-chooser, download, dialog, and newly opened window hooks",
+  "Input-value, selected-option, checked-state, attribute, and bounding-box reads",
+  "Hover, highlight, drag-and-drop, multi-click, and other pointer gesture APIs",
+  "Multiple isolated desktop sessions or switching among several application windows",
+  "Web-style DOM, iframe, arbitrary JavaScript, network, cookie, permission, tracing, and video APIs",
 ];
 
-const plannedSurfaces = surfaceStatus.filter(
-  (surface) => surface.label === "API",
-);
+const capabilityParity = [
+  {
+    capability: "Click, focus, fill, key input, text, count, and waits",
+    web: "Available",
+    android: "Available",
+    ios: "Available",
+    mac: "Available",
+    windows: "Available",
+  },
+  {
+    capability: "Semantic locators",
+    web: "Available",
+    android: "Available",
+    ios: "Available",
+    mac: "Available",
+    windows: "Available",
+  },
+  {
+    capability: "Accessibility snapshots and AI references",
+    web: "Available",
+    android: "Available",
+    ios: "Available",
+    mac: "Available",
+    windows: "Available",
+  },
+  {
+    capability: "Viewport screenshots",
+    web: "Available",
+    android: "Available",
+    ios: "Available",
+    mac: "Available",
+    windows: "Available",
+  },
+  {
+    capability: "Full-page / scroll-and-stitch screenshots",
+    web: "Available",
+    android: "Available",
+    ios: "Available",
+    mac: "Not yet",
+    windows: "Not yet",
+  },
+  {
+    capability: "URL navigation and deep links",
+    web: "Available",
+    android: "Available",
+    ios: "Available",
+    mac: "Not yet",
+    windows: "Not yet",
+  },
+  {
+    capability: "File chooser and download hooks",
+    web: "Available",
+    android: "Available",
+    ios: "Available",
+    mac: "Not yet",
+    windows: "Not yet",
+  },
+  {
+    capability: "Dialogs and newly opened contexts",
+    web: "Available",
+    android: "Not yet",
+    ios: "Not yet",
+    mac: "Not yet",
+    windows: "Not yet",
+  },
+  {
+    capability: "Input, selection, checked, attribute, and box reads",
+    web: "Available",
+    android: "Text/count only",
+    ios: "Text/count only",
+    mac: "Text/count only",
+    windows: "Text/count only",
+  },
+  {
+    capability: "Retrying text, count, and visibility assertions",
+    web: "Available",
+    android: "Available",
+    ios: "Available",
+    mac: "Available",
+    windows: "Available",
+  },
+  {
+    capability: "Retrying URL, form-state, attribute, and box assertions",
+    web: "Available",
+    android: "Not yet",
+    ios: "Not yet",
+    mac: "Not yet",
+    windows: "Not yet",
+  },
+  {
+    capability: "Hover and highlight",
+    web: "Available",
+    android: "Not yet",
+    ios: "Not yet",
+    mac: "Not yet",
+    windows: "Not yet",
+  },
+  {
+    capability: "DOM, frames, and in-page JavaScript",
+    web: "Available",
+    android: "Accessibility tree only",
+    ios: "Accessibility tree only",
+    mac: "Native tree only",
+    windows: "Native tree only",
+  },
+  {
+    capability: "Install the application under test",
+    web: "Not applicable",
+    android: "Available",
+    ios: "Available",
+    mac: "Not yet",
+    windows: "Not yet",
+  },
+] as const;
+
+const plannedSurfaces = [
+  {
+    label: "Desktop — Linux",
+    detail: "The shared desktop contract exists, but there is no installable Linux automation runtime yet.",
+    status: "Not yet available" as const,
+  },
+  ...surfaceStatus.filter((surface) => surface.label === "API"),
+];
 
 export default function Availability() {
   return (
@@ -195,6 +342,54 @@ export default function Availability() {
               <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{surface.detail}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section aria-label="cross-surface feature parity" className="mx-auto mt-14 w-full sm:mt-16">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
+            Cross-surface feature parity
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
+            The core action and locator model is shared everywhere. Features
+            tied to browsers, mobile operating systems, or desktop windowing
+            still differ; this matrix makes those boundaries explicit.
+          </p>
+        </div>
+        <div className="mt-8 overflow-x-auto rounded-[2rem] border border-[var(--line)] bg-[var(--card)] backdrop-blur-xl">
+          <table className="min-w-[920px] w-full border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-[var(--line)] text-[var(--ink)]">
+                <th className="px-5 py-4 font-semibold">Capability</th>
+                <th className="px-4 py-4 font-semibold">Web</th>
+                <th className="px-4 py-4 font-semibold">Android</th>
+                <th className="px-4 py-4 font-semibold">iOS</th>
+                <th className="px-4 py-4 font-semibold">macOS</th>
+                <th className="px-4 py-4 font-semibold">Windows</th>
+              </tr>
+            </thead>
+            <tbody>
+              {capabilityParity.map((row) => (
+                <tr key={row.capability} className="border-b border-[var(--line)] last:border-b-0">
+                  <th className="px-5 py-4 font-medium leading-6 text-[var(--ink)]">{row.capability}</th>
+                  {[row.web, row.android, row.ios, row.mac, row.windows].map((value, index) => (
+                    <td
+                      key={`${row.capability}-${index}`}
+                      className={`px-4 py-4 leading-6 ${
+                        value === "Available"
+                          ? "font-medium text-[var(--accent-2)]"
+                          : value === "Not yet"
+                            ? "text-[var(--muted)]"
+                            : "text-[var(--ink)]"
+                      }`}
+                    >
+                      {value}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 

@@ -234,8 +234,9 @@ function PluginCatalogDiagram() {
         })}
       </svg>
       <figcaption className="mt-4 max-w-[46ch] text-center text-sm leading-6 text-[var(--muted)]">
-        Web and Mobile — Android are installed and ready; every other slot is
-        already reserved, waiting on a real runtime build.
+        Web, Mobile — Android, Mobile — iOS, Desktop — macOS, and Desktop —
+        Windows are installed and ready. Desktop — Linux remains reserved,
+        waiting on a real runtime build.
       </figcaption>
     </figure>
   );

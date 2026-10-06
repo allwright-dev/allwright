@@ -1992,7 +1992,7 @@ async fn handle_tab_command(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
                                 message:
-                                    "navigation is not supported for native macOS app sessions"
+                                    "navigation is not supported for native desktop app sessions"
                                         .to_string(),
                             }),
                         )],
@@ -2201,7 +2201,19 @@ async fn handle_tab_command(
                         events: vec![tab_event(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "highlight is not supported for Android app sessions"
+                                message: "highlight is only supported for web page sessions"
+                                    .to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+                (EngineBrowserSessionHandle::Desktop(_), EnginePageSessionHandle::Desktop(_)) => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "highlight is only supported for web page sessions"
                                     .to_string(),
                             }),
                         )],
@@ -2374,7 +2386,19 @@ async fn handle_tab_command(
                         events: vec![tab_event(
                             &context_session_id,
                             ContextEvent::Error(ContextSessionErrorEvent {
-                                message: "hover_element is not supported for mobile tab sessions"
+                                message: "hover_element is only supported for web page sessions"
+                                    .to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                }
+                (EngineBrowserSessionHandle::Desktop(_), EnginePageSessionHandle::Desktop(_)) => {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "hover_element is only supported for web page sessions"
                                     .to_string(),
                             }),
                         )],
