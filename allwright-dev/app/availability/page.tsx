@@ -6,7 +6,7 @@ import { SITE_NAME } from "../brand";
 import { StatusPill } from "../status-pill";
 
 const description =
-  "The honest, current picture of allwright: what web, Android, iOS, and macOS desktop automation can do today, what Windows, Linux, and API testing still need, and which client languages are published.";
+  "The honest, current picture of allwright: what web, Android, iOS, macOS, and Windows desktop automation can do today, what Linux and API testing still need, and which client languages are published.";
 
 export const metadata: Metadata = {
   title: "Availability",
@@ -118,7 +118,24 @@ const macAvailable = [
 ];
 
 const macNotYetAvailable = [
-  "Windows and Linux desktop applications",
+  "Linux desktop applications",
+  "Application installation or distribution — launch targets must already be installed",
+  "Web-style DOM, JavaScript, navigation, hooks, and browser state APIs",
+];
+
+const winAvailable = [
+  "Connect to the local Windows desktop with an automatically started UI Automation agent",
+  "Launch or terminate an application by executable path, a command Windows can resolve, or a packaged-app ID",
+  "Automate Win32, WinForms, WPF, UWP, and WinUI applications",
+  "Click, focus, fill, press keys, read text, wait for selectors, and count elements",
+  "Capture native application screenshots",
+  "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
+  "Use native UI Automation selectors and Playwright-style semantic locators",
+  "Use the same Rust, Go, Java, Python, and TypeScript server-only client shape as the other surfaces",
+];
+
+const winNotYetAvailable = [
+  "Windows on ARM and 32-bit Windows",
   "Application installation or distribution — launch targets must already be installed",
   "Web-style DOM, JavaScript, navigation, hooks, and browser state APIs",
 ];
@@ -143,7 +160,8 @@ export default function Availability() {
           against real Chromium and Firefox browsers, Android automation runs
           on real devices and emulators, and iOS automation runs natively on
           Simulators and registered devices. Native macOS application automation
-          runs through XCUITest — each with the actions, locators, and retrying
+          runs through XCUITest, and native Windows application automation
+          runs through UI Automation — each with the actions, locators, and retrying
           assertions everyday tests rely on. This page is the detailed,
           continuously updated picture behind the status pills you see
           elsewhere on the site — surface by surface, capability by
@@ -158,7 +176,7 @@ export default function Availability() {
             Surfaces
           </h2>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
-            Web, Mobile Android, Mobile iOS, and Desktop macOS have real,
+            Web, Mobile Android, Mobile iOS, Desktop macOS, and Desktop Windows have real,
             installable plugins today. The rest have a reserved place in the
             plugin catalog but no runtime build yet — installing them
             isn&apos;t possible until that changes.
@@ -367,13 +385,51 @@ export default function Availability() {
         </div>
       </section>
 
+      <section aria-label="windows desktop capabilities" className="mx-auto mt-14 w-full sm:mt-16">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
+            Desktop — Windows, capability by capability
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
+            The desktop-windows plugin is installable on Windows x64 and starts
+            its bundled, self-contained UI Automation agent automatically — no
+            Appium, WinAppDriver, Developer Mode, or separate .NET install. The
+            app under test must already be installed.
+          </p>
+        </div>
+        <div className="mt-8 grid gap-6 sm:grid-cols-2">
+          <div className="rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl sm:p-8">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--ink)]">Available now</h3>
+            <ul className="mt-5 space-y-3">
+              {winAvailable.map((item) => (
+                <li key={item} className="flex gap-2.5 text-sm leading-6 text-[var(--muted)]">
+                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" aria-hidden="true" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-[2rem] border border-dashed border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl sm:p-8">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--ink)]">Not yet available</h3>
+            <ul className="mt-5 space-y-3">
+              {winNotYetAvailable.map((item) => (
+                <li key={item} className="flex gap-2.5 text-sm leading-6 text-[var(--muted)]">
+                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full border border-dashed border-[var(--muted)]" aria-hidden="true" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
       <section aria-label="planned surfaces" className="mx-auto mt-14 w-full sm:mt-16">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
             Still to come
           </h2>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
-            Windows and Linux desktop plugins plus API testing remain part of
+            The Linux desktop plugin plus API testing remain part of
             the direction, but there is no installable runtime for them yet.
           </p>
         </div>

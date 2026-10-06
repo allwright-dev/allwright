@@ -34,7 +34,7 @@ const pluginCatalog = [
   { label: "Web", center: { x: 240, y: 60 }, status: "Available now" as const },
   { label: "Mobile — Android", center: { x: 370, y: 135 }, status: "Available now" as const },
   { label: "Mobile — iOS", center: { x: 370, y: 285 }, status: "Available now" as const },
-  { label: "Desktop — Windows", center: { x: 240, y: 360 }, status: "Not yet available" as const },
+  { label: "Desktop — Windows", center: { x: 240, y: 360 }, status: "Available now" as const },
   { label: "Desktop — Linux", center: { x: 110, y: 285 }, status: "Not yet available" as const },
   { label: "Desktop — macOS", center: { x: 110, y: 135 }, status: "Available now" as const },
 ];
@@ -97,7 +97,7 @@ function WithEngineDiagram() {
       <svg
         viewBox="0 0 260 240"
         role="img"
-        aria-label="One small allwright core in the center, reaching web, mobile, and macOS desktop with solid lines, while API and the remaining desktop platforms are still to come"
+        aria-label="One small allwright core in the center, reaching web, mobile, and macOS and Windows desktop with solid lines, while API and Linux desktop are still to come"
         className="h-auto w-full max-w-[280px] text-[var(--line)]"
       >
         <defs>
@@ -161,7 +161,7 @@ function PluginCatalogDiagram() {
       <svg
         viewBox="0 0 480 420"
         role="img"
-        aria-label="The allwright core in the center with today's plugin slots around it: Web, Mobile Android, Mobile iOS, and Desktop macOS are installed; Desktop Windows and Desktop Linux remain reserved."
+        aria-label="The allwright core in the center with today's plugin slots around it: Web, Mobile Android, Mobile iOS, Desktop macOS, and Desktop Windows are installed; Desktop Linux remains reserved."
         className="h-auto w-full max-w-md text-[var(--line)]"
       >
         <defs>
@@ -482,8 +482,12 @@ export default function HowItWorks() {
           no Appium, no separate driver server. iOS automatically provisions
           its Simulator runtime or locally re-signs its prebuilt physical-device
           agent, then installs the app under test from a local path or URL.
-          Desktop and API testing will follow the same model
-          once their plugins ship — no new tool to learn, just one more{" "}
+          Desktop works the same way: the macOS plugin drives native apps
+          through a bundled XCUITest runner, and the Windows plugin drives
+          Win32, WinForms, WPF, UWP, and WinUI apps through an isolated UI
+          Automation agent — still no Appium or WinAppDriver. Linux desktop
+          and API testing will follow the same model once their plugins ship
+          — no new tool to learn, just one more{" "}
           <code className="font-mono text-[var(--ink)]">plugin install</code>{" "}
           for whichever surface you need next.
         </p>

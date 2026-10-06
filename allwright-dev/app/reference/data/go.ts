@@ -399,7 +399,7 @@ export const goReference: LanguageReference = {
     {
       slug: "desktop",
       title: "Desktop",
-      description: "Native macOS application automation through the installable desktop-mac XCUITest plugin. Windows and Linux are not available yet.",
+      description: "Native macOS (XCUITest) and Windows (UI Automation) application automation through the installable desktop-mac and desktop-windows plugins. Linux is not available yet.",
       members: [
         {
           name: "Desktop.Mac.Connect",
@@ -423,6 +423,29 @@ export const goReference: LanguageReference = {
           signature: "func (p *MacApp) Locator(selector string) *MacLocator\nfunc (p *MacApp) GetByRole(role string, options ...RoleOptions) *MacLocator",
           description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include Click, Fill, Focus, Press, Count, TextContent, InnerText, WaitForSelector, Screenshot, and AccessibilitySnapshot.",
           since: "v0.1.21",
+        },
+        {
+          name: "Desktop.Windows.Connect",
+          kind: "method",
+          signature: "func (WindowsSurface) Connect(ctx context.Context, options DesktopWindowsConnectOptions) (*WindowsDesktop, error)",
+          description: "Connects to the local Windows desktop and starts the bundled UI Automation agent automatically. Requires Windows x64; no Appium, WinAppDriver, Developer Mode, or separate .NET install is needed.",
+          since: "v0.1.24",
+          example: "win, err := allwright.Desktop.Windows.Connect(ctx, allwright.DesktopWindowsConnectOptions{})",
+        },
+        {
+          name: "WindowsDesktop.Launch",
+          kind: "method",
+          signature: "func (d *WindowsDesktop) Launch(ctx context.Context, options DesktopWindowsLaunchOptions) (*WindowsApp, error)",
+          description: "Launches an application by executable path, a command Windows can resolve such as notepad.exe, or a packaged-app AUMID. The returned app supports native locators, actions, text reads, waits, screenshots, and accessibility snapshots.",
+          since: "v0.1.24",
+          example: "app, err := win.Launch(ctx, allwright.DesktopWindowsLaunchOptions{AppID: \"notepad.exe\"})",
+        },
+        {
+          name: "WindowsApp locators and actions",
+          kind: "method",
+          signature: "func (p *WindowsApp) Locator(selector string) *WindowsLocator\nfunc (p *WindowsApp) GetByRole(role string, options ...RoleOptions) *WindowsLocator",
+          description: "Uses native UI Automation selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include Click, Fill, Focus, Press, Count, TextContent, InnerText, WaitForSelector, Screenshot, and AccessibilitySnapshot.",
+          since: "v0.1.24",
         },
       ],
     },

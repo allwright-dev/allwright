@@ -15,13 +15,23 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "v0.1.24",
+    date: "2026-10-06",
+    title: "Native Windows desktop automation arrives",
+    highlights: [
+      "Desktop Windows (x64) is available across the Rust, Go, Java, Python, and TypeScript clients. Connect through desktop.windows, launch an application by executable path, a command like notepad.exe, or a packaged-app ID, and use the same app-and-locator shape as macOS and mobile.",
+      "The desktop-windows plugin ships a self-contained UI Automation agent and starts it automatically — no Appium, WinAppDriver, Developer Mode, or separate .NET install. It automates Win32, WinForms, WPF, UWP, and WinUI apps with click, fill, focus, key input, count, text reads, waits, screenshots, and JSON/YAML accessibility snapshots.",
+      "@allwright.dev/vitest adds windows and windowsApp fixtures, configured through the desktop.windows section of allwright.config.yaml, and npm init allwright can scaffold a Windows project with --windows. The PowerShell installer sets up the CLI on Windows. Linux desktop remains planned.",
+    ],
+  },
+  {
     version: "v0.1.21",
     date: "2026-10-04",
     title: "Native macOS desktop automation arrives",
     highlights: [
       "Desktop macOS is available across the Rust, Go, Java, Python, and TypeScript clients. Connect through desktop.mac, launch an installed application by bundle identifier, and use the same app-and-locator shape as native mobile automation.",
       "The desktop-mac plugin ships with a headless XCUITest runner and starts it automatically on macOS 14 or newer. Native click, fill, focus, key input, count, text reads, waits, screenshots, and JSON/YAML accessibility snapshots all remain owned by the plugin and runner.",
-      "The core stays surface-neutral: clients send desktop session commands to the shared server, core lazily installs and loads desktop-mac, and opaque handles route each operation back to XCUITest. Windows and Linux desktop plugins remain planned.",
+      "The core stays surface-neutral: clients send desktop session commands to the shared server, core lazily installs and loads desktop-mac, and opaque handles route each operation back to XCUITest. Linux desktop remains planned.",
     ],
   },
   {

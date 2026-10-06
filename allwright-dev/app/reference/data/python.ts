@@ -422,7 +422,7 @@ export const pythonReference: LanguageReference = {
     {
       slug: "desktop",
       title: "Desktop",
-      description: "Native macOS application automation through the installable desktop-mac XCUITest plugin. Windows and Linux are not available yet.",
+      description: "Native macOS (XCUITest) and Windows (UI Automation) application automation through the installable desktop-mac and desktop-windows plugins. Linux is not available yet.",
       members: [
         {
           name: "desktop.mac.connect",
@@ -446,6 +446,29 @@ export const pythonReference: LanguageReference = {
           signature: "def locator(self, selector: str) -> MacLocator\ndef get_by_role(self, role: str, options: RoleOptions | None = None) -> MacLocator",
           description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, text_content, inner_text, wait_for_selector, screenshot, and accessibility_snapshot.",
           since: "v0.1.21",
+        },
+        {
+          name: "desktop.windows.connect",
+          kind: "method",
+          signature: "def connect(self, options: DesktopWindowsConnectOptions | None = None) -> WindowsDesktop",
+          description: "Connects to the local Windows desktop and starts the bundled UI Automation agent automatically. Requires Windows x64; no Appium, WinAppDriver, Developer Mode, or separate .NET install is needed.",
+          since: "v0.1.24",
+          example: "win = desktop.windows.connect()",
+        },
+        {
+          name: "WindowsDesktop.launch",
+          kind: "method",
+          signature: "def launch(self, options: DesktopWindowsLaunchOptions) -> WindowsApp",
+          description: "Launches an application by executable path, a command Windows can resolve such as notepad.exe, or a packaged-app AUMID. The returned app supports native locators, actions, text reads, waits, screenshots, and accessibility snapshots.",
+          since: "v0.1.24",
+          example: "app = win.launch(DesktopWindowsLaunchOptions(app_id=\"notepad.exe\"))",
+        },
+        {
+          name: "WindowsApp locators and actions",
+          kind: "method",
+          signature: "def locator(self, selector: str) -> WindowsLocator\ndef get_by_role(self, role: str, options: RoleOptions | None = None) -> WindowsLocator",
+          description: "Uses native UI Automation selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, text_content, inner_text, wait_for_selector, screenshot, and accessibility_snapshot.",
+          since: "v0.1.24",
         },
       ],
     },

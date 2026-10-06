@@ -51,8 +51,8 @@ export const surfaceStatus = [
   },
   {
     label: "Desktop",
-    detail: "Native macOS applications are available through XCUITest. Windows and Linux remain planned.",
-    status: "macOS available" as const,
+    detail: "Native macOS applications through XCUITest and native Windows x64 applications through UI Automation are available. Linux remains planned.",
+    status: "macOS + Windows available" as const,
   },
   { label: "API", detail: "Backend checks in the same test run.", status: "Not yet available" as const },
 ];

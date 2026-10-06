@@ -398,7 +398,7 @@ export const typescriptReference: LanguageReference = {
           name: "androidApp.locator",
           kind: "method",
           signature: "locator(selector: string): NativeAppLocator",
-          description: "Builds a chainable locator scoped to the app. Android, iOS, and macOS use the shared NativeApp/NativeAppLocator contract and expose getByRole, getByText, getByLabel, and getByTestId with native accessibility semantics and automatic retries.",
+          description: "Builds a chainable locator scoped to the app. Android, iOS, macOS, and Windows use the shared NativeApp/NativeAppLocator contract and expose getByRole, getByText, getByLabel, and getByTestId with native accessibility semantics and automatic retries.",
           since: "v0.0.45 – v0.0.52",
         },
         {
@@ -422,7 +422,7 @@ export const typescriptReference: LanguageReference = {
     {
       slug: "desktop",
       title: "Desktop",
-      description: "Native macOS application automation through the installable desktop-mac XCUITest plugin. Windows and Linux are not available yet.",
+      description: "Native macOS (XCUITest) and Windows (UI Automation) application automation through the installable desktop-mac and desktop-windows plugins. Linux is not available yet.",
       members: [
         {
           name: "desktop.mac.connect",
@@ -446,6 +446,29 @@ export const typescriptReference: LanguageReference = {
           signature: "locator(selector: string): DesktopMacLocator\ngetByRole(role: string, options?: RoleOptions): DesktopMacLocator",
           description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, textContent, innerText, waitForSelector, screenshot, and accessibilitySnapshot.",
           since: "v0.1.21",
+        },
+        {
+          name: "desktop.windows.connect",
+          kind: "method",
+          signature: "desktop.windows.connect(options?: DesktopWindowsConnectOptions): Promise<DesktopWindowsDesktop>",
+          description: "Connects to the local Windows desktop and starts the bundled UI Automation agent automatically. Requires Windows x64; no Appium, WinAppDriver, Developer Mode, or separate .NET install is needed.",
+          since: "v0.1.24",
+          example: "const win = await desktop.windows.connect();",
+        },
+        {
+          name: "DesktopWindowsDesktop.launch",
+          kind: "method",
+          signature: "launch(options: DesktopWindowsLaunchOptions): Promise<DesktopWindowsApp>",
+          description: "Launches an application by executable path, a command Windows can resolve such as notepad.exe, or a packaged-app AUMID. The returned app supports native locators, actions, text reads, waits, screenshots, and accessibility snapshots.",
+          since: "v0.1.24",
+          example: "const app = await win.launch({ appId: \"notepad.exe\" });",
+        },
+        {
+          name: "DesktopWindowsApp locators and actions",
+          kind: "method",
+          signature: "locator(selector: string): DesktopWindowsLocator\ngetByRole(role: string, options?: RoleOptions): DesktopWindowsLocator",
+          description: "Uses native UI Automation selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, textContent, innerText, waitForSelector, screenshot, and accessibilitySnapshot.",
+          since: "v0.1.24",
         },
       ],
     },
@@ -494,8 +517,8 @@ export const typescriptReference: LanguageReference = {
         {
           name: "test",
           kind: "function",
-          signature: "test(name: string, fn: (ctx: { page: Page; browser: Browser; android: MobileAndroidDevice; androidApp: MobileAndroidApp; ios: MobileIosDevice; iosApp: MobileIosApp; macos: DesktopMacDesktop; macosApp: DesktopMacApp }) => Promise<void>): void",
-          description: "A Vitest test extended with lazy web, Android, iOS, and macOS fixtures — nothing launches or connects until a fixture's method is first awaited.",
+          signature: "test(name: string, fn: (ctx: { page: Page; browser: Browser; android: MobileAndroidDevice; androidApp: MobileAndroidApp; ios: MobileIosDevice; iosApp: MobileIosApp; macos: DesktopMacDesktop; macosApp: DesktopMacApp; windows: DesktopWindowsDesktop; windowsApp: DesktopWindowsApp }) => Promise<void>): void",
+          description: "A Vitest test extended with lazy web, Android, iOS, macOS, and Windows fixtures — nothing launches or connects until a fixture's method is first awaited.",
           since: "v0.0.24",
           example: 'import { expect, test } from "@allwright.dev/vitest";\n\ntest("opens a page", async ({ page }) => {\n  await page.goto("https://themoderninternet.vercel.app");\n});',
         },
