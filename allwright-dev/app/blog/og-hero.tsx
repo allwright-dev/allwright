@@ -463,6 +463,42 @@ function IframesOgDiagram() {
   );
 }
 
+function SurfacesOgDiagram() {
+  const { width, height } = DIAGRAM_SIZE;
+  const midY = 132;
+  const coreX = 110;
+  const labels = ["Web", "Android", "iOS", "macOS", "Windows"];
+  const ys = labels.map((_, i) => 28 + i * 52);
+
+  return (
+    <div style={{ position: "relative", width, height, display: "flex" }}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ position: "absolute", left: 0, top: 0 }}>
+        <rect x={0} y={midY - 30} width={56} height={60} rx={12} fill="#3178C6" />
+        <line x1={60} y1={midY} x2={coreX - 36} y2={midY} stroke={MUTED} strokeWidth={2} />
+        <circle cx={coreX} cy={midY} r={36} fill="rgba(14,159,142,0.16)" stroke={BRAND_TO} strokeWidth={2} />
+        {ys.map((y) => (
+          <g key={y}>
+            <line x1={coreX + 36} y1={midY} x2={262} y2={y} stroke={BRAND_TO} strokeWidth={1.6} />
+            <rect x={266} y={y - 16} width={150} height={32} rx={10} fill="none" stroke={LINE} strokeWidth={2} />
+          </g>
+        ))}
+      </svg>
+
+      <div style={{ position: "absolute", left: 28, top: midY - 10, transform: "translateX(-50%)", display: "flex", fontSize: 20, fontWeight: 700, color: "#ffffff" }}>
+        TS
+      </div>
+      <div style={{ position: "absolute", left: coreX, top: midY - 8, transform: "translateX(-50%)", display: "flex", fontSize: 12, fontWeight: 700, color: INK_SOFT }}>
+        allwright
+      </div>
+      {labels.map((label, i) => (
+        <div key={label} style={{ position: "absolute", left: 282, top: ys[i] - 9, display: "flex", fontSize: 14, fontWeight: 600, color: INK }}>
+          {label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const ogHeroRegistry: Record<string, () => React.ReactElement> = {
   "get-started-with-typescript": TypeScriptOgDiagram,
   "why-allwright-if-playwright-exists": EngineOgDiagram,
@@ -473,6 +509,7 @@ const ogHeroRegistry: Record<string, () => React.ReactElement> = {
   "hooks-popups-uploads-downloads": HooksOgDiagram,
   "iframes-as-pages": IframesOgDiagram,
   "ios-testing-simulators-and-devices": IosOgDiagram,
+  "web-mobile-desktop-one-api": SurfacesOgDiagram,
 };
 
 /** Returns the post's diagram element for its social-preview card, or null for posts without one (their card falls back to a text-only layout). */

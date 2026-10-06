@@ -15,6 +15,19 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "v0.1.25",
+    date: "2026-10-06",
+    title: "One API across web, mobile, and desktop",
+    highlights: [
+      "Input values, checked state, attributes, and on-screen bounding boxes now read the same way on Android, iOS, macOS, and Windows as they do on the web, across all five clients. Locators expose inputValue, isChecked, getAttribute, and boundingBox on native apps too.",
+      "@allwright.dev/vitest value, checked-state, attribute, bounding-box, attached/hidden, enabled/disabled, focused, and editable matchers now work across web, Android, iOS, macOS, and Windows, with a page/app form that takes the selector first. URL, selected-option, and selected-text matchers remain web-only.",
+      "app.goto / app.navigate opens universal links and custom URL schemes on macOS and Windows desktop apps, matching the helper mobile already had.",
+      "Web clicks accept left, middle, and right mouse buttons and one-to-three click sequences, and every client gains dblclick (Go: DblClick) on pages and locators.",
+      "allwright update replaces an installed CLI in place from the latest GitHub release, or from a pinned release with --version vX.Y.Z. The staged binary is verified before it replaces the running one; on Windows the swap completes as soon as the command exits. Restart any running allwright serve process afterwards.",
+      "The shell and PowerShell installers now share one sudo-free default location (~/.local/bin on Linux and macOS, %LOCALAPPDATA%\\Microsoft\\WindowsApps on Windows), and ALLWRIGHT_VERSION accepts latest.",
+    ],
+  },
+  {
     version: "v0.1.24",
     date: "2026-10-06",
     title: "Native Windows desktop automation arrives",

@@ -1,0 +1,136 @@
+---
+title: "Web, mobile, and desktop on one API"
+description: "allwright v0.1.25 puts web, Android, iOS, macOS, and Windows behind one client shape, one locator model, and the same retrying assertions."
+date: "2026-10-06"
+author: "The allwright team"
+published: true
+tags: ["release", "desktop", "windows", "macos", "ios", "android", "web testing", "changelog"]
+keywords:
+  [
+    "allwright v0.1.25",
+    "cross platform test automation",
+    "web mobile desktop test automation",
+    "windows desktop test automation typescript",
+    "macos app test automation",
+    "ui automation testing without appium",
+    "playwright style desktop testing",
+    "one api for web android ios desktop",
+  ]
+---
+
+Six weeks ago allwright was a web automation tool with a promising Android
+story. As of **v0.1.25**, one install drives the places most software actually
+lives: **web browsers, Android, iOS, macOS apps, and Windows apps** — from
+Rust, Go, Java, Python, and TypeScript, with the same locators, actions, and
+retrying assertions everywhere.
+
+It took three releases to get here, and this one is the one that finishes the
+job.
+
+## The road to five surfaces
+
+- **v0.1.16 – v0.1.18** — [iOS](/blog/ios-testing-simulators-and-devices) on
+  Simulators and registered iPhones, joining Web and Android.
+- **v0.1.21** — native **macOS** desktop automation through a headless
+  XCUITest runner.
+- **v0.1.24** — native **Windows** desktop automation through a
+  self-contained UI Automation agent. No Appium, no WinAppDriver, no Developer
+  Mode, no separate .NET install.
+- **v0.1.25** — the parity release: the small, unglamorous work that makes the
+  five surfaces feel like one.
+
+## What "one API" means in practice
+
+The point was never five separate tools in a trench coat. A test for a desktop
+app looks like a test for a web page:
+
+```ts
+import { expect, test } from "@allwright.dev/vitest";
+
+test("edits a note", async ({ windowsApp }) => {
+  await windowsApp.getByRole("textbox").fill("hello from allwright");
+
+  await expect(windowsApp.getByRole("textbox")).toContainText("hello");
+});
+```
+
+Swap `windowsApp` for `macosApp`, `androidApp`, `iosApp`, or `page` and the shape
+holds: lazy fixtures, auto-waiting actions, semantic locators, and `expect`
+assertions that retry until they pass or time out. Web, Android, iOS, macOS, and
+Windows can all appear in the same test file, the same config, and the same
+`npm test`.
+
+## What v0.1.25 filled in
+
+The capability table on [Availability](/availability) is the source of truth,
+but the headline changes are:
+
+- **State reads everywhere.** Input values, checked state, attributes, and
+  on-screen bounding boxes now work on Android, iOS, macOS, and Windows — not
+  just the web.
+- **The same assertions, five surfaces.** `@allwright.dev/vitest` value,
+  checked-state, attribute, bounding-box, attached/hidden, enabled/disabled,
+  focused, and editable matchers work across web, mobile, and desktop, with the
+  page/app form taking a selector first.
+- **Deep links on desktop.** `app.goto(...)` opens universal links and custom
+  URL schemes on macOS and Windows, the same helper mobile already had.
+- **Web clicks grew up.** Left, middle, and right buttons, one-to-three click
+  sequences, and a `dblclick` helper on every client.
+- **`allwright update`.** Update an installed CLI in place from the latest
+  GitHub release, or pin one with `allwright update --version vX.Y.Z`. The new
+  binary is verified before it replaces the running one, and on Windows the
+  swap completes right after the command exits.
+- **Simpler installs.** The installers now use one predictable, sudo-free
+  default location, and `ALLWRIGHT_VERSION` accepts `latest`.
+
+## Getting started on your platform
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/allwright-dev/allwright/main/scripts/install.sh | bash
+
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/allwright-dev/allwright/main/scripts/install.ps1 | iex
+```
+
+Then scaffold a project for the surfaces you care about:
+
+```bash
+npm init allwright@latest my-tests -- --typescript --all
+```
+
+Use `--ios`, `--windows`, and the other surface flags to pick just what you
+need. Plugins install themselves the first time a surface is used.
+
+## What each surface needs
+
+| Surface | You need |
+|---|---|
+| Web | Chromium or Firefox |
+| Android | adb and an emulator or device |
+| iOS | A Mac with Xcode, and a Simulator or registered iPhone |
+| macOS apps | macOS 14+ with Xcode and Accessibility permission |
+| Windows apps | Windows x64 — nothing extra |
+
+## The honest status line
+
+Parity does not mean identical. Still not available:
+
+- **Linux desktop** and **API testing** remain planned.
+- **Windows on ARM** and 32-bit Windows.
+- **Hover, highlight, and pointer gestures** outside the web.
+- **File-chooser, download, and dialog hooks** on macOS and Windows.
+- **Full-page screenshots** on macOS and Windows.
+- Web-only features such as DOM access, network mocking, and cookies.
+
+The [Availability](/availability) page lists every gap, surface by surface, and
+the [Changelog](/changelog) tracks each release.
+
+## Where to go next
+
+- Read the [Availability](/availability) parity table to see exactly what each
+  surface supports.
+- Browse the client calls for your language in the [Reference](/reference).
+- Run `allwright update` if you already have it installed.
+- Star or watch [the repo](https://github.com/allwright-dev/allwright) and tell
+  us what breaks.

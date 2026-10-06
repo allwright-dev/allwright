@@ -700,6 +700,59 @@ function IosHero({ variant }: { variant?: HeroVariant }) {
   );
 }
 
+function SurfacesHero({ variant }: { variant?: HeroVariant }) {
+  const surfaces = [
+    { label: "Web", sub: "Chromium · Firefox", y: 40 },
+    { label: "Android", sub: "emulator · device", y: 118 },
+    { label: "iOS", sub: "Simulator · iPhone", y: 196 },
+    { label: "macOS", sub: "XCUITest", y: 274 },
+    { label: "Windows", sub: "UI Automation", y: 352 },
+  ];
+
+  return (
+    <HeroFrame
+      variant={variant}
+      label="A TypeScript client node with an arrow into the allwright core, and five arrows out of the core to Web, Android, iOS, macOS, and Windows, all driven through the same locator and expect calls"
+    >
+      <defs>
+        <ArrowMarker id="hero-surfaces-arrow" />
+      </defs>
+
+      {/* TypeScript node */}
+      <rect x={80} y={170} width={140} height={120} rx={24} fill="#3178C6" />
+      <text x={150} y={246} textAnchor="middle" fontSize="52" fontWeight="700" fill="#ffffff" fontFamily="var(--font-mono)">
+        TS
+      </text>
+      <text x={150} y={150} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--ink)">
+        one test file
+      </text>
+      <line x1={220} y1={230} x2={394} y2={230} stroke="currentColor" strokeWidth="1.4" markerEnd="url(#hero-surfaces-arrow)" />
+
+      {/* allwright core */}
+      <circle cx={460} cy={230} r={66} fill="var(--accent-soft)" stroke="var(--accent-2)" strokeWidth="1.6" />
+      <text x={460} y={224} textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--accent-2)">
+        allwright
+      </text>
+      <text x={460} y={246} textAnchor="middle" fontSize="13" fill="var(--accent-2)">
+        core
+      </text>
+
+      {surfaces.map((s) => (
+        <g key={s.label}>
+          <line x1={524} y1={230} x2={760} y2={s.y + 30} stroke="currentColor" strokeWidth="1.4" markerEnd="url(#hero-surfaces-arrow)" />
+          <rect x={780} y={s.y} width={330} height={60} rx={16} fill="var(--background)" stroke="currentColor" strokeWidth="1" />
+          <text x={804} y={s.y + 27} fontSize="17" fontWeight="600" fill="var(--ink)">
+            {s.label}
+          </text>
+          <text x={804} y={s.y + 47} fontSize="12" fontFamily="var(--font-mono)" fill="var(--muted)">
+            {s.sub}
+          </text>
+        </g>
+      ))}
+    </HeroFrame>
+  );
+}
+
 function DefaultHero({ variant }: { variant?: HeroVariant }) {
   return (
     <HeroFrame variant={variant} label="The allwright logo mark on a gradient card">
@@ -731,6 +784,7 @@ const heroRegistry: Record<string, (props: { variant?: HeroVariant }) => React.R
   "hooks-popups-uploads-downloads": HooksHero,
   "iframes-as-pages": IframesHero,
   "ios-testing-simulators-and-devices": IosHero,
+  "web-mobile-desktop-one-api": SurfacesHero,
 };
 
 export function HeroImage({ slug, variant }: { slug: string; variant?: HeroVariant }) {
