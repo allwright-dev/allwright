@@ -28,6 +28,8 @@ class DesktopMacLaunchOptions:
 
 MacApp = NativeApp
 MacLocator = NativeLocator
+WindowsApp = NativeApp
+WindowsLocator = NativeLocator
 
 
 class MacDesktop:
@@ -116,9 +118,45 @@ class MacSurface:
                     raise AllwrightError(event.error.message)
 
 
+DesktopWindowsConnectOptions = DesktopMacConnectOptions
+DesktopWindowsLaunchOptions = DesktopMacLaunchOptions
+WindowsDesktop = MacDesktop
+
+
+class WindowsSurface:
+    def connect(self, options: DesktopWindowsConnectOptions | None = None) -> WindowsDesktop:
+        from ._runtime import get_runtime, retry_options
+
+        runtime = get_runtime()
+        stream = StreamHandle(runtime.stub.SurfaceSession)
+        resolved = options or DesktopWindowsConnectOptions()
+        stream.send(engine_pb2.SurfaceSessionCommand(
+            connect_desktop=engine_pb2.ConnectDesktopCommand(
+                platform=engine_pb2.DESKTOP_PLATFORM_WINDOWS,
+                agent_endpoint=resolved.agent_endpoint,
+                retry_options=retry_options(resolved.timeout_ms),
+            )
+        ))
+        while True:
+            event = stream.recv("receive Windows desktop connect event")
+            match event.WhichOneof("event"):
+                case "desktop_connected":
+                    connected = event.desktop_connected
+                    return WindowsDesktop(
+                        runtime,
+                        stream,
+                        connected.desktop_session_id or event.session_id,
+                        event.session_id,
+                        connected.initial_app_session_id,
+                    )
+                case "error":
+                    raise AllwrightError(event.error.message)
+
+
 class DesktopNamespace:
     def __init__(self) -> None:
         self.mac = MacSurface()
+        self.windows = WindowsSurface()
 
 
 desktop = DesktopNamespace()

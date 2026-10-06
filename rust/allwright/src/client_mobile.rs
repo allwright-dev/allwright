@@ -164,13 +164,19 @@ pub struct DesktopMacLaunchOptions {
     pub timeout_ms: Option<u32>,
 }
 
+pub type DesktopWindowsConnectOptions = DesktopMacConnectOptions;
+pub type DesktopWindowsLaunchOptions = DesktopMacLaunchOptions;
+
 pub type MacApp = NativeApp;
 pub type MacLocator = NativeLocator;
+pub type WindowsApp = NativeApp;
+pub type WindowsLocator = NativeLocator;
 
 #[derive(Clone)]
 pub struct MacDesktop {
     inner: AndroidDevice,
 }
+pub type WindowsDesktop = MacDesktop;
 
 pub type IosApp = NativeApp;
 pub type IosLocator = NativeLocator;
@@ -386,7 +392,9 @@ pub mod ios {
 pub mod desktop {
     use super::*;
     pub use super::{
-        DesktopMacConnectOptions, DesktopMacLaunchOptions, MacApp, MacDesktop, MacLocator,
+        DesktopMacConnectOptions, DesktopMacLaunchOptions, DesktopWindowsConnectOptions,
+        DesktopWindowsLaunchOptions, MacApp, MacDesktop, MacLocator, WindowsApp, WindowsDesktop,
+        WindowsLocator,
     };
 
     pub mod mac {
@@ -413,6 +421,72 @@ pub mod desktop {
             loop {
                 let event = events.message().await?.ok_or_else(|| {
                     Error::new("surface session closed before macOS desktop connect response")
+                })?;
+                match event.event {
+                    Some(SurfaceEvent::DesktopConnected(DesktopConnectedEvent {
+                        initial_app_session_id,
+                        desktop_session_id,
+                        ..
+                    })) => {
+                        let initial_app = NativeApp {
+                            inner: Arc::new(NativeAppInner {
+                                runtime: Arc::clone(&runtime),
+                                surface_session_id: event.session_id.clone(),
+                                session_id: initial_app_session_id,
+                                state: AsyncMutex::new(NativeAppState::default()),
+                            }),
+                        };
+                        return Ok(MacDesktop {
+                            inner: AndroidDevice {
+                                inner: Arc::new(AndroidDeviceInner {
+                                    runtime,
+                                    state: AsyncMutex::new(AndroidDeviceState {
+                                        command_tx,
+                                        events,
+                                        closed: false,
+                                    }),
+                                    session_id: if desktop_session_id.is_empty() {
+                                        event.session_id
+                                    } else {
+                                        desktop_session_id
+                                    },
+                                    initial_app: initial_app.clone(),
+                                    current_app: Mutex::new(initial_app),
+                                }),
+                            },
+                        });
+                    }
+                    Some(SurfaceEvent::Error(error)) => return Err(Error::new(error.message)),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    pub mod windows {
+        use super::*;
+
+        pub async fn connect(options: DesktopWindowsConnectOptions) -> Result<WindowsDesktop> {
+            let runtime = get_runtime().await?;
+            let mut engine = runtime.engine.clone();
+            let (command_tx, command_rx) = mpsc::channel(16);
+            let response = engine
+                .surface_session(tonic::Request::new(ReceiverStream::new(command_rx)))
+                .await?;
+            let mut events = response.into_inner();
+            command_tx
+                .send(SurfaceSessionCommand {
+                    command: Some(SurfaceCommand::ConnectDesktop(ConnectDesktopCommand {
+                        platform: ProtoDesktopPlatform::Windows as i32,
+                        agent_endpoint: options.agent_endpoint,
+                        retry_options: command_retry_options(options.timeout_ms),
+                    })),
+                })
+                .await
+                .map_err(|_| Error::new("failed to send ConnectDesktopCommand"))?;
+            loop {
+                let event = events.message().await?.ok_or_else(|| {
+                    Error::new("surface session closed before Windows desktop connect response")
                 })?;
                 match event.event {
                     Some(SurfaceEvent::DesktopConnected(DesktopConnectedEvent {

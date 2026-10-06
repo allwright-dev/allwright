@@ -727,21 +727,26 @@ async fn handle_browser_command(
         })) => {
             let platform = ProtoDesktopPlatform::try_from(platform)
                 .unwrap_or(ProtoDesktopPlatform::Unspecified);
-            if platform != ProtoDesktopPlatform::Mac {
-                return Ok(CommandOutcome {
-                    event: browser_event(
-                        session_id,
-                        SurfaceEvent::Error(SurfaceSessionErrorEvent {
-                            message: "connect_desktop requires the macOS platform".to_string(),
-                        }),
-                    ),
-                    should_close: false,
-                });
-            }
+            let (desktop_platform, backend) = match platform {
+                ProtoDesktopPlatform::Mac => (DesktopPlatform::Mac, "xctest"),
+                ProtoDesktopPlatform::Windows => (DesktopPlatform::Windows, "uia3"),
+                ProtoDesktopPlatform::Unspecified => {
+                    return Ok(CommandOutcome {
+                        event: browser_event(
+                            session_id,
+                            SurfaceEvent::Error(SurfaceSessionErrorEvent {
+                                message: "connect_desktop requires the macOS or Windows platform"
+                                    .to_string(),
+                            }),
+                        ),
+                        should_close: false,
+                    });
+                }
+            };
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let connect = retry_with_timeout(retry_policy, || async {
                 web_lib::connect_desktop(DesktopConnectOptions {
-                    platform: DesktopPlatform::Mac,
+                    platform: desktop_platform,
                     agent_endpoint: agent_endpoint.clone(),
                     timeout_ms: retry_options
                         .as_ref()
@@ -777,10 +782,10 @@ async fn handle_browser_command(
                 event: browser_event(
                     session_id,
                     SurfaceEvent::DesktopConnected(DesktopConnectedEvent {
-                        platform: ProtoDesktopPlatform::Mac as i32,
+                        platform: platform as i32,
                         host_name: connect.host_name,
                         note: format!("{}; {}", connect.note, connect.initial_app.note),
-                        backend: "xctest".to_string(),
+                        backend: backend.to_string(),
                         desktop_session_id: connect.desktop_session.session_id,
                         initial_app_session_id,
                     }),

@@ -8,6 +8,16 @@ pub const SURFACE_ID: &str = "desktop";
 #[serde(rename_all = "snake_case")]
 pub enum DesktopPlatform {
     Mac,
+    Windows,
+}
+
+impl DesktopPlatform {
+    pub fn plugin_id(self) -> &'static str {
+        match self {
+            Self::Mac => "desktop-mac",
+            Self::Windows => "desktop-windows",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -236,6 +246,17 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<DesktopCommand>(&json).unwrap(),
             command
+        );
+
+        let windows = DesktopCommand::Connect(ConnectOptions {
+            platform: DesktopPlatform::Windows,
+            agent_endpoint: Some("http://127.0.0.1:8300".to_string()),
+            timeout_ms: Some(30_000),
+        });
+        let json = serde_json::to_string(&windows).unwrap();
+        assert_eq!(
+            serde_json::from_str::<DesktopCommand>(&json).unwrap(),
+            windows
         );
     }
 }

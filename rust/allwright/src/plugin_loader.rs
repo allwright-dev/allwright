@@ -35,9 +35,48 @@ struct DesktopPluginEnvelope {
 }
 
 fn invoke_desktop(command: DesktopCommand) -> Result<DesktopCommandResult, String> {
+    let plugin_id = match &command {
+        DesktopCommand::Connect(options) => options.platform.plugin_id(),
+        DesktopCommand::LaunchApp {
+            desktop_session, ..
+        }
+        | DesktopCommand::CloseApp {
+            desktop_session, ..
+        }
+        | DesktopCommand::ClickElement {
+            desktop_session, ..
+        }
+        | DesktopCommand::CountElements {
+            desktop_session, ..
+        }
+        | DesktopCommand::FocusElement {
+            desktop_session, ..
+        }
+        | DesktopCommand::FillElement {
+            desktop_session, ..
+        }
+        | DesktopCommand::PressKey {
+            desktop_session, ..
+        }
+        | DesktopCommand::GetText {
+            desktop_session, ..
+        }
+        | DesktopCommand::GetInnerText {
+            desktop_session, ..
+        }
+        | DesktopCommand::WaitForSelector {
+            desktop_session, ..
+        }
+        | DesktopCommand::Screenshot {
+            desktop_session, ..
+        }
+        | DesktopCommand::AccessibilitySnapshot {
+            desktop_session, ..
+        } => desktop_session.platform.plugin_id(),
+    };
     let request_json = serde_json::to_string(&command)
         .map_err(|error| format!("failed to encode desktop plugin request: {error}"))?;
-    let response_json = invoke_plugin("desktop-mac", &request_json)?;
+    let response_json = invoke_plugin(plugin_id, &request_json)?;
     let envelope: DesktopPluginEnvelope = serde_json::from_str(&response_json)
         .map_err(|error| format!("failed to decode desktop plugin response: {error}"))?;
     if envelope.ok {

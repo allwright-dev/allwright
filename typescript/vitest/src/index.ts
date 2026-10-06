@@ -21,6 +21,10 @@ import {
   type DesktopMacConnectOptions,
   type DesktopMacDesktop,
   type DesktopMacLaunchOptions,
+  type DesktopWindowsApp,
+  type DesktopWindowsConnectOptions,
+  type DesktopWindowsDesktop,
+  type DesktopWindowsLaunchOptions,
   type Browser,
   type BrowserKind,
   type CommandOptions,
@@ -55,6 +59,10 @@ export interface AllwrightVitestOptions {
     connectOptions?: DesktopMacConnectOptions;
     launchOptions?: DesktopMacLaunchOptions;
   };
+  windows?: {
+    connectOptions?: DesktopWindowsConnectOptions;
+    launchOptions?: DesktopWindowsLaunchOptions;
+  };
   configFile?: string;
   suite?: string;
 }
@@ -68,6 +76,8 @@ export interface AllwrightVitestFixtures {
   iosApp: MobileIosApp;
   macos: DesktopMacDesktop;
   macosApp: DesktopMacApp;
+  windows: DesktopWindowsDesktop;
+  windowsApp: DesktopWindowsApp;
 }
 
 const DEFAULT_ANDROID_CONNECT_TIMEOUT_MS = 30_000;
@@ -76,6 +86,8 @@ const DEFAULT_IOS_CONNECT_TIMEOUT_MS = 30_000;
 const DEFAULT_IOS_LAUNCH_TIMEOUT_MS = 60_000;
 const DEFAULT_MACOS_CONNECT_TIMEOUT_MS = 30_000;
 const DEFAULT_MACOS_LAUNCH_TIMEOUT_MS = 60_000;
+const DEFAULT_WINDOWS_CONNECT_TIMEOUT_MS = 30_000;
+const DEFAULT_WINDOWS_LAUNCH_TIMEOUT_MS = 60_000;
 
 type AllwrightVitestContext = AllwrightVitestFixtures & {
   allwright: AllwrightVitestOptions;
@@ -83,6 +95,7 @@ type AllwrightVitestContext = AllwrightVitestFixtures & {
   _androidResource: LazyResource<MobileAndroidDevice>;
   _iosResource: LazyResource<MobileIosDevice>;
   _macosResource: LazyResource<DesktopMacDesktop>;
+  _windowsResource: LazyResource<DesktopWindowsDesktop>;
 };
 
 type AsyncFactory<T> = () => Promise<T>;
@@ -628,6 +641,24 @@ function createLazyMacosDesktop(
   } satisfies DesktopMacDesktop;
 }
 
+function createLazyWindowsDesktop(
+  desktopResource: LazyResource<DesktopWindowsDesktop>,
+): DesktopWindowsDesktop {
+  const initialAppResource = createLazyResource(async () => (await desktopResource.get()).app());
+
+  return {
+    get sessionId() {
+      return getLazySyncProperty(desktopResource, "sessionId");
+    },
+    app() {
+      return createLazyMobileApp(initialAppResource);
+    },
+    async launch(options: DesktopWindowsLaunchOptions) {
+      return (await desktopResource.get()).launch(options);
+    },
+  } satisfies DesktopWindowsDesktop;
+}
+
 export const test = base.extend<AllwrightVitestContext>({
   allwright: async ({}, use) => {
     await use({});
@@ -693,6 +724,19 @@ export const test = base.extend<AllwrightVitestContext>({
     await use(macosResource);
   },
 
+  _windowsResource: async ({ allwright }, use) => {
+    const config = resolveVitestConfig(allwright);
+    if (config.serverAddr) {
+      setServerAddr(config.serverAddr);
+    }
+
+    const windowsResource = createLazyResource(async () =>
+      desktop.windows.connect(resolveWindowsConnectOptions(config, allwright)),
+    );
+
+    await use(windowsResource);
+  },
+
   browser: async ({ _browserResource }, use) => {
     try {
       await use(createLazyBrowser(_browserResource));
@@ -742,6 +786,20 @@ export const test = base.extend<AllwrightVitestContext>({
       const config = resolveVitestConfig(allwright);
       const launchOptions = resolveMacosLaunchOptions(config, allwright);
       return (await _macosResource.get()).launch(launchOptions);
+    });
+
+    await use(createLazyMobileApp(appResource));
+  },
+
+  windows: async ({ _windowsResource }, use) => {
+    await use(createLazyWindowsDesktop(_windowsResource));
+  },
+
+  windowsApp: async ({ _windowsResource, allwright }, use) => {
+    const appResource = createLazyResource(async () => {
+      const config = resolveVitestConfig(allwright);
+      const launchOptions = resolveWindowsLaunchOptions(config, allwright);
+      return (await _windowsResource.get()).launch(launchOptions);
     });
 
     await use(createLazyMobileApp(appResource));
@@ -904,6 +962,43 @@ function resolveMacosLaunchOptions(
     timeoutMs:
       options.macos?.launchOptions?.timeoutMs ??
       DEFAULT_MACOS_LAUNCH_TIMEOUT_MS,
+  };
+}
+
+function resolveWindowsConnectOptions(
+  config: ResolvedAllwrightConfig,
+  options: AllwrightVitestOptions,
+): DesktopWindowsConnectOptions {
+  return {
+    agentEndpoint:
+      options.windows?.connectOptions?.agentEndpoint ??
+      process.env.ALLWRIGHT_WINDOWS_AGENT_ENDPOINT,
+    timeoutMs:
+      options.windows?.connectOptions?.timeoutMs ??
+      DEFAULT_WINDOWS_CONNECT_TIMEOUT_MS,
+  };
+}
+
+function resolveWindowsLaunchOptions(
+  config: ResolvedAllwrightConfig,
+  options: AllwrightVitestOptions,
+): DesktopWindowsLaunchOptions {
+  const appId =
+    options.windows?.launchOptions?.appId ??
+    process.env.ALLWRIGHT_WINDOWS_APP_ID ??
+    config.desktop.windows?.appId;
+  if (!appId) {
+    throw new Error(
+      "windowsApp fixture requires Windows launch options with `appId`, or config.desktop.windows.app configured",
+    );
+  }
+
+  return {
+    appId,
+    terminateRunning: options.windows?.launchOptions?.terminateRunning ?? false,
+    timeoutMs:
+      options.windows?.launchOptions?.timeoutMs ??
+      DEFAULT_WINDOWS_LAUNCH_TIMEOUT_MS,
   };
 }
 

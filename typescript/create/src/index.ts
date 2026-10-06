@@ -13,7 +13,7 @@ const PACKAGE_VERSION = getPackageVersion();
 const ALLWRIGHT_VERSION = `^${PACKAGE_VERSION}`;
 
 type Language = "ts" | "js";
-type SurfaceId = "web" | "mobile-android" | "mobile-ios" | "desktop-mac";
+type SurfaceId = "web" | "mobile-android" | "mobile-ios" | "desktop-mac" | "desktop-windows";
 type PackageManager = "bun" | "npm" | "pnpm" | "yarn";
 
 const SURFACE_OPTIONS: Array<{ label: string; value: SurfaceId }> = [
@@ -21,6 +21,7 @@ const SURFACE_OPTIONS: Array<{ label: string; value: SurfaceId }> = [
   { label: "Mobile Android", value: "mobile-android" },
   { label: "Mobile iOS", value: "mobile-ios" },
   { label: "Desktop macOS", value: "desktop-mac" },
+  { label: "Desktop Windows", value: "desktop-windows" },
 ];
 
 interface InitOptions {
@@ -132,11 +133,16 @@ function parseArgs(args: string[]): InitOptions {
       case "--mac":
         options.surfaces.push("desktop-mac");
         break;
+      case "--desktop-windows":
+      case "--windows":
+      case "--win":
+        options.surfaces.push("desktop-windows");
+        break;
       case "--both":
         options.surfaces.push("web", "mobile-android");
         break;
       case "--all":
-        options.surfaces.push("web", "mobile-android", "mobile-ios", "desktop-mac");
+        options.surfaces.push("web", "mobile-android", "mobile-ios", "desktop-mac", "desktop-windows");
         break;
       case "--surface": {
         const value = args[index + 1];
@@ -201,7 +207,9 @@ async function selectSurfaces(interactive: boolean): Promise<SurfaceId[]> {
           ? "Android app automation"
           : surface.value === "mobile-ios"
             ? "iOS app automation"
-            : "native macOS app automation",
+            : surface.value === "desktop-mac"
+              ? "native macOS app automation"
+              : "native Windows app automation",
     })),
     required: true,
   });
@@ -296,6 +304,10 @@ function buildProjectFiles(input: {
 
   if (hasSurface(surfaces, "desktop-mac")) {
     files[`tests/macos.spec.${extension}`] = macosSpecContents(language);
+  }
+
+  if (hasSurface(surfaces, "desktop-windows")) {
+    files[`tests/windows.spec.${extension}`] = windowsSpecContents(language);
   }
 
   return files;
@@ -400,12 +412,21 @@ function allwrightConfigContents(surfaces: SurfaceId[]): string {
     lines.push('      binary: "https://allwright.dev/Flights-simulator.ipa"');
   }
 
-  if (hasSurface(surfaces, "desktop-mac")) {
+  if (hasSurface(surfaces, "desktop-mac") || hasSurface(surfaces, "desktop-windows")) {
     lines.push("");
     lines.push("desktop:");
+  }
+
+  if (hasSurface(surfaces, "desktop-mac")) {
     lines.push("  mac:");
     lines.push("    app:");
     lines.push("      id: com.apple.calculator");
+  }
+
+  if (hasSurface(surfaces, "desktop-windows")) {
+    lines.push("  windows:");
+    lines.push("    app:");
+    lines.push("      id: notepad.exe");
   }
 
   lines.push("");
@@ -483,6 +504,21 @@ test("opens Calculator through the macOS desktop agent", { timeout: 90_000 }, as
 `;
 }
 
+function windowsSpecContents(language: Language): string {
+  const importLine =
+    language === "ts"
+      ? 'import { expect, test } from "@allwright.dev/vitest";'
+      : 'import { expect, test } from "@allwright.dev/vitest";';
+
+  return `${importLine}
+
+test("opens Notepad through the Windows desktop agent", { timeout: 90_000 }, async ({ windowsApp }) => {
+  const screenshot = await windowsApp.screenshot();
+  expect(screenshot.byteLength).toBeGreaterThan(0);
+});
+`;
+}
+
 function generatedReadmeContents(surfaces: SurfaceId[]): string {
   const nextSteps = [
     "## Next steps",
@@ -510,6 +546,13 @@ function generatedReadmeContents(surfaces: SurfaceId[]): string {
     nextSteps.push(
       `${step++}. Run the suite on macOS 14 or newer with Xcode installed and UI Automation enabled for the process running Xcode.`,
       `${step++}. The first macOS run installs the desktop plugin, starts its bundled XCUITest runner, and launches Calculator by bundle identifier.`,
+    );
+  }
+
+  if (hasSurface(surfaces, "desktop-windows")) {
+    nextSteps.push(
+      `${step++}. Run the suite from an interactive Windows 10 or newer desktop session.`,
+      `${step++}. The first Windows run installs the desktop plugin, starts its bundled FlaUI UIA3 agent, and launches Notepad.`,
     );
   }
 
@@ -557,6 +600,14 @@ function parseSurfaceId(input: string): SurfaceId {
     normalized === "mac"
   ) {
     return "desktop-mac";
+  }
+  if (
+    normalized === "desktop-windows" ||
+    normalized === "desktop-win" ||
+    normalized === "windows" ||
+    normalized === "win"
+  ) {
+    return "desktop-windows";
   }
   throw new Error(`Unknown surface: ${input}`);
 }

@@ -1,7 +1,7 @@
 # @allwright.dev/vitest
 
 Vitest fixtures for allwright with Playwright-style `browser` and `page`
-injection, plus Android, iOS, and macOS app fixtures for native and hybrid tests.
+injection, plus Android, iOS, macOS, and Windows app fixtures for native and hybrid tests.
 
 Wrap the Vitest configuration with `allwrightVitestConfig`. It starts Allwright once before workers run and shuts it down once after the complete test run. Existing user global setup files remain supported and run after Allwright starts, then tear down before Allwright stops.
 
@@ -44,10 +44,19 @@ test("opens an iOS app", async ({ iosApp }) => {
 test("opens a macOS app", async ({ macosApp }) => {
   await macosApp.getByRole("button", { name: "New Document", exact: true }).click();
 });
+
+test("opens a Windows app", async ({ windowsApp }) => {
+  await windowsApp.getByRole("textbox").fill("Hello from Allwright");
+});
 ```
 
-Checked-in example specs live in [examples/basic.spec.ts](./examples/basic.spec.ts)
-and [examples/ios-flights.spec.ts](./examples/ios-flights.spec.ts).
+Checked-in example specs cover every implemented surface:
+[Web](./examples/basic.spec.ts), [Android](./examples/android-flights.spec.ts),
+[iOS](./examples/ios-flights.spec.ts),
+[macOS](./examples/macos-calculator.spec.ts), and
+[Windows](./examples/windows-notepad.spec.ts). Native specs use the app target
+configured for their surface in `allwright.config.yaml` or
+`allwright.config.json`.
 
 The fixture package reads the shared stack-agnostic config format through `@allwright.dev/core`.
 Use `allwright.config.yaml` by default, or `allwright.config.json` if you prefer. Both follow the same root schema in `allwright.schema.json`.
@@ -167,11 +176,35 @@ test("opens a document window", async ({ macosApp }) => {
 Use `ALLWRIGHT_MAC_AGENT_ENDPOINT` for an external agent or
 `ALLWRIGHT_MAC_APP_ID` to override the configured bundle identifier.
 
+Windows apps use an executable path, command name, or packaged-app AUMID. The
+fixture starts the bundled FlaUI UIA3 agent and launches the app lazily:
+
+```yaml
+# allwright.config.yaml
+desktop:
+  windows:
+    app:
+      id: notepad.exe
+```
+
+```ts
+import { expect, test } from "@allwright.dev/vitest";
+
+test("edits a document", async ({ windowsApp }) => {
+  await windowsApp.getByRole("textbox").fill("Hello from Allwright");
+  await expect(windowsApp.getByRole("textbox")).toContainText("Hello");
+});
+```
+
+Use `ALLWRIGHT_WINDOWS_AGENT_ENDPOINT` for an external agent or
+`ALLWRIGHT_WINDOWS_APP_ID` to override the configured application identifier.
+
 Fixtures are lazy on first use. Injecting `browser`, `page`, `android`,
-`androidApp`, `ios`, `iosApp`, `macos`, or `macosApp` does not launch or connect
-immediately; the underlying session is created only when the test first
-performs an action through that fixture. Sync metadata properties are only
-available after the lazy fixture has been realized by a prior awaited call.
+`androidApp`, `ios`, `iosApp`, `macos`, `macosApp`, `windows`, or `windowsApp`
+does not launch or connect immediately; the underlying session is created only
+when the test first performs an action through that fixture. Sync metadata
+properties are only available after the lazy fixture has been realized by a
+prior awaited call.
 
 Available fixtures:
 
@@ -183,13 +216,16 @@ Available fixtures:
 - `iosApp`: launched iOS app page
 - `macos`: connected macOS desktop session
 - `macosApp`: launched macOS app page
+- `windows`: connected Windows desktop session
+- `windowsApp`: launched Windows app page
 
 `androidApp` launches using `allwright.android.launchOptions` first, then falls back to `config.mobile.android`.
 `iosApp` does the same with `allwright.ios.launchOptions` and `config.mobile.ios`.
 `macosApp` does the same with `allwright.macos.launchOptions` and `config.desktop.mac`.
+`windowsApp` does the same with `allwright.windows.launchOptions` and `config.desktop.windows`.
 
-Android, iOS, and macOS apps and locators support the native action and expectation
-subset: `click`, `count`, `focus`, `fill`, `press`, `textContent`, `innerText`,
+Android, iOS, macOS, and Windows apps and locators support the native action and
+expectation subset: `click`, `count`, `focus`, `fill`, `press`, `textContent`, `innerText`,
 `waitForSelector`, and `screenshot`. Mobile expectations provide `toHaveText`,
 `toContainText`, `toHaveCount`, and `toBeVisible` with the same retry controls
 as web fixtures. Hover and highlight remain web-only.

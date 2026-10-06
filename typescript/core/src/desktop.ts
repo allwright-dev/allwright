@@ -5,6 +5,8 @@ import type {
   DesktopMacDesktop,
   DesktopMacLaunchOptions,
   DesktopSurfaceNamespace,
+  DesktopWindowsConnectOptions,
+  DesktopWindowsDesktop,
   EventQueue,
   NativeApp,
   RuntimeClient,
@@ -27,6 +29,7 @@ class DesktopMacImpl implements DesktopMacDesktop {
     private readonly stream: SurfaceSessionStream,
     private readonly queue: EventQueue<SurfaceSessionEvent>,
     initialAppSessionId: string,
+    private readonly platformLabel = "macOS",
   ) {
     this.#currentApp = new NativeAppImpl(runtime, surfaceSessionId, initialAppSessionId);
   }
@@ -36,7 +39,7 @@ class DesktopMacImpl implements DesktopMacDesktop {
   }
 
   async launch(options: DesktopMacLaunchOptions): Promise<NativeApp> {
-    if (this.#closed) throw new Error(`macOS desktop session ${this.sessionId} is closed`);
+    if (this.#closed) throw new Error(`${this.platformLabel} desktop session ${this.sessionId} is closed`);
     this.stream.write({
       launchDesktopApp: {
         appId: options.appId,
@@ -57,7 +60,7 @@ class DesktopMacImpl implements DesktopMacDesktop {
       if (event.error?.message) throw new Error(event.error.message);
       if (event.closed) {
         this.#closed = true;
-        throw new Error(`macOS desktop session ${this.sessionId} closed while launching app`);
+        throw new Error(`${this.platformLabel} desktop session ${this.sessionId} closed while launching app`);
       }
     }
   }
@@ -84,6 +87,36 @@ class DesktopMacSurfaceImpl {
           stream,
           queue,
           event.desktopConnected.initialAppSessionId,
+          "macOS",
+        );
+      }
+      if (event.error?.message) throw new Error(event.error.message);
+    }
+  }
+}
+
+class DesktopWindowsSurfaceImpl {
+  async connect(options: DesktopWindowsConnectOptions = {}): Promise<DesktopWindowsDesktop> {
+    const runtime = await getRuntime();
+    const { stream, queue } = await createBrowserSessionHandle(runtime);
+    stream.write({
+      connectDesktop: {
+        platform: 2,
+        agentEndpoint: options.agentEndpoint,
+        retryOptions: retryOptions(options.timeoutMs),
+      },
+    });
+    while (true) {
+      const event = await queue.next();
+      if (event.desktopConnected?.initialAppSessionId) {
+        return new DesktopMacImpl(
+          event.desktopConnected.desktopSessionId ?? event.sessionId ?? "",
+          event.sessionId ?? "",
+          runtime,
+          stream,
+          queue,
+          event.desktopConnected.initialAppSessionId,
+          "Windows",
         );
       }
       if (event.error?.message) throw new Error(event.error.message);
@@ -93,4 +126,5 @@ class DesktopMacSurfaceImpl {
 
 export const desktop: DesktopSurfaceNamespace = {
   mac: new DesktopMacSurfaceImpl(),
+  windows: new DesktopWindowsSurfaceImpl(),
 };

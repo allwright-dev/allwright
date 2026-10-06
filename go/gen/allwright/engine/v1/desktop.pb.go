@@ -26,6 +26,7 @@ type DesktopPlatform int32
 const (
 	DesktopPlatform_DESKTOP_PLATFORM_UNSPECIFIED DesktopPlatform = 0
 	DesktopPlatform_DESKTOP_PLATFORM_MAC         DesktopPlatform = 1
+	DesktopPlatform_DESKTOP_PLATFORM_WINDOWS     DesktopPlatform = 2
 )
 
 // Enum value maps for DesktopPlatform.
@@ -33,10 +34,12 @@ var (
 	DesktopPlatform_name = map[int32]string{
 		0: "DESKTOP_PLATFORM_UNSPECIFIED",
 		1: "DESKTOP_PLATFORM_MAC",
+		2: "DESKTOP_PLATFORM_WINDOWS",
 	}
 	DesktopPlatform_value = map[string]int32{
 		"DESKTOP_PLATFORM_UNSPECIFIED": 0,
 		"DESKTOP_PLATFORM_MAC":         1,
+		"DESKTOP_PLATFORM_WINDOWS":     2,
 	}
 )
 
@@ -357,10 +360,11 @@ const file_surfaces_desktop_v1_desktop_proto_rawDesc = "" +
 	"\x17DesktopAppLaunchedEvent\x12$\n" +
 	"\x0eapp_session_id\x18\x01 \x01(\tR\fappSessionId\x12\x15\n" +
 	"\x06app_id\x18\x02 \x01(\tR\x05appId\x12\x12\n" +
-	"\x04note\x18\x03 \x01(\tR\x04note*M\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note*k\n" +
 	"\x0fDesktopPlatform\x12 \n" +
 	"\x1cDESKTOP_PLATFORM_UNSPECIFIED\x10\x00\x12\x18\n" +
-	"\x14DESKTOP_PLATFORM_MAC\x10\x01BK\n" +
+	"\x14DESKTOP_PLATFORM_MAC\x10\x01\x12\x1c\n" +
+	"\x18DESKTOP_PLATFORM_WINDOWS\x10\x02BK\n" +
 	"\x17dev.allwright.engine.v1P\x01Z.allwright.dev/gen/allwright/engine/v1;enginev1b\x06proto3"
 
 var (

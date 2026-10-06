@@ -18,8 +18,14 @@ type DesktopMacLaunchOptions struct {
 	Timeout          uint32
 }
 
+type DesktopWindowsConnectOptions = DesktopMacConnectOptions
+type DesktopWindowsLaunchOptions = DesktopMacLaunchOptions
+
 type MacApp = NativeApp
 type MacLocator = NativeLocator
+type WindowsApp = NativeApp
+type WindowsLocator = NativeLocator
+type WindowsDesktop = MacDesktop
 
 type MacDesktop struct {
 	runtime          *runtimeClient
@@ -31,12 +37,14 @@ type MacDesktop struct {
 }
 
 type MacSurface struct{}
+type WindowsSurface struct{}
 
 type desktopNamespace struct {
-	Mac MacSurface
+	Mac     MacSurface
+	Windows WindowsSurface
 }
 
-var Desktop = desktopNamespace{Mac: MacSurface{}}
+var Desktop = desktopNamespace{Mac: MacSurface{}, Windows: WindowsSurface{}}
 
 func (d *MacDesktop) SessionID() string {
 	if d == nil {
@@ -95,18 +103,26 @@ func (d *MacDesktop) Launch(ctx context.Context, options DesktopMacLaunchOptions
 }
 
 func (MacSurface) Connect(ctx context.Context, options DesktopMacConnectOptions) (*MacDesktop, error) {
+	return connectDesktop(ctx, options, enginev1.DesktopPlatform_DESKTOP_PLATFORM_MAC, "mac")
+}
+
+func (WindowsSurface) Connect(ctx context.Context, options DesktopWindowsConnectOptions) (*WindowsDesktop, error) {
+	return connectDesktop(ctx, options, enginev1.DesktopPlatform_DESKTOP_PLATFORM_WINDOWS, "Windows")
+}
+
+func connectDesktop(ctx context.Context, options DesktopMacConnectOptions, platform enginev1.DesktopPlatform, label string) (*MacDesktop, error) {
 	runtime, err := getRuntime(ctx)
 	if err != nil {
 		return nil, err
 	}
 	stream, err := runtime.engine.SurfaceSession(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("open mac desktop surface stream: %w", err)
+		return nil, fmt.Errorf("open %s desktop surface stream: %w", label, err)
 	}
 	if err := stream.Send(&enginev1.SurfaceSessionCommand{
 		Command: &enginev1.SurfaceSessionCommand_ConnectDesktop{
 			ConnectDesktop: &enginev1.ConnectDesktopCommand{
-				Platform:      enginev1.DesktopPlatform_DESKTOP_PLATFORM_MAC,
+				Platform:      platform,
 				AgentEndpoint: optionalString(options.AgentEndpoint),
 				RetryOptions:  retryOptionsProto(durationFromOptionalUint32(options.Timeout)),
 			},
@@ -118,7 +134,7 @@ func (MacSurface) Connect(ctx context.Context, options DesktopMacConnectOptions)
 	for {
 		event, err := stream.Recv()
 		if err != nil {
-			return nil, fmt.Errorf("receive mac desktop connect event: %w", err)
+			return nil, fmt.Errorf("receive %s desktop connect event: %w", label, err)
 		}
 		switch payload := event.GetEvent().(type) {
 		case *enginev1.SurfaceSessionEvent_DesktopConnected:
@@ -131,7 +147,7 @@ func (MacSurface) Connect(ctx context.Context, options DesktopMacConnectOptions)
 				app: &MacApp{runtime: runtime, surfaceSessionID: event.GetSessionId(), sessionID: payload.DesktopConnected.GetInitialAppSessionId()},
 			}, nil
 		case *enginev1.SurfaceSessionEvent_Error:
-			return nil, fmt.Errorf("mac desktop connect error: %s", payload.Error.GetMessage())
+			return nil, fmt.Errorf("%s desktop connect error: %s", label, payload.Error.GetMessage())
 		}
 	}
 }

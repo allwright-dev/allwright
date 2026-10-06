@@ -10,6 +10,7 @@ import "core/v1/common.proto";
 enum DesktopPlatform {
   DESKTOP_PLATFORM_UNSPECIFIED = 0;
   DESKTOP_PLATFORM_MAC = 1;
+  DESKTOP_PLATFORM_WINDOWS = 2;
 }
 
 message ConnectDesktopCommand {

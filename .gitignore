@@ -29,6 +29,8 @@ node_modules/
 /java/build/
 /java/out/
 /java/bin/
+/rust/allwright-surface-desktop-windows/agent/bin/
+/rust/allwright-surface-desktop-windows/agent/obj/
 /.gradle-user-home/
 /.gradle-local/
 

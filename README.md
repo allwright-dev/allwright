@@ -30,10 +30,10 @@ allwright is under active development and not positioned as a finished multi-sur
 The current stage is:
 
 - the core product direction is broader than browser automation alone
-- web, Android, iOS, and macOS desktop automation use the same engine and lazy plugin boundary
+- web, Android, iOS, macOS desktop, and Windows desktop automation use the same engine and lazy plugin boundary
 - the Rust workspace now separates a lightweight `allwright-core` from the installable `allwright` CLI and surface crates
-- `web`, `mobile-android`, `mobile-ios`, and `desktop-mac` ship as separately installable runtime plugins
-- Windows and Linux desktop plus API automation remain planned
+- `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, and `desktop-windows` ship as separately installable runtime plugins
+- Linux desktop and API automation remain planned
 - the public API and internal architecture are still evolving as the project grows toward wider surface coverage
 
 If you are evaluating the repo today, the clearest signal is the direction: allwright is aiming to become a unified automation engine, and browser automation is the first concrete step on that path.
@@ -78,7 +78,8 @@ Today, the plugin ecosystem looks like this:
 - `web` and `mobile-android`: installable runtime surface plugins loaded by the core at runtime
 - `mobile-ios`: an experimental installable macOS plugin with bundled, auto-started headless XCUITest runners for iOS Simulators and physical devices; device runners are re-signed locally from the user's Apple development credentials
 - `desktop-mac`: installable macOS plugin with a bundled, auto-started XCUITest runner
-- `desktop-windows` and `desktop-linux`: planned surface plugins with publishable crate boundaries, but not yet installable runtime artifacts
+- `desktop-windows`: installable Windows x64 plugin with a bundled, self-contained FlaUI UIA3 agent
+- `desktop-linux`: planned surface plugin with a publishable crate boundary, but not yet an installable runtime artifact
 
 What `plugin install` means today:
 
@@ -88,7 +89,7 @@ What `plugin install` means today:
 - when a required plugin is unavailable, its commands fail with a plugin-required error while the core server still runs
 - the iOS and macOS archives include their native XCUITest runner artifacts and require macOS with Xcode
 
-Windows, Linux, and API support are still being completed; the shipped surfaces share one server-only client transport.
+Linux desktop and API support are still being completed; the shipped surfaces share one server-only client transport.
 
 Release automation today:
 
@@ -102,6 +103,20 @@ Release automation today:
 - the Rust, Go, Java, Python, and TypeScript clients now auto-bootstrap the matching `allwright` CLI and `web` plugin for their own version when they target a local server address and nothing is running yet
 - those clients also reuse an already-healthy local server when one exists, and only tear down the server process if that specific client started it
 - the release workflow syncs the Rust workspace version from the Git tag before building, so the tag is the release source of truth
+
+## Runnable Examples
+
+Each first-party client includes runnable examples for all five implemented
+surfaces:
+
+| Client | Web | Android | iOS | macOS | Windows |
+| --- | --- | --- | --- | --- | --- |
+| Rust | [`web_basic`](./rust/allwright/examples/web_basic.rs) | [`android_basic`](./rust/allwright/examples/android_basic.rs) | [`ios_basic`](./rust/allwright/examples/ios_basic.rs) | [`macos_basic`](./rust/allwright/examples/macos_basic.rs) | [`windows_basic`](./rust/allwright/examples/windows_basic.rs) |
+| Go | [`web-basic`](./go/examples/web-basic/main.go) | [`android-basic`](./go/examples/android-basic/main.go) | [`ios-basic`](./go/examples/ios-basic/main.go) | [`macos-basic`](./go/examples/macos-basic/main.go) | [`windows-basic`](./go/examples/windows-basic/main.go) |
+| Java | [`WebBasicTest`](./java/src/test/java/dev/allwright/examples/WebBasicTest.java) | [`AndroidBasicTest`](./java/src/test/java/dev/allwright/examples/AndroidBasicTest.java) | [`IosBasicTest`](./java/src/test/java/dev/allwright/examples/IosBasicTest.java) | [`MacosBasicTest`](./java/src/test/java/dev/allwright/examples/MacosBasicTest.java) | [`WindowsBasicTest`](./java/src/test/java/dev/allwright/examples/WindowsBasicTest.java) |
+| Python | [`web_basic`](./python/examples/web_basic.py) | [`android_basic`](./python/examples/android_basic.py) | [`ios_basic`](./python/examples/ios_basic.py) | [`macos_basic`](./python/examples/macos_basic.py) | [`windows_basic`](./python/examples/windows_basic.py) |
+| TypeScript | [`web-basic`](./typescript/core/examples/web-basic.ts) | [`android-basic`](./typescript/core/examples/android-basic.ts) | [`ios-basic`](./typescript/core/examples/ios-basic.ts) | [`macos-basic`](./typescript/core/examples/macos-basic.ts) | [`windows-basic`](./typescript/core/examples/windows-basic.ts) |
+| Vitest | [`basic`](./typescript/vitest/examples/basic.spec.ts) | [`android-flights`](./typescript/vitest/examples/android-flights.spec.ts) | [`ios-flights`](./typescript/vitest/examples/ios-flights.spec.ts) | [`macos-calculator`](./typescript/vitest/examples/macos-calculator.spec.ts) | [`windows-notepad`](./typescript/vitest/examples/windows-notepad.spec.ts) |
 
 ## Quick Start
 
@@ -154,6 +169,7 @@ List or install plugins:
 allwright plugin list
 allwright plugin install web
 allwright plugin install desktop-mac
+allwright plugin install desktop-windows
 ```
 
 If you are working from the repo checkout instead:
@@ -183,7 +199,7 @@ Today’s working paths cover web, Android, iOS, and native macOS applications t
 The practical path today is:
 
 - use the `allwright` CLI as the installable entrypoint
-- install the surface plugin you need (`web`, `mobile-android`, `mobile-ios`, or `desktop-mac` on macOS)
+- install the surface plugin you need (`web`, `mobile-android`, `mobile-ios`, `desktop-mac` on macOS, or `desktop-windows` on Windows x64)
 - use the Rust, Go, Java, Python, or TypeScript clients against the running engine server, or let the client auto-start a matching local server on first use
 
 Each working surface is loaded into core only when used. Clients always talk to the engine server; they never invoke plugin libraries or native agents directly.
@@ -227,6 +243,28 @@ native selectors, semantic role/text/label/test-id locators, click, count,
 focus, fill, key input, text reads, waits, screenshots, and accessibility
 snapshots. It requires macOS 14 or newer with Xcode installed and UI automation
 permission enabled for the process running Xcode.
+
+Windows uses the matching lazy `windowsApp` fixture. The configured `id` can be
+an executable path, a command such as `notepad.exe`, or a packaged-app AUMID:
+
+```yaml
+desktop:
+  windows:
+    app:
+      id: notepad.exe
+```
+
+```ts
+import { test } from "@allwright.dev/vitest";
+
+test("edits a document", async ({ windowsApp }) => {
+  await windowsApp.getByRole("textbox").fill("Hello from Allwright");
+});
+```
+
+The `windows` and `windowsApp` fixtures remain lazy, use 30-second connect and
+60-second launch defaults, and accept per-test overrides through
+`allwright.windows.connectOptions` and `allwright.windows.launchOptions`.
 
 Web pages support accessibility snapshots in JSON (default) or standard YAML:
 
@@ -407,7 +445,7 @@ browser.close()
 - `rust/allwright-surface-mobile-ios`: publishable `mobile-ios` surface crate
 - `rust/allwright-surface-desktop`: shared desktop surface abstractions
 - `rust/allwright-surface-desktop-mac`: runtime-loaded macOS plugin backed by a bundled XCUITest runner
-- `rust/allwright-surface-desktop-windows`: publishable `desktop-windows` surface crate
+- `rust/allwright-surface-desktop-windows`: runtime-loaded Windows plugin backed by a bundled FlaUI UIA3 sidecar
 - `rust/allwright-surface-desktop-linux`: publishable `desktop-linux` surface crate
 - `go/`: published Go client `allwright.dev` and Go playground
 - `java/`: published Java client `dev.allwright:allwright` on Maven Central
@@ -421,11 +459,11 @@ browser.close()
 ## Development Notes
 
 - The engine currently runs as a gRPC server.
-- Web, Android, iOS, and macOS desktop runtimes are implemented; Windows, Linux, and API support remain future work.
+- Web, Android, iOS, macOS desktop, and Windows desktop runtimes are implemented; Linux and API support remain future work.
 - Installing the `allwright` package is intended to deliver the CLI plus the lightweight engine core together.
 - The project should keep a single engine core even as surface modules become separately installable plugins.
-- The `web`, `mobile-android`, `mobile-ios`, and `desktop-mac` plugins are installed through GitHub Release downloads and loaded by core at runtime.
-- Desktop Windows and Linux remain disabled as install targets until their runtime binaries exist.
+- The `web`, `mobile-android`, `mobile-ios`, `desktop-mac`, and `desktop-windows` plugins are installed through GitHub Release downloads and loaded by core at runtime.
+- Desktop Linux remains disabled as an install target until its runtime binary exists.
 - The Rust workspace version is synced from the release tag during GitHub release builds.
 - The browser control path is intended to stay driverless.
 - The repo uses shared proto contracts across all supported client stacks.
@@ -459,6 +497,7 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which publish
 - `allwright-surface-mobile-android` plugin archives for the current OS matrix
 - `allwright-surface-mobile-ios` plugin archives with Simulator and physical-device XCUITest runners for both macOS architectures
 - `allwright-surface-desktop-mac` plugin archives with a macOS XCUITest runner for both macOS architectures
+- `allwright-surface-desktop-windows` plugin archives with a self-contained FlaUI UIA3 agent for Windows x64
 - crates.io publish for every Rust core, CLI, and surface-plugin crate after syncing and verifying every crate version from the tag
 
 - Linux `x86_64-unknown-linux-gnu`
@@ -558,11 +597,12 @@ The release workflow syncs `python/pyproject.toml` to `X.Y.Z`, builds the source
 The TypeScript client lives in `typescript/core` as `@allwright.dev/core`.
 The Vitest fixture package lives in `typescript/vitest` as `@allwright.dev/vitest`.
 The project initializer lives in `typescript/create` as `create-allwright` and powers `npm init allwright`.
-It can scaffold Web, Mobile Android, Mobile iOS, and Desktop macOS projects
+It can scaffold Web, Mobile Android, Mobile iOS, Desktop macOS, and Desktop Windows projects
 interactively. Use `--ios` / `--surface mobile-ios` for scripted iOS setup or
-`--macos` / `--surface desktop-mac` for a `macosApp` starter. Generated Apple
-projects rely on lazy core plugin installation, so initialization does not
-require a manual agent install.
+`--macos` / `--surface desktop-mac` for a `macosApp` starter. Use `--windows` /
+`--surface desktop-windows` for a `windowsApp` starter. Generated native projects
+rely on lazy core plugin installation, so initialization does not require a
+manual agent install.
 
 You only create the root release tag manually:
 

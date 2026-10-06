@@ -94,9 +94,12 @@ The tagged GitHub Actions release workflow publishes the Java artifact to Maven 
 
 Runnable JUnit examples include
 [`WebBasicTest`](./src/test/java/dev/allwright/examples/WebBasicTest.java),
-[`AndroidBasicTest`](./src/test/java/dev/allwright/examples/AndroidBasicTest.java), and
-[`IosBasicTest`](./src/test/java/dev/allwright/examples/IosBasicTest.java). Set
-`ALLWRIGHT_RUN_IOS_EXAMPLE=true` to opt into the live iOS example.
+[`AndroidBasicTest`](./src/test/java/dev/allwright/examples/AndroidBasicTest.java),
+[`IosBasicTest`](./src/test/java/dev/allwright/examples/IosBasicTest.java),
+[`MacosBasicTest`](./src/test/java/dev/allwright/examples/MacosBasicTest.java), and
+[`WindowsBasicTest`](./src/test/java/dev/allwright/examples/WindowsBasicTest.java).
+The live examples are opt-in; set the matching `ALLWRIGHT_RUN_*_EXAMPLE`
+environment variable to `true`, such as `ALLWRIGHT_RUN_MACOS_EXAMPLE=true`.
 
 ```java
 import dev.allwright.client.Allwright;

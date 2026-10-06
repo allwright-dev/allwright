@@ -285,6 +285,7 @@ fn install_plugin_package(
 
     if plugin_id != "mobile-ios"
         && plugin_id != "desktop-mac"
+        && plugin_id != "desktop-windows"
         && let Some(local_artifact) = repo_local_plugin_artifact_path(plugin_id, version)
     {
         println!(
@@ -332,6 +333,11 @@ fn install_plugin_package(
             "downloaded plugin `desktop-mac` from {package_name}@{version} but its bundled XCUITest runner is incomplete"
         ));
     }
+    if plugin_id == "desktop-windows" && !bundled_windows_agent_is_complete(&install_root) {
+        return Err(format!(
+            "downloaded plugin `desktop-windows` from {package_name}@{version} but its bundled FlaUI agent is incomplete"
+        ));
+    }
     println!("Verified runtime artifact `{runtime_artifact}`.");
     Ok(())
 }
@@ -346,8 +352,15 @@ fn plugin_install_is_complete(plugin_id: &str, runtime_artifact: &Path) -> bool 
     match plugin_id {
         "mobile-ios" => bundled_ios_agent_is_complete(install_root),
         "desktop-mac" => bundled_mac_agent_is_complete(install_root),
+        "desktop-windows" => bundled_windows_agent_is_complete(install_root),
         _ => true,
     }
+}
+
+fn bundled_windows_agent_is_complete(install_root: &Path) -> bool {
+    install_root
+        .join("agent/Allwright.WindowsAgent.exe")
+        .is_file()
 }
 
 fn bundled_mac_agent_is_complete(install_root: &Path) -> bool {
@@ -685,8 +698,9 @@ fn repo_local_plugin_artifact_path(plugin_id: &str, version: &str) -> Option<Pat
 fn ensure_plugin_install_supported(plugin_id: &str) -> Result<(), String> {
     match (plugin_id, env::consts::OS) {
         ("web" | "mobile-android", _) | ("mobile-ios" | "desktop-mac", "macos") => Ok(()),
+        ("desktop-windows", "windows") if env::consts::ARCH == "x86_64" => Ok(()),
         _ => Err(format!(
-            "plugin `{plugin_id}` is not installable on this platform. Runtime artifacts ship for `web`, `mobile-android`, `mobile-ios`, and `desktop-mac` on macOS."
+            "plugin `{plugin_id}` is not installable on this platform. Runtime artifacts ship for `web`, `mobile-android`, `mobile-ios`, `desktop-mac` on macOS, and `desktop-windows` on Windows."
         )),
     }
 }
@@ -722,6 +736,7 @@ fn plugin_runtime_artifact_stem(plugin_id: &str) -> Result<&'static str, String>
         "mobile-android" => Ok("allwright-surface-mobile-android"),
         "mobile-ios" => Ok("allwright-surface-mobile-ios"),
         "desktop-mac" => Ok("allwright-surface-desktop-mac"),
+        "desktop-windows" => Ok("allwright-surface-desktop-windows"),
         _ => Err(format!(
             "automatic install is not supported for allwright plugin `{plugin_id}`"
         )),
@@ -750,6 +765,20 @@ fn normalize_release_version(raw: &str) -> String {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn windows_install_requires_self_contained_agent() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = env::temp_dir().join(format!("allwright-windows-agent-test-{unique}"));
+        fs::create_dir_all(root.join("agent")).unwrap();
+        assert!(!bundled_windows_agent_is_complete(&root));
+        fs::write(root.join("agent/Allwright.WindowsAgent.exe"), b"agent").unwrap();
+        assert!(bundled_windows_agent_is_complete(&root));
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn ios_install_requires_xctestrun_and_runner_app() {

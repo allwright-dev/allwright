@@ -27,6 +27,11 @@ from ._desktop import (
     MacApp,
     MacDesktop,
     MacLocator,
+    DesktopWindowsConnectOptions,
+    DesktopWindowsLaunchOptions,
+    WindowsApp,
+    WindowsDesktop,
+    WindowsLocator,
     desktop,
 )
 from ._page import Page

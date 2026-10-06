@@ -452,6 +452,63 @@ jobs:
           ASSET_PATH: ${{ steps.package.outputs.asset_path }}
         run: bash ./scripts/upload-release-asset.sh "$TAG_NAME" "$ASSET_PATH"
 
+  release-desktop-windows-plugin:
+    name: Release desktop-windows plugin (x86_64-pc-windows-msvc)
+    needs: ensure-github-release
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Sync workspace version from tag
+        shell: bash
+        run: |
+          chmod +x ./scripts/sync-version.sh
+          ./scripts/sync-version.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Verify Rust package versions match tag
+        shell: bash
+        run: bash ./scripts/verify-rust-release-version.sh "${GITHUB_REF_NAME}"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build plugin library
+        run: cargo build -p allwright-surface-desktop-windows --release --target x86_64-pc-windows-msvc
+
+      - name: Publish self-contained FlaUI agent
+        run: dotnet publish rust/allwright-surface-desktop-windows/agent/Allwright.WindowsAgent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o target/windows-agent
+
+      - name: Package release asset
+        shell: pwsh
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          $assetName = "allwright-surface-desktop-windows-$env:TAG_NAME-x86_64-pc-windows-msvc.zip"
+          New-Item -ItemType Directory -Force -Path dist/package/lib, dist/package/agent | Out-Null
+          Copy-Item target/x86_64-pc-windows-msvc/release/allwright_surface_desktop_windows.dll dist/package/lib/
+          Copy-Item target/windows-agent/Allwright.WindowsAgent.exe dist/package/agent/
+          Compress-Archive -Path dist/package/* -DestinationPath "dist/$assetName"
+          "asset_name=$assetName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "asset_path=dist/$assetName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        id: package
+
+      - name: Upload release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+          ASSET_PATH: ${{ steps.package.outputs.asset_path }}
+        run: bash ./scripts/upload-release-asset.sh "$TAG_NAME" "$ASSET_PATH"
+
   release-web-plugin:
     name: Release web plugin (${{ matrix.target }})
     needs: ensure-github-release

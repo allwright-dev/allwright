@@ -51,11 +51,17 @@ Paths passed to `setFiles` and `saveAs` belong to the test process, even when
 the Allwright server is remote. Android apps support the same `fileChooser` and
 `download` hook shape; Android `newPage` hooks are not applicable.
 
-Runnable examples live in [examples/web-basic.ts](./examples/web-basic.ts), [examples/android-basic.ts](./examples/android-basic.ts), and [examples/ios-basic.ts](./examples/ios-basic.ts).
+Runnable examples cover every implemented surface:
+[Web](./examples/web-basic.ts), [Android](./examples/android-basic.ts),
+[iOS](./examples/ios-basic.ts), [macOS](./examples/macos-basic.ts), and
+[Windows](./examples/windows-basic.ts). The desktop examples default to
+Calculator on macOS and Notepad on Windows and accept `ALLWRIGHT_MAC_APP_ID`
+or `ALLWRIGHT_WINDOWS_APP_ID`.
 
-Android, iOS, and macOS applications implement the shared `NativeApp` and
+Android, iOS, macOS, and Windows applications implement the shared `NativeApp` and
 `NativeAppLocator` interfaces. Platform-specific type names such as
-`MobileAndroidApp`, `MobileIosLocator`, and `DesktopMacLocator` remain exported
+`MobileAndroidApp`, `MobileIosLocator`, `DesktopMacLocator`, and
+`DesktopWindowsLocator` remain exported
 as aliases for compatibility and platform-oriented annotations.
 
 Shared config files are stack-agnostic and can live in `allwright.config.yaml` or `allwright.config.json`.

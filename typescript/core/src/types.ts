@@ -324,9 +324,22 @@ export interface DesktopMacDesktop {
   launch(options: DesktopMacLaunchOptions): Promise<DesktopMacApp>;
 }
 
+export type DesktopWindowsConnectOptions = DesktopMacConnectOptions;
+export type DesktopWindowsLaunchOptions = DesktopMacLaunchOptions;
+export type DesktopWindowsApp = NativeApp;
+export type DesktopWindowsLocator = NativeAppLocator;
+export interface DesktopWindowsDesktop {
+  readonly sessionId: string;
+  app(): DesktopWindowsApp;
+  launch(options: DesktopWindowsLaunchOptions): Promise<DesktopWindowsApp>;
+}
+
 export interface DesktopSurfaceNamespace {
   mac: {
     connect(options?: DesktopMacConnectOptions): Promise<DesktopMacDesktop>;
+  };
+  windows: {
+    connect(options?: DesktopWindowsConnectOptions): Promise<DesktopWindowsDesktop>;
   };
 }
 

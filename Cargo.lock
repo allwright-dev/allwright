@@ -102,6 +102,10 @@ version = "0.1.23"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
+ "base64 0.22.1",
+ "serde",
+ "serde_json",
+ "serde_yaml",
  "tokio",
 ]
 

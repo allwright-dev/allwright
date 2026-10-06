@@ -347,6 +347,7 @@ fn plugin_runtime_artifact_stem(plugin_id: &str) -> &'static str {
         "mobile-android" => "allwright-surface-mobile-android",
         "mobile-ios" => "allwright-surface-mobile-ios",
         "desktop-mac" => "allwright-surface-desktop-mac",
+        "desktop-windows" => "allwright-surface-desktop-windows",
         _ => "allwright-plugin",
     }
 }
@@ -379,8 +380,9 @@ fn plugin_runtime_artifact_filename(plugin_id: &str) -> String {
 fn ensure_plugin_install_supported(plugin_id: &str) -> Result<(), Box<dyn Error>> {
     match (plugin_id, env::consts::OS) {
         ("web" | "mobile-android", _) | ("mobile-ios" | "desktop-mac", "macos") => Ok(()),
+        ("desktop-windows", "windows") if env::consts::ARCH == "x86_64" => Ok(()),
         _ => Err(format!(
-            "plugin `{plugin_id}` is not installable on this platform. Runtime artifacts ship for `web`, `mobile-android`, and `mobile-ios` plus `desktop-mac` on macOS."
+            "plugin `{plugin_id}` is not installable on this platform. Runtime artifacts ship for `web`, `mobile-android`, `mobile-ios`, `desktop-mac` on macOS, and `desktop-windows` on Windows."
         )
         .into()),
     }

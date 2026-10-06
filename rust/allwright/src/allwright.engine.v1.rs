@@ -62,6 +62,7 @@ pub struct DesktopAppLaunchedEvent {
 pub enum DesktopPlatform {
     Unspecified = 0,
     Mac = 1,
+    Windows = 2,
 }
 impl DesktopPlatform {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -72,6 +73,7 @@ impl DesktopPlatform {
         match self {
             Self::Unspecified => "DESKTOP_PLATFORM_UNSPECIFIED",
             Self::Mac => "DESKTOP_PLATFORM_MAC",
+            Self::Windows => "DESKTOP_PLATFORM_WINDOWS",
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -79,6 +81,7 @@ impl DesktopPlatform {
         match value {
             "DESKTOP_PLATFORM_UNSPECIFIED" => Some(Self::Unspecified),
             "DESKTOP_PLATFORM_MAC" => Some(Self::Mac),
+            "DESKTOP_PLATFORM_WINDOWS" => Some(Self::Windows),
             _ => None,
         }
     }

@@ -19,8 +19,12 @@ pip install -e ./python
 ## Example
 
 Runnable examples include [`examples/web_basic.py`](./examples/web_basic.py),
-[`examples/android_basic.py`](./examples/android_basic.py), and
-[`examples/ios_basic.py`](./examples/ios_basic.py).
+[`examples/android_basic.py`](./examples/android_basic.py),
+[`examples/ios_basic.py`](./examples/ios_basic.py),
+[`examples/macos_basic.py`](./examples/macos_basic.py), and
+[`examples/windows_basic.py`](./examples/windows_basic.py). The desktop
+examples default to Calculator on macOS and Notepad on Windows and accept
+`ALLWRIGHT_MAC_APP_ID` or `ALLWRIGHT_WINDOWS_APP_ID`.
 
 ```python
 from allwright import firefox

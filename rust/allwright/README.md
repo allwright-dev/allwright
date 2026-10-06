@@ -23,11 +23,18 @@ The surrounding Rust workspace now also publishes:
 
 Installing the `allwright` package is intended to provide the CLI plus this lightweight core together, while surface crates are added separately as plugins.
 
-Runnable client examples include `web_basic`, `android_basic`, and `ios_basic`:
+Runnable client examples cover every implemented surface: `web_basic`,
+`android_basic`, `ios_basic`, `macos_basic`, and `windows_basic`:
 
 ```sh
 cargo run -p allwright-core --example ios_basic
+cargo run -p allwright-core --example macos_basic
+cargo run -p allwright-core --example windows_basic
 ```
+
+The desktop examples launch Calculator on macOS and Notepad on Windows by
+default. Override them with `ALLWRIGHT_MAC_APP_ID` or
+`ALLWRIGHT_WINDOWS_APP_ID`.
 
 Typed hooks use one generic registration/wait lifecycle. For example, register
 the web-owned new-page hook before the action that opens a tab:

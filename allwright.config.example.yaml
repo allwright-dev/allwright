@@ -46,3 +46,6 @@ desktop:
     app:
       id: com.example.desktop
       binary: /Applications/Allwright.app
+  windows:
+    app:
+      id: notepad.exe
