@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "allwright"
-version = "0.1.23"
+version = "0.1.24"
 dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",
@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-core"
-version = "0.1.23"
+version = "0.1.24"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -57,7 +57,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-plugin-sdk"
-version = "0.1.23"
+version = "0.1.24"
 dependencies = [
  "serde",
  "serde_json",
@@ -66,7 +66,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop"
-version = "0.1.23"
+version = "0.1.24"
 dependencies = [
  "allwright-plugin-sdk",
  "serde",
@@ -76,7 +76,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-linux"
-version = "0.1.23"
+version = "0.1.24"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -85,7 +85,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-mac"
-version = "0.1.23"
+version = "0.1.24"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -98,7 +98,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-windows"
-version = "0.1.23"
+version = "0.1.24"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -111,7 +111,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile"
-version = "0.1.23"
+version = "0.1.24"
 dependencies = [
  "allwright-plugin-sdk",
  "serde",
@@ -121,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile-android"
-version = "0.1.23"
+version = "0.1.24"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
@@ -136,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile-ios"
-version = "0.1.23"
+version = "0.1.24"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
@@ -151,7 +151,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-web"
-version = "0.1.23"
+version = "0.1.24"
 dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",
@@ -1269,9 +1269,9 @@ dependencies = [
 
 [[package]]
 name = "powerfmt"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
+checksum = "4a6394b9e965e73d0a289ee54f589087e2c676aedf60885baf52c76b771e4958"
 
 [[package]]
 name = "ppv-lite86"
@@ -2314,9 +2314,9 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "want"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfa7760aed19e106de2c7c0b581b509f2f25d3dacaf737cb82ac61bc6d760b0e"
+checksum = "ec4cdd0dd910afe868b7ef477227d8d538b46b3075031afee8a9f2acb0a2ed0b"
 dependencies = [
  "try-lock",
 ]
@@ -2564,18 +2564,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.59"
+version = "0.8.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6df92bf3d9227be3d53173901ddbffac2babc27ae50f397776ffd6dc33f800cb"
+checksum = "6400fc4bb7426f6faac3fb07566122bb18622e3022bd2c36426a92ed489b1dbe"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.59"
+version = "0.8.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac4f328cf2f05d084e496c3e9c3f33ed0a183656a16e1fcec4d464d8373aec82"
+checksum = "99c27cc7525bad4df59a45e073c45b2c2aa820efb588234cc23a547ec69a34db"
 dependencies = [
  "proc-macro2",
  "quote",
