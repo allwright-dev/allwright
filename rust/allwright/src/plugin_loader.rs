@@ -8,8 +8,8 @@ use allwright_plugin_sdk::{
 use allwright_surface_desktop::{
     ConnectOptions as DesktopConnectOptions, DesktopActionInfo, DesktopAppInfo,
     DesktopAppSessionHandle, DesktopCommand, DesktopCommandResult, DesktopConnectInfo,
-    DesktopElementCountInfo, DesktopScreenshotInfo, DesktopSessionHandle, DesktopTextInfo,
-    DesktopWaitInfo, LaunchOptions as DesktopLaunchOptions,
+    DesktopElementCountInfo, DesktopNavigationInfo, DesktopScreenshotInfo, DesktopSessionHandle,
+    DesktopTextInfo, DesktopWaitInfo, LaunchOptions as DesktopLaunchOptions,
 };
 use allwright_surface_mobile::{
     ConnectOptions as MobileConnectOptions, MobileBrowserSessionHandle, MobileClickInfo,
@@ -41,6 +41,12 @@ fn invoke_desktop(command: DesktopCommand) -> Result<DesktopCommandResult, Strin
             desktop_session, ..
         }
         | DesktopCommand::CloseApp {
+            desktop_session, ..
+        }
+        | DesktopCommand::NavigateApp {
+            desktop_session, ..
+        }
+        | DesktopCommand::Capture {
             desktop_session, ..
         }
         | DesktopCommand::ClickElement {
@@ -128,6 +134,48 @@ pub async fn close_desktop_app(
     {
         DesktopCommandResult::CloseApp => Ok(()),
         _ => Err("desktop plugin returned an unexpected close response".to_string()),
+    }
+}
+
+pub async fn navigate_desktop_app(
+    desktop_session: &DesktopSessionHandle,
+    app_session: &DesktopAppSessionHandle,
+    url: &str,
+    timeout_ms: Option<u32>,
+) -> Result<DesktopNavigationInfo, String> {
+    match invoke_desktop_expected(DesktopCommand::NavigateApp {
+        desktop_session: desktop_session.clone(),
+        app_session: app_session.clone(),
+        url: url.to_string(),
+        timeout_ms,
+    })
+    .await?
+    {
+        DesktopCommandResult::NavigateApp(value) => Ok(value),
+        _ => Err("desktop plugin returned an unexpected navigate response".to_string()),
+    }
+}
+
+pub async fn capture_desktop(
+    desktop_session: &DesktopSessionHandle,
+    app_session: &DesktopAppSessionHandle,
+    kind: &str,
+    selector: &str,
+    attribute_name: &str,
+    timeout_ms: Option<u32>,
+) -> Result<allwright_plugin_sdk::CaptureInfo, String> {
+    match invoke_desktop_expected(DesktopCommand::Capture {
+        desktop_session: desktop_session.clone(),
+        app_session: app_session.clone(),
+        kind: kind.to_string(),
+        selector: selector.to_string(),
+        attribute_name: attribute_name.to_string(),
+        timeout_ms,
+    })
+    .await?
+    {
+        DesktopCommandResult::Capture(value) => Ok(value),
+        _ => Err("desktop plugin returned an unexpected capture response".to_string()),
     }
 }
 
@@ -356,6 +404,9 @@ fn mobile_plugin_id_for_command(command: &MobileCommand) -> Result<&'static str,
         | MobileCommand::NavigateApp {
             browser_session, ..
         }
+        | MobileCommand::Capture {
+            browser_session, ..
+        }
         | MobileCommand::ClickElement {
             browser_session, ..
         }
@@ -518,6 +569,29 @@ pub async fn navigate_mobile_app(
     {
         MobileCommandResult::NavigateApp(result) => Ok(result),
         _ => Err("mobile plugin returned an unexpected navigation response".to_string()),
+    }
+}
+
+pub async fn capture_mobile(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    kind: &str,
+    selector: &str,
+    attribute_name: &str,
+    timeout_ms: Option<u32>,
+) -> Result<allwright_plugin_sdk::CaptureInfo, String> {
+    match invoke_mobile_expected(MobileCommand::Capture {
+        browser_session: browser_session.clone(),
+        page_session: page_session.clone(),
+        kind: kind.to_string(),
+        selector: selector.to_string(),
+        attribute_name: attribute_name.to_string(),
+        timeout_ms,
+    })
+    .await?
+    {
+        MobileCommandResult::Capture(value) => Ok(value),
+        _ => Err("mobile plugin returned an unexpected capture response".to_string()),
     }
 }
 
@@ -910,6 +984,8 @@ pub async fn click_element(
     surface_session: &BrowserSessionHandle,
     page_session: &PageSessionHandle,
     css_selector: &str,
+    button: u8,
+    click_count: u32,
 ) -> Result<ClickInfo, String> {
     match invoke_web_expected(
         "ClickElementCommand",
@@ -917,6 +993,8 @@ pub async fn click_element(
             browser_session: surface_session.clone(),
             page_session: page_session.clone(),
             css_selector: css_selector.to_string(),
+            button,
+            click_count,
         },
     )
     .await?

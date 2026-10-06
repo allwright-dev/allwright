@@ -76,9 +76,16 @@ export const javaReference: LanguageReference = {
         {
           name: "click",
           kind: "method",
-          signature: "public void click(String selector)\npublic void click(String selector, CommandOptions options)",
-          description: "Clicks the first element matching selector.",
+          signature: "public void click(String selector)\npublic void click(String selector, CommandOptions options)\npublic void click(String selector, ClickOptions options)",
+          description: "Clicks the first matching element. ClickOptions accepts LEFT, MIDDLE, or RIGHT and a click count from 1 to 3.",
           since: "v0.0.14",
+        },
+        {
+          name: "dblclick",
+          kind: "method",
+          signature: "public void dblclick(String selector)\npublic void dblclick(String selector, ClickOptions options)",
+          description: "Double-clicks the first matching element with the selected mouse button.",
+          since: "v0.1.25",
         },
         {
           name: "fill",
@@ -208,7 +215,7 @@ export const javaReference: LanguageReference = {
       slug: "locator",
       title: "Locator",
       description:
-        "Every action and query method on Page (click, fill, hover, press, focus, highlight, count, textContent, innerText, inputValue, selectedOptions, selectedText, isChecked, getAttribute, boundingBox, waitFor) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds: building one via the WebLocators interface, and narrowing it once built.",
+        "Every action and query method on Page (click, dblclick, fill, hover, press, focus, highlight, count, textContent, innerText, inputValue, selectedOptions, selectedText, isChecked, getAttribute, boundingBox, waitFor) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds: building one via the WebLocators interface, and narrowing it once built.",
       members: [
         {
           name: "getByRole",
@@ -368,6 +375,13 @@ export const javaReference: LanguageReference = {
           since: "v0.0.57 – v0.0.58",
         },
         {
+          name: "NativeApp state reads",
+          kind: "method",
+          signature: "public String inputValue(String selector)\npublic boolean isChecked(String selector)\npublic String getAttribute(String selector, String name)\npublic BoundingBox boundingBox(String selector)",
+          description: "Reads native input values, checked/selected state, known accessibility attributes, and on-screen bounds on Android, iOS, macOS, and Windows. The same methods and CommandOptions overloads are available on NativeLocator; selected-option and selected-text reads remain web-only.",
+          since: "v0.1.24",
+        },
+        {
           name: "AndroidApp.waitForSelector",
           kind: "method",
           signature: "public void waitForSelector(String selector)",
@@ -438,7 +452,7 @@ export const javaReference: LanguageReference = {
           name: "MacApp locators and actions",
           kind: "method",
           signature: "public NativeLocator locator(String selector)\npublic NativeLocator getByRole(String role, RoleOptions options)",
-          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, textContent, innerText, waitForSelector, screenshot, and accessibilitySnapshot.",
+          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include goTo/navigate for universal links and URL schemes, plus click, fill, focus, press, count, textContent, innerText, waitForSelector, screenshot, and accessibilitySnapshot.",
           since: "v0.1.21",
         },
         {
@@ -461,7 +475,7 @@ export const javaReference: LanguageReference = {
           name: "WindowsApp locators and actions",
           kind: "method",
           signature: "public NativeLocator locator(String selector)\npublic NativeLocator getByRole(String role, RoleOptions options)",
-          description: "Uses native UI Automation selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, textContent, innerText, waitForSelector, screenshot, and accessibilitySnapshot.",
+          description: "Uses native UI Automation selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include goTo/navigate for universal links and URL schemes, plus click, fill, focus, press, count, textContent, innerText, waitForSelector, screenshot, and accessibilitySnapshot.",
           since: "v0.1.24",
         },
       ],

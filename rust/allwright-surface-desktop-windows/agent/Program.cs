@@ -21,7 +21,10 @@ internal sealed record AgentRequest(
     string Command,
     string? SessionId,
     string? AppId,
+    string? Url,
     string? Selector,
+    string? Kind,
+    string? AttributeName,
     string? Value,
     string? Key,
     string? Text,
@@ -112,12 +115,14 @@ internal static class Program
         "status" => new { host_name = Environment.MachineName, backend = "flaui-uia3" },
         "launch" => Launch(request),
         "close" => Close(request),
+        "open_url" => OpenUrl(request),
         "count" => new { count = FindAll(Session(request).Root, Required(request.Selector, "selector")).Length },
         "click" => WithElement(request, element => { element.Click(); return new { }; }),
         "focus" => WithElement(request, element => { element.Focus(); return new { }; }),
         "fill" => WithElement(request, element => { Fill(element, request.Value ?? ""); return new { }; }),
         "press" => WithElement(request, element => { element.Focus(); Press(request.Key ?? "", request.Text); return new { }; }),
         "text" => WithElement(request, element => new { text = ElementText(element) }),
+        "capture" => WithElement(request, element => CaptureElement(element, request)),
         "wait" => Wait(request),
         "screenshot" => Screenshot(request),
         "source" => Source(request),
@@ -150,6 +155,19 @@ internal static class Program
         Sessions.Remove(session.Id);
         try { session.Application.Close(); } catch { session.Application.Kill(); }
         return new { };
+    }
+
+    private static object OpenUrl(AgentRequest request)
+    {
+        _ = Session(request);
+        var value = Required(request.Url, "url");
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var url) || string.IsNullOrWhiteSpace(url.Scheme))
+            throw new InvalidOperationException("url must be an absolute URL with a scheme");
+        _ = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(value)
+        {
+            UseShellExecute = true
+        });
+        return new { url = value };
     }
 
     private static object WithElement(AgentRequest request, Func<AutomationElement, object> operation)
@@ -353,6 +371,58 @@ internal static class Program
     {
         if (element.Patterns.Value.TryGetPattern(out var value)) return value.Value.ValueOrDefault ?? "";
         return element.Properties.Name.ValueOrDefault ?? "";
+    }
+
+    private static object CaptureElement(AutomationElement element, AgentRequest request)
+    {
+        return Required(request.Kind, "kind") switch
+        {
+            "input_value" => new { value = ElementText(element), selected_options = Array.Empty<object>() },
+            "checked" => new { @checked = ElementChecked(element), selected_options = Array.Empty<object>() },
+            "attribute" => new { value = ElementAttribute(element, Required(request.AttributeName, "attribute_name")), selected_options = Array.Empty<object>() },
+            "bounding_box" => BoundingBoxCapture(element),
+            var kind => throw new InvalidOperationException($"capture kind `{kind}` is not supported for Windows native apps")
+        };
+    }
+
+    private static bool ElementChecked(AutomationElement element)
+    {
+        if (element.Patterns.Toggle.TryGetPattern(out var toggle))
+            return toggle.ToggleState.ValueOrDefault == ToggleState.On;
+        if (element.Patterns.SelectionItem.TryGetPattern(out var selection))
+            return selection.IsSelected.ValueOrDefault;
+        return false;
+    }
+
+    private static string? ElementAttribute(AutomationElement element, string name) => name switch
+    {
+        "name" or "label" or "text" => element.Properties.Name.ValueOrDefault,
+        "automationId" or "automation-id" or "id" or "testId" => element.Properties.AutomationId.ValueOrDefault,
+        "className" or "class" => element.Properties.ClassName.ValueOrDefault,
+        "controlType" or "type" or "role" => element.Properties.ControlType.ValueOrDefault.ToString(),
+        "value" => ElementText(element),
+        "enabled" => element.Properties.IsEnabled.ValueOrDefault.ToString().ToLowerInvariant(),
+        "focused" => element.Properties.HasKeyboardFocus.ValueOrDefault.ToString().ToLowerInvariant(),
+        "editable" => ElementEditable(element).ToString().ToLowerInvariant(),
+        "offscreen" => element.Properties.IsOffscreen.ValueOrDefault.ToString().ToLowerInvariant(),
+        "selected" or "checked" => ElementChecked(element).ToString().ToLowerInvariant(),
+        _ => null
+    };
+
+    private static bool ElementEditable(AutomationElement element)
+    {
+        return element.Properties.IsEnabled.ValueOrDefault
+            && element.Patterns.Value.TryGetPattern(out var value)
+            && !value.IsReadOnly.ValueOrDefault;
+    }
+
+    private static object BoundingBoxCapture(AutomationElement element)
+    {
+        var rectangle = element.Properties.BoundingRectangle.ValueOrDefault;
+        object? box = rectangle.Width > 0 && rectangle.Height > 0
+            ? new { x = rectangle.X, y = rectangle.Y, width = rectangle.Width, height = rectangle.Height }
+            : null;
+        return new { bounding_box = box, selected_options = Array.Empty<object>() };
     }
 
     private static AppSession Session(AgentRequest request)

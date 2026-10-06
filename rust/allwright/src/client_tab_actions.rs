@@ -8,19 +8,20 @@ use crate::proto::{
 use super::command::command_retry_options;
 use super::selectors::normalize_selector_for_transport;
 use super::tab::ensure_tab_open;
-use super::types::{CommandOptions, Error, PressOptions, Result, Tab};
+use super::types::{ClickOptions, CommandOptions, Error, PressOptions, Result, Tab};
 
 impl Tab {
     pub async fn click(&self, css_selector: impl Into<String>) -> Result<()> {
-        self.click_with_options(css_selector, CommandOptions::default())
+        self.click_with_options(css_selector, ClickOptions::default())
             .await
     }
 
     pub async fn click_with_options(
         &self,
         css_selector: impl Into<String>,
-        options: CommandOptions,
+        options: impl Into<ClickOptions>,
     ) -> Result<()> {
+        let options = options.into();
         let css_selector = normalize_selector_for_transport(&css_selector.into());
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -34,6 +35,8 @@ impl Tab {
                 command: Some(ContextCommand::ClickElement(ClickElementCommand {
                     css_selector: css_selector.clone(),
                     retry_options: command_retry_options(options.timeout_ms),
+                    button: Some(options.button.as_str().to_string()),
+                    click_count: options.click_count,
                 })),
             })
             .await
@@ -64,6 +67,20 @@ impl Tab {
                 _ => {}
             }
         }
+    }
+
+    pub async fn dblclick(&self, css_selector: impl Into<String>) -> Result<()> {
+        self.dblclick_with_options(css_selector, ClickOptions::default())
+            .await
+    }
+
+    pub async fn dblclick_with_options(
+        &self,
+        css_selector: impl Into<String>,
+        mut options: ClickOptions,
+    ) -> Result<()> {
+        options.click_count = Some(2);
+        self.click_with_options(css_selector, options).await
     }
 
     pub async fn focus(&self, css_selector: impl Into<String>) -> Result<()> {

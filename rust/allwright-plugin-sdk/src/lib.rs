@@ -303,6 +303,8 @@ pub enum PluginCommand {
         browser_session: BrowserSessionHandle,
         page_session: PageSessionHandle,
         css_selector: String,
+        button: u8,
+        click_count: u32,
     },
     CountElements {
         browser_session: BrowserSessionHandle,

@@ -1,12 +1,12 @@
 use allwright_plugin_sdk::{
-    ALLWRIGHT_PLUGIN_API_VERSION, AccessibilitySnapshotInfo, SurfaceFamily, SurfacePlugin,
-    SurfacePluginDescriptor,
+    ALLWRIGHT_PLUGIN_API_VERSION, AccessibilitySnapshotInfo, CaptureInfo, SurfaceFamily,
+    SurfacePlugin, SurfacePluginDescriptor,
 };
 use allwright_surface_desktop::{
     ConnectOptions, DesktopActionInfo, DesktopAppInfo, DesktopAppSessionHandle, DesktopCommand,
-    DesktopCommandResult, DesktopConnectInfo, DesktopElementCountInfo, DesktopPlatform,
-    DesktopScreenshotInfo, DesktopSessionHandle, DesktopTextInfo, DesktopWaitInfo, LaunchOptions,
-    boot_surface, normalize_selector_for_transport,
+    DesktopCommandResult, DesktopConnectInfo, DesktopElementCountInfo, DesktopNavigationInfo,
+    DesktopPlatform, DesktopScreenshotInfo, DesktopSessionHandle, DesktopTextInfo, DesktopWaitInfo,
+    LaunchOptions, boot_surface, normalize_selector_for_transport,
 };
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -50,7 +50,13 @@ struct AgentRequest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     app_id: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    url: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     selector: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    attribute_name: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -70,7 +76,10 @@ impl<'a> AgentRequest<'a> {
             command,
             session_id: None,
             app_id: None,
+            url: None,
             selector: None,
+            kind: None,
+            attribute_name: None,
             value: None,
             key: None,
             text: None,
@@ -335,6 +344,43 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
                 invoke_agent(&desktop_session.endpoint, &r, Some(10_000))?;
             }
             Ok(DesktopCommandResult::CloseApp)
+        }
+        DesktopCommand::NavigateApp {
+            desktop_session,
+            app_session,
+            url,
+            timeout_ms,
+        } => {
+            let mut request = AgentRequest::new("open_url");
+            request.session_id = Some(&app_session.app_session_id);
+            request.url = Some(&url);
+            request.timeout_ms = timeout_ms;
+            invoke_agent(&desktop_session.endpoint, &request, timeout_ms)?;
+            Ok(DesktopCommandResult::NavigateApp(DesktopNavigationInfo {
+                url,
+                note: "opened URL through the Windows shell".to_string(),
+            }))
+        }
+        DesktopCommand::Capture {
+            desktop_session,
+            app_session,
+            kind,
+            selector,
+            attribute_name,
+            timeout_ms,
+        } => {
+            let selector = normalize_selector_for_transport(&selector);
+            let mut request = AgentRequest::new("capture");
+            request.session_id = Some(&app_session.app_session_id);
+            request.selector = Some(&selector);
+            request.kind = Some(&kind);
+            request.attribute_name = Some(&attribute_name);
+            request.timeout_ms = timeout_ms;
+            let result = invoke_agent(&desktop_session.endpoint, &request, timeout_ms)?;
+            let capture: CaptureInfo = serde_json::from_value(result).map_err(|error| {
+                format!("Windows agent returned an invalid capture result: {error}")
+            })?;
+            Ok(DesktopCommandResult::Capture(capture))
         }
         DesktopCommand::ClickElement {
             desktop_session,

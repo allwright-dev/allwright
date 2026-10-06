@@ -41,6 +41,7 @@ from ._types import (
     CapturedOption, BoundingBox,
     AllwrightConfig,
     ClickResult,
+    ClickOptions,
     CommandOptions,
     CountResult,
     ElementResult,

@@ -1,6 +1,6 @@
 use allwright_plugin_sdk::{
-    ALLWRIGHT_PLUGIN_API_VERSION, AccessibilitySnapshotInfo, SurfaceFamily, SurfacePlugin,
-    SurfacePluginDescriptor,
+    ALLWRIGHT_PLUGIN_API_VERSION, AccessibilitySnapshotInfo, CaptureInfo, SurfaceFamily,
+    SurfacePlugin, SurfacePluginDescriptor,
 };
 use allwright_surface_mobile::{
     ConnectOptions, DeviceConnectionKind, DeviceTarget, LaunchOptions, MobileAppKind,
@@ -105,6 +105,10 @@ struct AgentRequest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     selector: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    attribute_name: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     key: Option<&'a str>,
@@ -129,6 +133,8 @@ impl<'a> AgentRequest<'a> {
             session_id: None,
             bundle_id: None,
             selector: None,
+            kind: None,
+            attribute_name: None,
             value: None,
             key: None,
             text: None,
@@ -2165,6 +2171,28 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             timeout_ms,
         } => navigate_ios_app(&browser_session, &page_session, &url, timeout_ms)
             .map(MobileCommandResult::NavigateApp),
+        MobileCommand::Capture {
+            browser_session,
+            page_session,
+            kind,
+            selector,
+            attribute_name,
+            timeout_ms,
+        } => {
+            let selector = normalized_selector(&selector)?;
+            let mut request = action_request("capture", &page_session, &selector, timeout_ms);
+            request.kind = Some(&kind);
+            request.attribute_name = Some(&attribute_name);
+            let result = invoke_agent(
+                endpoint_from_session(&browser_session)?,
+                &request,
+                timeout_ms,
+            )?;
+            let capture: CaptureInfo = serde_json::from_value(result).map_err(|error| {
+                format!("iOS agent returned an invalid capture result: {error}")
+            })?;
+            Ok(MobileCommandResult::Capture(capture))
+        }
         MobileCommand::ClickElement {
             browser_session,
             page_session,

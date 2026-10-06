@@ -2,6 +2,8 @@ import Foundation
 import Network
 #if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
 #endif
 import XCTest
 
@@ -172,6 +174,21 @@ final class AllwrightIOSAgent {
             snapshotGenerations.removeValue(forKey: sessionID)
             return .success(["closed": true])
 
+        case "open_url":
+#if os(macOS)
+            _ = try application(for: request)
+            let value = try requiredString("url", in: request)
+            guard let url = URL(string: value), url.scheme != nil else {
+                throw AgentError("url must be an absolute URL with a scheme")
+            }
+            guard NSWorkspace.shared.open(url) else {
+                throw AgentError("macOS could not open `\(value)` with a registered application")
+            }
+            return .success(["url": value])
+#else
+            throw AgentError("open_url is only available in the macOS desktop agent")
+#endif
+
         case "click":
             let element = try resolvedElement(for: request, requiringActionability: true)
             element.tap()
@@ -221,6 +238,73 @@ final class AllwrightIOSAgent {
                 ?? (!element.label.isEmpty ? element.label : element.title)
             return .success(["text": text])
 
+        case "capture":
+            let element = try resolvedElement(for: request)
+            let kind = try requiredString("kind", in: request)
+            switch kind {
+            case "input_value":
+                let value: String
+                if let string = element.value as? String {
+                    value = string
+                } else if let number = element.value as? NSNumber {
+                    value = number.stringValue
+                } else {
+                    value = ""
+                }
+                return .success(["value": value, "selected_options": []])
+            case "checked":
+                let checked: Bool
+                if let number = element.value as? NSNumber {
+                    checked = number.boolValue
+                } else if let string = element.value as? String {
+                    checked = ["1", "true", "on", "checked", "selected", "yes"].contains(string.lowercased())
+                } else {
+                    checked = element.isSelected
+                }
+                return .success(["checked": checked, "selected_options": []])
+            case "attribute":
+                let name = try requiredString("attribute_name", in: request)
+                let value: Any
+                switch name {
+                case "identifier", "id", "testId": value = element.identifier
+                case "label", "text": value = element.label
+                case "title": value = element.title
+                case "value": value = element.value ?? NSNull()
+                case "placeholder", "placeholderValue": value = element.placeholderValue ?? NSNull()
+                case "enabled": value = String(element.isEnabled)
+                case "selected", "checked": value = String(element.isSelected)
+                case "focused":
+#if os(macOS)
+                    let (_, application) = try application(for: request)
+                    let focused = application.descendants(matching: .any).matching(
+                        NSPredicate(format: "hasKeyboardFocus == true")
+                    ).firstMatch
+                    value = String(
+                        focused.exists
+                            && focused.elementType == element.elementType
+                            && focused.frame == element.frame
+                            && focused.identifier == element.identifier
+                    )
+#else
+                    value = String(element.hasFocus)
+#endif
+                case "editable":
+                    value = String(element.isEnabled && [.textField, .secureTextField, .textView].contains(element.elementType))
+                case "hittable": value = String(element.isHittable)
+                case "type", "elementType": value = String(describing: element.elementType)
+                default: value = NSNull()
+                }
+                return .success(["value": value, "selected_options": []])
+            case "bounding_box":
+                let frame = element.frame
+                let box: Any = frame.width > 0 && frame.height > 0
+                    ? ["x": frame.minX, "y": frame.minY, "width": frame.width, "height": frame.height]
+                    : NSNull()
+                return .success(["bounding_box": box, "selected_options": []])
+            default:
+                throw AgentError("capture kind `\(kind)` is not supported for \(platformLabel) native apps")
+            }
+
         case "wait":
             let (sessionID, application) = try application(for: request)
             let selector = try requiredString("selector", in: request)
@@ -229,19 +313,26 @@ final class AllwrightIOSAgent {
             if selector.hasPrefix("ref=") {
                 let deadline = Date().addingTimeInterval(timeout)
                 repeat {
-                    let exists = (try? referencedElement(selector, sessionID: sessionID, application: application))?.exists == true
-                    if exists == visible { return .success(["visible": visible]) }
+                    let element = try? referencedElement(selector, sessionID: sessionID, application: application)
+                    let isVisible = element?.exists == true && element?.isHittable == true
+                    if isVisible == visible { return .success(["visible": visible]) }
                     RunLoop.current.run(until: Date().addingTimeInterval(0.05))
                 } while Date() < deadline
                 throw AgentError("reference did not become \(visible ? "visible" : "hidden") before timeout")
             }
             let element = query(selector, in: application).firstMatch
-            if visible, element.waitForExistence(timeout: timeout) {
-                return .success(["visible": true])
+            if visible {
+                let expectation = XCTNSPredicateExpectation(
+                    predicate: NSPredicate(format: "exists == true AND hittable == true"),
+                    object: element
+                )
+                if XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed {
+                    return .success(["visible": true])
+                }
             }
             if !visible {
                 let expectation = XCTNSPredicateExpectation(
-                    predicate: NSPredicate(format: "exists == false"),
+                    predicate: NSPredicate(format: "exists == false OR hittable == false"),
                     object: element
                 )
                 if XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed {

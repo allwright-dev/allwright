@@ -71,9 +71,16 @@ export const goReference: LanguageReference = {
           name: "Click",
           kind: "method",
           signature: "func (t *Tab) Click(ctx context.Context, cssSelector string, options ...CommandOptions) error",
-          description: "Clicks the first element matching the selector.",
+          description: "Clicks the first matching element. CommandOptions accepts MouseButtonLeft, MouseButtonMiddle, or MouseButtonRight and a ClickCount from 1 to 3 for click calls.",
           since: "v0.0.14",
           example: 'page.Click(ctx, "button#submit")',
+        },
+        {
+          name: "DblClick",
+          kind: "method",
+          signature: "func (t *Tab) DblClick(ctx context.Context, cssSelector string, options ...CommandOptions) error",
+          description: "Double-clicks the first matching element with the selected mouse button.",
+          since: "v0.1.25",
         },
         {
           name: "Fill",
@@ -198,7 +205,7 @@ export const goReference: LanguageReference = {
       slug: "locator",
       title: "Locator",
       description:
-        "Every action and query method on Page (Click, Fill, Hover, Press, Focus, Highlight, Count, TextContent, InnerText, InputValue, SelectedOptions, SelectedText, IsChecked, GetAttribute, BoundingBox, WaitFor) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds on top: building one semantically instead of by raw selector, and narrowing it once built.",
+        "Every action and query method on Page (Click, DblClick, Fill, Hover, Press, Focus, Highlight, Count, TextContent, InnerText, InputValue, SelectedOptions, SelectedText, IsChecked, GetAttribute, BoundingBox, WaitFor) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds on top: building one semantically instead of by raw selector, and narrowing it once built.",
       members: [
         {
           name: "GetByRole",
@@ -351,6 +358,13 @@ export const goReference: LanguageReference = {
           since: "v0.0.57 – v0.0.58",
         },
         {
+          name: "(*NativeApp) state reads",
+          kind: "method",
+          signature: "func (p *NativeApp) InputValue(ctx context.Context, selector string, options ...CommandOptions) (string, error)\nfunc (p *NativeApp) IsChecked(ctx context.Context, selector string, options ...CommandOptions) (bool, error)\nfunc (p *NativeApp) GetAttribute(ctx context.Context, selector, name string, options ...CommandOptions) (*string, error)\nfunc (p *NativeApp) BoundingBox(ctx context.Context, selector string, options ...CommandOptions) (*BoundingBox, error)",
+          description: "Reads native input values, checked/selected state, known accessibility attributes, and on-screen bounds on Android, iOS, macOS, and Windows. The same methods are available on NativeLocator; selected-option and selected-text reads remain web-only.",
+          since: "v0.1.24",
+        },
+        {
           name: "(*NativeApp).WaitForSelector",
           kind: "method",
           signature: "func (p *NativeApp) WaitForSelector(ctx context.Context, selector string, options ...WaitForSelectorOptions) error",
@@ -421,7 +435,7 @@ export const goReference: LanguageReference = {
           name: "MacApp locators and actions",
           kind: "method",
           signature: "func (p *MacApp) Locator(selector string) *MacLocator\nfunc (p *MacApp) GetByRole(role string, options ...RoleOptions) *MacLocator",
-          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include Click, Fill, Focus, Press, Count, TextContent, InnerText, WaitForSelector, Screenshot, and AccessibilitySnapshot.",
+          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include Goto/Navigate for universal links and URL schemes, plus Click, Fill, Focus, Press, Count, TextContent, InnerText, WaitForSelector, Screenshot, and AccessibilitySnapshot.",
           since: "v0.1.21",
         },
         {
@@ -444,7 +458,7 @@ export const goReference: LanguageReference = {
           name: "WindowsApp locators and actions",
           kind: "method",
           signature: "func (p *WindowsApp) Locator(selector string) *WindowsLocator\nfunc (p *WindowsApp) GetByRole(role string, options ...RoleOptions) *WindowsLocator",
-          description: "Uses native UI Automation selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include Click, Fill, Focus, Press, Count, TextContent, InnerText, WaitForSelector, Screenshot, and AccessibilitySnapshot.",
+          description: "Uses native UI Automation selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include Goto/Navigate for universal links and URL schemes, plus Click, Fill, Focus, Press, Count, TextContent, InnerText, WaitForSelector, Screenshot, and AccessibilitySnapshot.",
           since: "v0.1.24",
         },
       ],

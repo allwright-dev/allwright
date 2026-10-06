@@ -1,6 +1,7 @@
 mod accessibility;
 use allwright_plugin_sdk::{
-    ALLWRIGHT_PLUGIN_API_VERSION, SurfaceFamily, SurfacePlugin, SurfacePluginDescriptor,
+    ALLWRIGHT_PLUGIN_API_VERSION, BoundingBox, CaptureInfo, SurfaceFamily, SurfacePlugin,
+    SurfacePluginDescriptor,
 };
 use allwright_surface_mobile::{
     ConnectOptions, DeviceConnectionKind, DeviceTarget, LaunchOptions, MobileAppKind,
@@ -660,7 +661,7 @@ pub async fn boot() -> String {
     boot_surface("android", 10).await
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 struct MobilePluginEnvelope {
     ok: bool,
     result: Option<MobileCommandResult>,
@@ -772,6 +773,22 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
                 note: "opened Android deep link through the platform intent router".to_string(),
             }))
         }
+        MobileCommand::Capture {
+            browser_session,
+            page_session,
+            kind,
+            selector,
+            attribute_name,
+            timeout_ms,
+        } => capture_element(
+            &browser_session,
+            &page_session,
+            &kind,
+            &selector,
+            &attribute_name,
+            timeout_ms,
+        )
+        .map(MobileCommandResult::Capture),
         MobileCommand::AccessibilitySnapshot {
             browser_session,
             page_session,
@@ -1550,6 +1567,83 @@ fn adb_get_text(
         .clone()
         .or_else(|| snapshot.node.content_desc.clone())
         .unwrap_or_default())
+}
+
+fn capture_element(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    kind: &str,
+    selector: &str,
+    attribute_name: &str,
+    timeout_ms: Option<u32>,
+) -> Result<CaptureInfo, String> {
+    accessibility::validate_scope(browser_session, page_session, "capture")?;
+    let snapshot =
+        resolve_selector_snapshot(&browser_session.device.device_id, selector, timeout_ms)?;
+    let node = snapshot.node;
+    let mut result = CaptureInfo::default();
+    match kind {
+        "input_value" => result.value = Some(node.text.unwrap_or_default()),
+        "checked" => result.checked = Some(node.checked.unwrap_or(false)),
+        "attribute" => {
+            result.value = android_node_attribute(&node, attribute_name);
+        }
+        "bounding_box" => {
+            result.bounding_box = node.bounds.and_then(|bounds| {
+                let width = bounds.right - bounds.left;
+                let height = bounds.bottom - bounds.top;
+                (width > 0 && height > 0).then_some(BoundingBox {
+                    x: f64::from(bounds.left),
+                    y: f64::from(bounds.top),
+                    width: f64::from(width),
+                    height: f64::from(height),
+                })
+            });
+        }
+        _ => {
+            return Err(format!(
+                "capture kind `{kind}` is not supported for Android native apps"
+            ));
+        }
+    }
+    Ok(result)
+}
+
+fn android_node_attribute(node: &AndroidUiNode, name: &str) -> Option<String> {
+    let bool_string = |value: Option<bool>| value.map(|value| value.to_string());
+    match name {
+        "text" | "value" => node.text.clone(),
+        "content-desc" | "contentDescription" | "description" => node.content_desc.clone(),
+        "resource-id" | "resourceId" | "id" => node.resource_id.clone(),
+        "class" | "className" => node.class_name.clone(),
+        "package" | "packageName" => node.package_name.clone(),
+        "checkable" => bool_string(node.checkable),
+        "checked" => bool_string(node.checked),
+        "clickable" => bool_string(node.clickable),
+        "long-clickable" | "longClickable" => bool_string(node.long_clickable),
+        "scrollable" => bool_string(node.scrollable),
+        "enabled" => bool_string(node.enabled),
+        "focusable" => bool_string(node.focusable),
+        "focused" => bool_string(node.focused),
+        "editable" => Some(
+            (node.enabled.unwrap_or(true)
+                && node
+                    .class_name
+                    .as_deref()
+                    .is_some_and(|class_name| class_name.ends_with("EditText")))
+            .to_string(),
+        ),
+        "selected" => bool_string(node.selected),
+        "password" => bool_string(node.password),
+        "index" => node.index.map(|value| value.to_string()),
+        "bounds" => node.bounds.map(|bounds| {
+            format!(
+                "[{},{}][{},{}]",
+                bounds.left, bounds.top, bounds.right, bounds.bottom
+            )
+        }),
+        _ => None,
+    }
 }
 
 fn adb_wait_for_selector(
@@ -3062,6 +3156,36 @@ mod tests {
         assert_eq!(
             bare_by_css_id.resource_id.as_deref(),
             Some("signup_first_name")
+        );
+    }
+
+    #[test]
+    fn exposes_native_capture_attributes_and_bounds() {
+        let nodes = parse_android_ui_nodes(sample_ui_hierarchy()).expect("xml should parse");
+        let node = find_node_by_selector(&nodes, "resourceIdMatches=.*bottom_nav_.*,selected=true")
+            .expect("selected navigation node");
+        assert_eq!(
+            android_node_attribute(node, "text").as_deref(),
+            Some("Account")
+        );
+        assert_eq!(
+            android_node_attribute(node, "selected").as_deref(),
+            Some("true")
+        );
+        assert!(android_node_attribute(node, "not-a-native-attribute").is_none());
+        let bounds = node.bounds.expect("sample node has bounds");
+        assert!(bounds.right > bounds.left);
+        assert!(bounds.bottom > bounds.top);
+
+        let input = find_node_by_selector(&nodes, "resourceId=com.example.airticket:id/email")
+            .expect("email input");
+        assert_eq!(
+            android_node_attribute(input, "editable").as_deref(),
+            Some("true")
+        );
+        assert_eq!(
+            android_node_attribute(input, "focused").as_deref(),
+            Some("true")
         );
     }
 

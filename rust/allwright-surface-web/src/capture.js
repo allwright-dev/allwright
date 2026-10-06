@@ -40,7 +40,22 @@
       break;
     case 'attribute':
       if (!attributeName) throw new Error('Attribute name must not be empty');
-      result.value = element.getAttribute(attributeName);
+      if (attributeName === '__allwright_state_enabled') {
+        const disabled = element.matches(':disabled') || element.closest('[aria-disabled="true"]') !== null;
+        result.value = String(!disabled);
+      } else if (attributeName === '__allwright_state_focused') {
+        result.value = String(element.matches(':focus'));
+      } else if (attributeName === '__allwright_state_editable') {
+        const editable = !element.matches(':disabled')
+          && element.closest('[aria-disabled="true"]') === null
+          && element.getAttribute('aria-readonly') !== 'true'
+          && ((['input', 'textarea'].includes(element.localName) && !element.readOnly)
+            || element.isContentEditable
+            || element.getAttribute('role') === 'textbox');
+        result.value = String(editable);
+      } else {
+        result.value = element.getAttribute(attributeName);
+      }
       break;
     case 'bounding_box': {
       const style = getComputedStyle(element);

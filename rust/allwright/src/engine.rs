@@ -238,6 +238,27 @@ fn command_retry_policy(options: Option<&CommandRetryOptions>) -> RetryPolicy {
     RetryPolicy::from_proto(options, 10_000, 250)
 }
 
+fn pointer_click_options(
+    button: Option<&str>,
+    click_count: Option<u32>,
+) -> Result<(u8, u32), String> {
+    let button = match button.unwrap_or("left") {
+        "left" | "" => 0,
+        "middle" => 1,
+        "right" => 2,
+        value => {
+            return Err(format!(
+                "unsupported mouse button `{value}`; expected left, middle, or right"
+            ));
+        }
+    };
+    let click_count = click_count.unwrap_or(1);
+    if !(1..=3).contains(&click_count) {
+        return Err("click_count must be between 1 and 3".to_string());
+    }
+    Ok((button, click_count))
+}
+
 async fn retry_with_timeout<T, F, Fut>(policy: RetryPolicy, mut operation: F) -> Result<T, String>
 where
     F: FnMut() -> Fut,
@@ -1986,16 +2007,36 @@ async fn handle_tab_command(
                         should_close: false,
                     });
                 }
-                (EngineBrowserSessionHandle::Desktop(_), EnginePageSessionHandle::Desktop(_)) => {
+                (
+                    EngineBrowserSessionHandle::Desktop(surface_session),
+                    EnginePageSessionHandle::Desktop(page_session),
+                ) => {
+                    let timeout_ms = retry_options
+                        .as_ref()
+                        .and_then(|options| options.timeout_ms)
+                        .and_then(|value| u32::try_from(value).ok());
+                    let result = retry_with_timeout(
+                        command_retry_policy(retry_options.as_ref()),
+                        || async {
+                            web_lib::navigate_desktop_app(
+                                surface_session,
+                                page_session,
+                                &url,
+                                timeout_ms,
+                            )
+                            .await
+                        },
+                    )
+                    .await;
+                    let event = match result {
+                        Ok(navigation) => ContextEvent::Navigated(PageNavigatedEvent {
+                            url: navigation.url,
+                            note: navigation.note,
+                        }),
+                        Err(message) => ContextEvent::Error(ContextSessionErrorEvent { message }),
+                    };
                     return Ok(TabCommandOutcome {
-                        events: vec![tab_event(
-                            &context_session_id,
-                            ContextEvent::Error(ContextSessionErrorEvent {
-                                message:
-                                    "navigation is not supported for native desktop app sessions"
-                                        .to_string(),
-                            }),
-                        )],
+                        events: vec![tab_event(&context_session_id, event)],
                         should_close: false,
                     });
                 }
@@ -2070,20 +2111,30 @@ async fn handle_tab_command(
         Some(ContextCommand::ClickElement(ClickElementCommand {
             css_selector,
             retry_options,
+            button,
+            click_count,
         })) => {
+            let (mouse_button, click_count) = pointer_click_options(button.as_deref(), click_count)
+                .map_err(Status::invalid_argument)?;
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let click = retry_with_timeout(retry_policy, || async {
                 match (&surface_session, &page_session) {
                     (
                         EngineBrowserSessionHandle::Web(surface_session),
                         EnginePageSessionHandle::Web(page_session),
-                    ) => web_lib::click_element(surface_session, page_session, &css_selector)
+                    ) => web_lib::click_element(
+                        surface_session,
+                        page_session,
+                        &css_selector,
+                        mouse_button,
+                        click_count,
+                    )
                         .await
                         .map(|click| (click.css_selector, click.note, click.bidi_session_id)),
                     (
                         EngineBrowserSessionHandle::Mobile(surface_session),
                         EnginePageSessionHandle::Mobile(page_session),
-                    ) => web_lib::click_mobile_element(
+                    ) if mouse_button == 0 && click_count == 1 => web_lib::click_mobile_element(
                         surface_session,
                         page_session,
                         &css_selector,
@@ -2096,7 +2147,7 @@ async fn handle_tab_command(
                     (
                         EngineBrowserSessionHandle::Desktop(surface_session),
                         EnginePageSessionHandle::Desktop(page_session),
-                    ) => web_lib::click_desktop_element(
+                    ) if mouse_button == 0 && click_count == 1 => web_lib::click_desktop_element(
                         surface_session,
                         page_session,
                         &css_selector,
@@ -2106,6 +2157,11 @@ async fn handle_tab_command(
                     )
                     .await
                     .map(|click| (click.selector, click.note, String::new())),
+                    (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_))
+                    | (EngineBrowserSessionHandle::Desktop(_), EnginePageSessionHandle::Desktop(_)) => Err(
+                        "mouse button and click-count options are currently available on web pages only"
+                            .to_string(),
+                    ),
                     _ => Err("tab session backend metadata is inconsistent".to_string()),
                 }
             })
@@ -2557,23 +2613,54 @@ async fn handle_tab_command(
                     return Err(Status::invalid_argument("capture kind is required"));
                 }
             };
-            let (EngineBrowserSessionHandle::Web(browser), EnginePageSessionHandle::Web(page)) =
-                (&surface_session, &page_session)
-            else {
-                return Err(Status::invalid_argument("capture requires a web context"));
-            };
-            let result =
-                retry_with_timeout(command_retry_policy(command.retry_options.as_ref()), || {
-                    web_lib::capture(
+            let timeout_ms = command
+                .retry_options
+                .as_ref()
+                .and_then(|options| options.timeout_ms);
+            let result = match (&surface_session, &page_session) {
+                (EngineBrowserSessionHandle::Web(browser), EnginePageSessionHandle::Web(page)) => {
+                    retry_with_timeout(command_retry_policy(command.retry_options.as_ref()), || {
+                        web_lib::capture(
+                            browser,
+                            page,
+                            kind,
+                            &command.css_selector,
+                            &command.attribute_name,
+                        )
+                    })
+                    .await
+                }
+                (
+                    EngineBrowserSessionHandle::Mobile(browser),
+                    EnginePageSessionHandle::Mobile(page),
+                ) => {
+                    crate::plugin_loader::capture_mobile(
                         browser,
                         page,
                         kind,
                         &command.css_selector,
                         &command.attribute_name,
+                        timeout_ms,
                     )
-                })
-                .await
-                .map_err(Status::internal)?;
+                    .await
+                }
+                (
+                    EngineBrowserSessionHandle::Desktop(desktop),
+                    EnginePageSessionHandle::Desktop(app),
+                ) => {
+                    crate::plugin_loader::capture_desktop(
+                        desktop,
+                        app,
+                        kind,
+                        &command.css_selector,
+                        &command.attribute_name,
+                        timeout_ms,
+                    )
+                    .await
+                }
+                _ => Err("capture context metadata is inconsistent".to_string()),
+            }
+            .map_err(Status::internal)?;
             Ok(TabCommandOutcome {
                 events: vec![tab_event(
                     &context_session_id,

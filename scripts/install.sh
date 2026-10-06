@@ -10,88 +10,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Fixed, sudo-free default: ~/.local/bin on both Linux and macOS.
 default_install_root() {
-  local candidate
-  local existing_allwright
-  local path_dir
-  local old_ifs="$IFS"
-
-  path_has_dir() {
-    case ":$PATH:" in
-      *":$1:"*) return 0 ;;
-      *) return 1 ;;
-    esac
-  }
-
-  can_use_dir() {
-    local dir="$1"
-    if [[ -d "$dir" ]]; then
-      [[ -w "$dir" ]]
-      return
-    fi
-
-    local parent
-    parent="$(dirname "$dir")"
-    [[ -d "$parent" && -w "$parent" ]]
-  }
-
-  is_tool_managed_dir() {
-    case "$1" in
-      *"/pnpm/"*|*"/.npm/"*|*"/.yarn/"*|*"/.volta/"*|*"/.pyenv/"*|*"/.rbenv/"*|*"/.asdf/"*|*"/.cargo/"*|*"/go/bin"*|*"/bun/bin"*)
-        return 0
-        ;;
-      *)
-        return 1
-        ;;
-    esac
-  }
-
-  # Upgrade the executable that the current shell already resolves. Otherwise a
-  # stale cargo/npm-managed binary earlier on PATH can shadow the fresh release
-  # installed into /usr/local/bin or ~/.local/bin.
-  existing_allwright="$(command -v allwright 2>/dev/null || true)"
-  if [[ -n "$existing_allwright" && "$existing_allwright" == */* ]]; then
-    candidate="$(dirname "$existing_allwright")"
-    if ! is_tool_managed_dir "$candidate" \
-      && [[ -f "$existing_allwright" && -w "$existing_allwright" && -w "$candidate" ]]
-    then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  fi
-
-  for candidate in \
-    "/usr/local/bin" \
-    "/opt/homebrew/bin" \
-    "$HOME/.local/bin" \
-    "$HOME/bin"
-  do
-    if can_use_dir "$candidate"; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-
-  IFS=":"
-  for path_dir in $PATH; do
-    [[ -n "$path_dir" ]] || continue
-    [[ -d "$path_dir" ]] || continue
-    [[ -w "$path_dir" ]] || continue
-    is_tool_managed_dir "$path_dir" && continue
-    printf '%s\n' "$path_dir"
-    IFS="$old_ifs"
-    return 0
-  done
-  IFS="$old_ifs"
-
-  for candidate in "$HOME/.local/bin" "$HOME/bin"; do
-    if can_use_dir "$candidate"; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-
-  printf '%s\n' "/tmp"
+  printf '%s\n' "$HOME/.local/bin"
 }
 
 install_root="${ALLWRIGHT_INSTALL_DIR:-$(default_install_root)}"
@@ -121,11 +42,13 @@ target="${arch_part}-${os_part}"
 
 if [[ "$version" == "latest" ]]; then
   if command -v python3 >/dev/null 2>&1; then
-    version="$(python3 - <<'PY'
+    version="$(python3 - "$repo" <<'PY'
 import json
+import sys
 import urllib.request
 
-with urllib.request.urlopen("https://api.github.com/repos/allwright-dev/allwright/releases/latest") as response:
+repository = sys.argv[1]
+with urllib.request.urlopen(f"https://api.github.com/repos/{repository}/releases/latest") as response:
     data = json.load(response)
 print(data["tag_name"])
 PY
@@ -156,6 +79,31 @@ if [[ "$installed_version" != "allwright $expected_version" ]]; then
   exit 1
 fi
 
+# Remove copies left by earlier installer versions. Presence is checked first
+# (no privileges needed); sudo is only used when a stale copy exists in a
+# directory we cannot write to.
+remove_legacy_installs() {
+  local dir legacy
+  for dir in "/usr/local/bin" "/opt/homebrew/bin" "$HOME/bin"; do
+    legacy="$dir/allwright"
+    [[ "$dir" == "$install_root" ]] && continue
+    [[ -f "$legacy" || -L "$legacy" ]] || continue
+
+    echo "Removing previously installed $legacy"
+    if [[ -w "$dir" ]]; then
+      rm -f "$legacy" || echo "warning: could not remove $legacy" >&2
+    elif command -v sudo >/dev/null 2>&1; then
+      echo "Administrator access is required to remove $legacy"
+      sudo rm -f "$legacy" || echo "warning: could not remove $legacy; remove it manually" >&2
+    else
+      echo "warning: $legacy is not writable and sudo is unavailable; remove it manually" >&2
+    fi
+  done
+}
+
+remove_legacy_installs
+hash -r 2>/dev/null || true
+
 resolved_allwright="$(command -v allwright 2>/dev/null || true)"
 if [[ -n "$resolved_allwright" && "$resolved_allwright" != "$install_root/allwright" ]]; then
   echo >&2
@@ -176,3 +124,5 @@ case ":$PATH:" in
     echo "  export PATH=\"$install_root:\$PATH\""
     ;;
 esac
+
+echo "Future releases can be installed with: allwright update"

@@ -17,6 +17,7 @@ from ._types import (
     CapturedOption, BoundingBox,
     AllwrightError,
     CommandOptions,
+    ClickOptions,
     ElementResult,
     HighlightOptions,
     PressOptions,
@@ -388,13 +389,19 @@ class Page(WebLocators):
     def navigate(self, url: str, options: CommandOptions | None = None) -> None:
         return self.goto(url, options)
 
-    def click(self, selector: str, options: CommandOptions | None = None) -> None:
+    def click(
+        self,
+        selector: str,
+        options: ClickOptions | CommandOptions | None = None,
+    ) -> None:
         from ._runtime import retry_options
 
         with self._lock:
             handle = self._ensure_handle()
             self._ensure_open()
-            command_options = options or CommandOptions()
+            command_options = options or ClickOptions()
+            button = command_options.button if isinstance(command_options, ClickOptions) else "left"
+            click_count = command_options.click_count if isinstance(command_options, ClickOptions) else None
             transport_selector = normalize_selector_for_transport(selector)
             handle.send(
                 engine_pb2.ContextSessionCommand(
@@ -402,6 +409,8 @@ class Page(WebLocators):
                     context_session_id=self.session_id,
                     click_element=engine_pb2.ClickElementCommand(
                         css_selector=transport_selector,
+                        button=button,
+                        click_count=click_count or 1,
                         retry_options=retry_options(command_options.timeout_ms),
                     ),
                 )
@@ -421,6 +430,21 @@ class Page(WebLocators):
                         raise AllwrightError(
                             f"page session error while clicking: {event.error.message}"
                         )
+
+    def dblclick(
+        self,
+        selector: str,
+        options: ClickOptions | CommandOptions | None = None,
+    ) -> None:
+        resolved = options or ClickOptions()
+        return self.click(
+            selector,
+            ClickOptions(
+                timeout_ms=resolved.timeout_ms,
+                button=resolved.button if isinstance(resolved, ClickOptions) else "left",
+                click_count=2,
+            ),
+        )
 
     def count(self, selector: str, options: CommandOptions | None = None) -> int:
         from ._runtime import retry_options

@@ -202,6 +202,40 @@ pub struct CommandOptions {
     pub timeout_ms: Option<u32>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum MouseButton {
+    #[default]
+    Left,
+    Middle,
+    Right,
+}
+
+impl MouseButton {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Left => "left",
+            Self::Middle => "middle",
+            Self::Right => "right",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ClickOptions {
+    pub timeout_ms: Option<u32>,
+    pub button: MouseButton,
+    pub click_count: Option<u32>,
+}
+
+impl From<CommandOptions> for ClickOptions {
+    fn from(options: CommandOptions) -> Self {
+        Self {
+            timeout_ms: options.timeout_ms,
+            ..Self::default()
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct ScreenshotOptions {
     pub timeout_ms: Option<u32>,

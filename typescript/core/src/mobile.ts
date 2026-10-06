@@ -6,6 +6,8 @@ import { chainMobileSelectorForTransport, normalizeMobileSelectorForTransport } 
 import { semanticSelector, type RoleOptions, type TextMatcher, type TextOptions } from "./web-locators.js";
 import type {
   AccessibilitySnapshotOptions,
+  BoundingBox,
+  CaptureResult,
   SurfaceSessionEvent,
   SurfaceSessionStream,
   CommandOptions,
@@ -140,7 +142,7 @@ export class NativeAppImpl implements NativeApp {
       setMobileFileChooserFiles: {
         fileChooserId,
         fileIds,
-        retryOptions: retryOptions(options.timeoutMs),
+        retryOptions: options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });
     while (true) {
@@ -282,7 +284,7 @@ export class NativeAppImpl implements NativeApp {
       if (event.error?.message) throw new Error(event.error.message);
       if (event.closed) {
         handle.closed = true;
-        throw new Error(`mobile app session ${this.sessionId} closed while opening deep link`);
+        throw new Error(`native app session ${this.sessionId} closed while opening deep link`);
       }
     }
   }
@@ -406,6 +408,22 @@ export class NativeAppImpl implements NativeApp {
     return (await this.#readText(selector, options, false)).text;
   }
 
+  async inputValue(selector: string, options: CommandOptions = {}): Promise<string> {
+    return (await this.#capture("CAPTURE_KIND_INPUT_VALUE", selector, "", options)).value ?? "";
+  }
+
+  async isChecked(selector: string, options: CommandOptions = {}): Promise<boolean> {
+    return (await this.#capture("CAPTURE_KIND_CHECKED", selector, "", options)).checked ?? false;
+  }
+
+  async getAttribute(selector: string, name: string, options: CommandOptions = {}): Promise<string | null> {
+    return (await this.#capture("CAPTURE_KIND_ATTRIBUTE", selector, name, options)).value ?? null;
+  }
+
+  async boundingBox(selector: string, options: CommandOptions = {}): Promise<BoundingBox | null> {
+    return (await this.#capture("CAPTURE_KIND_BOUNDING_BOX", selector, "", options)).boundingBox ?? null;
+  }
+
   async waitForSelector(
     selector: string,
     options: WaitForSelectorOptions = {},
@@ -512,6 +530,35 @@ export class NativeAppImpl implements NativeApp {
   #ensureOpen(handle: PageHandle): void {
     if (handle.closed) {
       throw new Error(`android app session ${this.sessionId} is closed`);
+    }
+  }
+
+  async #capture(
+    kind: string,
+    selector: string,
+    attributeName: string,
+    options: CommandOptions,
+  ): Promise<CaptureResult> {
+    const handle = await this.#getHandle();
+    this.#ensureOpen(handle);
+    handle.stream.write({
+      surfaceSessionId: this.#surfaceSessionId,
+      contextSessionId: this.sessionId,
+      capture: {
+        kind,
+        cssSelector: normalizeMobileSelectorForTransport(selector),
+        attributeName,
+        retryOptions: options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : undefined,
+      },
+    });
+    while (true) {
+      const event = await handle.queue.next();
+      if (event.captureResolved) return event.captureResolved;
+      if (event.error?.message) throw new Error(event.error.message);
+      if (event.closed) {
+        handle.closed = true;
+        throw new Error(`native app session ${this.sessionId} closed while capturing element state`);
+      }
     }
   }
 
@@ -636,6 +683,22 @@ class NativeAppLocatorImpl implements NativeAppLocator {
 
   async innerText(options: CommandOptions = {}): Promise<string> {
     return this.page.innerText(this.selector, options);
+  }
+
+  async inputValue(options: CommandOptions = {}): Promise<string> {
+    return this.page.inputValue(this.selector, options);
+  }
+
+  async isChecked(options: CommandOptions = {}): Promise<boolean> {
+    return this.page.isChecked(this.selector, options);
+  }
+
+  async getAttribute(name: string, options: CommandOptions = {}): Promise<string | null> {
+    return this.page.getAttribute(this.selector, name, options);
+  }
+
+  async boundingBox(options: CommandOptions = {}): Promise<BoundingBox | null> {
+    return this.page.boundingBox(this.selector, options);
   }
 
   async waitFor(options: WaitForSelectorOptions = {}): Promise<void> {

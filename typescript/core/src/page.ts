@@ -9,6 +9,7 @@ import { createPageHandle } from "./runtime.js";
 import type {
   BoundingBox, CapturedOption, CaptureResult,
   AccessibilitySnapshotOptions,
+  ClickOptions,
   CommandOptions,
   FileChooser,
   Dialog,
@@ -326,7 +327,7 @@ export class PageImpl extends WebLocatorBuilders implements Page {
     }
   }
 
-  async click(selector: string, options: CommandOptions = {}): Promise<void> {
+  async click(selector: string, options: ClickOptions = {}): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     const transportSelector = normalizeSelectorForTransport(selector);
@@ -335,6 +336,8 @@ export class PageImpl extends WebLocatorBuilders implements Page {
       contextSessionId: this.sessionId,
       clickElement: {
         cssSelector: transportSelector,
+        button: options.button,
+        clickCount: options.clickCount,
         retryOptions: options.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       },
     });
@@ -352,6 +355,10 @@ export class PageImpl extends WebLocatorBuilders implements Page {
         throw new Error(`page session ${this.sessionId} closed while waiting for click result`);
       }
     }
+  }
+
+  async dblclick(selector: string, options: Omit<ClickOptions, "clickCount"> = {}): Promise<void> {
+    return this.click(selector, { ...options, clickCount: 2 });
   }
 
   async count(selector: string, options: CommandOptions = {}): Promise<number> {

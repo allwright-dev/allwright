@@ -9,6 +9,7 @@ from ._selectors import chain_selector_for_transport
 from ._types import (
     CapturedOption, BoundingBox,
     CommandOptions,
+    ClickOptions,
     HighlightOptions,
     PressOptions,
     WaitForSelectorOptions,
@@ -58,8 +59,11 @@ class Locator(WebLocators):
     def last(self) -> Locator:
         return self.nth(-1)
 
-    def click(self, options: CommandOptions | None = None) -> None:
+    def click(self, options: ClickOptions | CommandOptions | None = None) -> None:
         return self.page.click(self.selector, options)
+
+    def dblclick(self, options: ClickOptions | CommandOptions | None = None) -> None:
+        return self.page.dblclick(self.selector, options)
 
     def count(self, options: CommandOptions | None = None) -> int:
         return self.page.count(self.selector, options)

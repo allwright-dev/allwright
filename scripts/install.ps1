@@ -7,71 +7,11 @@ param(
 $ErrorActionPreference = "Stop"
 
 function Get-DefaultInstallDir {
-    $preferredDirs = @(
-        "$env:ProgramFiles\allwright\bin",
-        "$env:LOCALAPPDATA\Programs\allwright\bin"
-    )
-
-    foreach ($dir in $preferredDirs) {
-        if (-not $dir -or $dir.Trim() -eq "") {
-            continue
-        }
-        $parent = Split-Path -Parent $dir
-        if (-not $parent) {
-            continue
-        }
-        try {
-            if (-not (Test-Path $dir) -and -not (Test-Path $parent)) {
-                continue
-            }
-            if (-not (Test-Path $dir) -and -not (Test-Path $parent -PathType Container)) {
-                continue
-            }
-            if (Test-Path $dir) {
-                $probe = Join-Path $dir ("allwright-write-test-" + [System.Guid]::NewGuid().ToString("N"))
-                New-Item -ItemType Directory -Path $probe | Out-Null
-                Remove-Item $probe -Force
-                return $dir
-            }
-            $probe = Join-Path $parent ("allwright-write-test-" + [System.Guid]::NewGuid().ToString("N"))
-            New-Item -ItemType Directory -Path $probe | Out-Null
-            Remove-Item $probe -Force
-            return $dir
-        }
-        catch {
-            continue
-        }
-    }
-
-    $pathEntries = ($env:PATH -split ';') | Where-Object { $_ -and $_.Trim() -ne "" }
-    foreach ($entry in $pathEntries) {
-        if (-not (Test-Path $entry)) {
-            continue
-        }
-        if ($entry -match '\\pnpm\\' -or
-            $entry -match '\\npm\\' -or
-            $entry -match '\\Yarn\\' -or
-            $entry -match '\\Volta\\' -or
-            $entry -match '\\cargo\\' -or
-            $entry -match '\\go\\bin' -or
-            $entry -match '\\bun\\bin') {
-            continue
-        }
-        try {
-            $probe = Join-Path $entry ("allwright-write-test-" + [System.Guid]::NewGuid().ToString("N"))
-            New-Item -ItemType Directory -Path $probe | Out-Null
-            Remove-Item $probe -Force
-            return $entry
-        }
-        catch {
-            continue
-        }
-    }
-
-    return (Join-Path $env:LOCALAPPDATA "Programs\allwright\bin")
+    # WindowsApps is on the user PATH by default and needs no admin rights.
+    return (Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps")
 }
 
-if (-not $Version -or $Version.Trim() -eq "") {
+if (-not $Version -or $Version.Trim() -eq "" -or $Version.Trim() -eq "latest") {
     $latest = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases/latest"
     $Version = $latest.tag_name
 }
@@ -94,7 +34,7 @@ $extractPath = Join-Path $tempRoot "extract"
 
 New-Item -ItemType Directory -Path $tempRoot | Out-Null
 New-Item -ItemType Directory -Path $extractPath | Out-Null
-New-Item -ItemType Directory -Path $InstallDir | Out-Null
+New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 
 try {
     Write-Host "Downloading $downloadUrl"
@@ -116,6 +56,27 @@ if ($installedVersion -ne "allwright $expectedVersion") {
     throw "Installed binary reports '$installedVersion'; expected 'allwright $expectedVersion'"
 }
 
+# Remove copies left by earlier installer versions (checked for presence first).
+$legacyDirs = @(
+    "$env:ProgramFiles\allwright\bin",
+    "$env:LOCALAPPDATA\Programs\allwright\bin"
+)
+foreach ($legacyDir in $legacyDirs) {
+    if (-not $legacyDir -or $legacyDir -eq $InstallDir) { continue }
+    $legacyExe = Join-Path $legacyDir "allwright.exe"
+    if (-not (Test-Path $legacyExe -PathType Leaf)) { continue }
+    Write-Host "Removing previously installed $legacyExe"
+    try {
+        Remove-Item $legacyExe -Force -ErrorAction Stop
+        if (-not (Get-ChildItem $legacyDir -Force -ErrorAction SilentlyContinue)) {
+            Remove-Item $legacyDir -Force -ErrorAction SilentlyContinue
+        }
+    }
+    catch {
+        Write-Warning "Could not remove $legacyExe (administrator rights may be required): $($_.Exception.Message)"
+    }
+}
+
 $resolved = Get-Command allwright -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($resolved -and $resolved.Source -ne $installedPath) {
     Write-Warning "Your shell resolves allwright to $($resolved.Source), so $installedPath may be shadowed by an older binary. Move $InstallDir earlier on PATH or remove the stale executable."
@@ -128,3 +89,5 @@ if (-not (($userPath -split ';') -contains $InstallDir)) {
     Write-Host "This install directory is not on your user PATH."
     Write-Host "Add $InstallDir to PATH if the command is not available in a new shell."
 }
+
+Write-Host "Future releases can be installed with: allwright update"

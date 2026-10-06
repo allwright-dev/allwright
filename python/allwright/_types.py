@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 
 class AllwrightError(RuntimeError):
@@ -56,6 +56,12 @@ class ResolvedConfig:
 @dataclass(slots=True)
 class CommandOptions:
     timeout_ms: int | None = None
+
+
+@dataclass(slots=True)
+class ClickOptions(CommandOptions):
+    button: Literal["left", "middle", "right"] = "left"
+    click_count: Literal[1, 2, 3] | None = None
 
 
 @dataclass(slots=True)

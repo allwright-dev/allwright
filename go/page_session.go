@@ -13,6 +13,13 @@ func (t *Tab) Click(ctx context.Context, cssSelector string, options ...CommandO
 	return err
 }
 
+func (t *Tab) DblClick(ctx context.Context, cssSelector string, options ...CommandOptions) error {
+	resolved := firstCommandOptions(options)
+	resolved.ClickCount = 2
+	_, err := t.clickResult(ctx, cssSelector, resolved)
+	return err
+}
+
 func (t *Tab) Count(ctx context.Context, cssSelector string, options ...CommandOptions) (int, error) {
 	result, err := t.countResult(ctx, cssSelector, options...)
 	if err != nil {

@@ -845,6 +845,10 @@ pub struct ClickElementCommand {
     pub css_selector: ::prost::alloc::string::String,
     #[prost(message, optional, tag = "2")]
     pub retry_options: ::core::option::Option<CommandRetryOptions>,
+    #[prost(string, optional, tag = "3")]
+    pub button: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(uint32, optional, tag = "4")]
+    pub click_count: ::core::option::Option<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CountElementsCommand {

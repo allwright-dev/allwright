@@ -1384,6 +1384,43 @@ pub async fn click_element(
     page_session: &PageSessionHandle,
     css_selector: &str,
 ) -> Result<ClickInfo, String> {
+    click_element_with_options(browser_session, page_session, css_selector, 0, 1).await
+}
+
+pub fn resolve_pointer_click_options(
+    button: Option<&str>,
+    click_count: Option<u32>,
+) -> Result<(u8, u32), String> {
+    let button = match button.unwrap_or("left") {
+        "left" | "" => 0,
+        "middle" => 1,
+        "right" => 2,
+        value => {
+            return Err(format!(
+                "unsupported mouse button `{value}`; expected left, middle, or right"
+            ));
+        }
+    };
+    let click_count = click_count.unwrap_or(1);
+    if !(1..=3).contains(&click_count) {
+        return Err("click_count must be between 1 and 3".to_string());
+    }
+    Ok((button, click_count))
+}
+
+pub async fn click_element_with_options(
+    browser_session: &BrowserSessionHandle,
+    page_session: &PageSessionHandle,
+    css_selector: &str,
+    button: u8,
+    click_count: u32,
+) -> Result<ClickInfo, String> {
+    if button > 2 {
+        return Err("mouse button must be 0 (left), 1 (middle), or 2 (right)".to_string());
+    }
+    if !(1..=3).contains(&click_count) {
+        return Err("click_count must be between 1 and 3".to_string());
+    }
     match (browser_session, page_session) {
         (
             BrowserSessionHandle::Chromium { cdp_websocket_url },
@@ -1393,11 +1430,13 @@ pub async fn click_element(
                 ..
             },
         ) => {
-            click_element_via_bidi(
+            click_element_via_bidi_with_options(
                 cdp_websocket_url,
                 mapper_target_id.as_deref(),
                 browsing_context_id.as_deref(),
                 css_selector,
+                button,
+                click_count,
             )
             .await
         }
@@ -1451,11 +1490,7 @@ pub async fn click_element(
                         "type": "pointer",
                         "id": "allwright-mouse",
                         "parameters": { "pointerType": "mouse" },
-                        "actions": [
-                            { "type": "pointerMove", "origin": "viewport", "x": x, "y": y },
-                            { "type": "pointerDown", "button": 0 },
-                            { "type": "pointerUp", "button": 0 }
-                        ]
+                        "actions": pointer_click_actions(x, y, button, click_count)
                     }]
                 }),
             )
@@ -1463,7 +1498,7 @@ pub async fn click_element(
             Ok(ClickInfo {
                 css_selector: css_selector.to_string(),
                 note: format!(
-                    "clicked element via Firefox WebDriver BiDi input.performActions using {} {}",
+                    "clicked element {click_count} time(s) with mouse button {button} via Firefox WebDriver BiDi input.performActions using {} {}",
                     selector_kind_label(parsed.kind),
                     parsed.value
                 ),
@@ -2592,6 +2627,25 @@ pub async fn click_element_via_bidi(
     existing_context_id: Option<&str>,
     css_selector: &str,
 ) -> Result<ClickInfo, String> {
+    click_element_via_bidi_with_options(
+        cdp_websocket_url,
+        existing_mapper_target_id,
+        existing_context_id,
+        css_selector,
+        0,
+        1,
+    )
+    .await
+}
+
+pub async fn click_element_via_bidi_with_options(
+    cdp_websocket_url: &str,
+    existing_mapper_target_id: Option<&str>,
+    existing_context_id: Option<&str>,
+    css_selector: &str,
+    button: u8,
+    click_count: u32,
+) -> Result<ClickInfo, String> {
     let parsed = parse_selector("click_element", css_selector)?;
     let selector_literal = json_string_literal(&parsed.value, "click selector")?;
     let query_first_js = selector_query_first_js(parsed.kind);
@@ -2638,11 +2692,7 @@ pub async fn click_element_via_bidi(
                     "type": "pointer",
                     "id": "allwright-mouse",
                     "parameters": { "pointerType": "mouse" },
-                    "actions": [
-                        { "type": "pointerMove", "origin": "viewport", "x": x, "y": y },
-                        { "type": "pointerDown", "button": 0 },
-                        { "type": "pointerUp", "button": 0 }
-                    ]
+                    "actions": pointer_click_actions(x, y, button, click_count)
                 }]
             }
         }),
@@ -2651,12 +2701,26 @@ pub async fn click_element_via_bidi(
     Ok(ClickInfo {
         css_selector: css_selector.to_string(),
         note: format!(
-            "clicked element via Chromium WebDriver BiDi input.performActions using {} {}",
+            "clicked element {click_count} time(s) with mouse button {button} via Chromium WebDriver BiDi input.performActions using {} {}",
             selector_kind_label(parsed.kind),
             parsed.value
         ),
         bidi_session_id: format!("chromium-bidi:{browsing_context_id}"),
     })
+}
+
+fn pointer_click_actions(x: f64, y: f64, button: u8, click_count: u32) -> Vec<Value> {
+    let mut actions = vec![json!({
+        "type": "pointerMove",
+        "origin": "viewport",
+        "x": x,
+        "y": y,
+    })];
+    for _ in 0..click_count {
+        actions.push(json!({ "type": "pointerDown", "button": button }));
+        actions.push(json!({ "type": "pointerUp", "button": button }));
+    }
+    actions
 }
 
 async fn discover_elements_via_bidi(
@@ -4699,10 +4763,18 @@ fn handle_plugin_command(command: PluginCommand) -> Result<PluginResult, String>
             browser_session,
             page_session,
             css_selector,
+            button,
+            click_count,
         } => block_on_plugin_future(async move {
-            click_element(&browser_session, &page_session, &css_selector)
-                .await
-                .map(PluginResult::ClickElement)
+            click_element_with_options(
+                &browser_session,
+                &page_session,
+                &css_selector,
+                button,
+                click_count,
+            )
+            .await
+            .map(PluginResult::ClickElement)
         }),
         PluginCommand::CountElements {
             browser_session,
@@ -5019,6 +5091,35 @@ mod tests {
             .expect("selector should parse");
         assert_eq!(parsed.kind, SelectorKind::Css);
         assert_eq!(parsed.value, "button[data-testid='save']");
+    }
+
+    #[test]
+    fn pointer_click_options_map_buttons_and_validate_click_counts() {
+        assert_eq!(
+            super::resolve_pointer_click_options(None, None).unwrap(),
+            (0, 1)
+        );
+        assert_eq!(
+            super::resolve_pointer_click_options(Some("middle"), Some(2)).unwrap(),
+            (1, 2)
+        );
+        assert_eq!(
+            super::resolve_pointer_click_options(Some("right"), Some(3)).unwrap(),
+            (2, 3)
+        );
+        assert!(super::resolve_pointer_click_options(Some("back"), Some(1)).is_err());
+        assert!(super::resolve_pointer_click_options(Some("left"), Some(0)).is_err());
+        assert!(super::resolve_pointer_click_options(Some("left"), Some(4)).is_err());
+    }
+
+    #[test]
+    fn pointer_actions_repeat_down_and_up_for_multi_clicks() {
+        let actions = super::pointer_click_actions(10.0, 20.0, 2, 2);
+        assert_eq!(actions.len(), 5);
+        assert_eq!(actions[0]["type"], "pointerMove");
+        assert_eq!(actions[1]["type"], "pointerDown");
+        assert_eq!(actions[1]["button"], 2);
+        assert_eq!(actions[4]["type"], "pointerUp");
     }
 
     #[test]

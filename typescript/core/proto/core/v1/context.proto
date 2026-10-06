@@ -170,6 +170,8 @@ message NavigatePageCommand {
 message ClickElementCommand {
   string css_selector = 1;
   optional CommandRetryOptions retry_options = 2;
+  optional string button = 3;
+  optional uint32 click_count = 4;
 }
 
 message CountElementsCommand {

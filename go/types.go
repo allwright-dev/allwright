@@ -109,8 +109,18 @@ type ResolvedConfig struct {
 }
 
 type CommandOptions struct {
-	Timeout time.Duration
+	Timeout    time.Duration
+	Button     MouseButton
+	ClickCount uint32
 }
+
+type MouseButton string
+
+const (
+	MouseButtonLeft   MouseButton = "left"
+	MouseButtonMiddle MouseButton = "middle"
+	MouseButtonRight  MouseButton = "right"
+)
 
 type ScreenshotOptions struct {
 	Timeout  time.Duration

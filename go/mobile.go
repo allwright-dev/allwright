@@ -170,13 +170,13 @@ func (p *NativeApp) Goto(ctx context.Context, url string, options ...CommandOpti
 
 func (p *NativeApp) Navigate(ctx context.Context, url string, options ...CommandOptions) error {
 	if p == nil {
-		return fmt.Errorf("mobile app is nil")
+		return fmt.Errorf("native app is nil")
 	}
 	if err := p.ensureStream(ctx); err != nil {
 		return err
 	}
 	if p.closed {
-		return fmt.Errorf("mobile app session %s is closed", p.sessionID)
+		return fmt.Errorf("native app session %s is closed", p.sessionID)
 	}
 	commandOptions := firstCommandOptions(options)
 	if err := p.stream.Send(&enginev1.ContextSessionCommand{
@@ -193,7 +193,7 @@ func (p *NativeApp) Navigate(ctx context.Context, url string, options ...Command
 	for {
 		event, err := p.stream.Recv()
 		if err != nil {
-			return fmt.Errorf("receive mobile app event during deep link: %w", err)
+			return fmt.Errorf("receive native app event during deep link: %w", err)
 		}
 		switch payload := event.GetEvent().(type) {
 		case *enginev1.ContextSessionEvent_Attached:
@@ -202,9 +202,9 @@ func (p *NativeApp) Navigate(ctx context.Context, url string, options ...Command
 			return nil
 		case *enginev1.ContextSessionEvent_Closed:
 			p.closed = true
-			return fmt.Errorf("mobile app session %s closed while opening deep link", p.sessionID)
+			return fmt.Errorf("native app session %s closed while opening deep link", p.sessionID)
 		case *enginev1.ContextSessionEvent_Error:
-			return fmt.Errorf("mobile app deep-link error: %s", payload.Error.GetMessage())
+			return fmt.Errorf("native app deep-link error: %s", payload.Error.GetMessage())
 		}
 	}
 }

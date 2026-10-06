@@ -130,6 +130,19 @@ The installer verifies the downloaded binary's version. If an older package-mana
 `allwright` appears earlier on `PATH`, it reports the exact shadowing executable instead of
 silently making the new install look stale.
 
+Update an existing installation in place from the latest GitHub release:
+
+```bash
+allwright update
+```
+
+Use `allwright update --version vX.Y.Z` to install a specific release. The updater downloads the
+same platform archive as the installer, validates the new binary before replacing the currently
+running executable, and honors `ALLWRIGHT_REPOSITORY` and `ALLWRIGHT_GITHUB_TOKEN` for alternate
+or private release repositories. On Windows, replacement completes immediately after the update
+command exits because Windows locks the running executable. Restart an already-running
+`allwright serve` process after updating; new server processes use the updated embedded core.
+
 or:
 
 ```bash
@@ -408,6 +421,9 @@ await page.click("a");
 await browser.close();
 ```
 
+Web clicks support left, middle, and right mouse buttons plus one-to-three click sequences. Each
+client also exposes `dblclick` (Go: `DblClick`) on pages and locators.
+
 Java example:
 
 ```java
@@ -617,6 +633,7 @@ The release workflow syncs all three package versions to `X.Y.Z`, updates `@allw
 
 - `scripts/install.sh`: installs the latest or requested `allwright` CLI release on Linux and macOS
 - `scripts/install.ps1`: installs the latest or requested `allwright` CLI release on Windows PowerShell
+- installed CLIs can subsequently update themselves with `allwright update`
 - `scripts/generate-go-proto.sh`: installs pinned Go protobuf generators locally under `go/.bin/` and regenerates the checked-in Go bindings from the canonical top-level `proto/` tree
 - `scripts/generate-rust-proto.sh`: regenerates `rust/allwright/src/proto_generated.rs` from the canonical top-level `proto/` tree
 - `scripts/sync-version.sh`: syncs the Rust workspace and internal crate versions from a release version string such as `X.Y.Z`
@@ -643,8 +660,8 @@ CI also verifies that the checked-in Go and Rust generated proto outputs are up 
 
 Both scripts support:
 
-- `ALLWRIGHT_VERSION` to pin a specific release tag such as `vX.Y.Z`
-- `ALLWRIGHT_INSTALL_DIR` to override the destination directory
+- `ALLWRIGHT_VERSION` to pin a specific release tag such as `vX.Y.Z`, or `latest`
+- `ALLWRIGHT_INSTALL_DIR` to override the destination directory (default: `$HOME/.local/bin` on Linux/macOS, `%LOCALAPPDATA%\Microsoft\WindowsApps` on Windows)
 - `ALLWRIGHT_REPOSITORY` to target a fork or alternate GitHub repository
 
 For repo-specific contribution guidance, see [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -77,9 +77,16 @@ export const typescriptReference: LanguageReference = {
         {
           name: "click",
           kind: "method",
-          signature: "click(selector: string, options?: CommandOptions): Promise<void>",
-          description: "Clicks the first element matching selector.",
+          signature: "click(selector: string, options?: ClickOptions): Promise<void>",
+          description: "Clicks the first matching element. ClickOptions accepts left, middle, or right button and a clickCount from 1 to 3.",
           since: "v0.0.14",
+        },
+        {
+          name: "dblclick",
+          kind: "method",
+          signature: "dblclick(selector: string, options?: Omit<ClickOptions, 'clickCount'>): Promise<void>",
+          description: "Double-clicks the first matching element with the selected mouse button.",
+          since: "v0.1.25",
         },
         {
           name: "fill",
@@ -212,7 +219,7 @@ export const typescriptReference: LanguageReference = {
       slug: "locator",
       title: "Locator",
       description:
-        "Every action and query method on Page (click, fill, hover, press, focus, highlight, count, textContent, innerText, inputValue, selectedOptions, selectedText, isChecked, getAttribute, boundingBox, waitFor) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds: building one semantically instead of by raw selector, and narrowing it once built.",
+        "Every action and query method on Page (click, dblclick, fill, hover, press, focus, highlight, count, textContent, innerText, inputValue, selectedOptions, selectedText, isChecked, getAttribute, boundingBox, waitFor) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds: building one semantically instead of by raw selector, and narrowing it once built.",
       members: [
         {
           name: "getByRole",
@@ -374,6 +381,13 @@ export const typescriptReference: LanguageReference = {
           since: "v0.0.57 – v0.0.58",
         },
         {
+          name: "NativeApp state reads",
+          kind: "method",
+          signature: "inputValue(selector: string, options?: CommandOptions): Promise<string>\nisChecked(selector: string, options?: CommandOptions): Promise<boolean>\ngetAttribute(selector: string, name: string, options?: CommandOptions): Promise<string | null>\nboundingBox(selector: string, options?: CommandOptions): Promise<BoundingBox | null>",
+          description: "Reads native input values, checked/selected state, known accessibility attributes, and on-screen bounds on Android, iOS, macOS, and Windows. The same methods are available on NativeAppLocator; selected-option and selected-text reads remain web-only.",
+          since: "v0.1.24",
+        },
+        {
           name: "androidApp.waitForSelector",
           kind: "method",
           signature: "waitForSelector(selector: string, options?: WaitForSelectorOptions): Promise<void>",
@@ -444,7 +458,7 @@ export const typescriptReference: LanguageReference = {
           name: "DesktopMacApp locators and actions",
           kind: "method",
           signature: "locator(selector: string): DesktopMacLocator\ngetByRole(role: string, options?: RoleOptions): DesktopMacLocator",
-          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, textContent, innerText, waitForSelector, screenshot, and accessibilitySnapshot.",
+          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include goto/navigate for universal links and URL schemes, plus click, fill, focus, press, count, textContent, innerText, waitForSelector, screenshot, and accessibilitySnapshot.",
           since: "v0.1.21",
         },
         {
@@ -467,7 +481,7 @@ export const typescriptReference: LanguageReference = {
           name: "DesktopWindowsApp locators and actions",
           kind: "method",
           signature: "locator(selector: string): DesktopWindowsLocator\ngetByRole(role: string, options?: RoleOptions): DesktopWindowsLocator",
-          description: "Uses native UI Automation selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, textContent, innerText, waitForSelector, screenshot, and accessibilitySnapshot.",
+          description: "Uses native UI Automation selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include goto/navigate for universal links and URL schemes, plus click, fill, focus, press, count, textContent, innerText, waitForSelector, screenshot, and accessibilitySnapshot.",
           since: "v0.1.24",
         },
       ],
@@ -526,14 +540,14 @@ export const typescriptReference: LanguageReference = {
           name: "expect",
           kind: "function",
           signature: "expect(actual: Page | NativeApp): PageExpectMatchers\nexpect(actual: Locator | NativeAppLocator): LocatorExpectMatchers",
-          description: "Vitest's expect, augmented: called with a web page/locator or native app/locator it returns retrying matchers — toHaveText, toContainText, toHaveCount, toBeVisible, plus the web-only state matchers below — instead of the plain-value assertions it returns for anything else.",
+          description: "Vitest's expect, augmented: called with a web page/locator or native app/locator it returns retrying matchers for text, count, visibility, attachment, enabled/disabled, focus, editability, value, checked state, attributes, and bounds. URL and selection matchers remain web-only.",
           since: "v0.0.24",
         },
         {
           name: "State matchers",
           kind: "method",
-          signature: "toHaveURL(expected: string | RegExp, options?)\ntoHaveValue(expected: string | RegExp, options?)\ntoHaveSelectedOptions(expected: SelectedOptionExpectation[], options?)\ntoHaveSelectedText(expected: string | RegExp | null, options?)\ntoBeChecked(options?)\ntoHaveAttribute(name: string, expected: string | RegExp | null, options?)\ntoHaveBoundingBox(expected: Partial<BoundingBox> | null, options?)",
-          description: "Web-only retrying matchers that re-read state on every attempt (default 5 s timeout, 100 ms interval; timeoutMs: 0 observes once). A string URL must match exactly; null asserts a missing attribute or unsupported selection; selected options match in order by value, regex, or { value, label, index }; a box compares only the fields you supply. Each element matcher also has a page form taking a selector first, e.g. expect(page).toHaveValue('#name', 'Alice').",
+          signature: "toBeAttached(options?)\ntoBeVisible(options?)\ntoBeHidden(options?)\ntoBeEnabled(options?)\ntoBeDisabled(options?)\ntoBeFocused(options?)\ntoBeEditable(options?)\ntoHaveValue(expected: string | RegExp, options?)\ntoBeChecked(options?)\ntoHaveAttribute(name: string, expected: string | RegExp | null, options?)\ntoHaveBoundingBox(expected: Partial<BoundingBox> | null, options?)\n\n// Web-only\ntoHaveURL(expected: string | RegExp, options?)\ntoHaveSelectedOptions(expected: SelectedOptionExpectation[], options?)\ntoHaveSelectedText(expected: string | RegExp | null, options?)",
+          description: "Retrying web and native matchers re-read state on every attempt (default 5 s timeout, 100 ms interval; timeoutMs: 0 observes once). URL and selection matchers are web-only. A string URL must match exactly; null asserts a missing attribute or unsupported selection; selected options match in order by value, regex, or { value, label, index }; a box compares only the supplied fields. Each element matcher also has a page/app form taking a selector first.",
           since: "v0.1.14",
           example: "await expect(page).toHaveURL(/\\/dashboard(?:\\?|$)/);\nawait expect(page.locator('select')).toHaveSelectedOptions([{ value: 'a', label: /Alpha/ }]);\nawait expect(page.locator('a')).toHaveAttribute('href', /dashboard/);\nawait expect(page.locator('input[type=radio]')).not().toBeChecked();",
         },

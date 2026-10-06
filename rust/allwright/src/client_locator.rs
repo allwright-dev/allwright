@@ -1,6 +1,7 @@
 use super::selectors::chain_selector_for_transport;
 use super::types::{
-    CommandOptions, HighlightOptions, Locator, Page, PressOptions, Result, WaitForSelectorOptions,
+    ClickOptions, CommandOptions, HighlightOptions, Locator, Page, PressOptions, Result,
+    WaitForSelectorOptions,
 };
 
 impl Locator {
@@ -34,9 +35,19 @@ impl Locator {
         self.page.click(self.selector.clone()).await
     }
 
-    pub async fn click_with_options(&self, options: CommandOptions) -> Result<()> {
+    pub async fn click_with_options(&self, options: impl Into<ClickOptions>) -> Result<()> {
         self.page
             .click_with_options(self.selector.clone(), options)
+            .await
+    }
+
+    pub async fn dblclick(&self) -> Result<()> {
+        self.page.dblclick(self.selector.clone()).await
+    }
+
+    pub async fn dblclick_with_options(&self, options: ClickOptions) -> Result<()> {
+        self.page
+            .dblclick_with_options(self.selector.clone(), options)
             .await
     }
 

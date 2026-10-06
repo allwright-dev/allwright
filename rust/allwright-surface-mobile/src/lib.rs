@@ -362,6 +362,14 @@ pub enum MobileCommand {
         url: String,
         timeout_ms: Option<u32>,
     },
+    Capture {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+        kind: String,
+        selector: String,
+        attribute_name: String,
+        timeout_ms: Option<u32>,
+    },
     ClickElement {
         browser_session: MobileBrowserSessionHandle,
         page_session: MobilePageSessionHandle,
@@ -422,7 +430,7 @@ pub enum MobileCommand {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum MobileCommandResult {
     RegisterHook(MobileHookRegistration),
@@ -435,6 +443,7 @@ pub enum MobileCommandResult {
     OpenPage(MobilePageInfo),
     ClosePage,
     NavigateApp(MobileNavigationInfo),
+    Capture(allwright_plugin_sdk::CaptureInfo),
     ClickElement(MobileClickInfo),
     CountElements(MobileElementCountInfo),
     FocusElement(MobileElementInfo),

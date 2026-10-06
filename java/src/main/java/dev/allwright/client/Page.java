@@ -414,6 +414,12 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
 
     public void click(String selector) { clickResult(selector); }
     public void click(String selector, CommandOptions options) { clickResult(selector, options); }
+    public void click(String selector, ClickOptions options) { clickResult(selector, options); }
+    public void dblclick(String selector) { clickResult(selector, new ClickOptions(null, MouseButton.LEFT, 2)); }
+    public void dblclick(String selector, ClickOptions options) {
+        ClickOptions resolved = options == null ? new ClickOptions() : options;
+        clickResult(selector, new ClickOptions(resolved.timeoutMs(), resolved.button(), 2));
+    }
     public int count(String selector) { return countResult(selector).count(); }
     public int count(String selector, CommandOptions options) { return countResult(selector, options).count(); }
     public void highlight(String selector) { highlightResult(selector); }
@@ -436,18 +442,25 @@ public final class Page implements AutoCloseable, WebLocators, HookContext {
     public byte[] screenshot(ScreenshotOptions options) { return screenshotResult(options).pngData(); }
 
     private synchronized ClickResult clickResult(String selector) {
-        return clickResult(selector, new CommandOptions());
+        return clickResult(selector, new ClickOptions());
     }
 
     private synchronized ClickResult clickResult(String selector, CommandOptions options) {
+        CommandOptions resolved = options == null ? new CommandOptions() : options;
+        return clickResult(selector, new ClickOptions(resolved.timeoutMs()));
+    }
+
+    private synchronized ClickResult clickResult(String selector, ClickOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
-        CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+        ClickOptions resolvedOptions = options == null ? new ClickOptions() : options;
         String transportSelector = SelectorSupport.normalizeSelectorForTransport(selector);
         ClickElementCommand.Builder click = ClickElementCommand.newBuilder().setCssSelector(transportSelector);
         if (CommandSupport.hasTimeout(resolvedOptions.timeoutMs())) {
             click.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
         }
+        click.setButton((resolvedOptions.button() == null ? MouseButton.LEFT : resolvedOptions.button()).wireName());
+        click.setClickCount(resolvedOptions.clickCount() == null ? 1 : resolvedOptions.clickCount());
         handle.send(
                 ContextSessionCommand.newBuilder()
                         .setSurfaceSessionId(browserSessionId)

@@ -656,10 +656,24 @@ async fn handle_tab_command(
         Some(TabCommand::ClickElement(ClickElementCommand {
             css_selector,
             retry_options,
+            button,
+            click_count,
         })) => {
+            let (button, click_count) = web_lib::resolve_pointer_click_options(
+                button.as_deref(),
+                click_count,
+            )
+            .map_err(Status::invalid_argument)?;
             let retry_policy = command_retry_policy(retry_options.as_ref());
             let click = retry_with_timeout(retry_policy, || async {
-                web_lib::click_element(&surface_session, &page_session, &css_selector).await
+                web_lib::click_element_with_options(
+                    &surface_session,
+                    &page_session,
+                    &css_selector,
+                    button,
+                    click_count,
+                )
+                .await
             })
             .await
             .map_err(Status::internal)?;

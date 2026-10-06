@@ -93,6 +93,24 @@ public class NativeLocator {
         return page.innerText(selector, options);
     }
 
+    public String inputValue() { return page.inputValue(selector); }
+
+    public String inputValue(CommandOptions options) { return page.inputValue(selector, options); }
+
+    public boolean isChecked() { return page.isChecked(selector); }
+
+    public boolean isChecked(CommandOptions options) { return page.isChecked(selector, options); }
+
+    public String getAttribute(String name) { return page.getAttribute(selector, name); }
+
+    public String getAttribute(String name, CommandOptions options) {
+        return page.getAttribute(selector, name, options);
+    }
+
+    public BoundingBox boundingBox() { return page.boundingBox(selector); }
+
+    public BoundingBox boundingBox(CommandOptions options) { return page.boundingBox(selector, options); }
+
     public void waitFor() {
         page.waitForSelector(selector);
     }

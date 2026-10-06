@@ -289,13 +289,18 @@ await expect(page.locator('select')).toHaveSelectedOptions(['a', 'b']);
 await expect(page.locator('select')).toHaveSelectedOptions([{ value: 'a', label: /Alpha/ }]);
 await expect(page.locator('textarea')).toHaveSelectedText('selected words');
 await expect(page.locator('input[type=checkbox]')).toBeChecked();
+await expect(page.locator('button[type=submit]')).toBeEnabled();
+await expect(page.locator('input')).toBeEditable();
+await expect(page.locator('input')).toBeFocused();
+await expect(page.locator('.spinner')).toBeHidden();
+await expect(page.locator('main')).toBeAttached();
 await expect(page.locator('h1')).toHaveText('Welcome');
 await expect(page.locator('a')).toHaveAttribute('href', /dashboard/);
 await expect(page.locator('button')).toHaveBoundingBox({ width: 100, height: 40 });
 await expect(page.locator('input[type=radio]')).not().toBeChecked();
 ```
 
-Every element matcher also has a page form, such as `expect(page).toHaveValue('#name', 'Alice')` or `expect(page).toHaveAttribute('a', 'href', '/home')`. These state matchers are web-only; Android retains its text/count/visibility matchers.
+Every element matcher also has a page/app form, such as `expect(page).toHaveValue('#name', 'Alice')` or `expect(androidApp).toBeEnabled('text="Continue"')`. Value, checked-state, attribute, bounding-box, attached/hidden, enabled/disabled, focused, and editable matchers work across web, Android, iOS, macOS, and Windows. URL, selected-option, and selected-text matchers remain web-only.
 
 All Allwright page/app/locator expectations retry until they match or the timeout expires, including `.not` and `.not()`. Defaults come from the shared assertion configuration, falling back to 5 seconds and a 100 ms interval. Override these with `{ timeoutMs, intervalMs }`. In-flight reads and nested command timeout hints are bounded by the remaining assertion budget; `timeoutMs: 0` makes one observation without polling. Ordinary assertions on already captured values, such as `expect(await page.url()).toBe(...)`, use standard Vitest behavior and do not re-read the page.
 

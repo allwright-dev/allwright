@@ -12,9 +12,10 @@ user certificate is selected. Set `agent_endpoint` in a client, or set both
 `ALLWRIGHT_MAC_AGENT_XCTESTRUN` and `ALLWRIGHT_MAC_AGENT_ENTITLEMENTS` for
 plugin development, to use explicit agent artifacts instead.
 
-Supported operations are application launch/termination, native selectors,
-click, count, focus, fill, key input, text reads, selector waits, screenshots,
-and JSON/YAML accessibility snapshots. macOS 14 or newer with Xcode is
+Supported operations are application launch/termination, universal-link and
+custom URL-scheme dispatch through `app.goto(...)`, native selectors, click,
+count, focus, fill, key input, text reads, input/checked/attribute/frame state reads, selector waits, screenshots, and
+JSON/YAML accessibility snapshots. macOS 14 or newer with Xcode is
 required, and the process running Xcode must be allowed to use UI automation
-in macOS Privacy & Security settings. Windows and Linux desktop automation are
-separate future plugins.
+in macOS Privacy & Security settings. Windows automation is a separate plugin;
+Linux desktop automation is not available yet.

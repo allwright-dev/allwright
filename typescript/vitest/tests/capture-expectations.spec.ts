@@ -1,7 +1,7 @@
 import { afterEach, describe, expect as check, test, vi } from 'vitest';
 import { expect } from '../src/index.js';
 import { createPageExpect } from '../src/expectations.js';
-import type { Locator, Page } from '@allwright.dev/core';
+import type { Locator, NativeApp, NativeAppLocator, Page } from '@allwright.dev/core';
 
 const retry = { timeoutMs: 200, intervalMs: 1 };
 const once = { timeoutMs: 0 };
@@ -85,6 +85,68 @@ test('page delegates every element matcher and preserves options, nulls, and sel
   f.reads.getAttribute.mockResolvedValue('');
   await check(expect(f.page).toHaveAttribute('#input', 'empty', null, once)).rejects.toThrow();
   await expect(f.page).toHaveAttribute('#input', 'empty', '', once);
+});
+
+test('native apps expose shared state matchers without web-only selection methods', async () => {
+  const inputValue = vi.fn().mockResolvedValue('ready');
+  const isChecked = vi.fn().mockResolvedValue(true);
+  const getAttribute = vi.fn().mockResolvedValue('enabled');
+  const boundingBox = vi.fn().mockResolvedValue({ x: 4, y: 8, width: 80, height: 24 });
+  const locator = {
+    inputValue, isChecked, getAttribute, boundingBox,
+    page: {}, selector: 'aw=native', click: vi.fn(), count: vi.fn(), focus: vi.fn(), fill: vi.fn(),
+    press: vi.fn(), textContent: vi.fn(), innerText: vi.fn(), waitFor: vi.fn(), locator: vi.fn(),
+    getByRole: vi.fn(), getByText: vi.fn(), getByLabel: vi.fn(), getByTestId: vi.fn(),
+  } as unknown as NativeAppLocator;
+  const app = { locator: vi.fn(() => locator) } as unknown as NativeApp;
+
+  await expect(locator).toHaveValue('ready', once);
+  await expect(locator).toBeChecked(once);
+  await expect(locator).toHaveAttribute('state', 'enabled', once);
+  await expect(app).toHaveBoundingBox('#field', { width: 80 }, once);
+  check(boundingBox).toHaveBeenCalledWith({ timeoutMs: 1 });
+});
+
+test('common presence, visibility, enabled, focus, and editable assertions work on native locators', async () => {
+  const states = { enabled: 'true', focused: 'true', editable: 'true' } as const;
+  const locator = {
+    page: {}, selector: 'aw=native',
+    count: vi.fn().mockResolvedValue(1),
+    waitFor: vi.fn().mockResolvedValue(undefined),
+    getAttribute: vi.fn(async (name: keyof typeof states) => states[name] ?? null),
+    inputValue: vi.fn(), isChecked: vi.fn(), boundingBox: vi.fn(), click: vi.fn(), focus: vi.fn(), fill: vi.fn(),
+    press: vi.fn(), textContent: vi.fn(), innerText: vi.fn(), locator: vi.fn(), getByRole: vi.fn(),
+    getByText: vi.fn(), getByLabel: vi.fn(), getByTestId: vi.fn(),
+  } as unknown as NativeAppLocator;
+
+  await expect(locator).toBeAttached(once);
+  await expect(locator).toBeVisible(once);
+  await expect(locator).toBeEnabled(once);
+  await expect(locator).not.toBeDisabled(once);
+  await expect(locator).toBeFocused(once);
+  await expect(locator).toBeEditable(once);
+  locator.count = vi.fn().mockResolvedValue(0);
+  await expect(locator).toBeHidden(once);
+});
+
+test('web state assertions use computed-state capture attributes', async () => {
+  const getAttribute = vi.fn(async (name: string) => ({
+    __allwright_state_enabled: 'false',
+    __allwright_state_focused: 'true',
+    __allwright_state_editable: 'false',
+  })[name] ?? null);
+  const locator = {
+    page: {}, selector: '#field', getAttribute,
+    filter: vi.fn(() => ({ count: vi.fn().mockResolvedValue(1) })),
+    count: vi.fn().mockResolvedValue(1), inputValue: vi.fn(), selectedOptions: vi.fn(), selectedText: vi.fn(),
+    isChecked: vi.fn(), boundingBox: vi.fn(), textContent: vi.fn(), click: vi.fn(), focus: vi.fn(), fill: vi.fn(),
+    hover: vi.fn(), press: vi.fn(), innerText: vi.fn(), waitFor: vi.fn(), locator: vi.fn(),
+  } as unknown as Locator;
+
+  await expect(locator).toBeDisabled(once);
+  await expect(locator).toBeFocused(once);
+  await expect(locator).not.toBeEditable(once);
+  check(getAttribute).toHaveBeenCalledWith('__allwright_state_enabled', { timeoutMs: 1 });
 });
 
 test('URL exact matching, regex state, and immutable double negation', async () => {

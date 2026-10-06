@@ -71,10 +71,17 @@ export const rustReference: LanguageReference = {
         {
           name: "click",
           kind: "method",
-          signature: "pub async fn click_with_options(&self, css_selector: impl Into<String>, options: CommandOptions) -> Result<()>",
-          description: "Clicks the first matching element; click(...) omits options for the default timeout.",
+          signature: "pub async fn click_with_options(&self, css_selector: impl Into<String>, options: impl Into<ClickOptions>) -> Result<()>",
+          description: "Clicks the first matching element. ClickOptions accepts Left, Middle, or Right and a click_count from 1 to 3; CommandOptions remains accepted for compatibility.",
           since: "v0.0.14",
           example: 'page.click("a[target=_blank]").await?;',
+        },
+        {
+          name: "dblclick",
+          kind: "method",
+          signature: "pub async fn dblclick_with_options(&self, css_selector: impl Into<String>, options: ClickOptions) -> Result<()>",
+          description: "Double-clicks the first matching element; dblclick(...) uses default options.",
+          since: "v0.1.25",
         },
         {
           name: "fill",
@@ -205,7 +212,7 @@ export const rustReference: LanguageReference = {
       slug: "locator",
       title: "Locator",
       description:
-        "Locator mirrors Page's action/query methods (click, fill, hover, press, focus, count, text_content, inner_text, input_value, selected_options, selected_text, is_checked, get_attribute, bounding_box, wait_for), each delegating to self.page().<method>(self.selector()). What's below is what a Locator adds: building one semantically instead of by raw CSS, and narrowing it once built.",
+        "Locator mirrors Page's action/query methods (click, dblclick, fill, hover, press, focus, count, text_content, inner_text, input_value, selected_options, selected_text, is_checked, get_attribute, bounding_box, wait_for), each delegating to self.page().<method>(self.selector()). What's below is what a Locator adds: building one semantically instead of by raw CSS, and narrowing it once built.",
       members: [
         {
           name: "get_by_role",
@@ -357,6 +364,13 @@ export const rustReference: LanguageReference = {
           since: "v0.0.57 – v0.0.58",
         },
         {
+          name: "NativeApp state reads",
+          kind: "method",
+          signature: "pub async fn input_value(&self, selector: &str, options: CommandOptions) -> Result<String>\npub async fn is_checked(&self, selector: &str, options: CommandOptions) -> Result<bool>\npub async fn get_attribute(&self, selector: &str, name: &str, options: CommandOptions) -> Result<Option<String>>\npub async fn bounding_box(&self, selector: &str, options: CommandOptions) -> Result<Option<BoundingBox>>",
+          description: "Reads native input values, checked/selected state, known accessibility attributes, and on-screen bounds on Android, iOS, macOS, and Windows. The same methods are available on NativeLocator; selected-option and selected-text reads remain web-only.",
+          since: "v0.1.24",
+        },
+        {
           name: "NativeApp::wait_for_selector",
           kind: "method",
           signature: "pub async fn wait_for_selector(&self, selector: &str, options: WaitForSelectorOptions) -> Result<()>",
@@ -427,7 +441,7 @@ export const rustReference: LanguageReference = {
           name: "MacApp locators and actions",
           kind: "method",
           signature: "pub fn locator(&self, selector: impl Into<String>) -> MacLocator\npub fn get_by_role(&self, role: &str, options: RoleOptions) -> MacLocator",
-          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, text_content, inner_text, wait_for_selector, screenshot, and accessibility_snapshot.",
+          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include goto/navigate for universal links and URL schemes, plus click, fill, focus, press, count, text_content, inner_text, wait_for_selector, screenshot, and accessibility_snapshot.",
           since: "v0.1.21",
         },
         {
@@ -450,7 +464,7 @@ export const rustReference: LanguageReference = {
           name: "WindowsApp locators and actions",
           kind: "method",
           signature: "pub fn locator(&self, selector: impl Into<String>) -> WindowsLocator\npub fn get_by_role(&self, role: &str, options: RoleOptions) -> WindowsLocator",
-          description: "Uses native UI Automation selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, text_content, inner_text, wait_for_selector, screenshot, and accessibility_snapshot.",
+          description: "Uses native UI Automation selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include goto/navigate for universal links and URL schemes, plus click, fill, focus, press, count, text_content, inner_text, wait_for_selector, screenshot, and accessibility_snapshot.",
           since: "v0.1.24",
         },
       ],

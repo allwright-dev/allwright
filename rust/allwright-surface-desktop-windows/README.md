@@ -11,8 +11,9 @@ embedding UIA state in core. Requests use typed JSON over loopback HTTP. No Appi
 WinAppDriver, Developer Mode, or separately installed .NET runtime is required.
 
 Supported shared desktop operations are app launch/close, Playwright-style native
-locators, click, count, focus, fill, key input, text reads, waits, PNG screenshots,
-and JSON/YAML accessibility snapshots. `app_id` is an executable path, a command
+locators, universal-link and custom URL-scheme dispatch through `app.goto(...)`,
+click, count, focus, fill, key input, text reads, input/checked/attribute/bounding-box state reads, waits, PNG screenshots, and
+JSON/YAML accessibility snapshots. `app_id` is an executable path, a command
 resolvable by Windows such as `notepad.exe`, or a packaged-app AUMID containing `!`.
 
 ```ts

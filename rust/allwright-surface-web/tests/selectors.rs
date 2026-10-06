@@ -1,7 +1,7 @@
 use allwright_plugin_sdk::BrowserKind;
 use allwright_surface_web::{
-    click_element, close_browser_process, count_elements, fill_element, get_text_content,
-    launch_browser, navigate_page,
+    click_element, click_element_with_options, close_browser_process, count_elements, fill_element,
+    get_text_content, launch_browser, navigate_page,
 };
 use serde_json::Value;
 use std::io::{Read, Write};
@@ -224,6 +224,19 @@ async fn semantic_locators_in_browser() {
     click_element(&browser.browser_session, page, &selector)
         .await
         .unwrap();
+    click_element_with_options(&browser.browser_session, page, "#pointer-actions", 0, 2)
+        .await
+        .unwrap();
+    click_element_with_options(&browser.browser_session, page, "#pointer-actions", 2, 1)
+        .await
+        .unwrap();
+    assert_eq!(
+        get_text_content(&browser.browser_session, page, "#pointer-events")
+            .await
+            .unwrap()
+            .text,
+        "double;right;"
+    );
     let selector = format!(
         "{} css=\"li\" {} xpath=\"//h3\"",
         semantic(serde_json::json!({"kind":"role","role":"region","name":"Products"})),

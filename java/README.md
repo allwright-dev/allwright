@@ -24,6 +24,9 @@ dependencies {
 }
 ```
 
+Web clicks accept `new ClickOptions(timeoutMs, MouseButton.RIGHT, clickCount)` with click counts
+from 1 to 3. Use `page.dblclick(selector)` or `locator.dblclick()` for double-clicks.
+
 For an action that opens a tab, register the generic typed hook first:
 
 ```java
@@ -118,3 +121,5 @@ try (Browser browser = Allwright.firefox().launch()) {
 ```
 
 Web state reads: `page.url()`, `locator.inputValue()`, `locator.selectedOptions()`, `locator.selectedText()`, `locator.isChecked()`, `locator.getAttribute(name)`, and `locator.boundingBox()`. Element methods also accept selectors on `Page`; overloads accept `CommandOptions`. Selected options return `List<CapturedOption>`; boxes return `BoundingBox` in frame/page viewport CSS pixels. Missing attributes, unsupported text selections, and hidden/zero-area boxes return `null`. Existing `textContent()` and `innerText()` read element text. See the [shared semantics](../typescript/core/README.md#read-page-and-element-state).
+
+Native apps and locators also expose `inputValue`, `isChecked`, `getAttribute`, and `boundingBox` across Android, iOS, macOS, and Windows. Native boxes use platform screen coordinates; selected-option and selected-text reads remain web-only.

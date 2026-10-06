@@ -174,6 +174,9 @@ function createLazyLocator(
     async click(options?: Parameters<Locator["click"]>[0]) {
       return (await pageResource.get()).locator(await selectorFactory()).click(options);
     },
+    async dblclick(options?: Parameters<Locator["dblclick"]>[0]) {
+      return (await pageResource.get()).locator(await selectorFactory()).dblclick(options);
+    },
     async count(options?: Parameters<Locator["count"]>[0]) {
       return (await pageResource.get()).locator(await selectorFactory()).count(options);
     },
@@ -287,8 +290,11 @@ function createLazyPage(pageResource: LazyResource<Page>): Page {
     async navigate(url: string, options?: CommandOptions) {
       return (await pageResource.get()).navigate(url, options);
     },
-    async click(selector: string, options?: CommandOptions) {
+    async click(selector: string, options?: Parameters<Page["click"]>[1]) {
       return (await pageResource.get()).click(selector, options);
+    },
+    async dblclick(selector: string, options?: Parameters<Page["dblclick"]>[1]) {
+      return (await pageResource.get()).dblclick(selector, options);
     },
     async count(selector: string, options?: CommandOptions) {
       return (await pageResource.get()).count(selector, options);
@@ -502,6 +508,18 @@ function createLazyMobileApp(appResource: LazyResource<NativeApp>): NativeApp {
     async innerText(selector: string, options?: CommandOptions) {
       return (await appResource.get()).innerText(selector, options);
     },
+    async inputValue(selector: string, options?: CommandOptions) {
+      return (await appResource.get()).inputValue(selector, options);
+    },
+    async isChecked(selector: string, options?: CommandOptions) {
+      return (await appResource.get()).isChecked(selector, options);
+    },
+    async getAttribute(selector: string, name: string, options?: CommandOptions) {
+      return (await appResource.get()).getAttribute(selector, name, options);
+    },
+    async boundingBox(selector: string, options?: CommandOptions) {
+      return (await appResource.get()).boundingBox(selector, options);
+    },
     async waitForSelector(selector: string, options?: WaitForSelectorOptions) {
       return (await appResource.get()).waitForSelector(selector, options);
     },
@@ -547,6 +565,18 @@ function createLazyMobileLocator(
     },
     async innerText(options?: Parameters<NativeAppLocator["innerText"]>[0]) {
       return (await appResource.get()).locator(await selectorFactory()).innerText(options);
+    },
+    async inputValue(options?: CommandOptions) {
+      return (await appResource.get()).locator(await selectorFactory()).inputValue(options);
+    },
+    async isChecked(options?: CommandOptions) {
+      return (await appResource.get()).locator(await selectorFactory()).isChecked(options);
+    },
+    async getAttribute(name: string, options?: CommandOptions) {
+      return (await appResource.get()).locator(await selectorFactory()).getAttribute(name, options);
+    },
+    async boundingBox(options?: CommandOptions) {
+      return (await appResource.get()).locator(await selectorFactory()).boundingBox(options);
     },
     async waitFor(options?: Parameters<NativeAppLocator["waitFor"]>[0]) {
       return (await appResource.get()).locator(await selectorFactory()).waitFor(options);

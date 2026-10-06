@@ -20,6 +20,9 @@ await page.click(
 await browser.close();
 ```
 
+Web clicks accept `{ button: "left" | "middle" | "right", clickCount: 1 | 2 | 3 }`.
+Use `page.dblclick(selector)` or `locator.dblclick()` for the common double-click case.
+
 Register a typed hook before an action that opens a tab, then wait for its
 typed result afterward:
 
@@ -123,3 +126,5 @@ const box = await page.locator('button').boundingBox(); // { x, y, width, height
 Element reads also have page methods such as `page.inputValue(selector, options)` and accept `timeoutMs`. Reads use the first locator match and work in frame pages. `inputValue` reads the live property of an input, textarea, or select. `selectedOptions` supports native selects (including multiple selections) and ARIA combobox/listbox options marked `aria-selected="true"`. `selectedText` returns the textbox's selected substring, an empty string for a caret, or `null` for input types without selection support. `isChecked` supports native checkbox/radio and ARIA checked controls; ARIA mixed state returns false.
 
 Missing attributes return `null` (an empty attribute remains `""`). Bounding boxes use CSS pixels relative to the page/frame viewport and return `null` for hidden or zero-area elements. Missing elements and incompatible control types raise errors. Use `textContent()` for raw text or `innerText()` for rendered text.
+
+`NativeApp` and `NativeAppLocator` expose `inputValue`, `isChecked`, `getAttribute`, and `boundingBox` on Android, iOS, macOS, and Windows. Native attributes are platform accessibility/UI Automation properties, and native boxes use platform screen coordinates. Selected-option and selected-text reads remain web-only.

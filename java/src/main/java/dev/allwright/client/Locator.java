@@ -65,6 +65,18 @@ public final class Locator implements WebLocators {
         page.click(selector, options);
     }
 
+    public void click(ClickOptions options) {
+        page.click(selector, options);
+    }
+
+    public void dblclick() {
+        page.dblclick(selector);
+    }
+
+    public void dblclick(ClickOptions options) {
+        page.dblclick(selector, options);
+    }
+
     public int count() {
         return page.count(selector);
     }

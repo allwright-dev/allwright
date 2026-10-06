@@ -13,6 +13,7 @@ from ._web_locators import TextMatcher, semantic_selector
 from ._types import (
     AccessibilitySnapshotOptions,
     AllwrightError,
+    BoundingBox,
     CommandOptions,
     ElementResult,
     PressOptions,
@@ -287,7 +288,7 @@ class NativeApp:
                 )
             )
             while True:
-                event = handle.recv("receive mobile app event while opening deep link")
+                event = handle.recv("receive native app event while opening deep link")
                 match event.WhichOneof("event"):
                     case "attached":
                         pass
@@ -295,7 +296,7 @@ class NativeApp:
                         return None
                     case "closed":
                         self._closed = True
-                        raise AllwrightError("mobile app session closed while opening deep link")
+                        raise AllwrightError("native app session closed while opening deep link")
                     case "error":
                         raise AllwrightError(event.error.message)
 
@@ -490,6 +491,65 @@ class NativeApp:
             text_content=False,
         ).text
 
+    def _capture(
+        self,
+        kind: str,
+        selector: str,
+        attribute_name: str,
+        options: CommandOptions | None,
+    ):
+        from ._runtime import retry_options
+
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self._surface_session_id,
+                context_session_id=self._session_id,
+                capture=engine_pb2.CaptureCommand(
+                    kind=getattr(engine_pb2, "CAPTURE_KIND_" + kind),
+                    css_selector=normalize_mobile_selector_for_transport(selector),
+                    attribute_name=attribute_name,
+                    retry_options=retry_options((options or CommandOptions()).timeout_ms),
+                ),
+            ))
+            while True:
+                event = handle.recv("receive native capture result")
+                match event.WhichOneof("event"):
+                    case "capture_resolved":
+                        return event.capture_resolved
+                    case "error":
+                        raise AllwrightError(event.error.message)
+                    case "closed":
+                        self._closed = True
+                        raise AllwrightError("native app session closed while capturing")
+
+    def input_value(self, selector: str, options: CommandOptions | None = None) -> str:
+        return self._capture("INPUT_VALUE", selector, "", options).value
+
+    def is_checked(self, selector: str, options: CommandOptions | None = None) -> bool:
+        return self._capture("CHECKED", selector, "", options).checked
+
+    def get_attribute(
+        self,
+        selector: str,
+        name: str,
+        options: CommandOptions | None = None,
+    ) -> str | None:
+        result = self._capture("ATTRIBUTE", selector, name, options)
+        return result.value if result.HasField("value") else None
+
+    def bounding_box(
+        self,
+        selector: str,
+        options: CommandOptions | None = None,
+    ) -> BoundingBox | None:
+        result = self._capture("BOUNDING_BOX", selector, "", options)
+        if not result.HasField("bounding_box"):
+            return None
+        box = result.bounding_box
+        return BoundingBox(box.x, box.y, box.width, box.height)
+
     def wait_for_selector(
         self,
         selector: str,
@@ -657,6 +717,18 @@ class NativeLocator:
 
     def inner_text(self, options: CommandOptions | None = None) -> str:
         return self.page.inner_text(self.selector, options)
+
+    def input_value(self, options: CommandOptions | None = None) -> str:
+        return self.page.input_value(self.selector, options)
+
+    def is_checked(self, options: CommandOptions | None = None) -> bool:
+        return self.page.is_checked(self.selector, options)
+
+    def get_attribute(self, name: str, options: CommandOptions | None = None) -> str | None:
+        return self.page.get_attribute(self.selector, name, options)
+
+    def bounding_box(self, options: CommandOptions | None = None) -> BoundingBox | None:
+        return self.page.bounding_box(self.selector, options)
 
     def wait_for(self, options: WaitForSelectorOptions | None = None) -> None:
         return self.page.wait_for_selector(self.selector, options)

@@ -9,12 +9,14 @@ use std::fs;
 use std::io::{Cursor, Read, Write};
 use std::net::SocketAddr;
 use std::path::{Component, Path, PathBuf};
-use std::time::Duration;
+use std::process::Command;
+#[cfg(windows)]
+use std::process::Stdio;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tar::Archive;
 use zip::ZipArchive;
 
-const GITHUB_RELEASE_BASE_URL: &str =
-    "https://github.com/allwright-dev/allwright/releases/download";
+const DEFAULT_GITHUB_REPOSITORY: &str = "allwright-dev/allwright";
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -35,6 +37,12 @@ enum CliCommand {
     Plugin {
         #[command(subcommand)]
         command: PluginCommand,
+    },
+    /// Update this allwright executable from GitHub Releases
+    Update {
+        /// Install a specific release instead of the latest (for example v0.1.24)
+        #[arg(long)]
+        version: Option<String>,
     },
 }
 
@@ -74,8 +82,235 @@ async fn main() -> Result<(), Box<dyn Error>> {
         CliCommand::Plugin { command } => {
             tokio::task::block_in_place(|| handle_plugin_command(command))?;
         }
+        CliCommand::Update { version } => {
+            tokio::task::block_in_place(|| update_cli(version.as_deref()))?;
+        }
     }
 
+    Ok(())
+}
+
+fn update_cli(requested_version: Option<&str>) -> Result<(), Box<dyn Error>> {
+    let repository = github_repository();
+    let release_tag = match requested_version.map(str::trim) {
+        Some("") | None => latest_release_tag(&repository)?,
+        Some("latest") => latest_release_tag(&repository)?,
+        Some(version) => normalize_release_tag(version)?,
+    };
+    let target_version = release_tag.trim_start_matches('v');
+    let current_version = env!("CARGO_PKG_VERSION");
+    if target_version == current_version {
+        println!("allwright {current_version} is already up to date.");
+        return Ok(());
+    }
+
+    let asset_name = cli_asset_name(&release_tag)?;
+    let url =
+        format!("https://github.com/{repository}/releases/download/{release_tag}/{asset_name}");
+    println!("Updating allwright {current_version} -> {target_version}...");
+    let asset_bytes = download_release_asset(&url, &asset_name)?;
+    let temporary_root = temporary_update_root()?;
+    let temporary = TemporaryDirectory::create(temporary_root)?;
+    unpack_plugin_release_asset(&asset_name, &asset_bytes, temporary.path())?;
+
+    let binary_name = if cfg!(windows) {
+        "allwright.exe"
+    } else {
+        "allwright"
+    };
+    let downloaded_binary = temporary.path().join("bin").join(binary_name);
+    if !downloaded_binary.is_file() {
+        return Err(
+            format!("release archive `{asset_name}` does not contain bin/{binary_name}").into(),
+        );
+    }
+    verify_cli_version(&downloaded_binary, target_version)?;
+
+    let current_executable = env::current_exe()?;
+    replace_current_executable(&current_executable, &downloaded_binary, target_version)?;
+    println!("Restart any running allwright server to use the new version.");
+    Ok(())
+}
+
+fn github_repository() -> String {
+    env::var("ALLWRIGHT_REPOSITORY")
+        .ok()
+        .filter(|repository| !repository.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_GITHUB_REPOSITORY.to_string())
+}
+
+fn latest_release_tag(repository: &str) -> Result<String, Box<dyn Error>> {
+    let url = format!("https://api.github.com/repos/{repository}/releases/latest");
+    let client = release_http_client()?;
+    let mut request = client.get(&url).header(
+        "User-Agent",
+        format!("allwright-cli/{}", env!("CARGO_PKG_VERSION")),
+    );
+    if let Ok(token) = env::var("ALLWRIGHT_GITHUB_TOKEN")
+        && !token.trim().is_empty()
+    {
+        request = request.bearer_auth(token);
+    }
+    println!("Checking the latest allwright release...");
+    let body = request.send()?.error_for_status()?.text()?;
+    let response: serde_json::Value = serde_json::from_str(&body)?;
+    let tag = response
+        .get("tag_name")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("GitHub latest-release response did not contain tag_name")?;
+    normalize_release_tag(tag)
+}
+
+fn normalize_release_tag(version: &str) -> Result<String, Box<dyn Error>> {
+    let version = version.trim();
+    let bare = version.strip_prefix('v').unwrap_or(version);
+    let components = bare.split('.').collect::<Vec<_>>();
+    if components.len() != 3
+        || !components.iter().all(|part| {
+            !part.is_empty() && part.chars().all(|character| character.is_ascii_digit())
+        })
+    {
+        return Err(format!(
+            "invalid allwright release version `{version}`; expected vX.Y.Z or X.Y.Z"
+        )
+        .into());
+    }
+    Ok(format!("v{bare}"))
+}
+
+fn cli_asset_name(release_tag: &str) -> Result<String, Box<dyn Error>> {
+    let (target, extension) = release_target_platform()?;
+    Ok(format!("allwright-{release_tag}-{target}.{extension}"))
+}
+
+fn temporary_update_root() -> Result<PathBuf, Box<dyn Error>> {
+    let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+    Ok(env::temp_dir().join(format!("allwright-update-{}-{nonce}", std::process::id())))
+}
+
+struct TemporaryDirectory(PathBuf);
+
+impl TemporaryDirectory {
+    fn create(path: PathBuf) -> Result<Self, Box<dyn Error>> {
+        fs::create_dir_all(&path)?;
+        Ok(Self(path))
+    }
+
+    fn path(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for TemporaryDirectory {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn verify_cli_version(binary: &Path, expected_version: &str) -> Result<(), Box<dyn Error>> {
+    let output = Command::new(binary).arg("--version").output()?;
+    if !output.status.success() {
+        return Err(format!(
+            "downloaded allwright binary failed its version check with status {}",
+            output.status
+        )
+        .into());
+    }
+    let actual = String::from_utf8(output.stdout)?.trim().to_string();
+    let expected = format!("allwright {expected_version}");
+    if actual != expected {
+        return Err(format!("downloaded binary reports `{actual}`; expected `{expected}`").into());
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn replace_current_executable(
+    current_executable: &Path,
+    downloaded_binary: &Path,
+    target_version: &str,
+) -> Result<(), Box<dyn Error>> {
+    let parent = current_executable
+        .parent()
+        .ok_or("current allwright executable has no parent directory")?;
+    let staged = parent.join(format!(".allwright-update-{}", std::process::id()));
+    fs::copy(downloaded_binary, &staged).map_err(|error| {
+        format!(
+            "cannot stage the update next to {}: {error}. Re-run the installer if this executable is managed by another user or package manager",
+            current_executable.display()
+        )
+    })?;
+    fs::File::open(&staged)?.sync_all()?;
+    if let Err(error) = fs::rename(&staged, current_executable) {
+        let _ = fs::remove_file(&staged);
+        return Err(format!(
+            "cannot replace {}: {error}. Re-run the installer if this executable is managed by another user or package manager",
+            current_executable.display()
+        )
+        .into());
+    }
+    println!(
+        "Updated allwright to {target_version} at {}.",
+        current_executable.display()
+    );
+    Ok(())
+}
+
+#[cfg(windows)]
+fn replace_current_executable(
+    current_executable: &Path,
+    downloaded_binary: &Path,
+    target_version: &str,
+) -> Result<(), Box<dyn Error>> {
+    let parent = current_executable
+        .parent()
+        .ok_or("current allwright executable has no parent directory")?;
+    let staged = parent.join(format!("allwright-update-{}.exe", std::process::id()));
+    fs::copy(downloaded_binary, &staged).map_err(|error| {
+        format!(
+            "cannot stage the update next to {}: {error}. Re-run the PowerShell installer if this executable is managed by another user",
+            current_executable.display()
+        )
+    })?;
+
+    let script = env::temp_dir().join(format!("allwright-update-{}.ps1", std::process::id()));
+    fs::write(
+        &script,
+        r#"param([int]$ParentProcessId, [string]$StagedPath, [string]$TargetPath)
+Wait-Process -Id $ParentProcessId -ErrorAction SilentlyContinue
+try {
+    for ($attempt = 0; $attempt -lt 50; $attempt++) {
+        try {
+            Copy-Item -LiteralPath $StagedPath -Destination $TargetPath -Force -ErrorAction Stop
+            Remove-Item -LiteralPath $StagedPath -Force -ErrorAction SilentlyContinue
+            exit 0
+        } catch {
+            Start-Sleep -Milliseconds 100
+        }
+    }
+    exit 1
+} finally {
+    Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+}
+"#,
+    )?;
+    Command::new("powershell.exe")
+        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
+        .arg(&script)
+        .arg("-ParentProcessId")
+        .arg(std::process::id().to_string())
+        .arg("-StagedPath")
+        .arg(&staged)
+        .arg("-TargetPath")
+        .arg(current_executable)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    println!(
+        "Downloaded allwright {target_version}; the executable at {} will be replaced when this command exits.",
+        current_executable.display()
+    );
     Ok(())
 }
 
@@ -408,7 +643,7 @@ fn release_target_platform() -> Result<(&'static str, &'static str), Box<dyn Err
         ("windows", "aarch64") => Ok(("aarch64-pc-windows-msvc", "zip")),
         ("windows", "x86_64") => Ok(("x86_64-pc-windows-msvc", "zip")),
         (os, arch) => {
-            Err(format!("unsupported platform for plugin downloads: os={os}, arch={arch}").into())
+            Err(format!("unsupported platform for release downloads: os={os}, arch={arch}").into())
         }
     }
 }
@@ -417,11 +652,20 @@ fn download_plugin_release_asset(
     version: &str,
     asset_name: &str,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let url = format!("{GITHUB_RELEASE_BASE_URL}/v{version}/{asset_name}");
-    let client = Client::builder()
+    let repository = github_repository();
+    let url = format!("https://github.com/{repository}/releases/download/v{version}/{asset_name}");
+    download_release_asset(&url, asset_name)
+}
+
+fn release_http_client() -> Result<Client, Box<dyn Error>> {
+    Ok(Client::builder()
         .timeout(Duration::from_secs(120))
-        .build()?;
-    let mut request = client.get(&url).header(
+        .build()?)
+}
+
+fn download_release_asset(url: &str, asset_name: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+    let client = release_http_client()?;
+    let mut request = client.get(url).header(
         "User-Agent",
         format!("allwright-cli/{}", env!("CARGO_PKG_VERSION")),
     );
@@ -565,4 +809,42 @@ fn plugin_install_root(plugin_id: &str) -> Result<PathBuf, Box<dyn Error>> {
         .parent()
         .ok_or("plugin manifest path has no parent directory")?;
     Ok(plugin_home.join("plugins").join(plugin_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_update_with_latest_or_pinned_release() {
+        let latest = Args::try_parse_from(["allwright", "update"]).unwrap();
+        assert!(matches!(
+            latest.command,
+            Some(CliCommand::Update { version: None })
+        ));
+
+        let pinned = Args::try_parse_from(["allwright", "update", "--version", "v1.2.3"]).unwrap();
+        assert!(matches!(
+            pinned.command,
+            Some(CliCommand::Update { version: Some(version) }) if version == "v1.2.3"
+        ));
+    }
+
+    #[test]
+    fn normalizes_release_versions_strictly() {
+        assert_eq!(normalize_release_tag("1.2.3").unwrap(), "v1.2.3");
+        assert_eq!(normalize_release_tag(" v0.1.24 ").unwrap(), "v0.1.24");
+        assert!(normalize_release_tag("latest").is_err());
+        assert!(normalize_release_tag("1.2").is_err());
+        assert!(normalize_release_tag("v1.2.next").is_err());
+    }
+
+    #[test]
+    fn cli_asset_matches_the_release_archive_convention() {
+        let (target, extension) = release_target_platform().unwrap();
+        assert_eq!(
+            cli_asset_name("v1.2.3").unwrap(),
+            format!("allwright-v1.2.3-{target}.{extension}")
+        );
+    }
 }

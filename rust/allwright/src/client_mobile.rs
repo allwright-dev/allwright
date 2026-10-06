@@ -14,15 +14,16 @@ use crate::proto::register_hook_command::Hook as RegisterHook;
 use crate::proto::surface_session_command::Command as SurfaceCommand;
 use crate::proto::surface_session_event::Event as SurfaceEvent;
 use crate::proto::{
-    AccessibilitySnapshotCommand, AppLaunchedEvent, ClickElementCommand, ConnectDesktopCommand,
-    ConnectMobileCommand, ContextSessionCommand, CountElementsCommand, DesktopAppLaunchedEvent,
-    DesktopConnectedEvent, DesktopPlatform as ProtoDesktopPlatform, FillElementCommand,
-    FocusElementCommand, GetInnerTextCommand, GetTextContentCommand, LaunchAppCommand,
-    LaunchDesktopAppCommand, MobileConnectedEvent, MobilePlatform as ProtoMobilePlatform,
-    NavigatePageCommand, PressKeyCommand, ReadFileChunkCommand, RegisterHookCommand,
-    RegisterMobileDownloadHook, RegisterMobileFileChooserHook, SaveMobileDownloadCommand,
-    ScreenshotCommand, SetMobileFileChooserFilesCommand, SurfaceSessionCommand,
-    UploadFileChunkCommand, WaitForHookCommand, WaitForSelectorCommand,
+    AccessibilitySnapshotCommand, AppLaunchedEvent, CaptureCommand, ClickElementCommand,
+    ConnectDesktopCommand, ConnectMobileCommand, ContextSessionCommand, CountElementsCommand,
+    DesktopAppLaunchedEvent, DesktopConnectedEvent, DesktopPlatform as ProtoDesktopPlatform,
+    FillElementCommand, FocusElementCommand, GetInnerTextCommand, GetTextContentCommand,
+    LaunchAppCommand, LaunchDesktopAppCommand, MobileConnectedEvent,
+    MobilePlatform as ProtoMobilePlatform, NavigatePageCommand, PressKeyCommand,
+    ReadFileChunkCommand, RegisterHookCommand, RegisterMobileDownloadHook,
+    RegisterMobileFileChooserHook, SaveMobileDownloadCommand, ScreenshotCommand,
+    SetMobileFileChooserFilesCommand, SurfaceSessionCommand, UploadFileChunkCommand,
+    WaitForHookCommand, WaitForSelectorCommand,
 };
 
 use super::hook::{DownloadHook, FileChooserHook};
@@ -113,8 +114,8 @@ use super::command::command_retry_options;
 use super::runtime::get_runtime;
 use super::types::{
     AccessibilitySnapshotFormat, AccessibilitySnapshotMode, AccessibilitySnapshotOptions,
-    CommandOptions, Error, PressOptions, Result, RuntimeClient, ScreenshotOptions, TextResult,
-    WaitForSelectorOptions,
+    BoundingBox, CommandOptions, Error, PressOptions, Result, RuntimeClient, ScreenshotOptions,
+    TextResult, WaitForSelectorOptions,
 };
 use super::web_locators::{RoleOptions, TextMatcher, TextOptions};
 
@@ -801,7 +802,7 @@ impl NativeApp {
         loop {
             let event =
                 handle.events.message().await?.ok_or_else(|| {
-                    Error::new("mobile app session closed while opening deep link")
+                    Error::new("native app session closed while opening deep link")
                 })?;
             match event.event {
                 Some(ContextEvent::Navigated(_)) => return Ok(()),
@@ -809,7 +810,7 @@ impl NativeApp {
                 Some(ContextEvent::Closed(_)) => {
                     handle.closed = true;
                     return Err(Error::new(
-                        "mobile app session closed while opening deep link",
+                        "native app session closed while opening deep link",
                     ));
                 }
                 _ => {}
@@ -831,6 +832,8 @@ impl NativeApp {
                 command: Some(ContextCommand::ClickElement(ClickElementCommand {
                     css_selector: selector.clone(),
                     retry_options: command_retry_options(options.timeout_ms),
+                    button: None,
+                    click_count: None,
                 })),
             })
             .await
@@ -1064,6 +1067,103 @@ impl NativeApp {
         self.read_text(selector, options, false)
             .await
             .map(|result| result.text)
+    }
+
+    async fn capture(
+        &self,
+        kind: crate::proto::CaptureKind,
+        selector: &str,
+        attribute_name: &str,
+        options: CommandOptions,
+    ) -> Result<crate::proto::CaptureResolvedEvent> {
+        let mut state = self.inner.state.lock().await;
+        let handle = self.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.inner.session_id)?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.inner.surface_session_id.clone(),
+                context_session_id: self.inner.session_id.clone(),
+                command: Some(ContextCommand::Capture(CaptureCommand {
+                    kind: kind as i32,
+                    css_selector: normalize_mobile_selector_for_transport(selector),
+                    attribute_name: attribute_name.to_string(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send native capture command"))?;
+        loop {
+            let event = handle
+                .events
+                .message()
+                .await?
+                .ok_or_else(|| Error::new("native app session closed while capturing"))?;
+            match event.event {
+                Some(ContextEvent::CaptureResolved(result)) => return Ok(result),
+                Some(ContextEvent::Error(error)) => return Err(Error::new(error.message)),
+                Some(ContextEvent::Closed(_)) => {
+                    handle.closed = true;
+                    return Err(Error::new("native app session closed while capturing"));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn input_value(&self, selector: &str, options: CommandOptions) -> Result<String> {
+        Ok(self
+            .capture(crate::proto::CaptureKind::InputValue, selector, "", options)
+            .await?
+            .value
+            .unwrap_or_default())
+    }
+
+    pub async fn is_checked(&self, selector: &str, options: CommandOptions) -> Result<bool> {
+        Ok(self
+            .capture(crate::proto::CaptureKind::Checked, selector, "", options)
+            .await?
+            .checked
+            .unwrap_or(false))
+    }
+
+    pub async fn get_attribute(
+        &self,
+        selector: &str,
+        name: &str,
+        options: CommandOptions,
+    ) -> Result<Option<String>> {
+        Ok(self
+            .capture(
+                crate::proto::CaptureKind::Attribute,
+                selector,
+                name,
+                options,
+            )
+            .await?
+            .value)
+    }
+
+    pub async fn bounding_box(
+        &self,
+        selector: &str,
+        options: CommandOptions,
+    ) -> Result<Option<BoundingBox>> {
+        Ok(self
+            .capture(
+                crate::proto::CaptureKind::BoundingBox,
+                selector,
+                "",
+                options,
+            )
+            .await?
+            .bounding_box
+            .map(|value| BoundingBox {
+                x: value.x,
+                y: value.y,
+                width: value.width,
+                height: value.height,
+            }))
     }
 
     pub async fn wait_for_selector(
@@ -1640,6 +1740,26 @@ impl NativeLocator {
 
     pub async fn inner_text(&self, options: CommandOptions) -> Result<String> {
         self.page.inner_text(&self.selector, options).await
+    }
+
+    pub async fn input_value(&self, options: CommandOptions) -> Result<String> {
+        self.page.input_value(&self.selector, options).await
+    }
+
+    pub async fn is_checked(&self, options: CommandOptions) -> Result<bool> {
+        self.page.is_checked(&self.selector, options).await
+    }
+
+    pub async fn get_attribute(
+        &self,
+        name: &str,
+        options: CommandOptions,
+    ) -> Result<Option<String>> {
+        self.page.get_attribute(&self.selector, name, options).await
+    }
+
+    pub async fn bounding_box(&self, options: CommandOptions) -> Result<Option<BoundingBox>> {
+        self.page.bounding_box(&self.selector, options).await
     }
 
     pub async fn wait_for(&self, options: WaitForSelectorOptions) -> Result<()> {

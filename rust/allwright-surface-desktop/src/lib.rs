@@ -1,4 +1,6 @@
-use allwright_plugin_sdk::{AccessibilitySnapshotInfo, SurfaceFamily, SurfacePluginDescriptor};
+use allwright_plugin_sdk::{
+    AccessibilitySnapshotInfo, CaptureInfo, SurfaceFamily, SurfacePluginDescriptor,
+};
 use serde::{Deserialize, Serialize};
 use tokio::time::{Duration, sleep};
 
@@ -68,6 +70,12 @@ pub struct DesktopActionInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DesktopNavigationInfo {
+    pub url: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DesktopElementCountInfo {
     pub selector: String,
     pub count: u32,
@@ -105,6 +113,20 @@ pub enum DesktopCommand {
     CloseApp {
         desktop_session: DesktopSessionHandle,
         app_session: DesktopAppSessionHandle,
+    },
+    NavigateApp {
+        desktop_session: DesktopSessionHandle,
+        app_session: DesktopAppSessionHandle,
+        url: String,
+        timeout_ms: Option<u32>,
+    },
+    Capture {
+        desktop_session: DesktopSessionHandle,
+        app_session: DesktopAppSessionHandle,
+        kind: String,
+        selector: String,
+        attribute_name: String,
+        timeout_ms: Option<u32>,
     },
     ClickElement {
         desktop_session: DesktopSessionHandle,
@@ -171,12 +193,14 @@ pub enum DesktopCommand {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum DesktopCommandResult {
     Connect(DesktopConnectInfo),
     LaunchApp(DesktopAppInfo),
     CloseApp,
+    NavigateApp(DesktopNavigationInfo),
+    Capture(CaptureInfo),
     ClickElement(DesktopActionInfo),
     CountElements(DesktopElementCountInfo),
     FocusElement(DesktopActionInfo),
@@ -257,6 +281,25 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<DesktopCommand>(&json).unwrap(),
             windows
+        );
+
+        let navigate = DesktopCommand::NavigateApp {
+            desktop_session: DesktopSessionHandle {
+                platform: DesktopPlatform::Windows,
+                endpoint: "http://127.0.0.1:8300".to_string(),
+                session_id: "desktop-1".to_string(),
+            },
+            app_session: DesktopAppSessionHandle {
+                app_session_id: "app-1".to_string(),
+                app_id: Some("notepad.exe".to_string()),
+            },
+            url: "allwright://flights/42".to_string(),
+            timeout_ms: Some(10_000),
+        };
+        let json = serde_json::to_string(&navigate).unwrap();
+        assert_eq!(
+            serde_json::from_str::<DesktopCommand>(&json).unwrap(),
+            navigate
         );
     }
 }

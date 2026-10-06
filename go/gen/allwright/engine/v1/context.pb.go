@@ -2070,6 +2070,8 @@ type ClickElementCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CssSelector   string                 `protobuf:"bytes,1,opt,name=css_selector,json=cssSelector,proto3" json:"css_selector,omitempty"`
 	RetryOptions  *CommandRetryOptions   `protobuf:"bytes,2,opt,name=retry_options,json=retryOptions,proto3,oneof" json:"retry_options,omitempty"`
+	Button        *string                `protobuf:"bytes,3,opt,name=button,proto3,oneof" json:"button,omitempty"`
+	ClickCount    *uint32                `protobuf:"varint,4,opt,name=click_count,json=clickCount,proto3,oneof" json:"click_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2116,6 +2118,20 @@ func (x *ClickElementCommand) GetRetryOptions() *CommandRetryOptions {
 		return x.RetryOptions
 	}
 	return nil
+}
+
+func (x *ClickElementCommand) GetButton() string {
+	if x != nil && x.Button != nil {
+		return *x.Button
+	}
+	return ""
+}
+
+func (x *ClickElementCommand) GetClickCount() uint32 {
+	if x != nil && x.ClickCount != nil {
+		return *x.ClickCount
+	}
+	return 0
 }
 
 type CountElementsCommand struct {
@@ -3956,11 +3972,16 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\x13NavigatePageCommand\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12R\n" +
 	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
-	"\x0e_retry_options\"\x9e\x01\n" +
+	"\x0e_retry_options\"\xfc\x01\n" +
 	"\x13ClickElementCommand\x12!\n" +
 	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12R\n" +
-	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
-	"\x0e_retry_options\"\x9f\x01\n" +
+	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01\x12\x1b\n" +
+	"\x06button\x18\x03 \x01(\tH\x01R\x06button\x88\x01\x01\x12$\n" +
+	"\vclick_count\x18\x04 \x01(\rH\x02R\n" +
+	"clickCount\x88\x01\x01B\x10\n" +
+	"\x0e_retry_optionsB\t\n" +
+	"\a_buttonB\x0e\n" +
+	"\f_click_count\"\x9f\x01\n" +
 	"\x14CountElementsCommand\x12!\n" +
 	"\fcss_selector\x18\x01 \x01(\tR\vcssSelector\x12R\n" +
 	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +

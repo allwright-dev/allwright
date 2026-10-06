@@ -45,6 +45,9 @@ page.click("a[target=_blank]").await?;
 let new_page = hook.wait().await?;
 ```
 
+Web `click_with_options` accepts `ClickOptions` with `MouseButton::{Left, Middle, Right}` and a
+click count from 1 to 3. Use `page.dblclick(selector)` or `locator.dblclick()` for double-clicks.
+
 ```rust,no_run
 let hook = page.register_hook(allwright::FILE_CHOOSER).await?;
 page.click("button.open-upload").await?;
@@ -67,3 +70,5 @@ remote Allwright server when necessary. Android app contexts expose the same
 mobile chooser/download handles.
 
 Web state reads: `page.url().await`, `locator.input_value().await`, `locator.selected_options().await`, `locator.selected_text().await`, `locator.is_checked().await`, `locator.get_attribute(name).await`, and `locator.bounding_box().await`. Element methods also accept selectors on `Page`; `_with_options` variants accept `CommandOptions`. Selected options return `Vec<CapturedOption>`; boxes return `Option<BoundingBox>` in frame/page viewport CSS pixels. Missing attributes, unsupported text selections, and hidden/zero-area boxes return `None`. Existing `text_content()` and `inner_text()` read element text. See the [shared semantics](../../typescript/core/README.md#read-page-and-element-state).
+
+Native apps and locators also expose `input_value`, `is_checked`, `get_attribute`, and `bounding_box` across Android, iOS, macOS, and Windows. Native boxes use platform screen coordinates; selected-option and selected-text reads remain web-only.

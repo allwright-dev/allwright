@@ -78,9 +78,16 @@ export const pythonReference: LanguageReference = {
         {
           name: "click",
           kind: "method",
-          signature: "def click(self, selector: str, options: CommandOptions | None = None) -> None",
-          description: "Clicks the first element matching selector.",
+          signature: "def click(self, selector: str, options: ClickOptions | CommandOptions | None = None) -> None",
+          description: "Clicks the first matching element. ClickOptions accepts left, middle, or right button and a click_count from 1 to 3.",
           since: "v0.0.14",
+        },
+        {
+          name: "dblclick",
+          kind: "method",
+          signature: "def dblclick(self, selector: str, options: ClickOptions | CommandOptions | None = None) -> None",
+          description: "Double-clicks the first matching element with the selected mouse button.",
+          since: "v0.1.25",
         },
         {
           name: "fill",
@@ -212,7 +219,7 @@ export const pythonReference: LanguageReference = {
       slug: "locator",
       title: "Locator",
       description:
-        "Every action and query method on Page (click, fill, hover, press, focus, highlight, count, text_content, inner_text, input_value, selected_options, selected_text, is_checked, get_attribute, bounding_box, wait_for) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds: building one semantically instead of by raw selector, and narrowing it once built.",
+        "Every action and query method on Page (click, dblclick, fill, hover, press, focus, highlight, count, text_content, inner_text, input_value, selected_options, selected_text, is_checked, get_attribute, bounding_box, wait_for) is also available directly on a Locator, scoped to whatever it resolves to. What's below is what a Locator adds: building one semantically instead of by raw selector, and narrowing it once built.",
       members: [
         {
           name: "get_by_role",
@@ -374,6 +381,13 @@ export const pythonReference: LanguageReference = {
           since: "v0.0.57 – v0.0.58",
         },
         {
+          name: "NativeApp state reads",
+          kind: "method",
+          signature: "def input_value(self, selector: str, options: CommandOptions | None = None) -> str\ndef is_checked(self, selector: str, options: CommandOptions | None = None) -> bool\ndef get_attribute(self, selector: str, name: str, options: CommandOptions | None = None) -> str | None\ndef bounding_box(self, selector: str, options: CommandOptions | None = None) -> BoundingBox | None",
+          description: "Reads native input values, checked/selected state, known accessibility attributes, and on-screen bounds on Android, iOS, macOS, and Windows. The same methods are available on NativeLocator; selected-option and selected-text reads remain web-only.",
+          since: "v0.1.24",
+        },
+        {
           name: "NativeApp.wait_for_selector",
           kind: "method",
           signature: "def wait_for_selector(self, selector: str, options: WaitForSelectorOptions | None = None) -> None",
@@ -444,7 +458,7 @@ export const pythonReference: LanguageReference = {
           name: "MacApp locators and actions",
           kind: "method",
           signature: "def locator(self, selector: str) -> MacLocator\ndef get_by_role(self, role: str, options: RoleOptions | None = None) -> MacLocator",
-          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, text_content, inner_text, wait_for_selector, screenshot, and accessibility_snapshot.",
+          description: "Uses native XCUITest selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include goto/navigate for universal links and URL schemes, plus click, fill, focus, press, count, text_content, inner_text, wait_for_selector, screenshot, and accessibility_snapshot.",
           since: "v0.1.21",
         },
         {
@@ -467,7 +481,7 @@ export const pythonReference: LanguageReference = {
           name: "WindowsApp locators and actions",
           kind: "method",
           signature: "def locator(self, selector: str) -> WindowsLocator\ndef get_by_role(self, role: str, options: RoleOptions | None = None) -> WindowsLocator",
-          description: "Uses native UI Automation selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include click, fill, focus, press, count, text_content, inner_text, wait_for_selector, screenshot, and accessibility_snapshot.",
+          description: "Uses native UI Automation selectors and the Playwright-style role, text, label, and test-id locator subset. App methods include goto/navigate for universal links and URL schemes, plus click, fill, focus, press, count, text_content, inner_text, wait_for_selector, screenshot, and accessibility_snapshot.",
           since: "v0.1.24",
         },
       ],

@@ -93,6 +93,14 @@ func (t *Tab) clickResult(ctx context.Context, cssSelector string, options ...Co
 
 	commandOptions := firstCommandOptions(options)
 	cssSelector = normalizeSelectorForTransport(cssSelector)
+	button := string(commandOptions.Button)
+	if button == "" {
+		button = string(MouseButtonLeft)
+	}
+	clickCount := commandOptions.ClickCount
+	if clickCount == 0 {
+		clickCount = 1
+	}
 
 	if err := t.stream.Send(&enginev1.ContextSessionCommand{
 		SurfaceSessionId: t.browserSessionID,
@@ -101,6 +109,8 @@ func (t *Tab) clickResult(ctx context.Context, cssSelector string, options ...Co
 			ClickElement: &enginev1.ClickElementCommand{
 				CssSelector:  cssSelector,
 				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+				Button:       &button,
+				ClickCount:   &clickCount,
 			},
 		},
 	}); err != nil {

@@ -2,6 +2,7 @@ import { WebLocatorBuilders, semanticSelector, type LocatorFilterOptions } from 
 import { chainSelectorForTransport } from "./selectors.js";
 import type {
   BoundingBox, CapturedOption, CaptureResult,
+  ClickOptions,
   CommandOptions,
   HighlightOptions,
   Locator,
@@ -24,8 +25,12 @@ export class LocatorImpl extends WebLocatorBuilders implements Locator {
   frame(options: CommandOptions = {}): Promise<Page> { return this.page.frame(this.selector, options); }
   Frame(options: CommandOptions = {}): Promise<Page> { return this.frame(options); }
 
-  async click(options: CommandOptions = {}): Promise<void> {
+  async click(options: ClickOptions = {}): Promise<void> {
     return this.page.click(this.selector, options);
+  }
+
+  async dblclick(options: Omit<ClickOptions, "clickCount"> = {}): Promise<void> {
+    return this.page.dblclick(this.selector, options);
   }
 
   async count(options: CommandOptions = {}): Promise<number> {

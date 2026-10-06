@@ -82,6 +82,26 @@ public class NativeApp implements HookContext {
     public String textContent(String selector, CommandOptions options) { return textContentResult(selector, options).text(); }
     public String innerText(String selector) { return innerTextResult(selector).text(); }
     public String innerText(String selector, CommandOptions options) { return innerTextResult(selector, options).text(); }
+    public String inputValue(String selector) { return inputValue(selector, new CommandOptions()); }
+    public String inputValue(String selector, CommandOptions options) {
+        return capture(dev.allwright.engine.v1.CaptureKind.CAPTURE_KIND_INPUT_VALUE, selector, "", options).getValue();
+    }
+    public boolean isChecked(String selector) { return isChecked(selector, new CommandOptions()); }
+    public boolean isChecked(String selector, CommandOptions options) {
+        return capture(dev.allwright.engine.v1.CaptureKind.CAPTURE_KIND_CHECKED, selector, "", options).getChecked();
+    }
+    public String getAttribute(String selector, String name) { return getAttribute(selector, name, new CommandOptions()); }
+    public String getAttribute(String selector, String name, CommandOptions options) {
+        var result = capture(dev.allwright.engine.v1.CaptureKind.CAPTURE_KIND_ATTRIBUTE, selector, name, options);
+        return result.hasValue() ? result.getValue() : null;
+    }
+    public BoundingBox boundingBox(String selector) { return boundingBox(selector, new CommandOptions()); }
+    public BoundingBox boundingBox(String selector, CommandOptions options) {
+        var result = capture(dev.allwright.engine.v1.CaptureKind.CAPTURE_KIND_BOUNDING_BOX, selector, "", options);
+        if (!result.hasBoundingBox()) return null;
+        var box = result.getBoundingBox();
+        return new BoundingBox(box.getX(), box.getY(), box.getWidth(), box.getHeight());
+    }
     public void waitForSelector(String selector) { waitForSelectorResult(selector); }
     public void waitForSelector(String selector, WaitForSelectorOptions options) { waitForSelectorResult(selector, options); }
     public byte[] screenshot() { return screenshotResult().pngData(); }
@@ -109,7 +129,7 @@ public class NativeApp implements HookContext {
                 .setNavigate(navigate)
                 .build());
         while (true) {
-            ContextSessionEvent event = handle.recv("receive mobile app event while opening deep link");
+            ContextSessionEvent event = handle.recv("receive native app event while opening deep link");
             switch (event.getEventCase()) {
                 case NAVIGATED -> {
                     return new NavigateResult(
@@ -120,7 +140,7 @@ public class NativeApp implements HookContext {
                 }
                 case CLOSED -> {
                     closed = true;
-                    throw new AllwrightException("mobile app session " + sessionId + " closed while opening deep link");
+                    throw new AllwrightException("native app session " + sessionId + " closed while opening deep link");
                 }
                 case ERROR -> throw new AllwrightException(event.getError().getMessage());
                 default -> {
@@ -133,6 +153,40 @@ public class NativeApp implements HookContext {
     public void goTo(String url, CommandOptions options) { goToResult(url, options); }
     public void navigate(String url) { goToResult(url); }
     public void navigate(String url, CommandOptions options) { goToResult(url, options); }
+
+    private synchronized dev.allwright.engine.v1.CaptureResolvedEvent capture(
+            dev.allwright.engine.v1.CaptureKind kind,
+            String selector,
+            String attribute,
+            CommandOptions options) {
+        var handle = ensureStream();
+        ensureOpen();
+        var resolved = options == null ? new CommandOptions() : options;
+        var capture = dev.allwright.engine.v1.CaptureCommand.newBuilder()
+                .setKind(kind)
+                .setCssSelector(NativeSelectorSupport.normalizeSelectorForTransport(selector))
+                .setAttributeName(attribute);
+        if (CommandSupport.hasTimeout(resolved.timeoutMs())) {
+            capture.setRetryOptions(CommandSupport.commandRetryOptions(resolved.timeoutMs()));
+        }
+        handle.send(ContextSessionCommand.newBuilder()
+                .setSurfaceSessionId(surfaceSessionId)
+                .setContextSessionId(sessionId)
+                .setCapture(capture)
+                .build());
+        while (true) {
+            var event = handle.recv("receive native capture result");
+            switch (event.getEventCase()) {
+                case CAPTURE_RESOLVED -> { return event.getCaptureResolved(); }
+                case ERROR -> throw new AllwrightException(event.getError().getMessage());
+                case CLOSED -> {
+                    closed = true;
+                    throw new AllwrightException("native app session closed while capturing");
+                }
+                default -> { }
+            }
+        }
+    }
 
     private synchronized ClickResult clickResult(String selector, CommandOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();

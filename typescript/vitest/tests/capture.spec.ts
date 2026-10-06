@@ -13,7 +13,7 @@ afterAll(() => shutdown());
 test.skipIf(!process.env.ALLWRIGHT_TEST_BROWSER)('capture live page and element state through the engine', { timeout: 60_000 }, async ({ page }) => {
   const input = page.getByLabel('Name', { exact: true });
   const html = `<label>Name<input id="name" value="initial"></label>
-    <textarea id="notes">hello world</textarea><input id="number" type="number" value="42">
+    <textarea id="notes">hello world</textarea><input id="number" type="number" value="42"><button id="disabled" disabled>Disabled</button>
     <input id="checked" type="checkbox" checked><input id="radio" type="radio">
     <div role="checkbox" aria-checked="mixed" id="mixed"></div>
     <select id="choices" multiple><option value="a" selected>Alpha</option><option value="b">Beta</option><option value="c" selected label="Charlie">C</option></select>
@@ -46,6 +46,13 @@ test.skipIf(!process.env.ALLWRIGHT_TEST_BROWSER)('capture live page and element 
   expect(await page.getAttribute('#box', 'absent')).toBeNull();
   expect(await page.locator('#box').boundingBox()).toEqual({ x: 20, y: 30, width: 100, height: 40 });
   expect(await page.boundingBox('#hidden')).toBeNull();
+  await expect(input).toBeAttached();
+  await expect(input).toBeEnabled();
+  await expect(page.locator('#disabled')).toBeDisabled();
+  await expect(page.locator('#notes')).toBeEditable();
+  await input.focus();
+  await expect(input).toBeFocused();
+  await expect(page.locator('#hidden')).toBeHidden();
   await expect(page.inputValue('#box', { timeoutMs: 100 })).rejects.toThrow(/inputValue/);
   await expect(page.getAttribute('#absent', 'id', { timeoutMs: 100 })).rejects.toThrow(/No element/);
   const frame = await page.locator('#frame').frame();

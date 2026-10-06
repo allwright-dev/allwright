@@ -10,6 +10,16 @@ export interface MobilePageExpectMatchers {
   toContainText(selector: string, expected: string | RegExp, options?: TextExpectationOptions): Promise<void>;
   toHaveCount(selector: string, expected: number, options?: RetryExpectationOptions): Promise<void>;
   toBeVisible(selector: string, options?: VisibleExpectationOptions): Promise<void>;
+  toBeHidden(selector: string, options?: VisibleExpectationOptions): Promise<void>;
+  toBeAttached(selector: string, options?: TextExpectationOptions): Promise<void>;
+  toBeEnabled(selector: string, options?: TextExpectationOptions): Promise<void>;
+  toBeDisabled(selector: string, options?: TextExpectationOptions): Promise<void>;
+  toBeFocused(selector: string, options?: TextExpectationOptions): Promise<void>;
+  toBeEditable(selector: string, options?: TextExpectationOptions): Promise<void>;
+  toHaveValue(selector: string, expected: string | RegExp, options?: TextExpectationOptions): Promise<void>;
+  toBeChecked(selector: string, options?: TextExpectationOptions): Promise<void>;
+  toHaveAttribute(selector: string, name: string, expected: string | RegExp | null, options?: TextExpectationOptions): Promise<void>;
+  toHaveBoundingBox(selector: string, expected: Partial<BoundingBox> | null, options?: TextExpectationOptions): Promise<void>;
 }
 export interface MobileLocatorExpectMatchers {
   readonly not: MobileLocatorExpectMatchers & (() => MobileLocatorExpectMatchers);
@@ -17,26 +27,28 @@ export interface MobileLocatorExpectMatchers {
   toContainText(expected: string | RegExp, options?: TextExpectationOptions): Promise<void>;
   toHaveCount(expected: number, options?: RetryExpectationOptions): Promise<void>;
   toBeVisible(options?: VisibleExpectationOptions): Promise<void>;
-}
-export type SelectedOptionExpectation = string | RegExp | { value?: string | RegExp; label?: string | RegExp; index?: number };
-export interface LocatorExpectMatchers extends MobileLocatorExpectMatchers {
-  readonly not: LocatorExpectMatchers & (() => LocatorExpectMatchers);
+  toBeHidden(options?: VisibleExpectationOptions): Promise<void>;
+  toBeAttached(options?: TextExpectationOptions): Promise<void>;
+  toBeEnabled(options?: TextExpectationOptions): Promise<void>;
+  toBeDisabled(options?: TextExpectationOptions): Promise<void>;
+  toBeFocused(options?: TextExpectationOptions): Promise<void>;
+  toBeEditable(options?: TextExpectationOptions): Promise<void>;
   toHaveValue(expected: string | RegExp, options?: TextExpectationOptions): Promise<void>;
-  toHaveSelectedOptions(expected: SelectedOptionExpectation[], options?: TextExpectationOptions): Promise<void>;
-  toHaveSelectedText(expected: string | RegExp | null, options?: TextExpectationOptions): Promise<void>;
   toBeChecked(options?: TextExpectationOptions): Promise<void>;
   toHaveAttribute(name: string, expected: string | RegExp | null, options?: TextExpectationOptions): Promise<void>;
   toHaveBoundingBox(expected: Partial<BoundingBox> | null, options?: TextExpectationOptions): Promise<void>;
 }
+export type SelectedOptionExpectation = string | RegExp | { value?: string | RegExp; label?: string | RegExp; index?: number };
+export interface LocatorExpectMatchers extends MobileLocatorExpectMatchers {
+  readonly not: LocatorExpectMatchers & (() => LocatorExpectMatchers);
+  toHaveSelectedOptions(expected: SelectedOptionExpectation[], options?: TextExpectationOptions): Promise<void>;
+  toHaveSelectedText(expected: string | RegExp | null, options?: TextExpectationOptions): Promise<void>;
+}
 export interface PageExpectMatchers extends MobilePageExpectMatchers {
   readonly not: PageExpectMatchers & (() => PageExpectMatchers);
   toHaveURL(expected: string | RegExp, options?: TextExpectationOptions): Promise<void>;
-  toHaveValue(selector: string, expected: string | RegExp, options?: TextExpectationOptions): Promise<void>;
   toHaveSelectedOptions(selector: string, expected: SelectedOptionExpectation[], options?: TextExpectationOptions): Promise<void>;
   toHaveSelectedText(selector: string, expected: string | RegExp | null, options?: TextExpectationOptions): Promise<void>;
-  toBeChecked(selector: string, options?: TextExpectationOptions): Promise<void>;
-  toHaveAttribute(selector: string, name: string, expected: string | RegExp | null, options?: TextExpectationOptions): Promise<void>;
-  toHaveBoundingBox(selector: string, expected: Partial<BoundingBox> | null, options?: TextExpectationOptions): Promise<void>;
 }
 type Defaults = () => RetryExpectationOptions;
 type AnyLocator = Locator | NativeAppLocator;
@@ -97,9 +109,25 @@ async function isVisible(locator: AnyLocator, command: CommandOptions): Promise<
     await locator.waitFor({ ...command, visible: true });
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("selector found but not visible: ")) return false;
+    if (error instanceof Error && (
+      error.message.startsWith("selector found but not visible: ")
+      || error.message.includes("did not become visible")
+    )) return false;
     throw error;
   }
+}
+
+async function nativeOrWebState(
+  locator: AnyLocator,
+  state: "enabled" | "focused" | "editable",
+  command: CommandOptions,
+): Promise<boolean> {
+  const attribute = "filter" in locator ? `__allwright_state_${state}` : state;
+  const value = await locator.getAttribute(attribute, command);
+  if (value !== "true" && value !== "false") {
+    throw new Error(`Element did not expose a ${state} state`);
+  }
+  return value === "true";
 }
 
 export function createLocatorExpect(locator: Locator, defaults: Defaults, negated?: boolean): LocatorExpectMatchers;
@@ -133,17 +161,63 @@ export function createLocatorExpect(locator: AnyLocator, defaults: Defaults, neg
         assertion(await isVisible(locator, command)).toBe(true);
       }, options, defaults());
     },
+    async toBeHidden(options = {}) {
+      await retryExpectation(async command => {
+        assertion(await isVisible(locator, command)).toBe(false);
+      }, options, defaults());
+    },
+    async toBeAttached(options = {}) {
+      await retryExpectation(async command => {
+        assertion((await locator.count(command)) > 0).toBe(true);
+      }, options, defaults());
+    },
+    async toBeEnabled(options = {}) {
+      await retryExpectation(async command => {
+        assertion(await nativeOrWebState(locator, "enabled", command)).toBe(true);
+      }, options, defaults());
+    },
+    async toBeDisabled(options = {}) {
+      await retryExpectation(async command => {
+        assertion(await nativeOrWebState(locator, "enabled", command)).toBe(false);
+      }, options, defaults());
+    },
+    async toBeFocused(options = {}) {
+      await retryExpectation(async command => {
+        assertion(await nativeOrWebState(locator, "focused", command)).toBe(true);
+      }, options, defaults());
+    },
+    async toBeEditable(options = {}) {
+      await retryExpectation(async command => {
+        assertion(await nativeOrWebState(locator, "editable", command)).toBe(true);
+      }, options, defaults());
+    },
+    async toHaveValue(expected, options = {}) {
+      await retryExpectation(async command => assertion(await locator.inputValue(command)).toEqual(expectedText(expected)), options, defaults());
+    },
+    async toBeChecked(options = {}) {
+      await retryExpectation(async command => assertion(await locator.isChecked(command)).toBe(true), options, defaults());
+    },
+    async toHaveAttribute(name, expected, options = {}) {
+      await retryExpectation(async command => assertion(await locator.getAttribute(name, command)).toEqual(expectedText(expected)), options, defaults());
+    },
+    async toHaveBoundingBox(expected, options = {}) {
+      await retryExpectation(async command => assertion(await locator.boundingBox(command)).toEqual(expected === null ? null : vitestExpect.objectContaining(expected)), options, defaults());
+    },
   };
-  if (!("inputValue" in locator)) return common;
+  if (!("selectedOptions" in locator)) return common;
   const web: LocatorExpectMatchers = {
     toHaveText: common.toHaveText,
     toContainText: common.toContainText,
     toHaveCount: common.toHaveCount,
     toBeVisible: common.toBeVisible,
+    toBeHidden: common.toBeHidden,
+    toBeAttached: common.toBeAttached,
+    toBeEnabled: common.toBeEnabled,
+    toBeDisabled: common.toBeDisabled,
+    toBeFocused: common.toBeFocused,
+    toBeEditable: common.toBeEditable,
     get not() { return callableMatchers(createLocatorExpect(locator, defaults, !negated)); },
-    async toHaveValue(expected, options = {}) {
-      await retryExpectation(async command => assertion(await locator.inputValue(command)).toEqual(expectedText(expected)), options, defaults());
-    },
+    toHaveValue: common.toHaveValue,
     async toHaveSelectedOptions(expected, options = {}) {
       await retryExpectation(async command => {
         const wanted = expected.map(option => {
@@ -160,15 +234,9 @@ export function createLocatorExpect(locator: AnyLocator, defaults: Defaults, neg
     async toHaveSelectedText(expected, options = {}) {
       await retryExpectation(async command => assertion(await locator.selectedText(command)).toEqual(expectedText(expected)), options, defaults());
     },
-    async toBeChecked(options = {}) {
-      await retryExpectation(async command => assertion(await locator.isChecked(command)).toBe(true), options, defaults());
-    },
-    async toHaveAttribute(name, expected, options = {}) {
-      await retryExpectation(async command => assertion(await locator.getAttribute(name, command)).toEqual(expectedText(expected)), options, defaults());
-    },
-    async toHaveBoundingBox(expected, options = {}) {
-      await retryExpectation(async command => assertion(await locator.boundingBox(command)).toEqual(expected === null ? null : vitestExpect.objectContaining(expected)), options, defaults());
-    },
+    toBeChecked: common.toBeChecked,
+    toHaveAttribute: common.toHaveAttribute,
+    toHaveBoundingBox: common.toHaveBoundingBox,
   };
   return web;
 }
@@ -184,6 +252,16 @@ export function createPageExpect(page: Page | NativeApp, defaults: Defaults, neg
     toContainText: (selector, expected, options) => matcher(selector).toContainText(expected, options),
     toHaveCount: (selector, expected, options) => matcher(selector).toHaveCount(expected, options),
     toBeVisible: (selector, options) => matcher(selector).toBeVisible(options),
+    toBeHidden: (selector, options) => matcher(selector).toBeHidden(options),
+    toBeAttached: (selector, options) => matcher(selector).toBeAttached(options),
+    toBeEnabled: (selector, options) => matcher(selector).toBeEnabled(options),
+    toBeDisabled: (selector, options) => matcher(selector).toBeDisabled(options),
+    toBeFocused: (selector, options) => matcher(selector).toBeFocused(options),
+    toBeEditable: (selector, options) => matcher(selector).toBeEditable(options),
+    toHaveValue: (selector, expected, options) => matcher(selector).toHaveValue(expected, options),
+    toBeChecked: (selector, options) => matcher(selector).toBeChecked(options),
+    toHaveAttribute: (selector, name, expected, options) => matcher(selector).toHaveAttribute(name, expected, options),
+    toHaveBoundingBox: (selector, expected, options) => matcher(selector).toHaveBoundingBox(expected, options),
   };
   if (!("url" in page)) return common;
   const webMatcher = (selector: string) => createLocatorExpect(page.locator(selector), defaults, negated);
@@ -192,6 +270,12 @@ export function createPageExpect(page: Page | NativeApp, defaults: Defaults, neg
     toContainText: common.toContainText,
     toHaveCount: common.toHaveCount,
     toBeVisible: common.toBeVisible,
+    toBeHidden: common.toBeHidden,
+    toBeAttached: common.toBeAttached,
+    toBeEnabled: common.toBeEnabled,
+    toBeDisabled: common.toBeDisabled,
+    toBeFocused: common.toBeFocused,
+    toBeEditable: common.toBeEditable,
     get not() { return callableMatchers(createPageExpect(page, defaults, !negated)); },
     async toHaveURL(expected, options = {}) {
       await retryExpectation(async command => {
@@ -199,12 +283,12 @@ export function createPageExpect(page: Page | NativeApp, defaults: Defaults, neg
         (negated ? vitestExpect(url).not : vitestExpect(url)).toEqual(expectedText(expected));
       }, options, defaults());
     },
-    toHaveValue: (selector, expected, options) => webMatcher(selector).toHaveValue(expected, options),
+    toHaveValue: common.toHaveValue,
     toHaveSelectedOptions: (selector, expected, options) => webMatcher(selector).toHaveSelectedOptions(expected, options),
     toHaveSelectedText: (selector, expected, options) => webMatcher(selector).toHaveSelectedText(expected, options),
-    toBeChecked: (selector, options) => webMatcher(selector).toBeChecked(options),
-    toHaveAttribute: (selector, name, expected, options) => webMatcher(selector).toHaveAttribute(name, expected, options),
-    toHaveBoundingBox: (selector, expected, options) => webMatcher(selector).toHaveBoundingBox(expected, options),
+    toBeChecked: common.toBeChecked,
+    toHaveAttribute: common.toHaveAttribute,
+    toHaveBoundingBox: common.toHaveBoundingBox,
   };
   return web;
 }

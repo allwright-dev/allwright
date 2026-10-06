@@ -36,7 +36,7 @@ const webAvailable = [
   "Register a typed download hook and save the completed download to a local path",
   "Handle JavaScript alerts, confirms, and prompts with typed hooks — accept, dismiss, or enter prompt text",
   "Navigate to a URL",
-  "Click an element",
+  "Click, double-click, middle-click, or right-click an element with configurable click counts",
   "Type into a field",
   "Hover over an element",
   "Press a key on an element",
@@ -46,11 +46,12 @@ const webAvailable = [
   "Count matching elements",
   "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
   "Read visible or raw text from an element",
+  "Read input values, checked state, native accessibility attributes, and on-screen bounding boxes",
   "Capture the current page URL, live input values, selected options and text, checkbox/radio state, attributes, and element bounding boxes",
   "Wait for an element to appear or become visible",
   "Capture viewport or full-page screenshots",
   "Read page accessibility snapshots as JSON or standard YAML, with queryable element references in AI mode",
-  "Retrying URL, value, selection, checked state, text, attribute, bounding-box, count, and visibility assertions, including negation (via @allwright.dev/vitest)",
+  "Retrying URL, value, selection, checked state, text, attribute, bounding-box, count, attached/hidden, enabled/disabled, focused, and editable assertions, including negation (via @allwright.dev/vitest)",
 ];
 
 const webNotYetAvailable = [
@@ -58,7 +59,6 @@ const webNotYetAvailable = [
   "Cookies and saved session state",
   "Geolocation and other device permissions",
   "Mobile viewport and device emulation",
-  "Double-click, right-click, and configurable pointer-button actions",
   "Drag and drop",
   "Multiple isolated browser profiles per session",
   "Video recording, tracing, coverage, or PDF export",
@@ -81,13 +81,13 @@ const androidAvailable = [
   "Register typed file-chooser and public-download hooks with files streamed to and from the test machine",
   "Text, partial-text, resource id, class name, XPath, and state-based (e.g. clickable) selectors",
   "Playwright-style getByRole, getByText, getByLabel, and getByTestId native accessibility locators",
-  "Retrying text, count, and visibility assertions, including negation (via @allwright.dev/vitest)",
+  "Retrying text, value, checked-state, attribute, bounding-box, count, attached/hidden, enabled/disabled, focused, and editable assertions, including negation (via @allwright.dev/vitest)",
 ];
 
 const androidNotYetAvailable = [
   "Hover and highlight (web-only for now)",
   "Explicit swipe, scroll, drag-and-drop, pinch, and multi-touch gesture APIs",
-  "Input-value, selected-option, checked-state, attribute, and bounding-box reads",
+  "Selected-option and selected-text reads",
   "Typed dialog and newly opened app-context hooks (file chooser and download hooks are available)",
   "Multiple isolated app sessions or switching among several foreground app contexts",
   "General CSS/DOM, iframe, or arbitrary in-app JavaScript sessions for WebViews",
@@ -100,6 +100,7 @@ const iosAvailable = [
   "Download a simulator .ipa or ZIP, or use a local .app bundle, then install and launch it automatically",
   "Install and launch a signed physical-device .ipa, ZIP, or .app bundle without a manual install step",
   "Click, focus, fill, press keys, read text, wait for selectors, count elements, and capture screenshots",
+  "Read input values, checked state, native accessibility attributes, and on-screen bounding boxes",
   "Open universal links and custom URL schemes with app.goto / app.navigate",
   "Capture full-page scroll-and-stitch screenshots",
   "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
@@ -107,14 +108,14 @@ const iosAvailable = [
   "Automate WebView content exposed through the native XCTest accessibility tree",
   "Accessibility-id, text, XCTest element type, and basic XPath selectors",
   "Playwright-style getByRole, getByText, getByLabel, and getByTestId native accessibility locators",
-  "Playwright-style action auto-waiting and retrying text, count, and visibility assertions",
+  "Playwright-style action auto-waiting and retrying text, value, checked-state, attribute, bounding-box, count, attached/hidden, enabled/disabled, focused, and editable assertions",
   "The same Rust, Go, Java, Python, and TypeScript client shape used by Android",
 ];
 
 const iosNotYetAvailable = [
   "Hover and highlight (web-only for now)",
   "Explicit swipe, scroll, drag-and-drop, pinch, and multi-touch gesture APIs",
-  "Input-value, selected-option, checked-state, attribute, and bounding-box reads",
+  "Selected-option and selected-text reads",
   "Typed dialog and newly opened app-context hooks (file chooser and download hooks are available)",
   "Multiple isolated app sessions or switching among several foreground app contexts",
   "Arbitrary in-page JavaScript and general CSS/DOM sessions inside WebViews",
@@ -124,20 +125,21 @@ const iosNotYetAvailable = [
 const macAvailable = [
   "Connect to the local macOS desktop with an automatically started XCUITest runner",
   "Launch or terminate an application by bundle identifier",
+  "Open universal links and custom URL schemes with app.goto / app.navigate",
   "Click, focus, fill, press keys, read text, wait for selectors, and count elements",
+  "Read input values, checked state, native accessibility attributes, and on-screen bounding boxes",
   "Capture native application screenshots",
   "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
   "Use accessibility-id, text, XCTest element type, basic XPath, and Playwright-style semantic locators",
-  "Use retrying text, count, and visibility assertions through @allwright.dev/vitest",
+  "Use retrying text, value, checked-state, attribute, bounding-box, count, attached/hidden, enabled/disabled, focused, and editable assertions through @allwright.dev/vitest",
   "Use the same Rust, Go, Java, Python, and TypeScript server-only client shape as the other surfaces",
 ];
 
 const macNotYetAvailable = [
   "Application installation or distribution — launch targets must already be installed",
-  "Deep-link or URL-scheme navigation",
   "Full-page or scroll-and-stitch screenshots",
   "File-chooser, download, dialog, and newly opened window hooks",
-  "Input-value, selected-option, checked-state, attribute, and bounding-box reads",
+  "Selected-option and selected-text reads",
   "Hover, highlight, drag-and-drop, multi-click, and other pointer gesture APIs",
   "Multiple isolated desktop sessions or switching among several application windows",
   "Web-style DOM, iframe, arbitrary JavaScript, network, cookie, permission, tracing, and video APIs",
@@ -146,22 +148,23 @@ const macNotYetAvailable = [
 const winAvailable = [
   "Connect to the local Windows desktop with an automatically started UI Automation agent",
   "Launch or terminate an application by executable path, a command Windows can resolve, or a packaged-app ID",
+  "Open universal links and custom URL schemes with app.goto / app.navigate",
   "Automate Win32, WinForms, WPF, UWP, and WinUI applications",
   "Click, focus, fill, press keys, read text, wait for selectors, and count elements",
+  "Read input values, checked state, native UI Automation attributes, and on-screen bounding boxes",
   "Capture native application screenshots",
   "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
   "Use native UI Automation selectors and Playwright-style semantic locators",
-  "Use retrying text, count, and visibility assertions through @allwright.dev/vitest",
+  "Use retrying text, value, checked-state, attribute, bounding-box, count, attached/hidden, enabled/disabled, focused, and editable assertions through @allwright.dev/vitest",
   "Use the same Rust, Go, Java, Python, and TypeScript server-only client shape as the other surfaces",
 ];
 
 const winNotYetAvailable = [
   "Windows on ARM and 32-bit Windows",
   "Application installation or distribution — launch targets must already be installed",
-  "Deep-link or URL-scheme navigation",
   "Full-page or scroll-and-stitch screenshots",
   "File-chooser, download, dialog, and newly opened window hooks",
-  "Input-value, selected-option, checked-state, attribute, and bounding-box reads",
+  "Selected-option and selected-text reads",
   "Hover, highlight, drag-and-drop, multi-click, and other pointer gesture APIs",
   "Multiple isolated desktop sessions or switching among several application windows",
   "Web-style DOM, iframe, arbitrary JavaScript, network, cookie, permission, tracing, and video APIs",
@@ -213,8 +216,8 @@ const capabilityParity = [
     web: "Available",
     android: "Available",
     ios: "Available",
-    mac: "Not yet",
-    windows: "Not yet",
+    mac: "Available",
+    windows: "Available",
   },
   {
     capability: "File chooser and download hooks",
@@ -233,15 +236,7 @@ const capabilityParity = [
     windows: "Not yet",
   },
   {
-    capability: "Input, selection, checked, attribute, and box reads",
-    web: "Available",
-    android: "Text/count only",
-    ios: "Text/count only",
-    mac: "Text/count only",
-    windows: "Text/count only",
-  },
-  {
-    capability: "Retrying text, count, and visibility assertions",
+    capability: "Input, checked, attribute, and box reads",
     web: "Available",
     android: "Available",
     ios: "Available",
@@ -249,7 +244,7 @@ const capabilityParity = [
     windows: "Available",
   },
   {
-    capability: "Retrying URL, form-state, attribute, and box assertions",
+    capability: "Selected-option and selected-text reads",
     web: "Available",
     android: "Not yet",
     ios: "Not yet",
@@ -257,7 +252,23 @@ const capabilityParity = [
     windows: "Not yet",
   },
   {
-    capability: "Hover and highlight",
+    capability: "Retrying text, count, attached/hidden, enabled/disabled, focused, and editable assertions",
+    web: "Available",
+    android: "Available",
+    ios: "Available",
+    mac: "Available",
+    windows: "Available",
+  },
+  {
+    capability: "Retrying value, checked-state, attribute, and box assertions",
+    web: "Available",
+    android: "Available",
+    ios: "Available",
+    mac: "Available",
+    windows: "Available",
+  },
+  {
+    capability: "Hover, highlight, double-click, and right-click",
     web: "Available",
     android: "Not yet",
     ios: "Not yet",
@@ -458,8 +469,8 @@ export default function Availability() {
             &ldquo;Available now&rdquo; means the mobile-android plugin is
             real, installable, and drives a genuine app over adb — no Appium,
             no separate driver server. It covers the core actions, reads,
-            hooks, and text, count, and visibility assertions; the richer
-            web-only state matchers aren&apos;t on Android yet.
+            hooks, and the shared retrying assertion set. URL and selection
+            matchers remain web-only.
           </p>
         </div>
         <div className="mt-8 grid gap-6 sm:grid-cols-2">

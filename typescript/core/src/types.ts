@@ -14,6 +14,13 @@ export interface CommandOptions {
   timeoutMs?: number;
 }
 
+export type MouseButton = "left" | "middle" | "right";
+
+export interface ClickOptions extends CommandOptions {
+  button?: MouseButton;
+  clickCount?: 1 | 2 | 3;
+}
+
 export interface AccessibilitySnapshotOptions extends CommandOptions {
   format?: "json" | "yaml";
   mode?: "default" | "ai" | "autoexpect" | "codegen";
@@ -187,7 +194,8 @@ export interface Page extends PageInfo, WebLocators {
   locator(selector: string, options?: LocatorFilterOptions): Locator;
   goto(url: string, options?: CommandOptions): Promise<void>;
   navigate(url: string, options?: CommandOptions): Promise<void>;
-  click(selector: string, options?: CommandOptions): Promise<void>;
+  click(selector: string, options?: ClickOptions): Promise<void>;
+  dblclick(selector: string, options?: Omit<ClickOptions, "clickCount">): Promise<void>;
   count(selector: string, options?: CommandOptions): Promise<number>;
   highlight(selector: string, options?: HighlightOptions): Promise<void>;
   focus(selector: string, options?: CommandOptions): Promise<void>;
@@ -228,6 +236,10 @@ export interface NativeAppLocator {
   press(key: string, options?: PressOptions): Promise<void>;
   textContent(options?: CommandOptions): Promise<string | null>;
   innerText(options?: CommandOptions): Promise<string>;
+  inputValue(options?: CommandOptions): Promise<string>;
+  isChecked(options?: CommandOptions): Promise<boolean>;
+  getAttribute(name: string, options?: CommandOptions): Promise<string | null>;
+  boundingBox(options?: CommandOptions): Promise<BoundingBox | null>;
   waitFor(options?: WaitForSelectorOptions): Promise<void>;
   locator(selector: string): NativeAppLocator;
   getByRole(role: string, options?: RoleOptions): NativeAppLocator;
@@ -253,6 +265,10 @@ export interface NativeApp {
   press(selector: string, key: string, options?: PressOptions): Promise<void>;
   textContent(selector: string, options?: CommandOptions): Promise<string | null>;
   innerText(selector: string, options?: CommandOptions): Promise<string>;
+  inputValue(selector: string, options?: CommandOptions): Promise<string>;
+  isChecked(selector: string, options?: CommandOptions): Promise<boolean>;
+  getAttribute(selector: string, name: string, options?: CommandOptions): Promise<string | null>;
+  boundingBox(selector: string, options?: CommandOptions): Promise<BoundingBox | null>;
   waitForSelector(selector: string, options?: WaitForSelectorOptions): Promise<void>;
   screenshot(options?: ScreenshotOptions): Promise<Uint8Array>;
   registerHook<T>(type: HookType<T>): Promise<Hook<T>>;
@@ -360,7 +376,8 @@ export interface Locator extends WebLocators {
   last(): Locator;
   readonly page: Page;
   readonly selector: string;
-  click(options?: CommandOptions): Promise<void>;
+  click(options?: ClickOptions): Promise<void>;
+  dblclick(options?: Omit<ClickOptions, "clickCount">): Promise<void>;
   count(options?: CommandOptions): Promise<number>;
   highlight(options?: HighlightOptions): Promise<void>;
   focus(options?: CommandOptions): Promise<void>;
@@ -877,6 +894,8 @@ export interface ClickRequest {
   contextSessionId: string;
   clickElement: {
     cssSelector: string;
+    button?: MouseButton;
+    clickCount?: number;
     retryOptions?: {
       timeoutMs?: number;
     };

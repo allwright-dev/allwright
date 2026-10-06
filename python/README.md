@@ -40,6 +40,9 @@ page.wait_for_selector('xpath=//h1[text()="Form Inputs"]')
 browser.close()
 ```
 
+Web clicks accept `ClickOptions(button="left" | "middle" | "right", click_count=1 | 2 | 3)`.
+Use `page.dblclick(selector)` or `locator.dblclick()` for the common double-click case.
+
 For an action that opens a tab, register the generic typed hook first:
 
 ```python
@@ -69,3 +72,5 @@ remote Allwright server when necessary. Android app contexts support
 `hooks.file_chooser` and `hooks.download` with the same lifecycle.
 
 Web state reads: `page.url()`, `locator.input_value()`, `locator.selected_options()`, `locator.selected_text()`, `locator.is_checked()`, `locator.get_attribute(name)`, and `locator.bounding_box()`. Element methods also accept selectors on `Page`. Selected options return `CapturedOption(value, label, index)` objects; boxes return `BoundingBox(x, y, width, height)` in frame/page viewport CSS pixels. Missing attributes, unsupported text selections, and hidden/zero-area boxes return `None`. Existing `text_content()` and `inner_text()` read element text. See the [shared semantics](../typescript/core/README.md#read-page-and-element-state).
+
+Native apps and locators also expose `input_value`, `is_checked`, `get_attribute`, and `bounding_box` across Android, iOS, macOS, and Windows. Native boxes use platform screen coordinates; selected-option and selected-text reads remain web-only.

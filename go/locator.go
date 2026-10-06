@@ -46,6 +46,13 @@ func (l *Locator) Click(ctx context.Context, options ...CommandOptions) error {
 	return l.page.Click(ctx, l.selector, options...)
 }
 
+func (l *Locator) DblClick(ctx context.Context, options ...CommandOptions) error {
+	if l == nil || l.page == nil {
+		return fmt.Errorf("locator page is nil")
+	}
+	return l.page.DblClick(ctx, l.selector, options...)
+}
+
 func (l *Locator) Count(ctx context.Context, options ...CommandOptions) (int, error) {
 	if l == nil || l.page == nil {
 		return 0, fmt.Errorf("locator page is nil")

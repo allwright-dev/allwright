@@ -27,6 +27,7 @@ dependencies = [
  "flate2",
  "libloading",
  "reqwest",
+ "serde_json",
  "tar",
  "tokio",
  "tonic",
