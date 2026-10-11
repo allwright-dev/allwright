@@ -68,6 +68,8 @@ struct AgentRequest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     timeout_ms: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    full_page: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     terminate_running: Option<bool>,
 }
 impl<'a> AgentRequest<'a> {
@@ -85,6 +87,7 @@ impl<'a> AgentRequest<'a> {
             text: None,
             visible: None,
             timeout_ms: None,
+            full_page: None,
             terminate_running: None,
         }
     }
@@ -577,17 +580,25 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
             desktop_session,
             app_session,
             timeout_ms,
+            full_page,
         } => {
             let mut r = AgentRequest::new("screenshot");
+            let agent_timeout_ms = timeout_ms.or(full_page.then_some(30_000));
             r.session_id = Some(&app_session.app_session_id);
-            r.timeout_ms = timeout_ms;
-            let value = invoke_agent(&desktop_session.endpoint, &r, timeout_ms)?;
+            r.timeout_ms = agent_timeout_ms;
+            r.full_page = Some(full_page);
+            let value = invoke_agent(&desktop_session.endpoint, &r, agent_timeout_ms)?;
             let png_data = base64::engine::general_purpose::STANDARD
                 .decode(result_string(&value, "png_base64")?)
                 .map_err(|e| format!("Windows agent returned invalid screenshot data: {e}"))?;
             Ok(DesktopCommandResult::Screenshot(DesktopScreenshotInfo {
                 png_data,
-                note: "captured Windows app screenshot through UIA3".to_string(),
+                note: if full_page {
+                    "captured full-page Windows app screenshot by scrolling through UIA3"
+                } else {
+                    "captured Windows application-window screenshot through UIA3"
+                }
+                .to_string(),
             }))
         }
         DesktopCommand::AccessibilitySnapshot {

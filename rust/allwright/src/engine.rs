@@ -2949,6 +2949,7 @@ async fn handle_tab_command(
                         retry_options
                             .as_ref()
                             .and_then(|options| options.timeout_ms),
+                        full_page.unwrap_or(false),
                     )
                     .await
                     .map(|shot| (shot.png_data, shot.note)),

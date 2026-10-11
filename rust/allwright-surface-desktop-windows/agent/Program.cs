@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -30,6 +32,7 @@ internal sealed record AgentRequest(
     string? Text,
     bool? Visible,
     uint? TimeoutMs,
+    bool? FullPage,
     bool? TerminateRunning);
 
 internal sealed record AppSession(string Id, string AppId, FlaApplication Application, AutomationElement Root);
@@ -205,13 +208,135 @@ internal static class Program
 
     private static object Screenshot(AgentRequest request)
     {
+        var root = Session(request).Root;
+        if (request.FullPage != true)
+        {
+            return new { png_base64 = Convert.ToBase64String(CapturePng(root)) };
+        }
+
+        var scrollable = root.FindAllDescendants().Prepend(root)
+            .Where(element =>
+            {
+                try
+                {
+                    return element.Patterns.Scroll.IsSupported
+                        && element.Patterns.Scroll.Pattern.VerticallyScrollable.Value;
+                }
+                catch { return false; }
+            })
+            .OrderByDescending(element =>
+            {
+                var bounds = element.Properties.BoundingRectangle.ValueOrDefault;
+                return bounds.Width * bounds.Height;
+            })
+            .FirstOrDefault();
+        if (scrollable is null)
+            return new { png_base64 = Convert.ToBase64String(CapturePng(root)) };
+
+        var scroll = scrollable.Patterns.Scroll.Pattern;
+        var initialVerticalScrollPercent = scroll.VerticalScrollPercent.Value;
+        var shots = new List<byte[]>();
+        byte[]? previous = null;
+        for (var index = 0; index < 20; index++)
+        {
+            var shot = CapturePng(scrollable);
+            if (previous is not null && shot.SequenceEqual(previous)) break;
+            shots.Add(shot);
+            previous = shot;
+            if (index == 19) break;
+            try { scroll.Scroll(ScrollAmount.NoAmount, ScrollAmount.LargeIncrement); }
+            catch { break; }
+            Thread.Sleep(250);
+        }
+        try
+        {
+            scroll.SetScrollPercent(-1, initialVerticalScrollPercent);
+        }
+        catch
+        {
+            for (var index = 1; index < shots.Count; index++)
+            {
+                try { scroll.Scroll(ScrollAmount.NoAmount, ScrollAmount.LargeDecrement); }
+                catch { break; }
+                Thread.Sleep(50);
+            }
+        }
+        return new { png_base64 = Convert.ToBase64String(StitchScreenshots(shots)) };
+    }
+
+    private static byte[] CapturePng(AutomationElement element)
+    {
         var path = Path.Combine(Path.GetTempPath(), $"allwright-{Guid.NewGuid():N}.png");
         try
         {
-            FlaCapture.Element(Session(request).Root).ToFile(path);
-            return new { png_base64 = Convert.ToBase64String(File.ReadAllBytes(path)) };
+            FlaCapture.Element(element).ToFile(path);
+            return File.ReadAllBytes(path);
         }
         finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    private static byte[] StitchScreenshots(IReadOnlyList<byte[]> shots)
+    {
+        if (shots.Count == 0) throw new InvalidOperationException("Windows full-page screenshot captured no frames");
+        if (shots.Count == 1) return shots[0];
+        var images = shots.Select(shot => new Bitmap(new MemoryStream(shot))).ToArray();
+        try
+        {
+            var width = images[0].Width;
+            var height = images[0].Height;
+            if (images.Any(image => image.Width != width || image.Height != height))
+                throw new InvalidOperationException("Windows app dimensions changed while capturing a full page");
+            var overlaps = Enumerable.Range(1, images.Length - 1)
+                .Select(index => ScreenshotOverlap(images[index - 1], images[index]))
+                .ToArray();
+            var totalHeight = height + overlaps.Sum(overlap => height - overlap);
+            using var output = new Bitmap(width, totalHeight, PixelFormat.Format32bppArgb);
+            using (var graphics = Graphics.FromImage(output))
+            {
+                graphics.Clear(Color.Transparent);
+                graphics.DrawImageUnscaled(images[0], 0, 0);
+                var y = height;
+                for (var index = 1; index < images.Length; index++)
+                {
+                    var overlap = overlaps[index - 1];
+                    var fragmentHeight = height - overlap;
+                    graphics.DrawImage(
+                        images[index],
+                        new Rectangle(0, y, width, fragmentHeight),
+                        new Rectangle(0, overlap, width, fragmentHeight),
+                        GraphicsUnit.Pixel);
+                    y += fragmentHeight;
+                }
+            }
+            using var stream = new MemoryStream();
+            output.Save(stream, ImageFormat.Png);
+            return stream.ToArray();
+        }
+        finally
+        {
+            foreach (var image in images) image.Dispose();
+        }
+    }
+
+    private static int ScreenshotOverlap(Bitmap previous, Bitmap next)
+    {
+        var minimumOverlap = Math.Max(previous.Height / 4, 1);
+        for (var overlap = previous.Height - 1; overlap >= minimumOverlap; overlap--)
+        {
+            var rowStep = Math.Max(overlap / 24, 1);
+            var columnStep = Math.Max(previous.Width / 24, 1);
+            var sampled = 0;
+            var matched = 0;
+            for (var row = 0; row < overlap; row += rowStep)
+            for (var column = 0; column < previous.Width; column += columnStep)
+            {
+                sampled++;
+                if (previous.GetPixel(column, previous.Height - overlap + row).ToArgb()
+                    == next.GetPixel(column, row).ToArgb()) matched++;
+            }
+            if (sampled > 0 && matched * 100 >= sampled * 98) return overlap;
+        }
+        return 0;
     }
 
     private static object Source(AgentRequest request)

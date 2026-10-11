@@ -344,7 +344,8 @@ final class AllwrightIOSAgent {
         case "screenshot":
             let (_, application) = try application(for: request)
             let fullPage = request["full_page"] as? Bool ?? false
-            let png = fullPage ? fullPageScreenshot(application) : application.screenshot().pngRepresentation
+            let target = screenshotTarget(application)
+            let png = fullPage ? fullPageScreenshot(target: target) : target.screenshot().pngRepresentation
             return .success(["png_base64": png.base64EncodedString()])
 
         case "file_chooser_status":
@@ -643,25 +644,56 @@ final class AllwrightIOSAgent {
         String(describing: type)
     }
 
-    private func fullPageScreenshot(_ application: XCUIApplication) -> Data {
+    private func screenshotTarget(_ application: XCUIApplication) -> XCUIElement {
 #if os(macOS)
-        return application.screenshot().pngRepresentation
+        let window = application.windows.firstMatch
+        return window.exists ? window : application
 #else
-        let scrollable = [application.scrollViews.firstMatch, application.tables.firstMatch, application.collectionViews.firstMatch]
+        return application
+#endif
+    }
+
+    private func fullPageScreenshot(target: XCUIElement) -> Data {
+#if os(macOS)
+        let scrollable = (
+            target.scrollViews.allElementsBoundByIndex
+                + target.tables.allElementsBoundByIndex
+                + target.collectionViews.allElementsBoundByIndex
+                + target.webViews.allElementsBoundByIndex
+        )
+            .filter { $0.exists && $0.isHittable }
+            .max { lhs, rhs in
+                lhs.frame.width * lhs.frame.height < rhs.frame.width * rhs.frame.height
+            }
+#else
+        let scrollable = [target.scrollViews.firstMatch, target.tables.firstMatch, target.collectionViews.firstMatch]
             .first(where: { $0.exists && $0.isHittable })
-        guard let scrollable else { return application.screenshot().pngRepresentation }
+#endif
+        guard let scrollable else { return target.screenshot().pngRepresentation }
         var shots: [Data] = []
         var previous: Data?
-        for _ in 0..<20 {
-            let shot = application.screenshot().pngRepresentation
+        for index in 0..<20 {
+#if os(macOS)
+            let shot = scrollable.screenshot().pngRepresentation
+#else
+            let shot = target.screenshot().pngRepresentation
+#endif
             if shot == previous { break }
             shots.append(shot)
             previous = shot
+            if index == 19 { break }
             scrollable.swipeUp()
+            Thread.sleep(forTimeInterval: 0.25)
         }
-        for _ in 1..<shots.count { scrollable.swipeDown() }
+        for _ in 1..<shots.count {
+            scrollable.swipeDown()
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+#if os(macOS)
+        return stitchMacOSScreenshots(shots) ?? shots.first ?? target.screenshot().pngRepresentation
+#else
         let images = shots.compactMap(UIImage.init(data:))
-        guard images.count > 1, let first = images.first else { return shots.first ?? application.screenshot().pngRepresentation }
+        guard images.count > 1, let first = images.first else { return shots.first ?? target.screenshot().pngRepresentation }
         let size = CGSize(width: first.size.width, height: images.reduce(0) { $0 + $1.size.height })
         return UIGraphicsImageRenderer(size: size).pngData { context in
             var y: CGFloat = 0
@@ -672,6 +704,94 @@ final class AllwrightIOSAgent {
         }
 #endif
     }
+
+#if os(macOS)
+    private func stitchMacOSScreenshots(_ shots: [Data]) -> Data? {
+        let representations = shots.compactMap(NSBitmapImageRep.init(data:))
+        guard representations.count == shots.count, let first = representations.first else { return shots.first }
+        guard representations.allSatisfy({ $0.pixelsWide == first.pixelsWide && $0.pixelsHigh == first.pixelsHigh }) else {
+            return shots.first
+        }
+        guard representations.count > 1 else { return shots.first }
+
+        var overlaps = [Int]()
+        for index in 1..<representations.count {
+            overlaps.append(screenshotOverlap(representations[index - 1], representations[index]))
+        }
+        let width = first.pixelsWide
+        let height = first.pixelsHigh
+        let totalHeight = height + overlaps.reduce(0) { $0 + height - $1 }
+        guard let output = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: width,
+            pixelsHigh: totalHeight,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bitmapFormat: [],
+            bytesPerRow: width * 4,
+            bitsPerPixel: 32
+        ), let context = NSGraphicsContext(bitmapImageRep: output) else { return shots.first }
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        NSColor.clear.setFill()
+        NSRect(x: 0, y: 0, width: width, height: totalHeight).fill()
+        var y = totalHeight
+        for (index, representation) in representations.enumerated() {
+            let overlap = index == 0 ? 0 : overlaps[index - 1]
+            let fragmentHeight = height - overlap
+            y -= fragmentHeight
+            let image = NSImage(size: NSSize(width: width, height: height))
+            image.addRepresentation(representation)
+            image.draw(
+                in: NSRect(x: 0, y: y, width: width, height: fragmentHeight),
+                from: NSRect(x: 0, y: 0, width: width, height: fragmentHeight),
+                operation: .copy,
+                fraction: 1
+            )
+        }
+        context.flushGraphics()
+        NSGraphicsContext.restoreGraphicsState()
+        return output.representation(using: .png, properties: [:])
+    }
+
+    private func screenshotOverlap(_ previous: NSBitmapImageRep, _ next: NSBitmapImageRep) -> Int {
+        guard
+            let previousData = previous.bitmapData,
+            let nextData = next.bitmapData,
+            previous.isPlanar == false,
+            next.isPlanar == false
+        else { return 0 }
+        let width = previous.pixelsWide
+        let height = previous.pixelsHigh
+        let previousBytesPerPixel = max(previous.bitsPerPixel / 8, 1)
+        let nextBytesPerPixel = max(next.bitsPerPixel / 8, 1)
+        let minimumOverlap = max(height / 4, 1)
+        for overlap in stride(from: height - 1, through: minimumOverlap, by: -1) {
+            let rowStep = max(overlap / 24, 1)
+            let columnStep = max(width / 24, 1)
+            var sampled = 0
+            var matched = 0
+            for row in stride(from: 0, to: overlap, by: rowStep) {
+                for column in stride(from: 0, to: width, by: columnStep) {
+                    let before = (height - overlap + row) * previous.bytesPerRow + column * previousBytesPerPixel
+                    let after = row * next.bytesPerRow + column * nextBytesPerPixel
+                    sampled += 1
+                    if previousData[before] == nextData[after]
+                        && previousData[before + min(1, previousBytesPerPixel - 1)] == nextData[after + min(1, nextBytesPerPixel - 1)]
+                        && previousData[before + min(2, previousBytesPerPixel - 1)] == nextData[after + min(2, nextBytesPerPixel - 1)] {
+                        matched += 1
+                    }
+                }
+            }
+            if sampled > 0 && matched * 100 >= sampled * 98 { return overlap }
+        }
+        return 0
+    }
+#endif
 
     private func query(_ selector: String, in application: XCUIApplication) -> XCUIElementQuery {
         let segments = Selector.parseAll(selector)

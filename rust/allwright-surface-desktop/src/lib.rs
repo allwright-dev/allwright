@@ -184,6 +184,7 @@ pub enum DesktopCommand {
         desktop_session: DesktopSessionHandle,
         app_session: DesktopAppSessionHandle,
         timeout_ms: Option<u32>,
+        full_page: bool,
     },
     AccessibilitySnapshot {
         desktop_session: DesktopSessionHandle,
@@ -300,6 +301,26 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<DesktopCommand>(&json).unwrap(),
             navigate
+        );
+
+        let screenshot = DesktopCommand::Screenshot {
+            desktop_session: DesktopSessionHandle {
+                platform: DesktopPlatform::Mac,
+                endpoint: "http://127.0.0.1:8200".to_string(),
+                session_id: "desktop-2".to_string(),
+            },
+            app_session: DesktopAppSessionHandle {
+                app_session_id: "app-2".to_string(),
+                app_id: Some("dev.allwright.fixture".to_string()),
+            },
+            timeout_ms: Some(30_000),
+            full_page: true,
+        };
+        let json = serde_json::to_string(&screenshot).unwrap();
+        assert!(json.contains("\"full_page\":true"));
+        assert_eq!(
+            serde_json::from_str::<DesktopCommand>(&json).unwrap(),
+            screenshot
         );
     }
 }

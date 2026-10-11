@@ -128,7 +128,7 @@ const macAvailable = [
   "Open universal links and custom URL schemes with app.goto / app.navigate",
   "Click, focus, fill, press keys, read text, wait for selectors, and count elements",
   "Read input values, checked state, native accessibility attributes, and on-screen bounding boxes",
-  "Capture native application screenshots",
+  "Capture the application window or a full scroll-and-stitch screenshot of its primary scrollable region",
   "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
   "Use accessibility-id, text, XCTest element type, basic XPath, and Playwright-style semantic locators",
   "Use retrying text, value, checked-state, attribute, bounding-box, count, attached/hidden, enabled/disabled, focused, and editable assertions through @allwright.dev/vitest",
@@ -137,7 +137,6 @@ const macAvailable = [
 
 const macNotYetAvailable = [
   "Application installation or distribution — launch targets must already be installed",
-  "Full-page or scroll-and-stitch screenshots",
   "File-chooser, download, dialog, and newly opened window hooks",
   "Selected-option and selected-text reads",
   "Hover, highlight, drag-and-drop, multi-click, and other pointer gesture APIs",
@@ -152,7 +151,7 @@ const winAvailable = [
   "Automate Win32, WinForms, WPF, UWP, and WinUI applications",
   "Click, focus, fill, press keys, read text, wait for selectors, and count elements",
   "Read input values, checked state, native UI Automation attributes, and on-screen bounding boxes",
-  "Capture native application screenshots",
+  "Capture the application window or a full scroll-and-stitch screenshot of its primary scrollable region",
   "Read native accessibility snapshots as JSON or YAML and act through cached AI element references",
   "Use native UI Automation selectors and Playwright-style semantic locators",
   "Use retrying text, value, checked-state, attribute, bounding-box, count, attached/hidden, enabled/disabled, focused, and editable assertions through @allwright.dev/vitest",
@@ -162,7 +161,6 @@ const winAvailable = [
 const winNotYetAvailable = [
   "Windows on ARM and 32-bit Windows",
   "Application installation or distribution — launch targets must already be installed",
-  "Full-page or scroll-and-stitch screenshots",
   "File-chooser, download, dialog, and newly opened window hooks",
   "Selected-option and selected-text reads",
   "Hover, highlight, drag-and-drop, multi-click, and other pointer gesture APIs",
@@ -208,8 +206,8 @@ const capabilityParity = [
     web: "Available",
     android: "Available",
     ios: "Available",
-    mac: "Not yet",
-    windows: "Not yet",
+    mac: "Available",
+    windows: "Available",
   },
   {
     capability: "URL navigation and deep links",

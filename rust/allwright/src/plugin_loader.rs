@@ -300,11 +300,13 @@ pub async fn screenshot_desktop(
     desktop_session: &DesktopSessionHandle,
     app_session: &DesktopAppSessionHandle,
     timeout_ms: Option<u32>,
+    full_page: bool,
 ) -> Result<DesktopScreenshotInfo, String> {
     match invoke_desktop_expected(DesktopCommand::Screenshot {
         desktop_session: desktop_session.clone(),
         app_session: app_session.clone(),
         timeout_ms,
+        full_page,
     })
     .await?
     {

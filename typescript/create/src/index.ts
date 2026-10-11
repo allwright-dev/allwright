@@ -662,8 +662,19 @@ async function detectPackageManager(targetDir: string): Promise<PackageManager> 
 async function installDependencies(targetDir: string, packageManager: PackageManager): Promise<void> {
   p.log.step(`Installing dependencies with ${packageManager}...`);
 
+  // Package managers installed on Windows are exposed through .cmd shims. Node
+  // cannot execute those shims directly, so run the fixed install command via
+  // cmd.exe instead. Spawning cmd.exe explicitly also avoids `shell: true`,
+  // which is deprecated when arguments are passed separately.
+  const command = process.platform === "win32"
+    ? process.env.ComSpec || "cmd.exe"
+    : packageManager;
+  const args = process.platform === "win32"
+    ? ["/d", "/s", "/c", `${packageManager} install`]
+    : ["install"];
+
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(packageManager, ["install"], {
+    const child = spawn(command, args, {
       cwd: targetDir,
       stdio: "inherit",
     });
