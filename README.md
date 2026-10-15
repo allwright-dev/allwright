@@ -185,6 +185,20 @@ allwright plugin install desktop-mac
 allwright plugin install desktop-windows
 ```
 
+On Windows, launch the visual inspector with an application path or URL:
+
+```powershell
+allwright inspector desktop-windows "C:\Windows\System32\notepad.exe"
+allwright inspector desktop-windows "https://allwright.dev"
+```
+
+The command opens a local browser UI at `http://127.0.0.1:9227`. Select an
+element from the live application screenshot or UIA3 hierarchy to inspect its
+properties, copy a suggested locator, or click it in the application. Use
+`--url <url>` after an application target when the application accepts a URL
+through the Windows shell, and `--no-open` when the browser should not be
+opened automatically.
+
 If you are working from the repo checkout instead:
 
 ```bash

@@ -16,6 +16,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tar::Archive;
 use zip::ZipArchive;
 
+mod inspector;
+
 const DEFAULT_GITHUB_REPOSITORY: &str = "allwright-dev/allwright";
 
 #[derive(Parser, Debug)]
@@ -43,6 +45,22 @@ enum CliCommand {
         /// Install a specific release instead of the latest (for example v0.1.24)
         #[arg(long)]
         version: Option<String>,
+    },
+    /// Open a local UI inspector for an application surface
+    Inspector {
+        /// Surface to inspect (currently `desktop-windows`)
+        surface: String,
+        /// Application path, application id, or URL to inspect
+        target: String,
+        /// Open this URL after launching the application
+        #[arg(long)]
+        url: Option<String>,
+        /// Address for the local inspector web application
+        #[arg(long, default_value = "127.0.0.1:9227")]
+        listen_addr: SocketAddr,
+        /// Print the inspector URL without opening a browser
+        #[arg(long)]
+        no_open: bool,
     },
 }
 
@@ -84,6 +102,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         CliCommand::Update { version } => {
             tokio::task::block_in_place(|| update_cli(version.as_deref()))?;
+        }
+        CliCommand::Inspector {
+            surface,
+            target,
+            url,
+            listen_addr,
+            no_open,
+        } => {
+            tokio::task::block_in_place(|| {
+                inspector::run(&surface, &target, url.as_deref(), listen_addr, !no_open)
+            })?;
         }
     }
 
@@ -866,6 +895,27 @@ mod tests {
         assert!(matches!(
             pinned.command,
             Some(CliCommand::Update { version: Some(version) }) if version == "v1.2.3"
+        ));
+    }
+
+    #[test]
+    fn parses_windows_inspector_target() {
+        let args = Args::try_parse_from([
+            "allwright",
+            "inspector",
+            "desktop-windows",
+            "C:\\Windows\\notepad.exe",
+            "--no-open",
+        ])
+        .unwrap();
+        assert!(matches!(
+            args.command,
+            Some(CliCommand::Inspector {
+                surface,
+                target,
+                no_open: true,
+                ..
+            }) if surface == "desktop-windows" && target == "C:\\Windows\\notepad.exe"
         ));
     }
 

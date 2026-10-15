@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Allwright Inspector</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0a0d12; --panel:#111620; --line:#252c38; --muted:#8d98aa; --text:#eef2f8; --accent:#7ce2bd; --select:#67a9ff; }
+    * { box-sizing:border-box } body { margin:0; height:100vh; overflow:hidden; background:var(--bg); color:var(--text); font:13px/1.45 ui-sans-serif,system-ui,sans-serif }
+    header { height:54px; display:flex; align-items:center; gap:12px; padding:0 18px; border-bottom:1px solid var(--line); background:#0d1118 }
+    .mark { width:28px; height:28px; display:grid; place-items:center; border-radius:8px; color:#07110e; background:var(--accent); font-weight:900 }
+    header strong { font-size:15px } header span { color:var(--muted) } button { border:1px solid var(--line); border-radius:7px; padding:7px 11px; color:var(--text); background:#171e29; cursor:pointer } button:hover { border-color:#4d5a6d } button.primary { color:#06120d; border-color:var(--accent); background:var(--accent); font-weight:700 } .spacer { flex:1 }
+    main { height:calc(100vh - 54px); display:grid; grid-template-columns:minmax(460px,1fr) 360px 330px }
+    section { min-width:0; border-right:1px solid var(--line); background:var(--panel) } .title { height:42px; display:flex; align-items:center; padding:0 14px; border-bottom:1px solid var(--line); color:#cbd3df; font-weight:650 }
+    #stageWrap { height:calc(100% - 42px); overflow:auto; padding:24px; background-color:#090c11; background-image:radial-gradient(#26303d 1px,transparent 1px); background-size:18px 18px }
+    #stage { position:relative; width:max-content; min-width:100px; min-height:100px; margin:auto; box-shadow:0 18px 60px #000a } #shot { display:block; max-width:none; cursor:crosshair; user-select:none }
+    #highlight { position:absolute; pointer-events:none; border:2px solid var(--select); background:#67a9ff25; box-shadow:0 0 0 1px #07111dcc; display:none }
+    #tree { height:calc(100% - 42px); overflow:auto; padding:8px } .node { white-space:nowrap } .nodeRow { display:flex; align-items:center; gap:5px; min-height:25px; padding:2px 6px; border-radius:5px; cursor:pointer } .nodeRow:hover { background:#1a2230 } .nodeRow.active { background:#19304d; color:#fff } .twisty { width:12px; color:#647186 } .role { color:var(--accent) } .name { overflow:hidden; color:#d8dee8; text-overflow:ellipsis } .children { margin-left:14px }
+    #details { height:calc(100% - 42px); overflow:auto; padding:14px } .empty { color:var(--muted); padding:16px 2px } .property { display:grid; grid-template-columns:100px 1fr; gap:8px; padding:7px 0; border-bottom:1px solid #202733 } .property label { color:var(--muted) } .property div { min-width:0; overflow-wrap:anywhere } .locator { margin:15px 0 8px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em } code { display:block; padding:10px; border:1px solid var(--line); border-radius:7px; background:#090d13; color:#b7ddff; overflow-wrap:anywhere; white-space:pre-wrap } .actions { display:flex; gap:8px; margin-top:10px } #status.error { color:#ff8c8c }
+    @media (max-width:1000px) { main { grid-template-columns:1fr 330px } section.treePane { display:none } }
+  </style>
+</head>
+<body>
+  <header><div class="mark">A</div><strong>Allwright Inspector</strong><span>desktop-windows · UIA3</span><div class="spacer"></div><span id="status">Connecting…</span><button id="refresh">Refresh</button></header>
+  <main>
+    <section><div class="title">Application window</div><div id="stageWrap"><div id="stage"><img id="shot" draggable="false"><div id="highlight"></div></div></div></section>
+    <section class="treePane"><div class="title">Element hierarchy</div><div id="tree"></div></section>
+    <section><div class="title">Element details</div><div id="details"><div class="empty">Choose an element in the screenshot or hierarchy.</div></div></section>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id); let root, nodes=[], selected;
+    function flatten(node, depth=0) { if (!node) return; node._depth=depth; nodes.push(node); (node.children||[]).forEach(n=>flatten(n,depth+1)); }
+    function locator(n) { if (n.automationId) return `id=${n.automationId}`; const spec={kind:'role',role:n.role||'custom'}; if(n.name){spec.name=n.name;spec.exact=true} return `aw=${JSON.stringify(spec)}`; }
+    function renderTree() { $('tree').replaceChildren(treeNode(root)); }
+    function treeNode(n) { const wrap=document.createElement('div'); wrap.className='node'; const row=document.createElement('div'); row.className='nodeRow'+(n===selected?' active':''); const kids=n.children||[]; row.innerHTML=`<span class="twisty">${kids.length?'▾':''}</span><span class="role">${escapeHtml(n.role||'element')}</span><span class="name">${escapeHtml(n.name||n.automationId||'')}</span>`; row.onclick=e=>{e.stopPropagation();choose(n)}; wrap.append(row); if(kids.length){const children=document.createElement('div');children.className='children';kids.forEach(k=>children.append(treeNode(k)));wrap.append(children)} return wrap; }
+    function escapeHtml(v){const d=document.createElement('div');d.textContent=v;return d.innerHTML}
+    function choose(n){ selected=n; renderTree(); const b=n.bounds||{}; const rb=root.bounds||{}; const sx=$('shot').naturalWidth/Math.max(1,rb.width||$('shot').naturalWidth), sy=$('shot').naturalHeight/Math.max(1,rb.height||$('shot').naturalHeight); Object.assign($('highlight').style,{display:'block',left:`${(b.x-rb.x)*sx}px`,top:`${(b.y-rb.y)*sy}px`,width:`${b.width*sx}px`,height:`${b.height*sy}px`}); const values={role:n.role,name:n.name,automationId:n.automationId,className:n.className,enabled:n.enabled,offscreen:n.offscreen,bounds:n.bounds}; $('details').innerHTML=Object.entries(values).map(([k,v])=>`<div class="property"><label>${k}</label><div>${escapeHtml(typeof v==='object'?JSON.stringify(v):String(v??''))}</div></div>`).join('')+`<div class="locator">Suggested locator</div><code>${escapeHtml(locator(n))}</code><div class="actions"><button id="copy">Copy locator</button><button class="primary" id="interact">Click element</button></div>`; $('copy').onclick=()=>navigator.clipboard.writeText(locator(n)); $('interact').onclick=()=>interact(n); }
+    function pick(event){ if(!root)return; const rect=$('shot').getBoundingClientRect(), rb=root.bounds||{}; const x=rb.x+(event.clientX-rect.left)*($('shot').naturalWidth/rect.width)*(rb.width/$('shot').naturalWidth), y=rb.y+(event.clientY-rect.top)*($('shot').naturalHeight/rect.height)*(rb.height/$('shot').naturalHeight); const hit=nodes.filter(n=>{const b=n.bounds;return b&&b.width>0&&b.height>0&&x>=b.x&&x<=b.x+b.width&&y>=b.y&&y<=b.y+b.height}).sort((a,b)=>(a.bounds.width*a.bounds.height)-(b.bounds.width*b.bounds.height))[0]; if(hit)choose(hit); }
+    async function load(payload){ root=payload.tree.root; nodes=[];flatten(root); const image=$('shot'); await new Promise((ok,no)=>{image.onload=ok;image.onerror=no;image.src=payload.image}); $('stage').style.width=image.naturalWidth+'px'; renderTree(); selected=undefined;$('highlight').style.display='none';$('details').innerHTML='<div class="empty">Choose an element in the screenshot or hierarchy.</div>'; }
+    async function request(path,options){ $('status').className='';$('status').textContent='Loading…';try{const response=await fetch(path,options);const data=await response.json();if(!response.ok)throw new Error(data.error||response.statusText);await load(data);$('status').textContent=`${nodes.length} elements`}catch(error){$('status').className='error';$('status').textContent=error.message}}
+    async function interact(n){await request('/api/click',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({selector:locator(n)})})}
+    $('shot').addEventListener('click',pick); $('refresh').onclick=()=>request('/api/snapshot'); request('/api/snapshot');
+  </script>
+</body>
+</html>

@@ -23,10 +23,13 @@ version = "0.1.27"
 dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",
+ "allwright-surface-desktop",
+ "base64 0.22.1",
  "clap",
  "flate2",
  "libloading",
  "reqwest",
+ "serde",
  "serde_json",
  "tar",
  "tokio",

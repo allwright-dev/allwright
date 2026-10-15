@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using System.Runtime.InteropServices;
 using FlaUI.Core;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Capturing;
@@ -35,7 +36,7 @@ internal sealed record AgentRequest(
     bool? FullPage,
     bool? TerminateRunning);
 
-internal sealed record AppSession(string Id, string AppId, FlaApplication Application, AutomationElement Root);
+internal sealed record AppSession(string Id, string AppId, FlaApplication? Application, AutomationElement Root);
 
 internal static class Program
 {
@@ -45,6 +46,9 @@ internal static class Program
     };
     private static readonly UIA3Automation Automation = new();
     private static readonly Dictionary<string, AppSession> Sessions = new();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
 
     [STAThread]
     private static void Main(string[] args)
@@ -135,6 +139,9 @@ internal static class Program
     private static object Launch(AgentRequest request)
     {
         var appId = Required(request.AppId, "app_id");
+        if (Uri.TryCreate(appId, UriKind.Absolute, out var uri)
+            && uri.Scheme is "http" or "https")
+            return LaunchUrl(appId, request.TimeoutMs);
         if (request.TerminateRunning == true)
         {
             var processName = Path.GetFileNameWithoutExtension(appId);
@@ -152,11 +159,54 @@ internal static class Program
         return new { session_id = id, process_id = app.ProcessId };
     }
 
+    private static object LaunchUrl(string url, uint? timeoutMs)
+    {
+        var previousWindow = GetForegroundWindow();
+        var acceptExistingAfter = DateTime.UtcNow.AddMilliseconds(750);
+        var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url)
+        {
+            UseShellExecute = true
+        });
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs ?? 30_000);
+        AutomationElement? root = null;
+        do
+        {
+            var handle = GetForegroundWindow();
+            if (handle != IntPtr.Zero && (handle != previousWindow || DateTime.UtcNow >= acceptExistingAfter))
+            {
+                try
+                {
+                    var candidate = Automation.FromHandle(handle);
+                    if (candidate.Properties.ControlType.ValueOrDefault == ControlType.Window)
+                    {
+                        root = candidate;
+                        break;
+                    }
+                }
+                catch { }
+            }
+            Thread.Sleep(100);
+        } while (DateTime.UtcNow < deadline);
+        if (root is null)
+            throw new InvalidOperationException($"URL `{url}` did not expose a foreground browser window before timeout");
+
+        FlaApplication? application = null;
+        try
+        {
+            if (process is not null && !process.HasExited) application = FlaApplication.Attach(process);
+        }
+        catch { }
+        var id = $"windows-app-{Guid.NewGuid():N}";
+        Sessions[id] = new AppSession(id, url, application, root);
+        return new { session_id = id, process_id = process?.Id };
+    }
+
     private static object Close(AgentRequest request)
     {
         var session = Session(request);
         Sessions.Remove(session.Id);
-        try { session.Application.Close(); } catch { session.Application.Kill(); }
+        if (session.Application is not null)
+            try { session.Application.Close(); } catch { session.Application.Kill(); }
         return new { };
     }
 
