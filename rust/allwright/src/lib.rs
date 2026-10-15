@@ -3,6 +3,7 @@ mod client;
 #[cfg(feature = "server")]
 #[path = "engine.rs"]
 mod engine_lib;
+mod home;
 #[cfg(feature = "server")]
 mod plugin_loader;
 #[cfg(feature = "server")]

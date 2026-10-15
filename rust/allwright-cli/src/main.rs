@@ -793,14 +793,53 @@ fn write_installed_plugins(plugins: &[InstalledPlugin]) -> Result<(), Box<dyn Er
 }
 
 fn plugin_manifest_path() -> Result<PathBuf, Box<dyn Error>> {
-    if let Ok(home) = env::var("ALLWRIGHT_HOME") {
-        return Ok(PathBuf::from(home).join("plugins.txt"));
+    Ok(resolve_allwright_home(
+        env::var("ALLWRIGHT_HOME").ok().as_deref(),
+        env::var("HOME").ok().as_deref(),
+        env::var("USERPROFILE").ok().as_deref(),
+        env::var("HOMEDRIVE").ok().as_deref(),
+        env::var("HOMEPATH").ok().as_deref(),
+        cfg!(windows),
+    )?
+    .join("plugins.txt"))
+}
+
+fn resolve_allwright_home(
+    configured: Option<&str>,
+    home: Option<&str>,
+    user_profile: Option<&str>,
+    home_drive: Option<&str>,
+    home_path: Option<&str>,
+    windows: bool,
+) -> Result<PathBuf, Box<dyn Error>> {
+    if let Some(configured) = non_empty(configured) {
+        return Ok(PathBuf::from(configured));
     }
 
-    let home = env::var("HOME")
-        .map(PathBuf::from)
-        .map_err(|_| "HOME is not set and ALLWRIGHT_HOME was not provided")?;
-    Ok(home.join(".allwright").join("plugins.txt"))
+    let user_home = if windows {
+        non_empty(user_profile)
+            .map(PathBuf::from)
+            .or_else(|| {
+                Some(PathBuf::from(format!(
+                    "{}{}",
+                    non_empty(home_drive)?,
+                    non_empty(home_path)?
+                )))
+            })
+            .or_else(|| non_empty(home).map(PathBuf::from))
+    } else {
+        non_empty(home).map(PathBuf::from)
+    };
+
+    user_home
+        .map(|path| path.join(".allwright"))
+        .ok_or_else(|| {
+            "could not determine the user home directory; set ALLWRIGHT_HOME explicitly".into()
+        })
+}
+
+fn non_empty(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|value| !value.is_empty())
 }
 
 fn plugin_install_root(plugin_id: &str) -> Result<PathBuf, Box<dyn Error>> {
@@ -845,6 +884,15 @@ mod tests {
         assert_eq!(
             cli_asset_name("v1.2.3").unwrap(),
             format!("allwright-v1.2.3-{target}.{extension}")
+        );
+    }
+
+    #[test]
+    fn windows_plugin_manifest_defaults_to_user_profile() {
+        assert_eq!(
+            resolve_allwright_home(None, None, Some("C:\\Users\\tester"), None, None, true,)
+                .unwrap(),
+            PathBuf::from("C:\\Users\\tester").join(".allwright")
         );
     }
 }

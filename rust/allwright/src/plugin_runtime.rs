@@ -11,11 +11,11 @@ use reqwest::blocking::Client;
 use tar::Archive;
 use zip::ZipArchive;
 
+use crate::home;
 use crate::plugins::package;
 
 const ALLWRIGHT_AUTO_INSTALL_ENV_VAR: &str = "ALLWRIGHT_AUTO_INSTALL";
 const ALLWRIGHT_GITHUB_TOKEN_ENV_VAR: &str = "ALLWRIGHT_GITHUB_TOKEN";
-const ALLWRIGHT_HOME_ENV_VAR: &str = "ALLWRIGHT_HOME";
 const ALLWRIGHT_REPOSITORY_ENV_VAR: &str = "ALLWRIGHT_REPOSITORY";
 const ALLWRIGHT_VERSION_ENV_VAR: &str = "ALLWRIGHT_VERSION";
 const DEFAULT_RELEASE_REPOSITORY: &str = "allwright-dev/allwright";
@@ -661,15 +661,7 @@ fn plugin_install_root(plugin_id: &str) -> Result<PathBuf, String> {
 }
 
 fn allwright_home() -> Result<PathBuf, String> {
-    if let Ok(home) = env::var(ALLWRIGHT_HOME_ENV_VAR) {
-        let trimmed = home.trim();
-        if !trimmed.is_empty() {
-            return Ok(PathBuf::from(trimmed));
-        }
-    }
-    let home = env::var("HOME")
-        .map_err(|_| "HOME is not set and ALLWRIGHT_HOME was not provided".to_string())?;
-    Ok(PathBuf::from(home).join(".allwright"))
+    home::allwright_home()
 }
 
 fn auto_install_enabled() -> bool {

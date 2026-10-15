@@ -15,13 +15,13 @@ use tar::Archive;
 use tonic::transport::Endpoint;
 use zip::ZipArchive;
 
+use crate::home;
 use crate::proto::{PingRequest, engine_service_client::EngineServiceClient};
 
 use super::types::{Error, Result};
 
 const ALLWRIGHT_AUTO_INSTALL_ENV_VAR: &str = "ALLWRIGHT_AUTO_INSTALL";
 const ALLWRIGHT_CLI_PATH_ENV_VAR: &str = "ALLWRIGHT_CLI_PATH";
-const ALLWRIGHT_HOME_ENV_VAR: &str = "ALLWRIGHT_HOME";
 const ALLWRIGHT_REPOSITORY_ENV_VAR: &str = "ALLWRIGHT_REPOSITORY";
 const ALLWRIGHT_VERSION_ENV_VAR: &str = "ALLWRIGHT_VERSION";
 const DEFAULT_RELEASE_REPOSITORY: &str = "allwright-dev/allwright";
@@ -552,15 +552,7 @@ fn expected_runtime_version() -> String {
 }
 
 fn allwright_home() -> Result<PathBuf> {
-    if let Ok(home) = env::var(ALLWRIGHT_HOME_ENV_VAR) {
-        let trimmed = home.trim();
-        if !trimmed.is_empty() {
-            return Ok(PathBuf::from(trimmed));
-        }
-    }
-    let home = env::var("HOME")
-        .map_err(|_| Error::new("HOME is not set and ALLWRIGHT_HOME was not provided"))?;
-    Ok(PathBuf::from(home).join(".allwright"))
+    home::allwright_home().map_err(Error::new)
 }
 
 fn auto_install_enabled() -> bool {
