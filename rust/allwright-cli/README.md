@@ -17,3 +17,13 @@ The inspector starts a loopback-only web application, opens it in the default
 browser, and exposes the current screenshot, UIA3 hierarchy, element details,
 suggested locators, and an element click action. A URL can be used as the target
 to inspect the foreground browser window.
+
+Inspect a native macOS application by bundle identifier:
+
+```bash
+allwright inspector desktop-mac com.apple.TextEdit
+```
+
+The macOS inspector uses the same browser interface and is backed by the
+desktop-mac XCUITest agent. It requires Xcode and macOS UI automation
+permission.

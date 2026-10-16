@@ -19,17 +19,12 @@ pub fn run(
     listen_addr: SocketAddr,
     open_browser: bool,
 ) -> Result<(), Box<dyn Error>> {
-    if surface != "desktop-windows" {
-        return Err(format!(
-            "inspector surface `{surface}` is not supported yet; expected `desktop-windows`"
-        )
-        .into());
-    }
+    let surface = InspectorSurface::parse(surface)?;
     if !listen_addr.ip().is_loopback() {
         return Err("the inspector must listen on a loopback address".into());
     }
 
-    let runtime = InspectorRuntime::start(target, url)?;
+    let runtime = InspectorRuntime::start(surface, target, url)?;
     let listener = TcpListener::bind(listen_addr)?;
     let address = listener.local_addr()?;
     let inspector_url = format!("http://{address}/");
@@ -58,67 +53,124 @@ pub fn run(
 }
 
 struct InspectorRuntime {
+    surface: InspectorSurface,
     desktop: DesktopSessionHandle,
     app: DesktopAppSessionHandle,
 }
 
+#[derive(Clone, Copy)]
+struct InspectorSurface {
+    id: &'static str,
+    platform: DesktopPlatform,
+    backend: &'static str,
+}
+
+impl InspectorSurface {
+    fn parse(value: &str) -> Result<Self, Box<dyn Error>> {
+        match value {
+            "desktop-windows" => Ok(Self {
+                id: "desktop-windows",
+                platform: DesktopPlatform::Windows,
+                backend: "UIA3",
+            }),
+            "desktop-mac" => Ok(Self {
+                id: "desktop-mac",
+                platform: DesktopPlatform::Mac,
+                backend: "XCUITest",
+            }),
+            _ => Err(format!(
+                "inspector surface `{value}` is not supported; expected `desktop-windows` or `desktop-mac`"
+            )
+            .into()),
+        }
+    }
+}
+
 impl InspectorRuntime {
-    fn start(target: &str, url: Option<&str>) -> Result<Self, Box<dyn Error>> {
-        let connect = invoke(DesktopCommand::Connect(ConnectOptions {
-            platform: DesktopPlatform::Windows,
-            agent_endpoint: None,
-            timeout_ms: Some(30_000),
-        }))?;
+    fn start(
+        surface: InspectorSurface,
+        target: &str,
+        url: Option<&str>,
+    ) -> Result<Self, Box<dyn Error>> {
+        let connect = invoke(
+            surface.id,
+            DesktopCommand::Connect(ConnectOptions {
+                platform: surface.platform,
+                agent_endpoint: None,
+                timeout_ms: Some(30_000),
+            }),
+        )?;
         let DesktopCommandResult::Connect(connection) = connect else {
-            return Err("desktop-windows returned an unexpected connect response".into());
+            return Err(format!("{} returned an unexpected connect response", surface.id).into());
         };
 
-        let launch = invoke(DesktopCommand::LaunchApp {
-            desktop_session: connection.desktop_session.clone(),
-            options: LaunchOptions {
-                app_id: target.to_string(),
-                terminate_running: false,
-                timeout_ms: Some(30_000),
+        let launch = invoke(
+            surface.id,
+            DesktopCommand::LaunchApp {
+                desktop_session: connection.desktop_session.clone(),
+                options: LaunchOptions {
+                    app_id: target.to_string(),
+                    terminate_running: false,
+                    timeout_ms: Some(30_000),
+                },
             },
-        })?;
+        )?;
         let DesktopCommandResult::LaunchApp(application) = launch else {
-            return Err("desktop-windows returned an unexpected launch response".into());
+            return Err(format!("{} returned an unexpected launch response", surface.id).into());
         };
 
         if let Some(url) = url {
-            invoke(DesktopCommand::NavigateApp {
-                desktop_session: connection.desktop_session.clone(),
-                app_session: application.app_session.clone(),
-                url: url.to_string(),
-                timeout_ms: Some(10_000),
-            })?;
+            invoke(
+                surface.id,
+                DesktopCommand::NavigateApp {
+                    desktop_session: connection.desktop_session.clone(),
+                    app_session: application.app_session.clone(),
+                    url: url.to_string(),
+                    timeout_ms: Some(10_000),
+                },
+            )?;
         }
 
         Ok(Self {
+            surface,
             desktop: connection.desktop_session,
             app: application.app_session,
         })
     }
 
     fn snapshot(&self) -> Result<Value, Box<dyn Error>> {
-        let screenshot = invoke(DesktopCommand::Screenshot {
-            desktop_session: self.desktop.clone(),
-            app_session: self.app.clone(),
-            timeout_ms: Some(10_000),
-            full_page: false,
-        })?;
+        let screenshot = invoke(
+            self.surface.id,
+            DesktopCommand::Screenshot {
+                desktop_session: self.desktop.clone(),
+                app_session: self.app.clone(),
+                timeout_ms: Some(10_000),
+                full_page: false,
+            },
+        )?;
         let DesktopCommandResult::Screenshot(screenshot) = screenshot else {
-            return Err("desktop-windows returned an unexpected screenshot response".into());
+            return Err(format!(
+                "{} returned an unexpected screenshot response",
+                self.surface.id
+            )
+            .into());
         };
 
-        let tree = invoke(DesktopCommand::AccessibilitySnapshot {
-            desktop_session: self.desktop.clone(),
-            app_session: self.app.clone(),
-            format: "json".to_string(),
-            mode: "default".to_string(),
-        })?;
+        let tree = invoke(
+            self.surface.id,
+            DesktopCommand::AccessibilitySnapshot {
+                desktop_session: self.desktop.clone(),
+                app_session: self.app.clone(),
+                format: "json".to_string(),
+                mode: "default".to_string(),
+            },
+        )?;
         let DesktopCommandResult::AccessibilitySnapshot(tree) = tree else {
-            return Err("desktop-windows returned an unexpected accessibility response".into());
+            return Err(format!(
+                "{} returned an unexpected accessibility response",
+                self.surface.id
+            )
+            .into());
         };
         let tree: Value = serde_json::from_str(&tree.snapshot)?;
         Ok(json!({
@@ -126,17 +178,22 @@ impl InspectorRuntime {
                 "data:image/png;base64,{}",
                 base64::engine::general_purpose::STANDARD.encode(screenshot.png_data)
             ),
-            "tree": tree,
+            "tree": normalize_snapshot(tree)?,
+            "surface": self.surface.id,
+            "backend": self.surface.backend,
         }))
     }
 
     fn click(&self, selector: String) -> Result<Value, Box<dyn Error>> {
-        invoke(DesktopCommand::ClickElement {
-            desktop_session: self.desktop.clone(),
-            app_session: self.app.clone(),
-            selector,
-            timeout_ms: Some(10_000),
-        })?;
+        invoke(
+            self.surface.id,
+            DesktopCommand::ClickElement {
+                desktop_session: self.desktop.clone(),
+                app_session: self.app.clone(),
+                selector,
+                timeout_ms: Some(10_000),
+            },
+        )?;
         std::thread::sleep(std::time::Duration::from_millis(200));
         self.snapshot()
     }
@@ -149,21 +206,94 @@ struct PluginEnvelope {
     error: Option<String>,
 }
 
-fn invoke(command: DesktopCommand) -> Result<DesktopCommandResult, Box<dyn Error>> {
+fn invoke(
+    plugin_id: &str,
+    command: DesktopCommand,
+) -> Result<DesktopCommandResult, Box<dyn Error>> {
     let request = serde_json::to_string(&command)?;
-    let response = allwright::plugins::invoke_plugin("desktop-windows", &request)
-        .map_err(|error| format!("desktop-windows: {error}"))?;
+    let response = allwright::plugins::invoke_plugin(plugin_id, &request)
+        .map_err(|error| format!("{plugin_id}: {error}"))?;
     let response: PluginEnvelope = serde_json::from_str(&response)?;
     if response.ok {
         response
             .result
-            .ok_or_else(|| "desktop-windows returned no result".into())
+            .ok_or_else(|| format!("{plugin_id} returned no result").into())
     } else {
         Err(response
             .error
-            .unwrap_or_else(|| "desktop-windows failed without an error message".to_string())
+            .unwrap_or_else(|| format!("{plugin_id} failed without an error message"))
             .into())
     }
+}
+
+fn normalize_snapshot(snapshot: Value) -> Result<Value, Box<dyn Error>> {
+    if snapshot.get("root").is_some() {
+        return Ok(snapshot);
+    }
+    let document = snapshot
+        .get("documents")
+        .and_then(Value::as_array)
+        .and_then(|documents| documents.first())
+        .ok_or("accessibility snapshot does not contain a document")?;
+    let root = document
+        .get("root")
+        .ok_or("accessibility snapshot document does not contain a root")?;
+    Ok(json!({
+        "version": snapshot.get("version").cloned().unwrap_or(json!(1)),
+        "platform": document.get("platform").cloned().unwrap_or(Value::Null),
+        "root": normalize_xctest_node(root),
+    }))
+}
+
+fn normalize_xctest_node(node: &Value) -> Value {
+    let properties = node.get("properties").unwrap_or(&Value::Null);
+    let states = node.get("states").unwrap_or(&Value::Null);
+    let children = node
+        .get("children")
+        .and_then(Value::as_array)
+        .map(|children| {
+            children
+                .iter()
+                .map(normalize_xctest_node)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let bounds = properties
+        .get("frame")
+        .filter(|frame| {
+            frame.get("width").and_then(Value::as_f64).unwrap_or(0.0) > 0.0
+                && frame.get("height").and_then(Value::as_f64).unwrap_or(0.0) > 0.0
+        })
+        .cloned()
+        .or_else(|| {
+            children
+                .iter()
+                .find(|child| {
+                    child
+                        .get("className")
+                        .and_then(Value::as_str)
+                        .is_some_and(|class_name| class_name.eq_ignore_ascii_case("window"))
+                })
+                .and_then(|child| child.get("bounds"))
+                .cloned()
+        })
+        .unwrap_or_else(empty_bounds);
+    json!({
+        "role": node.get("role").cloned().unwrap_or_else(|| json!("generic")),
+        "name": node.get("name").cloned().unwrap_or_else(|| json!("")),
+        "automationId": properties.get("identifier").cloned().unwrap_or_else(|| json!("")),
+        "className": properties.get("type").cloned().unwrap_or_else(|| json!("")),
+        "enabled": !states.get("disabled").and_then(Value::as_bool).unwrap_or(false),
+        "offscreen": !properties.get("rendered").and_then(Value::as_bool).unwrap_or(true),
+        "bounds": bounds,
+        "properties": properties,
+        "states": states,
+        "children": children,
+    })
+}
+
+fn empty_bounds() -> Value {
+    json!({"x": 0, "y": 0, "width": 0, "height": 0})
 }
 
 fn handle_request(
@@ -311,7 +441,9 @@ fn open_in_browser(url: &str) -> Result<(), Box<dyn Error>> {
         command
     } else if cfg!(target_os = "macos") {
         let mut command = Command::new("open");
-        command.arg(url);
+        // Keep the inspector out of an already-running browser window. This is
+        // important when the inspected native application is itself Safari.
+        command.args(["-n", "-a", "Safari", url]);
         command
     } else {
         let mut command = Command::new("xdg-open");
@@ -347,5 +479,56 @@ mod tests {
         assert!(is_loopback_origin("http://127.0.0.1:9227"));
         assert!(is_loopback_origin("http://localhost:9227"));
         assert!(!is_loopback_origin("https://example.com"));
+    }
+
+    #[test]
+    fn normalizes_xctest_document_for_the_shared_inspector() {
+        let snapshot = json!({
+            "version": 1,
+            "documents": [{
+                "platform": "macos",
+                "root": {
+                    "role": "application",
+                    "name": "TextEdit",
+                    "states": {},
+                    "properties": {
+                        "type": "application",
+                        "rendered": true
+                    },
+                    "children": [{
+                        "role": "generic",
+                        "name": "Document",
+                        "states": {},
+                        "properties": {
+                            "type": "Window",
+                            "rendered": true,
+                            "frame": {"x": 20, "y": 40, "width": 800, "height": 600}
+                        },
+                        "children": [{
+                            "role": "button",
+                            "name": "Save",
+                            "states": {"disabled": false},
+                            "properties": {
+                                "identifier": "save-button",
+                                "type": "button",
+                                "rendered": true,
+                                "frame": {"x": 700, "y": 50, "width": 80, "height": 30}
+                            },
+                            "children": []
+                        }]
+                    }]
+                }
+            }]
+        });
+        let normalized = normalize_snapshot(snapshot).unwrap();
+        assert_eq!(normalized["root"]["bounds"]["x"], 20);
+        assert_eq!(
+            normalized["root"]["children"][0]["children"][0]["automationId"],
+            "save-button"
+        );
+        assert_eq!(
+            normalized["root"]["children"][0]["children"][0]["enabled"],
+            true
+        );
     }
 }

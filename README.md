@@ -199,6 +199,17 @@ properties, copy a suggested locator, or click it in the application. Use
 through the Windows shell, and `--no-open` when the browser should not be
 opened automatically.
 
+On macOS, pass the application bundle identifier:
+
+```bash
+allwright inspector desktop-mac com.apple.TextEdit
+allwright inspector desktop-mac com.apple.Safari --url https://allwright.dev
+```
+
+The macOS inspector uses the same interface and locator workflow, backed by the
+XCUITest accessibility hierarchy. Xcode and UI automation permission are
+required, just as they are for the regular `desktop-mac` surface.
+
 If you are working from the repo checkout instead:
 
 ```bash

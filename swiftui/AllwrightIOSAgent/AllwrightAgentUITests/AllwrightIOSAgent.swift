@@ -474,12 +474,17 @@ final class AllwrightIOSAgent {
         let generation = (snapshotGenerations[sessionID] ?? 0) + 1
         snapshotGenerations[sessionID] = generation
         var references: [String: SnapshotReference] = [:]
-        var children: [[String: Any]] = []
+        var snapshotNodes: [(depth: Int, node: [String: Any])] = []
         var matchIndexes: [String: Int] = [:]
 
         for (index, rawLine) in hierarchy.split(separator: "\n").enumerated() {
-            let line = String(rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
+            let raw = String(rawLine)
+            let depth = raw.prefix { $0 == " " || $0 == "\t" }.reduce(0) {
+                $1 == "\t" ? $0 + 4 : $0 + 1
+            }
+            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
                 .trimmingCharacters(in: CharacterSet(charactersIn: "→"))
+                .trimmingCharacters(in: .whitespaces)
             guard let type = debugElementType(line), type != .application else { continue }
             let identifier = debugQuotedValue("identifier", in: line) ?? ""
             let label = debugQuotedValue("label", in: line)
@@ -516,20 +521,22 @@ final class AllwrightIOSAgent {
                     hierarchySignature: hierarchySignature
                 )
             }
-            children.append([
+            snapshotNodes.append((depth: depth, node: [
                 "role": accessibilityRole(type),
                 "name": type == .secureTextField ? (debugQuotedValue("placeholderValue", in: line) ?? label) : label,
                 "states": ["disabled": disabled, "selected": selected],
                 "properties": properties,
                 "children": [],
-            ])
+            ]))
         }
+        let children = nestedSnapshotNodes(snapshotNodes)
         snapshotReferences[sessionID] = mode == "ai" ? references : [:]
 #if os(macOS)
         let platform = "macos"
 #else
         let platform = "ios"
 #endif
+        let applicationFrame = screenshotTarget(application).frame
         var document: [String: Any] = [
             "contextId": sessionID,
             "parentContextId": NSNull(),
@@ -538,12 +545,40 @@ final class AllwrightIOSAgent {
                 "role": "application",
                 "name": application.label,
                 "states": [:],
-                "properties": ["bundleIdentifier": applicationBundleIDs[sessionID] ?? ""],
+                "properties": [
+                    "bundleIdentifier": applicationBundleIDs[sessionID] ?? "",
+                    "type": "application",
+                    "rendered": applicationFrame.width > 0 && applicationFrame.height > 0,
+                    "frame": [
+                        "x": applicationFrame.origin.x,
+                        "y": applicationFrame.origin.y,
+                        "width": applicationFrame.width,
+                        "height": applicationFrame.height,
+                    ],
+                ],
                 "children": children,
             ],
         ]
         if mode == "ai" { document["snapshotId"] = generation }
         return ["version": 1, "documents": [document]]
+    }
+
+    private func nestedSnapshotNodes(
+        _ entries: [(depth: Int, node: [String: Any])]
+    ) -> [[String: Any]] {
+        var index = 0
+        func descendants(after parentDepth: Int) -> [[String: Any]] {
+            var result: [[String: Any]] = []
+            while index < entries.count, entries[index].depth > parentDepth {
+                let entry = entries[index]
+                index += 1
+                var node = entry.node
+                node["children"] = descendants(after: entry.depth)
+                result.append(node)
+            }
+            return result
+        }
+        return descendants(after: -1)
     }
 
     private func debugQuotedValue(_ key: String, in line: String) -> String? {
@@ -561,6 +596,7 @@ final class AllwrightIOSAgent {
         hierarchy.split(separator: "\n").compactMap { rawLine -> String? in
             let line = String(rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
                 .trimmingCharacters(in: CharacterSet(charactersIn: "→"))
+                .trimmingCharacters(in: .whitespaces)
             guard let type = debugElementType(line) else { return nil }
             let identifier = debugQuotedValue("identifier", in: line) ?? ""
             let label = debugQuotedValue("label", in: line) ?? ""

@@ -48,7 +48,7 @@ enum CliCommand {
     },
     /// Open a local UI inspector for an application surface
     Inspector {
-        /// Surface to inspect (currently `desktop-windows`)
+        /// Surface to inspect (`desktop-windows` or `desktop-mac`)
         surface: String,
         /// Application path, application id, or URL to inspect
         target: String,
@@ -916,6 +916,27 @@ mod tests {
                 no_open: true,
                 ..
             }) if surface == "desktop-windows" && target == "C:\\Windows\\notepad.exe"
+        ));
+    }
+
+    #[test]
+    fn parses_macos_inspector_target() {
+        let args = Args::try_parse_from([
+            "allwright",
+            "inspector",
+            "desktop-mac",
+            "com.apple.TextEdit",
+            "--no-open",
+        ])
+        .unwrap();
+        assert!(matches!(
+            args.command,
+            Some(CliCommand::Inspector {
+                surface,
+                target,
+                no_open: true,
+                ..
+            }) if surface == "desktop-mac" && target == "com.apple.TextEdit"
         ));
     }
 
