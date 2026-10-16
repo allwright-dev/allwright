@@ -1,6 +1,12 @@
 use allwright_surface_desktop::{
-    ConnectOptions, DesktopAppSessionHandle, DesktopCommand, DesktopCommandResult, DesktopPlatform,
-    DesktopSessionHandle, LaunchOptions,
+    ConnectOptions as DesktopConnectOptions, DesktopAppSessionHandle, DesktopCommand,
+    DesktopCommandResult, DesktopPlatform, DesktopSessionHandle,
+    LaunchOptions as DesktopLaunchOptions,
+};
+use allwright_surface_mobile::{
+    ConnectOptions as MobileConnectOptions, LaunchOptions as MobileLaunchOptions,
+    MobileBrowserSessionHandle, MobileCommand, MobileCommandResult, MobilePageSessionHandle,
+    MobilePlatform,
 };
 use base64::Engine;
 use serde::Deserialize;
@@ -15,6 +21,7 @@ const INDEX_HTML: &str = include_str!("inspector.html");
 pub fn run(
     surface: &str,
     target: &str,
+    device: Option<&str>,
     url: Option<&str>,
     listen_addr: SocketAddr,
     open_browser: bool,
@@ -24,7 +31,7 @@ pub fn run(
         return Err("the inspector must listen on a loopback address".into());
     }
 
-    let runtime = InspectorRuntime::start(surface, target, url)?;
+    let runtime = InspectorRuntime::start(surface, target, device, url)?;
     let listener = TcpListener::bind(listen_addr)?;
     let address = listener.local_addr()?;
     let inspector_url = format!("http://{address}/");
@@ -54,31 +61,52 @@ pub fn run(
 
 struct InspectorRuntime {
     surface: InspectorSurface,
-    desktop: DesktopSessionHandle,
-    app: DesktopAppSessionHandle,
+    session: InspectorSession,
 }
 
 #[derive(Clone, Copy)]
-struct InspectorSurface {
-    id: &'static str,
-    platform: DesktopPlatform,
+enum InspectorSurface {
+    Desktop {
+        id: &'static str,
+        platform: DesktopPlatform,
+    },
+    MobileIos,
+}
+
+enum InspectorSession {
+    Desktop {
+        desktop: DesktopSessionHandle,
+        app: DesktopAppSessionHandle,
+    },
+    Mobile {
+        browser: MobileBrowserSessionHandle,
+        page: MobilePageSessionHandle,
+    },
 }
 
 impl InspectorSurface {
     fn parse(value: &str) -> Result<Self, Box<dyn Error>> {
         match value {
-            "desktop-windows" => Ok(Self {
+            "desktop-windows" => Ok(Self::Desktop {
                 id: "desktop-windows",
                 platform: DesktopPlatform::Windows,
             }),
-            "desktop-mac" => Ok(Self {
+            "desktop-mac" => Ok(Self::Desktop {
                 id: "desktop-mac",
                 platform: DesktopPlatform::Mac,
             }),
+            "mobile-ios" => Ok(Self::MobileIos),
             _ => Err(format!(
-                "inspector surface `{value}` is not supported; expected `desktop-windows` or `desktop-mac`"
+                "inspector surface `{value}` is not supported; expected `desktop-windows`, `desktop-mac`, or `mobile-ios`"
             )
             .into()),
+        }
+    }
+
+    fn id(self) -> &'static str {
+        match self {
+            Self::Desktop { id, .. } => id,
+            Self::MobileIos => "mobile-ios",
         }
     }
 }
@@ -87,128 +115,259 @@ impl InspectorRuntime {
     fn start(
         surface: InspectorSurface,
         target: &str,
+        device: Option<&str>,
         url: Option<&str>,
     ) -> Result<Self, Box<dyn Error>> {
-        let connect = invoke(
-            surface.id,
-            DesktopCommand::Connect(ConnectOptions {
-                platform: surface.platform,
-                agent_endpoint: None,
-                timeout_ms: Some(30_000),
-            }),
-        )?;
-        let DesktopCommandResult::Connect(connection) = connect else {
-            return Err(format!("{} returned an unexpected connect response", surface.id).into());
+        let session = match surface {
+            InspectorSurface::Desktop { id, platform } => {
+                if device.is_some() {
+                    return Err("--device is only supported by the mobile-ios inspector".into());
+                }
+                let connect = invoke_desktop(
+                    id,
+                    DesktopCommand::Connect(DesktopConnectOptions {
+                        platform,
+                        agent_endpoint: None,
+                        timeout_ms: Some(30_000),
+                    }),
+                )?;
+                let DesktopCommandResult::Connect(connection) = connect else {
+                    return Err(format!("{id} returned an unexpected connect response").into());
+                };
+                let launch = invoke_desktop(
+                    id,
+                    DesktopCommand::LaunchApp {
+                        desktop_session: connection.desktop_session.clone(),
+                        options: DesktopLaunchOptions {
+                            app_id: target.to_string(),
+                            terminate_running: false,
+                            timeout_ms: Some(30_000),
+                        },
+                    },
+                )?;
+                let DesktopCommandResult::LaunchApp(application) = launch else {
+                    return Err(format!("{id} returned an unexpected launch response").into());
+                };
+                if let Some(url) = url {
+                    invoke_desktop(
+                        id,
+                        DesktopCommand::NavigateApp {
+                            desktop_session: connection.desktop_session.clone(),
+                            app_session: application.app_session.clone(),
+                            url: url.to_string(),
+                            timeout_ms: Some(10_000),
+                        },
+                    )?;
+                }
+                InspectorSession::Desktop {
+                    desktop: connection.desktop_session,
+                    app: application.app_session,
+                }
+            }
+            InspectorSurface::MobileIos => {
+                let connect = invoke_mobile(
+                    "mobile-ios",
+                    MobileCommand::Connect(MobileConnectOptions {
+                        platform: MobilePlatform::Ios,
+                        device: device.map(str::to_string),
+                        adb_endpoint: None,
+                        agent_endpoint: None,
+                        preserve_app_state: false,
+                        timeout_ms: Some(60_000),
+                    }),
+                )?;
+                let MobileCommandResult::Connect(connection) = connect else {
+                    return Err("mobile-ios returned an unexpected connect response".into());
+                };
+                let launch = invoke_mobile(
+                    "mobile-ios",
+                    MobileCommand::LaunchApp {
+                        browser_session: connection.browser_session.clone(),
+                        options: MobileLaunchOptions {
+                            apk_path: Some(target.to_string()),
+                            app_id: None,
+                            launch_activity: None,
+                            stop_before_launch: true,
+                            timeout_ms: Some(120_000),
+                        },
+                    },
+                )?;
+                let MobileCommandResult::LaunchApp(application) = launch else {
+                    return Err("mobile-ios returned an unexpected launch response".into());
+                };
+                if let Some(url) = url {
+                    invoke_mobile(
+                        "mobile-ios",
+                        MobileCommand::NavigateApp {
+                            browser_session: connection.browser_session.clone(),
+                            page_session: application.page_session.clone(),
+                            url: url.to_string(),
+                            timeout_ms: Some(10_000),
+                        },
+                    )?;
+                }
+                InspectorSession::Mobile {
+                    browser: connection.browser_session,
+                    page: application.page_session,
+                }
+            }
         };
-
-        let launch = invoke(
-            surface.id,
-            DesktopCommand::LaunchApp {
-                desktop_session: connection.desktop_session.clone(),
-                options: LaunchOptions {
-                    app_id: target.to_string(),
-                    terminate_running: false,
-                    timeout_ms: Some(30_000),
-                },
-            },
-        )?;
-        let DesktopCommandResult::LaunchApp(application) = launch else {
-            return Err(format!("{} returned an unexpected launch response", surface.id).into());
-        };
-
-        if let Some(url) = url {
-            invoke(
-                surface.id,
-                DesktopCommand::NavigateApp {
-                    desktop_session: connection.desktop_session.clone(),
-                    app_session: application.app_session.clone(),
-                    url: url.to_string(),
-                    timeout_ms: Some(10_000),
-                },
-            )?;
-        }
-
-        Ok(Self {
-            surface,
-            desktop: connection.desktop_session,
-            app: application.app_session,
-        })
+        Ok(Self { surface, session })
     }
 
     fn snapshot(&self) -> Result<Value, Box<dyn Error>> {
-        let screenshot = invoke(
-            self.surface.id,
-            DesktopCommand::Screenshot {
-                desktop_session: self.desktop.clone(),
-                app_session: self.app.clone(),
-                timeout_ms: Some(10_000),
-                full_page: false,
-            },
-        )?;
-        let DesktopCommandResult::Screenshot(screenshot) = screenshot else {
-            return Err(format!(
-                "{} returned an unexpected screenshot response",
-                self.surface.id
-            )
-            .into());
-        };
-
-        let tree = invoke(
-            self.surface.id,
-            DesktopCommand::InspectorSnapshot {
-                desktop_session: self.desktop.clone(),
-                app_session: self.app.clone(),
-            },
-        )?;
-        let DesktopCommandResult::InspectorSnapshot(tree) = tree else {
-            return Err(format!(
-                "{} returned an unexpected inspector snapshot response",
-                self.surface.id
-            )
-            .into());
+        let (png_data, tree) = match &self.session {
+            InspectorSession::Desktop { desktop, app } => {
+                let screenshot = invoke_desktop(
+                    self.surface.id(),
+                    DesktopCommand::Screenshot {
+                        desktop_session: desktop.clone(),
+                        app_session: app.clone(),
+                        timeout_ms: Some(10_000),
+                        full_page: false,
+                    },
+                )?;
+                let DesktopCommandResult::Screenshot(screenshot) = screenshot else {
+                    return Err(format!(
+                        "{} returned an unexpected screenshot response",
+                        self.surface.id()
+                    )
+                    .into());
+                };
+                let tree = invoke_desktop(
+                    self.surface.id(),
+                    DesktopCommand::InspectorSnapshot {
+                        desktop_session: desktop.clone(),
+                        app_session: app.clone(),
+                    },
+                )?;
+                let DesktopCommandResult::InspectorSnapshot(tree) = tree else {
+                    return Err(format!(
+                        "{} returned an unexpected inspector snapshot response",
+                        self.surface.id()
+                    )
+                    .into());
+                };
+                (screenshot.png_data, tree)
+            }
+            InspectorSession::Mobile { browser, page } => {
+                let screenshot = invoke_mobile(
+                    self.surface.id(),
+                    MobileCommand::Screenshot {
+                        browser_session: browser.clone(),
+                        page_session: page.clone(),
+                        timeout_ms: Some(30_000),
+                        full_page: false,
+                    },
+                )?;
+                let MobileCommandResult::Screenshot(screenshot) = screenshot else {
+                    return Err(format!(
+                        "{} returned an unexpected screenshot response",
+                        self.surface.id()
+                    )
+                    .into());
+                };
+                let tree = invoke_mobile(
+                    self.surface.id(),
+                    MobileCommand::InspectorSnapshot {
+                        browser_session: browser.clone(),
+                        page_session: page.clone(),
+                    },
+                )?;
+                let MobileCommandResult::InspectorSnapshot(tree) = tree else {
+                    return Err(format!(
+                        "{} returned an unexpected inspector snapshot response",
+                        self.surface.id()
+                    )
+                    .into());
+                };
+                (screenshot.png_data, tree)
+            }
         };
         let backend = tree.backend.clone();
         Ok(json!({
             "image": format!(
                 "data:image/png;base64,{}",
-                base64::engine::general_purpose::STANDARD.encode(screenshot.png_data)
+                base64::engine::general_purpose::STANDARD.encode(png_data)
             ),
             "tree": tree,
-            "surface": self.surface.id,
+            "surface": self.surface.id(),
             "backend": backend,
         }))
     }
 
     fn click(&self, selector: String) -> Result<Value, Box<dyn Error>> {
-        invoke(
-            self.surface.id,
-            DesktopCommand::ClickElement {
-                desktop_session: self.desktop.clone(),
-                app_session: self.app.clone(),
-                selector,
-                timeout_ms: Some(10_000),
-            },
-        )?;
+        match &self.session {
+            InspectorSession::Desktop { desktop, app } => {
+                invoke_desktop(
+                    self.surface.id(),
+                    DesktopCommand::ClickElement {
+                        desktop_session: desktop.clone(),
+                        app_session: app.clone(),
+                        selector,
+                        timeout_ms: Some(10_000),
+                    },
+                )?;
+            }
+            InspectorSession::Mobile { browser, page } => {
+                invoke_mobile(
+                    self.surface.id(),
+                    MobileCommand::ClickElement {
+                        browser_session: browser.clone(),
+                        page_session: page.clone(),
+                        selector,
+                        timeout_ms: Some(10_000),
+                    },
+                )?;
+            }
+        }
         std::thread::sleep(std::time::Duration::from_millis(200));
         self.snapshot()
     }
 }
 
 #[derive(Deserialize)]
-struct PluginEnvelope {
+struct DesktopPluginEnvelope {
     ok: bool,
     result: Option<DesktopCommandResult>,
     error: Option<String>,
 }
 
-fn invoke(
+#[derive(Deserialize)]
+struct MobilePluginEnvelope {
+    ok: bool,
+    result: Option<MobileCommandResult>,
+    error: Option<String>,
+}
+
+fn invoke_desktop(
     plugin_id: &str,
     command: DesktopCommand,
 ) -> Result<DesktopCommandResult, Box<dyn Error>> {
     let request = serde_json::to_string(&command)?;
     let response = allwright::plugins::invoke_plugin(plugin_id, &request)
         .map_err(|error| format!("{plugin_id}: {error}"))?;
-    let response: PluginEnvelope = serde_json::from_str(&response)?;
+    let response: DesktopPluginEnvelope = serde_json::from_str(&response)?;
+    if response.ok {
+        response
+            .result
+            .ok_or_else(|| format!("{plugin_id} returned no result").into())
+    } else {
+        Err(response
+            .error
+            .unwrap_or_else(|| format!("{plugin_id} failed without an error message"))
+            .into())
+    }
+}
+
+fn invoke_mobile(
+    plugin_id: &str,
+    command: MobileCommand,
+) -> Result<MobileCommandResult, Box<dyn Error>> {
+    let request = serde_json::to_string(&command)?;
+    let response = allwright::plugins::invoke_plugin(plugin_id, &request)
+        .map_err(|error| format!("{plugin_id}: {error}"))?;
+    let response: MobilePluginEnvelope = serde_json::from_str(&response)?;
     if response.ok {
         response
             .result

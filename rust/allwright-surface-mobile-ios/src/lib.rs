@@ -1,6 +1,6 @@
 use allwright_plugin_sdk::{
-    ALLWRIGHT_PLUGIN_API_VERSION, AccessibilitySnapshotInfo, CaptureInfo, SurfaceFamily,
-    SurfacePlugin, SurfacePluginDescriptor,
+    ALLWRIGHT_PLUGIN_API_VERSION, AccessibilitySnapshotInfo, CaptureInfo, InspectorBounds,
+    InspectorNode, InspectorSnapshot, SurfaceFamily, SurfacePlugin, SurfacePluginDescriptor,
 };
 use allwright_surface_mobile::{
     ConnectOptions, DeviceConnectionKind, DeviceTarget, LaunchOptions, MobileAppKind,
@@ -2105,6 +2105,91 @@ fn read_text_command(
     })
 }
 
+fn inspector_snapshot(raw: &str) -> Result<InspectorSnapshot, String> {
+    let snapshot: Value = serde_json::from_str(raw)
+        .map_err(|error| format!("iOS agent returned invalid snapshot JSON: {error}"))?;
+    let document = snapshot
+        .get("documents")
+        .and_then(Value::as_array)
+        .and_then(|documents| documents.first())
+        .ok_or_else(|| "iOS accessibility snapshot does not contain a document".to_string())?;
+    let root = document
+        .get("root")
+        .ok_or_else(|| "iOS accessibility snapshot document does not contain a root".to_string())?;
+    Ok(InspectorSnapshot {
+        version: snapshot
+            .get("version")
+            .and_then(Value::as_u64)
+            .and_then(|version| u32::try_from(version).ok())
+            .unwrap_or(1),
+        platform: document
+            .get("platform")
+            .and_then(Value::as_str)
+            .unwrap_or("ios")
+            .to_string(),
+        backend: "XCUITest".to_string(),
+        root: inspector_node(root),
+    })
+}
+
+fn inspector_node(node: &Value) -> InspectorNode {
+    let properties = node.get("properties").cloned().unwrap_or(Value::Null);
+    let states = node.get("states").cloned().unwrap_or(Value::Null);
+    let children = node
+        .get("children")
+        .and_then(Value::as_array)
+        .map(|children| children.iter().map(inspector_node).collect::<Vec<_>>())
+        .unwrap_or_default();
+    let bounds = properties
+        .get("frame")
+        .and_then(inspector_bounds)
+        .filter(|bounds| bounds.width > 0.0 && bounds.height > 0.0)
+        .unwrap_or_default();
+    InspectorNode {
+        role: node
+            .get("role")
+            .and_then(Value::as_str)
+            .unwrap_or("generic")
+            .to_string(),
+        name: node
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        automation_id: properties
+            .get("identifier")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        class_name: properties
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        enabled: !states
+            .get("disabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        offscreen: !properties
+            .get("rendered")
+            .and_then(Value::as_bool)
+            .unwrap_or(true),
+        bounds,
+        properties,
+        states,
+        children,
+    }
+}
+
+fn inspector_bounds(value: &Value) -> Option<InspectorBounds> {
+    Some(InspectorBounds {
+        x: value.get("x")?.as_f64()?,
+        y: value.get("y")?.as_f64()?,
+        width: value.get("width")?.as_f64()?,
+        height: value.get("height")?.as_f64()?,
+    })
+}
+
 fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, String> {
     match command {
         MobileCommand::RegisterHook {
@@ -2396,6 +2481,24 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
                 },
             ))
         }
+        MobileCommand::InspectorSnapshot {
+            browser_session,
+            page_session,
+        } => {
+            let mut request = AgentRequest::new("source");
+            request.session_id = Some(&page_session.page_id);
+            request.value = Some("default");
+            request.timeout_ms = Some(60_000);
+            let result = invoke_agent(
+                endpoint_from_session(&browser_session)?,
+                &request,
+                request.timeout_ms,
+            )?;
+            let raw = result_string(&result, "snapshot")?;
+            Ok(MobileCommandResult::InspectorSnapshot(inspector_snapshot(
+                raw,
+            )?))
+        }
     }
 }
 
@@ -2585,5 +2688,44 @@ mod tests {
         assert!(!profile_is_safe_for_agent(&profile(
             "TEAM123.com.example.customer-app"
         )));
+    }
+
+    #[test]
+    fn normalizes_xctest_document_for_the_inspector() {
+        let raw = json!({
+            "version": 1,
+            "documents": [{
+                "platform": "ios",
+                "root": {
+                    "role": "application",
+                    "name": "Flights",
+                    "states": {},
+                    "properties": {
+                        "identifier": "",
+                        "type": "application",
+                        "rendered": true,
+                        "frame": {"x": 0, "y": 0, "width": 393, "height": 852}
+                    },
+                    "children": [{
+                        "role": "button",
+                        "name": "Login",
+                        "states": {"disabled": false},
+                        "properties": {
+                            "identifier": "login-button",
+                            "type": "button",
+                            "rendered": true,
+                            "frame": {"x": 20, "y": 700, "width": 353, "height": 48}
+                        },
+                        "children": []
+                    }]
+                }
+            }]
+        });
+        let snapshot = inspector_snapshot(&raw.to_string()).unwrap();
+        assert_eq!(snapshot.platform, "ios");
+        assert_eq!(snapshot.backend, "XCUITest");
+        assert_eq!(snapshot.root.bounds.height, 852.0);
+        assert_eq!(snapshot.root.children[0].automation_id, "login-button");
+        assert!(snapshot.root.children[0].enabled);
     }
 }

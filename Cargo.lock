@@ -24,6 +24,7 @@ dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
+ "allwright-surface-mobile",
  "base64 0.22.1",
  "clap",
  "flate2",

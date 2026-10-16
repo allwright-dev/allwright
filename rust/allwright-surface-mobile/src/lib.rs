@@ -1,5 +1,4 @@
-use allwright_plugin_sdk::SurfaceFamily;
-use allwright_plugin_sdk::SurfacePluginDescriptor;
+use allwright_plugin_sdk::{InspectorSnapshot, SurfaceFamily, SurfacePluginDescriptor};
 use serde::{Deserialize, Serialize};
 use tokio::time::{Duration, sleep};
 
@@ -344,6 +343,10 @@ pub enum MobileCommand {
         format: String,
         mode: String,
     },
+    InspectorSnapshot {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+    },
     Connect(ConnectOptions),
     LaunchApp {
         browser_session: MobileBrowserSessionHandle,
@@ -438,6 +441,7 @@ pub enum MobileCommandResult {
     SetFileChooserFiles(MobileFileChooserFilesSetInfo),
     SaveDownload(MobileDownloadSavedInfo),
     AccessibilitySnapshot(allwright_plugin_sdk::AccessibilitySnapshotInfo),
+    InspectorSnapshot(InspectorSnapshot),
     Connect(MobileConnectInfo),
     LaunchApp(MobilePageInfo),
     OpenPage(MobilePageInfo),

@@ -48,10 +48,13 @@ enum CliCommand {
     },
     /// Open a local UI inspector for an application surface
     Inspector {
-        /// Surface to inspect (`desktop-windows` or `desktop-mac`)
+        /// Surface to inspect (`desktop-windows`, `desktop-mac`, or `mobile-ios`)
         surface: String,
-        /// Application path, application id, or URL to inspect
+        /// Desktop application id/path, or iOS application file path/URL
         target: String,
+        /// iOS Simulator name/UDID or connected-device UDID
+        #[arg(long)]
+        device: Option<String>,
         /// Open this URL after launching the application
         #[arg(long)]
         url: Option<String>,
@@ -106,12 +109,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
         CliCommand::Inspector {
             surface,
             target,
+            device,
             url,
             listen_addr,
             no_open,
         } => {
             tokio::task::block_in_place(|| {
-                inspector::run(&surface, &target, url.as_deref(), listen_addr, !no_open)
+                inspector::run(
+                    &surface,
+                    &target,
+                    device.as_deref(),
+                    url.as_deref(),
+                    listen_addr,
+                    !no_open,
+                )
             })?;
         }
     }
@@ -938,6 +949,32 @@ mod tests {
                 no_open: true,
                 ..
             }) if surface == "desktop-mac" && target == "com.apple.TextEdit"
+        ));
+    }
+
+    #[test]
+    fn parses_ios_inspector_source_and_device() {
+        let args = Args::try_parse_from([
+            "allwright",
+            "inspector",
+            "mobile-ios",
+            "https://allwright.dev/Flights-simulator.ipa",
+            "--device",
+            "iPhone 17 Pro",
+            "--no-open",
+        ])
+        .unwrap();
+        assert!(matches!(
+            args.command,
+            Some(CliCommand::Inspector {
+                surface,
+                target,
+                device: Some(device),
+                no_open: true,
+                ..
+            }) if surface == "mobile-ios"
+                && target == "https://allwright.dev/Flights-simulator.ipa"
+                && device == "iPhone 17 Pro"
         ));
     }
 

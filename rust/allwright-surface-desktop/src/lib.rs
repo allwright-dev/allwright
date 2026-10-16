@@ -1,5 +1,6 @@
 use allwright_plugin_sdk::{
-    AccessibilitySnapshotInfo, CaptureInfo, SurfaceFamily, SurfacePluginDescriptor,
+    AccessibilitySnapshotInfo, CaptureInfo, InspectorSnapshot, SurfaceFamily,
+    SurfacePluginDescriptor,
 };
 use serde::{Deserialize, Serialize};
 use tokio::time::{Duration, sleep};
@@ -100,40 +101,6 @@ pub struct DesktopWaitInfo {
 pub struct DesktopScreenshotInfo {
     pub png_data: Vec<u8>,
     pub note: String,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct DesktopElementBounds {
-    pub x: f64,
-    pub y: f64,
-    pub width: f64,
-    pub height: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct DesktopInspectorNode {
-    pub role: String,
-    pub name: String,
-    pub automation_id: String,
-    pub class_name: String,
-    pub enabled: bool,
-    pub offscreen: bool,
-    pub bounds: DesktopElementBounds,
-    #[serde(default)]
-    pub properties: serde_json::Value,
-    #[serde(default)]
-    pub states: serde_json::Value,
-    pub children: Vec<DesktopInspectorNode>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DesktopInspectorSnapshot {
-    pub version: u32,
-    pub platform: String,
-    pub backend: String,
-    pub root: DesktopInspectorNode,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -250,7 +217,7 @@ pub enum DesktopCommandResult {
     WaitForSelector(DesktopWaitInfo),
     Screenshot(DesktopScreenshotInfo),
     AccessibilitySnapshot(AccessibilitySnapshotInfo),
-    InspectorSnapshot(DesktopInspectorSnapshot),
+    InspectorSnapshot(InspectorSnapshot),
 }
 
 pub fn shared_descriptor() -> SurfacePluginDescriptor {

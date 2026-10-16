@@ -240,6 +240,40 @@ pub struct AccessibilitySnapshotInfo {
     pub format: String,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct InspectorBounds {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct InspectorNode {
+    pub role: String,
+    pub name: String,
+    pub automation_id: String,
+    pub class_name: String,
+    pub enabled: bool,
+    pub offscreen: bool,
+    pub bounds: InspectorBounds,
+    #[serde(default)]
+    pub properties: serde_json::Value,
+    #[serde(default)]
+    pub states: serde_json::Value,
+    pub children: Vec<InspectorNode>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct InspectorSnapshot {
+    pub version: u32,
+    pub platform: String,
+    pub backend: String,
+    pub root: InspectorNode,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScreenshotInfo {
     pub png_data: Vec<u8>,

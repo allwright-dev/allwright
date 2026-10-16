@@ -439,6 +439,9 @@ fn mobile_plugin_id_for_command(command: &MobileCommand) -> Result<&'static str,
         | MobileCommand::AccessibilitySnapshot {
             browser_session, ..
         }
+        | MobileCommand::InspectorSnapshot {
+            browser_session, ..
+        }
         | MobileCommand::Screenshot {
             browser_session, ..
         } => browser_session.platform,

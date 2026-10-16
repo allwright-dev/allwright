@@ -796,6 +796,9 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             mode,
         } => accessibility::snapshot(&browser_session, &page_session, &format, &mode)
             .map(MobileCommandResult::AccessibilitySnapshot),
+        MobileCommand::InspectorSnapshot { .. } => {
+            Err("mobile-android inspector snapshots are not implemented".to_string())
+        }
         MobileCommand::ClickElement {
             browser_session,
             page_session,

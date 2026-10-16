@@ -181,6 +181,7 @@ List or install plugins:
 ```bash
 allwright plugin list
 allwright plugin install web
+allwright plugin install mobile-ios
 allwright plugin install desktop-mac
 allwright plugin install desktop-windows
 ```
@@ -209,6 +210,20 @@ allwright inspector desktop-mac com.apple.Safari --url https://allwright.dev
 The macOS inspector uses the same interface and locator workflow, backed by the
 XCUITest accessibility hierarchy. Xcode and UI automation permission are
 required, just as they are for the regular `desktop-mac` surface.
+
+For an iOS Simulator or registered physical device, pass a local application
+artifact or downloadable URL. Use `--device` to select a Simulator by name/UDID
+or a connected device by UDID; when omitted, the iOS surface selects its default
+available Simulator or device:
+
+```bash
+allwright inspector mobile-ios ./Flights-simulator.ipa
+allwright inspector mobile-ios https://allwright.dev/Flights-simulator.ipa --device "iPhone 17 Pro"
+```
+
+The iOS surface downloads or resolves the application, installs and launches it,
+and provides the shared screenshot, hierarchy, element details, locator code,
+and click workflow through XCUITest.
 
 If you are working from the repo checkout instead:
 

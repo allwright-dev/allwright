@@ -1,13 +1,12 @@
 use allwright_plugin_sdk::{
-    ALLWRIGHT_PLUGIN_API_VERSION, AccessibilitySnapshotInfo, CaptureInfo, SurfaceFamily,
-    SurfacePlugin, SurfacePluginDescriptor,
+    ALLWRIGHT_PLUGIN_API_VERSION, AccessibilitySnapshotInfo, CaptureInfo, InspectorSnapshot,
+    SurfaceFamily, SurfacePlugin, SurfacePluginDescriptor,
 };
 use allwright_surface_desktop::{
     ConnectOptions, DesktopActionInfo, DesktopAppInfo, DesktopAppSessionHandle, DesktopCommand,
-    DesktopCommandResult, DesktopConnectInfo, DesktopElementCountInfo, DesktopInspectorSnapshot,
-    DesktopNavigationInfo, DesktopPlatform, DesktopScreenshotInfo, DesktopSessionHandle,
-    DesktopTextInfo, DesktopWaitInfo, LaunchOptions, boot_surface,
-    normalize_selector_for_transport,
+    DesktopCommandResult, DesktopConnectInfo, DesktopElementCountInfo, DesktopNavigationInfo,
+    DesktopPlatform, DesktopScreenshotInfo, DesktopSessionHandle, DesktopTextInfo, DesktopWaitInfo,
+    LaunchOptions, boot_surface, normalize_selector_for_transport,
 };
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -332,8 +331,8 @@ fn action_info(selector: String, action: &str) -> DesktopActionInfo {
     }
 }
 
-fn inspector_snapshot(raw: &str) -> Result<DesktopInspectorSnapshot, String> {
-    let mut snapshot: DesktopInspectorSnapshot = serde_json::from_str(raw)
+fn inspector_snapshot(raw: &str) -> Result<InspectorSnapshot, String> {
+    let mut snapshot: InspectorSnapshot = serde_json::from_str(raw)
         .map_err(|error| format!("Windows agent returned invalid inspector snapshot: {error}"))?;
     snapshot.backend = "UIA3".to_string();
     Ok(snapshot)

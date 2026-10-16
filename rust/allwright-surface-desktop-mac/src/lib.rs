@@ -1,13 +1,12 @@
 use allwright_plugin_sdk::{
-    ALLWRIGHT_PLUGIN_API_VERSION, AccessibilitySnapshotInfo, CaptureInfo, SurfaceFamily,
-    SurfacePlugin, SurfacePluginDescriptor,
+    ALLWRIGHT_PLUGIN_API_VERSION, AccessibilitySnapshotInfo, CaptureInfo, InspectorBounds,
+    InspectorNode, InspectorSnapshot, SurfaceFamily, SurfacePlugin, SurfacePluginDescriptor,
 };
 use allwright_surface_desktop::{
     ConnectOptions, DesktopActionInfo, DesktopAppInfo, DesktopAppSessionHandle, DesktopCommand,
-    DesktopCommandResult, DesktopConnectInfo, DesktopElementBounds, DesktopElementCountInfo,
-    DesktopInspectorNode, DesktopInspectorSnapshot, DesktopNavigationInfo, DesktopPlatform,
-    DesktopScreenshotInfo, DesktopSessionHandle, DesktopTextInfo, DesktopWaitInfo, LaunchOptions,
-    boot_surface, normalize_selector_for_transport,
+    DesktopCommandResult, DesktopConnectInfo, DesktopElementCountInfo, DesktopNavigationInfo,
+    DesktopPlatform, DesktopScreenshotInfo, DesktopSessionHandle, DesktopTextInfo, DesktopWaitInfo,
+    LaunchOptions, boot_surface, normalize_selector_for_transport,
 };
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -460,7 +459,7 @@ fn action_info(selector: String, action: &str) -> DesktopActionInfo {
     }
 }
 
-fn inspector_snapshot(raw: &str) -> Result<DesktopInspectorSnapshot, String> {
+fn inspector_snapshot(raw: &str) -> Result<InspectorSnapshot, String> {
     let snapshot: Value = serde_json::from_str(raw)
         .map_err(|error| format!("macOS agent returned invalid snapshot JSON: {error}"))?;
     let document = snapshot
@@ -471,7 +470,7 @@ fn inspector_snapshot(raw: &str) -> Result<DesktopInspectorSnapshot, String> {
     let root = document.get("root").ok_or_else(|| {
         "macOS accessibility snapshot document does not contain a root".to_string()
     })?;
-    Ok(DesktopInspectorSnapshot {
+    Ok(InspectorSnapshot {
         version: snapshot
             .get("version")
             .and_then(Value::as_u64)
@@ -487,7 +486,7 @@ fn inspector_snapshot(raw: &str) -> Result<DesktopInspectorSnapshot, String> {
     })
 }
 
-fn inspector_node(node: &Value) -> DesktopInspectorNode {
+fn inspector_node(node: &Value) -> InspectorNode {
     let properties = node.get("properties").cloned().unwrap_or(Value::Null);
     let states = node.get("states").cloned().unwrap_or(Value::Null);
     let children = node
@@ -506,7 +505,7 @@ fn inspector_node(node: &Value) -> DesktopInspectorNode {
                 .map(|child| child.bounds.clone())
         })
         .unwrap_or_default();
-    DesktopInspectorNode {
+    InspectorNode {
         role: node
             .get("role")
             .and_then(Value::as_str)
@@ -542,8 +541,8 @@ fn inspector_node(node: &Value) -> DesktopInspectorNode {
     }
 }
 
-fn inspector_bounds(value: &Value) -> Option<DesktopElementBounds> {
-    Some(DesktopElementBounds {
+fn inspector_bounds(value: &Value) -> Option<InspectorBounds> {
+    Some(InspectorBounds {
         x: value.get("x")?.as_f64()?,
         y: value.get("y")?.as_f64()?,
         width: value.get("width")?.as_f64()?,
