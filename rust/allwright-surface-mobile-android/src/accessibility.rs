@@ -1,5 +1,6 @@
 //! Native snapshot semantics and ephemeral references belong to the Android plugin.
 use super::*;
+use allwright_plugin_sdk::{InspectorBounds, InspectorNode, InspectorSnapshot};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::{
@@ -360,6 +361,126 @@ pub(super) fn snapshot(
     })
 }
 
+pub(super) fn inspector_snapshot(
+    browser: &MobileBrowserSessionHandle,
+    page: &MobilePageSessionHandle,
+) -> Result<InspectorSnapshot, String> {
+    let value = capture_source(
+        browser,
+        page,
+        adb_dump_source(&browser.device.device_id)?,
+        "default",
+    )?;
+    normalize_inspector_snapshot(&value)
+}
+
+fn normalize_inspector_snapshot(value: &Value) -> Result<InspectorSnapshot, String> {
+    let document = value
+        .get("documents")
+        .and_then(Value::as_array)
+        .and_then(|documents| documents.first())
+        .ok_or_else(|| "Android accessibility snapshot does not contain a document".to_string())?;
+    let root = document.get("root").ok_or_else(|| {
+        "Android accessibility snapshot document does not contain a root".to_string()
+    })?;
+    Ok(InspectorSnapshot {
+        version: value
+            .get("version")
+            .and_then(Value::as_u64)
+            .and_then(|version| u32::try_from(version).ok())
+            .unwrap_or(1),
+        platform: "android".to_string(),
+        backend: "UiAutomator2".to_string(),
+        root: normalize_inspector_node(root),
+    })
+}
+
+fn normalize_inspector_node(node: &Value) -> InspectorNode {
+    let properties = node.get("properties").cloned().unwrap_or(Value::Null);
+    let states = node.get("states").cloned().unwrap_or(Value::Null);
+    let children = node
+        .get("children")
+        .and_then(Value::as_array)
+        .map(|children| {
+            children
+                .iter()
+                .map(normalize_inspector_node)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let bounds = properties
+        .get("bounds")
+        .and_then(inspector_bounds)
+        .filter(|bounds| bounds.width > 0.0 && bounds.height > 0.0)
+        .or_else(|| enclosing_bounds(&children))
+        .unwrap_or_default();
+    InspectorNode {
+        role: node
+            .get("role")
+            .and_then(Value::as_str)
+            .unwrap_or("generic")
+            .to_string(),
+        name: node
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        automation_id: properties
+            .get("resourceId")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        class_name: properties
+            .get("class")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        enabled: !states
+            .get("disabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        offscreen: !properties
+            .get("rendered")
+            .and_then(Value::as_bool)
+            .unwrap_or(true),
+        bounds,
+        properties,
+        states,
+        children,
+    }
+}
+
+fn inspector_bounds(value: &Value) -> Option<InspectorBounds> {
+    Some(InspectorBounds {
+        x: value.get("x")?.as_f64()?,
+        y: value.get("y")?.as_f64()?,
+        width: value.get("width")?.as_f64()?,
+        height: value.get("height")?.as_f64()?,
+    })
+}
+
+fn enclosing_bounds(children: &[InspectorNode]) -> Option<InspectorBounds> {
+    let mut visible = children
+        .iter()
+        .map(|child| &child.bounds)
+        .filter(|bounds| bounds.width > 0.0 && bounds.height > 0.0);
+    let first = visible.next()?;
+    let (mut left, mut top) = (first.x, first.y);
+    let (mut right, mut bottom) = (first.x + first.width, first.y + first.height);
+    for bounds in visible {
+        left = left.min(bounds.x);
+        top = top.min(bounds.y);
+        right = right.max(bounds.x + bounds.width);
+        bottom = bottom.max(bounds.y + bounds.height);
+    }
+    Some(InspectorBounds {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -454,6 +575,33 @@ mod tests {
         }
         clear(&browser, &page).unwrap();
     }
+
+    #[test]
+    fn inspector_snapshot_uses_canonical_android_fields_and_bounds() {
+        let (browser, page, source) = fixture();
+        let value = capture_source(&browser, &page, source, "default").unwrap();
+        let snapshot = normalize_inspector_snapshot(&value).unwrap();
+
+        assert_eq!(snapshot.version, 1);
+        assert_eq!(snapshot.platform, "android");
+        assert_eq!(snapshot.backend, "UiAutomator2");
+        assert_eq!(snapshot.root.bounds.width, 400.0);
+        assert_eq!(snapshot.root.bounds.height, 800.0);
+
+        let frame = &snapshot.root.children[0];
+        let save = &frame.children[0];
+        assert_eq!(save.role, "button");
+        assert_eq!(save.name, "Save");
+        assert_eq!(save.class_name, "android.widget.Button");
+        assert!(save.enabled);
+        assert!(!save.offscreen);
+
+        let disabled_checkbox = &frame.children[1];
+        assert!(!disabled_checkbox.enabled);
+        assert_eq!(disabled_checkbox.states["checked"], true);
+        assert!(frame.children[3].offscreen);
+    }
+
     #[test]
     fn references_expire_and_non_ai_observations_invalidate_changes() {
         let (browser, page, mut source) = fixture();

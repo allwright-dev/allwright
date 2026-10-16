@@ -2380,6 +2380,27 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
                 note: "sent key input through XCUITest".to_string(),
             }))
         }
+        MobileCommand::ScrollElement {
+            browser_session,
+            page_session,
+            selector,
+            direction,
+            timeout_ms,
+        } => {
+            let selector = normalized_selector(&selector)?;
+            let mut request = action_request("scroll", &page_session, &selector, timeout_ms);
+            request.key = Some(&direction);
+            invoke_agent(
+                endpoint_from_session(&browser_session)?,
+                &request,
+                timeout_ms,
+            )?;
+            Ok(MobileCommandResult::ScrollElement(MobilePressInfo {
+                selector,
+                key: direction.clone(),
+                note: format!("scrolled iOS element {direction} through XCUITest"),
+            }))
+        }
         MobileCommand::GetText {
             browser_session,
             page_session,

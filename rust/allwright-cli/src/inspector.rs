@@ -70,6 +70,7 @@ enum InspectorSurface {
         id: &'static str,
         platform: DesktopPlatform,
     },
+    MobileAndroid,
     MobileIos,
 }
 
@@ -95,9 +96,10 @@ impl InspectorSurface {
                 id: "desktop-mac",
                 platform: DesktopPlatform::Mac,
             }),
+            "mobile-android" => Ok(Self::MobileAndroid),
             "mobile-ios" => Ok(Self::MobileIos),
             _ => Err(format!(
-                "inspector surface `{value}` is not supported; expected `desktop-windows`, `desktop-mac`, or `mobile-ios`"
+                "inspector surface `{value}` is not supported; expected `desktop-windows`, `desktop-mac`, `mobile-android`, or `mobile-ios`"
             )
             .into()),
         }
@@ -106,6 +108,7 @@ impl InspectorSurface {
     fn id(self) -> &'static str {
         match self {
             Self::Desktop { id, .. } => id,
+            Self::MobileAndroid => "mobile-android",
             Self::MobileIos => "mobile-ios",
         }
     }
@@ -121,7 +124,7 @@ impl InspectorRuntime {
         let session = match surface {
             InspectorSurface::Desktop { id, platform } => {
                 if device.is_some() {
-                    return Err("--device is only supported by the mobile-ios inspector".into());
+                    return Err("--device is only supported by mobile inspectors".into());
                 }
                 let connect = invoke_desktop(
                     id,
@@ -164,11 +167,17 @@ impl InspectorRuntime {
                     app: application.app_session,
                 }
             }
-            InspectorSurface::MobileIos => {
+            InspectorSurface::MobileAndroid | InspectorSurface::MobileIos => {
+                let plugin_id = surface.id();
+                let platform = match surface {
+                    InspectorSurface::MobileAndroid => MobilePlatform::Android,
+                    InspectorSurface::MobileIos => MobilePlatform::Ios,
+                    InspectorSurface::Desktop { .. } => unreachable!(),
+                };
                 let connect = invoke_mobile(
-                    "mobile-ios",
+                    plugin_id,
                     MobileCommand::Connect(MobileConnectOptions {
-                        platform: MobilePlatform::Ios,
+                        platform,
                         device: device.map(str::to_string),
                         adb_endpoint: None,
                         agent_endpoint: None,
@@ -177,10 +186,12 @@ impl InspectorRuntime {
                     }),
                 )?;
                 let MobileCommandResult::Connect(connection) = connect else {
-                    return Err("mobile-ios returned an unexpected connect response".into());
+                    return Err(
+                        format!("{plugin_id} returned an unexpected connect response").into(),
+                    );
                 };
                 let launch = invoke_mobile(
-                    "mobile-ios",
+                    plugin_id,
                     MobileCommand::LaunchApp {
                         browser_session: connection.browser_session.clone(),
                         options: MobileLaunchOptions {
@@ -193,11 +204,13 @@ impl InspectorRuntime {
                     },
                 )?;
                 let MobileCommandResult::LaunchApp(application) = launch else {
-                    return Err("mobile-ios returned an unexpected launch response".into());
+                    return Err(
+                        format!("{plugin_id} returned an unexpected launch response").into(),
+                    );
                 };
                 if let Some(url) = url {
                     invoke_mobile(
-                        "mobile-ios",
+                        plugin_id,
                         MobileCommand::NavigateApp {
                             browser_session: connection.browser_session.clone(),
                             page_session: application.page_session.clone(),
@@ -296,7 +309,46 @@ impl InspectorRuntime {
         }))
     }
 
-    fn click(&self, selector: String) -> Result<Value, Box<dyn Error>> {
+    fn action(
+        &self,
+        action: &str,
+        selector: String,
+        value: Option<String>,
+        key: Option<String>,
+        text: Option<String>,
+        direction: Option<String>,
+    ) -> Result<Value, Box<dyn Error>> {
+        match action {
+            "click" => self.click_element(&selector)?,
+            "double_click" => {
+                self.click_element(&selector)?;
+                std::thread::sleep(std::time::Duration::from_millis(75));
+                self.click_element(&selector)?;
+            }
+            "fill" => {
+                self.fill_element(&selector, value.as_deref().ok_or("fill requires a value")?)?
+            }
+            "press" => self.press_key(
+                &selector,
+                key.as_deref()
+                    .filter(|key| !key.trim().is_empty())
+                    .ok_or("press requires a non-empty key")?,
+                text.as_deref(),
+            )?,
+            "scroll" => self.scroll_element(
+                &selector,
+                direction
+                    .as_deref()
+                    .filter(|direction| matches!(*direction, "up" | "down" | "left" | "right"))
+                    .ok_or("scroll requires an up, down, left, or right direction")?,
+            )?,
+            _ => return Err(format!("unsupported inspector action `{action}`").into()),
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        self.snapshot()
+    }
+
+    fn click_element(&self, selector: &str) -> Result<(), Box<dyn Error>> {
         match &self.session {
             InspectorSession::Desktop { desktop, app } => {
                 invoke_desktop(
@@ -304,7 +356,7 @@ impl InspectorRuntime {
                     DesktopCommand::ClickElement {
                         desktop_session: desktop.clone(),
                         app_session: app.clone(),
-                        selector,
+                        selector: selector.to_string(),
                         timeout_ms: Some(10_000),
                     },
                 )?;
@@ -315,14 +367,110 @@ impl InspectorRuntime {
                     MobileCommand::ClickElement {
                         browser_session: browser.clone(),
                         page_session: page.clone(),
-                        selector,
+                        selector: selector.to_string(),
                         timeout_ms: Some(10_000),
                     },
                 )?;
             }
         }
-        std::thread::sleep(std::time::Duration::from_millis(200));
-        self.snapshot()
+        Ok(())
+    }
+
+    fn fill_element(&self, selector: &str, value: &str) -> Result<(), Box<dyn Error>> {
+        match &self.session {
+            InspectorSession::Desktop { desktop, app } => {
+                invoke_desktop(
+                    self.surface.id(),
+                    DesktopCommand::FillElement {
+                        desktop_session: desktop.clone(),
+                        app_session: app.clone(),
+                        selector: selector.to_string(),
+                        value: value.to_string(),
+                        timeout_ms: Some(10_000),
+                    },
+                )?;
+            }
+            InspectorSession::Mobile { browser, page } => {
+                invoke_mobile(
+                    self.surface.id(),
+                    MobileCommand::FillElement {
+                        browser_session: browser.clone(),
+                        page_session: page.clone(),
+                        selector: selector.to_string(),
+                        value: value.to_string(),
+                        timeout_ms: Some(10_000),
+                    },
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    fn press_key(
+        &self,
+        selector: &str,
+        key: &str,
+        text: Option<&str>,
+    ) -> Result<(), Box<dyn Error>> {
+        match &self.session {
+            InspectorSession::Desktop { desktop, app } => {
+                invoke_desktop(
+                    self.surface.id(),
+                    DesktopCommand::PressKey {
+                        desktop_session: desktop.clone(),
+                        app_session: app.clone(),
+                        selector: selector.to_string(),
+                        key: key.to_string(),
+                        text: text.map(str::to_string),
+                        timeout_ms: Some(10_000),
+                    },
+                )?;
+            }
+            InspectorSession::Mobile { browser, page } => {
+                invoke_mobile(
+                    self.surface.id(),
+                    MobileCommand::PressKey {
+                        browser_session: browser.clone(),
+                        page_session: page.clone(),
+                        selector: selector.to_string(),
+                        key: key.to_string(),
+                        text: text.map(str::to_string),
+                        timeout_ms: Some(10_000),
+                    },
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    fn scroll_element(&self, selector: &str, direction: &str) -> Result<(), Box<dyn Error>> {
+        match &self.session {
+            InspectorSession::Desktop { desktop, app } => {
+                invoke_desktop(
+                    self.surface.id(),
+                    DesktopCommand::ScrollElement {
+                        desktop_session: desktop.clone(),
+                        app_session: app.clone(),
+                        selector: selector.to_string(),
+                        direction: direction.to_string(),
+                        timeout_ms: Some(10_000),
+                    },
+                )?;
+            }
+            InspectorSession::Mobile { browser, page } => {
+                invoke_mobile(
+                    self.surface.id(),
+                    MobileCommand::ScrollElement {
+                        browser_session: browser.clone(),
+                        page_session: page.clone(),
+                        selector: selector.to_string(),
+                        direction: direction.to_string(),
+                        timeout_ms: Some(10_000),
+                    },
+                )?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -410,7 +558,29 @@ fn handle_request(
                 .and_then(Value::as_str)
                 .filter(|value| !value.trim().is_empty())
                 .ok_or("click requires a non-empty selector")?;
-            let body = serde_json::to_vec(&runtime.click(selector.to_string())?)?;
+            let body = serde_json::to_vec(&runtime.action(
+                "click",
+                selector.to_string(),
+                None,
+                None,
+                None,
+                None,
+            )?)?;
+            write_response(stream, "200 OK", "application/json", &body)?;
+        }
+        ("POST", "/api/action") => {
+            let payload: InspectorActionRequest = serde_json::from_slice(&request.body)?;
+            if payload.selector.trim().is_empty() {
+                return Err("inspector action requires a non-empty selector".into());
+            }
+            let body = serde_json::to_vec(&runtime.action(
+                &payload.action,
+                payload.selector,
+                payload.value,
+                payload.key,
+                payload.text,
+                payload.direction,
+            )?)?;
             write_response(stream, "200 OK", "application/json", &body)?;
         }
         _ => write_response(
@@ -421,6 +591,16 @@ fn handle_request(
         )?,
     }
     Ok(())
+}
+
+#[derive(Deserialize)]
+struct InspectorActionRequest {
+    action: String,
+    selector: String,
+    value: Option<String>,
+    key: Option<String>,
+    text: Option<String>,
+    direction: Option<String>,
 }
 
 struct HttpRequest {
@@ -554,12 +734,35 @@ mod tests {
     #[test]
     fn inspector_html_has_core_workflow() {
         assert!(INDEX_HTML.contains("/api/snapshot"));
-        assert!(INDEX_HTML.contains("/api/click"));
+        assert!(INDEX_HTML.contains("/api/action"));
         assert!(INDEX_HTML.contains("Element hierarchy"));
+        assert!(INDEX_HTML.contains(">Inspect</button>"));
+        assert!(INDEX_HTML.contains(">Interact</button>"));
+        assert!(INDEX_HTML.contains("double_click"));
+        assert!(INDEX_HTML.contains("wheelInteract"));
+        assert!(INDEX_HTML.contains("touchEnd"));
+        assert!(INDEX_HTML.contains("Text to fill"));
+        assert!(INDEX_HTML.contains("Press key"));
         assert!(INDEX_HTML.contains("app.getByRole"));
         assert!(INDEX_HTML.contains("app.get_by_role"));
         assert!(INDEX_HTML.contains("app.GetByRole"));
         assert!(INDEX_HTML.contains("app.get_by_role_with_options"));
+        assert!(INDEX_HTML.contains("object-fit:contain"));
+        assert!(INDEX_HTML.contains("function fitStage()"));
+        assert!(INDEX_HTML.contains("window.addEventListener('resize',fitStage)"));
+    }
+
+    #[test]
+    fn parses_inspector_interaction_actions() {
+        let action: InspectorActionRequest = serde_json::from_str(
+            r#"{"action":"fill","selector":"id=email","value":"person@example.com"}"#,
+        )
+        .unwrap();
+        assert_eq!(action.action, "fill");
+        assert_eq!(action.selector, "id=email");
+        assert_eq!(action.value.as_deref(), Some("person@example.com"));
+        assert!(action.key.is_none());
+        assert!(action.direction.is_none());
     }
 
     #[test]

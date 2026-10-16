@@ -406,6 +406,13 @@ pub enum MobileCommand {
         text: Option<String>,
         timeout_ms: Option<u32>,
     },
+    ScrollElement {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+        selector: String,
+        direction: String,
+        timeout_ms: Option<u32>,
+    },
     GetText {
         browser_session: MobileBrowserSessionHandle,
         page_session: MobilePageSessionHandle,
@@ -453,6 +460,7 @@ pub enum MobileCommandResult {
     FocusElement(MobileElementInfo),
     FillElement(MobileFillInfo),
     PressKey(MobilePressInfo),
+    ScrollElement(MobilePressInfo),
     GetText(MobileTextInfo),
     GetInnerText(MobileTextInfo),
     WaitForSelector(MobileWaitForSelectorInfo),

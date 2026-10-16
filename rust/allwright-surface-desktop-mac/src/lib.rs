@@ -718,6 +718,28 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
                 "sent key input to",
             )))
         }
+        DesktopCommand::ScrollElement {
+            desktop_session,
+            app_session,
+            selector,
+            direction,
+            timeout_ms,
+        } => {
+            agent_action(
+                "scroll",
+                &desktop_session,
+                &app_session,
+                &selector,
+                None,
+                Some(&direction),
+                None,
+                None,
+                timeout_ms,
+            )?;
+            Ok(DesktopCommandResult::ScrollElement(action_info(
+                selector, "scrolled",
+            )))
+        }
         DesktopCommand::GetText {
             desktop_session,
             app_session,

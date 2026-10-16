@@ -162,6 +162,13 @@ pub enum DesktopCommand {
         text: Option<String>,
         timeout_ms: Option<u32>,
     },
+    ScrollElement {
+        desktop_session: DesktopSessionHandle,
+        app_session: DesktopAppSessionHandle,
+        selector: String,
+        direction: String,
+        timeout_ms: Option<u32>,
+    },
     GetText {
         desktop_session: DesktopSessionHandle,
         app_session: DesktopAppSessionHandle,
@@ -212,6 +219,7 @@ pub enum DesktopCommandResult {
     FocusElement(DesktopActionInfo),
     FillElement(DesktopActionInfo),
     PressKey(DesktopActionInfo),
+    ScrollElement(DesktopActionInfo),
     GetText(DesktopTextInfo),
     GetInnerText(DesktopTextInfo),
     WaitForSelector(DesktopWaitInfo),

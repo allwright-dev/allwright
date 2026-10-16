@@ -48,11 +48,11 @@ enum CliCommand {
     },
     /// Open a local UI inspector for an application surface
     Inspector {
-        /// Surface to inspect (`desktop-windows`, `desktop-mac`, or `mobile-ios`)
+        /// Surface to inspect (`desktop-windows`, `desktop-mac`, `mobile-android`, or `mobile-ios`)
         surface: String,
-        /// Desktop application id/path, or iOS application file path/URL
+        /// Desktop application id/path, or mobile application file path/URL
         target: String,
-        /// iOS Simulator name/UDID or connected-device UDID
+        /// Android device serial/name, iOS Simulator name/UDID, or iOS device UDID
         #[arg(long)]
         device: Option<String>,
         /// Open this URL after launching the application
@@ -975,6 +975,32 @@ mod tests {
             }) if surface == "mobile-ios"
                 && target == "https://allwright.dev/Flights-simulator.ipa"
                 && device == "iPhone 17 Pro"
+        ));
+    }
+
+    #[test]
+    fn parses_android_inspector_source_and_device() {
+        let args = Args::try_parse_from([
+            "allwright",
+            "inspector",
+            "mobile-android",
+            "https://allwright.dev/sample.apk",
+            "--device",
+            "emulator-5554",
+            "--no-open",
+        ])
+        .unwrap();
+        assert!(matches!(
+            args.command,
+            Some(CliCommand::Inspector {
+                surface,
+                target,
+                device: Some(device),
+                no_open: true,
+                ..
+            }) if surface == "mobile-android"
+                && target == "https://allwright.dev/sample.apk"
+                && device == "emulator-5554"
         ));
     }
 

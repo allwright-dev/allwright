@@ -796,9 +796,11 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             mode,
         } => accessibility::snapshot(&browser_session, &page_session, &format, &mode)
             .map(MobileCommandResult::AccessibilitySnapshot),
-        MobileCommand::InspectorSnapshot { .. } => {
-            Err("mobile-android inspector snapshots are not implemented".to_string())
-        }
+        MobileCommand::InspectorSnapshot {
+            browser_session,
+            page_session,
+        } => accessibility::inspector_snapshot(&browser_session, &page_session)
+            .map(MobileCommandResult::InspectorSnapshot),
         MobileCommand::ClickElement {
             browser_session,
             page_session,
@@ -850,6 +852,20 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             timeout_ms,
         )
         .map(MobileCommandResult::PressKey),
+        MobileCommand::ScrollElement {
+            browser_session,
+            page_session,
+            selector,
+            direction,
+            timeout_ms,
+        } => scroll_element(
+            &browser_session,
+            &page_session,
+            &selector,
+            &direction,
+            timeout_ms,
+        )
+        .map(MobileCommandResult::ScrollElement),
         MobileCommand::GetText {
             browser_session,
             page_session,
@@ -1556,6 +1572,71 @@ fn adb_press_key(
     Err(format!(
         "unsupported Android key `{key}`; provide a single character, `text`, or a supported special key"
     ))
+}
+
+fn scroll_element(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    selector: &str,
+    direction: &str,
+    timeout_ms: Option<u32>,
+) -> Result<MobilePressInfo, String> {
+    accessibility::validate_scope(browser_session, page_session, selector)?;
+    let snapshot =
+        resolve_selector_snapshot(&browser_session.device.device_id, selector, timeout_ms)?;
+    let bounds = snapshot
+        .node
+        .bounds
+        .ok_or_else(|| format!("selector resolved without bounds: {}", snapshot.selector))?;
+    let center_x = (bounds.left + bounds.right) / 2;
+    let center_y = (bounds.top + bounds.bottom) / 2;
+    let inset_x = ((bounds.right - bounds.left) / 5).max(1);
+    let inset_y = ((bounds.bottom - bounds.top) / 5).max(1);
+    let (start_x, start_y, end_x, end_y) = match direction {
+        "down" => (
+            center_x,
+            bounds.bottom - inset_y,
+            center_x,
+            bounds.top + inset_y,
+        ),
+        "up" => (
+            center_x,
+            bounds.top + inset_y,
+            center_x,
+            bounds.bottom - inset_y,
+        ),
+        "right" => (
+            bounds.right - inset_x,
+            center_y,
+            bounds.left + inset_x,
+            center_y,
+        ),
+        "left" => (
+            bounds.left + inset_x,
+            center_y,
+            bounds.right - inset_x,
+            center_y,
+        ),
+        _ => return Err(format!("unsupported scroll direction `{direction}`")),
+    };
+    run_adb_for_device(
+        &browser_session.device.device_id,
+        &[
+            "shell",
+            "input",
+            "swipe",
+            &start_x.to_string(),
+            &start_y.to_string(),
+            &end_x.to_string(),
+            &end_y.to_string(),
+            "250",
+        ],
+    )?;
+    Ok(MobilePressInfo {
+        selector: snapshot.selector,
+        key: direction.to_string(),
+        note: format!("scrolled Android element {direction} through an ADB swipe"),
+    })
 }
 
 fn adb_get_text(

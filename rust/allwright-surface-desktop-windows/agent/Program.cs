@@ -128,6 +128,7 @@ internal static class Program
         "focus" => WithElement(request, element => { element.Focus(); return new { }; }),
         "fill" => WithElement(request, element => { Fill(element, request.Value ?? ""); return new { }; }),
         "press" => WithElement(request, element => { element.Focus(); Press(request.Key ?? "", request.Text); return new { }; }),
+        "scroll" => WithElement(request, element => { Scroll(element, request.Key ?? ""); return new { }; }),
         "text" => WithElement(request, element => new { text = ElementText(element) }),
         "capture" => WithElement(request, element => CaptureElement(element, request)),
         "wait" => Wait(request),
@@ -540,6 +541,34 @@ internal static class Program
             _ => (VirtualKeyShort)0
         };
         if (virtualKey == 0) Keyboard.Type(key); else Keyboard.Type(virtualKey);
+    }
+
+    private static void Scroll(AutomationElement element, string direction)
+    {
+        if (element.Patterns.Scroll.TryGetPattern(out var pattern))
+        {
+            var horizontal = ScrollAmount.NoAmount;
+            var vertical = ScrollAmount.NoAmount;
+            switch (direction.ToLowerInvariant())
+            {
+                case "down": vertical = ScrollAmount.LargeIncrement; break;
+                case "up": vertical = ScrollAmount.LargeDecrement; break;
+                case "right": horizontal = ScrollAmount.LargeIncrement; break;
+                case "left": horizontal = ScrollAmount.LargeDecrement; break;
+                default: throw new InvalidOperationException($"unsupported scroll direction `{direction}`");
+            }
+            pattern.Scroll(horizontal, vertical);
+            return;
+        }
+        element.Focus();
+        Keyboard.Type(direction.ToLowerInvariant() switch
+        {
+            "down" => VirtualKeyShort.NEXT,
+            "up" => VirtualKeyShort.PRIOR,
+            "right" => VirtualKeyShort.RIGHT,
+            "left" => VirtualKeyShort.LEFT,
+            _ => throw new InvalidOperationException($"unsupported scroll direction `{direction}`")
+        });
     }
 
     private static string ElementText(AutomationElement element)

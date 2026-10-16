@@ -224,6 +224,17 @@ final class AllwrightIOSAgent {
             element.typeText(keyText(key, explicitText: request["text"] as? String))
             return .success(["performed": true])
 
+        case "scroll":
+            let element = try resolvedElement(for: request, requiringActionability: true)
+            switch try requiredString("key", in: request) {
+            case "down": element.swipeUp()
+            case "up": element.swipeDown()
+            case "right": element.swipeLeft()
+            case "left": element.swipeRight()
+            default: throw AgentError("unsupported scroll direction")
+            }
+            return .success(["performed": true])
+
         case "count":
             let (sessionID, application) = try application(for: request)
             let selector = try requiredString("selector", in: request)

@@ -64,6 +64,9 @@ fn invoke_desktop(command: DesktopCommand) -> Result<DesktopCommandResult, Strin
         | DesktopCommand::PressKey {
             desktop_session, ..
         }
+        | DesktopCommand::ScrollElement {
+            desktop_session, ..
+        }
         | DesktopCommand::GetText {
             desktop_session, ..
         }
@@ -425,6 +428,9 @@ fn mobile_plugin_id_for_command(command: &MobileCommand) -> Result<&'static str,
             browser_session, ..
         }
         | MobileCommand::PressKey {
+            browser_session, ..
+        }
+        | MobileCommand::ScrollElement {
             browser_session, ..
         }
         | MobileCommand::GetText {

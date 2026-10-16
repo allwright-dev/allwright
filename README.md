@@ -181,6 +181,7 @@ List or install plugins:
 ```bash
 allwright plugin list
 allwright plugin install web
+allwright plugin install mobile-android
 allwright plugin install mobile-ios
 allwright plugin install desktop-mac
 allwright plugin install desktop-windows
@@ -200,6 +201,11 @@ properties, copy a suggested locator, or click it in the application. Use
 through the Windows shell, and `--no-open` when the browser should not be
 opened automatically.
 
+All inspectors provide separate **Inspect** and **Interact** modes. Inspect mode
+selects elements without activating them. Interact mode sends clicks or taps
+from the screenshot to the live application; selected elements also expose
+double-click/double-tap, scrolling/swiping, fill, and key-press controls.
+
 On macOS, pass the application bundle identifier:
 
 ```bash
@@ -210,6 +216,19 @@ allwright inspector desktop-mac com.apple.Safari --url https://allwright.dev
 The macOS inspector uses the same interface and locator workflow, backed by the
 XCUITest accessibility hierarchy. Xcode and UI automation permission are
 required, just as they are for the regular `desktop-mac` surface.
+
+For an Android emulator or connected device, pass a local APK or a downloadable
+APK URL. Use `--device` to select a device by ADB serial or configured name; when
+omitted, the Android surface selects its default connected device:
+
+```bash
+allwright inspector mobile-android ./sample.apk
+allwright inspector mobile-android https://allwright.dev/sample.apk --device emulator-5554
+```
+
+The Android inspector installs and launches the APK, then provides the shared
+screenshot, UiAutomator hierarchy, element details, locator code, and click
+workflow.
 
 For an iOS Simulator or registered physical device, pass a local application
 artifact or downloadable URL. Use `--device` to select a Simulator by name/UDID
