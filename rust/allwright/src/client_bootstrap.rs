@@ -477,7 +477,14 @@ fn unpack_cli_archive(asset_name: &str, asset_bytes: &[u8], destination: &Path) 
                 "failed to inspect the downloaded CLI zip archive: {error}"
             ))
         })?;
-        if normalized_archive_path(Path::new(file.name())).as_deref() != Some(expected.as_path()) {
+        let file_name = file.name().map_err(|error| {
+            Error::new(format!(
+                "failed to read a downloaded CLI zip entry name: {error}"
+            ))
+        })?;
+        if normalized_archive_path(Path::new(file_name.as_ref())).as_deref()
+            != Some(expected.as_path())
+        {
             continue;
         }
 

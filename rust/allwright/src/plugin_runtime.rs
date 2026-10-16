@@ -555,7 +555,10 @@ fn unpack_plugin_release_asset(
             let mut entry = archive
                 .by_index(index)
                 .map_err(|error| format!("read plugin zip entry {index}: {error}"))?;
-            let Some(relative_path) = safe_archive_path(entry.name()) else {
+            let entry_name = entry
+                .name()
+                .map_err(|error| format!("read plugin zip entry {index} name: {error}"))?;
+            let Some(relative_path) = safe_archive_path(entry_name.as_ref()) else {
                 continue;
             };
             let destination = install_root.join(relative_path);

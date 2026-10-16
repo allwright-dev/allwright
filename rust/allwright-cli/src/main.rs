@@ -763,7 +763,8 @@ fn unpack_plugin_release_asset(
         let mut archive = ZipArchive::new(reader)?;
         for index in 0..archive.len() {
             let mut entry = archive.by_index(index)?;
-            let Some(relative_path) = safe_archive_path(entry.name()) else {
+            let entry_name = entry.name()?;
+            let Some(relative_path) = safe_archive_path(entry_name.as_ref()) else {
                 continue;
             };
             let destination = install_root.join(relative_path);
