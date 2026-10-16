@@ -78,6 +78,9 @@ fn invoke_desktop(command: DesktopCommand) -> Result<DesktopCommandResult, Strin
         }
         | DesktopCommand::AccessibilitySnapshot {
             desktop_session, ..
+        }
+        | DesktopCommand::InspectorSnapshot {
+            desktop_session, ..
         } => desktop_session.platform.plugin_id(),
     };
     let request_json = serde_json::to_string(&command)

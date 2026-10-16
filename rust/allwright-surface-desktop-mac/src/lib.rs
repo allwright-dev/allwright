@@ -4,9 +4,10 @@ use allwright_plugin_sdk::{
 };
 use allwright_surface_desktop::{
     ConnectOptions, DesktopActionInfo, DesktopAppInfo, DesktopAppSessionHandle, DesktopCommand,
-    DesktopCommandResult, DesktopConnectInfo, DesktopElementCountInfo, DesktopNavigationInfo,
-    DesktopPlatform, DesktopScreenshotInfo, DesktopSessionHandle, DesktopTextInfo, DesktopWaitInfo,
-    LaunchOptions, boot_surface, normalize_selector_for_transport,
+    DesktopCommandResult, DesktopConnectInfo, DesktopElementBounds, DesktopElementCountInfo,
+    DesktopInspectorNode, DesktopInspectorSnapshot, DesktopNavigationInfo, DesktopPlatform,
+    DesktopScreenshotInfo, DesktopSessionHandle, DesktopTextInfo, DesktopWaitInfo, LaunchOptions,
+    boot_surface, normalize_selector_for_transport,
 };
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -459,6 +460,97 @@ fn action_info(selector: String, action: &str) -> DesktopActionInfo {
     }
 }
 
+fn inspector_snapshot(raw: &str) -> Result<DesktopInspectorSnapshot, String> {
+    let snapshot: Value = serde_json::from_str(raw)
+        .map_err(|error| format!("macOS agent returned invalid snapshot JSON: {error}"))?;
+    let document = snapshot
+        .get("documents")
+        .and_then(Value::as_array)
+        .and_then(|documents| documents.first())
+        .ok_or_else(|| "macOS accessibility snapshot does not contain a document".to_string())?;
+    let root = document.get("root").ok_or_else(|| {
+        "macOS accessibility snapshot document does not contain a root".to_string()
+    })?;
+    Ok(DesktopInspectorSnapshot {
+        version: snapshot
+            .get("version")
+            .and_then(Value::as_u64)
+            .and_then(|version| u32::try_from(version).ok())
+            .unwrap_or(1),
+        platform: document
+            .get("platform")
+            .and_then(Value::as_str)
+            .unwrap_or("macos")
+            .to_string(),
+        backend: "XCUITest".to_string(),
+        root: inspector_node(root),
+    })
+}
+
+fn inspector_node(node: &Value) -> DesktopInspectorNode {
+    let properties = node.get("properties").cloned().unwrap_or(Value::Null);
+    let states = node.get("states").cloned().unwrap_or(Value::Null);
+    let children = node
+        .get("children")
+        .and_then(Value::as_array)
+        .map(|children| children.iter().map(inspector_node).collect::<Vec<_>>())
+        .unwrap_or_default();
+    let bounds = properties
+        .get("frame")
+        .and_then(inspector_bounds)
+        .filter(|bounds| bounds.width > 0.0 && bounds.height > 0.0)
+        .or_else(|| {
+            children
+                .iter()
+                .find(|child| child.class_name.eq_ignore_ascii_case("window"))
+                .map(|child| child.bounds.clone())
+        })
+        .unwrap_or_default();
+    DesktopInspectorNode {
+        role: node
+            .get("role")
+            .and_then(Value::as_str)
+            .unwrap_or("generic")
+            .to_string(),
+        name: node
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        automation_id: properties
+            .get("identifier")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        class_name: properties
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        enabled: !states
+            .get("disabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        offscreen: !properties
+            .get("rendered")
+            .and_then(Value::as_bool)
+            .unwrap_or(true),
+        bounds,
+        properties,
+        states,
+        children,
+    }
+}
+
+fn inspector_bounds(value: &Value) -> Option<DesktopElementBounds> {
+    Some(DesktopElementBounds {
+        x: value.get("x")?.as_f64()?,
+        y: value.get("y")?.as_f64()?,
+        width: value.get("width")?.as_f64()?,
+        height: value.get("height")?.as_f64()?,
+    })
+}
+
 fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult, String> {
     match command {
         DesktopCommand::Connect(options) => connect(&options).map(DesktopCommandResult::Connect),
@@ -770,6 +862,19 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
                 },
             ))
         }
+        DesktopCommand::InspectorSnapshot {
+            desktop_session,
+            app_session,
+        } => {
+            let mut request = AgentRequest::new("source");
+            request.session_id = Some(&app_session.app_session_id);
+            request.value = Some("default");
+            let result = invoke_agent(&desktop_session.endpoint, &request, Some(10_000))?;
+            let raw = result_string(&result, "snapshot")?;
+            Ok(DesktopCommandResult::InspectorSnapshot(inspector_snapshot(
+                raw,
+            )?))
+        }
     }
 }
 
@@ -867,5 +972,49 @@ mod tests {
             parse_http_endpoint(DEFAULT_AGENT_ENDPOINT).unwrap(),
             ("127.0.0.1".to_string(), 8200, "/v1/command".to_string())
         );
+    }
+
+    #[test]
+    fn normalizes_xctest_document_for_the_inspector() {
+        let snapshot = json!({
+            "version": 1,
+            "documents": [{
+                "platform": "macos",
+                "root": {
+                    "role": "application",
+                    "name": "TextEdit",
+                    "states": {},
+                    "properties": {"type": "application", "rendered": true},
+                    "children": [{
+                        "role": "generic",
+                        "name": "Document",
+                        "states": {},
+                        "properties": {
+                            "type": "Window",
+                            "rendered": true,
+                            "frame": {"x": 20, "y": 40, "width": 800, "height": 600}
+                        },
+                        "children": [{
+                            "role": "button",
+                            "name": "Save",
+                            "states": {"disabled": false},
+                            "properties": {
+                                "identifier": "save-button",
+                                "type": "button",
+                                "rendered": true,
+                                "frame": {"x": 700, "y": 50, "width": 80, "height": 30}
+                            },
+                            "children": []
+                        }]
+                    }]
+                }
+            }]
+        });
+        let normalized = inspector_snapshot(&snapshot.to_string()).unwrap();
+        assert_eq!(normalized.backend, "XCUITest");
+        assert_eq!(normalized.root.bounds.x, 20.0);
+        let save = &normalized.root.children[0].children[0];
+        assert_eq!(save.automation_id, "save-button");
+        assert!(save.enabled);
     }
 }

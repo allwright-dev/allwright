@@ -4,9 +4,10 @@ use allwright_plugin_sdk::{
 };
 use allwright_surface_desktop::{
     ConnectOptions, DesktopActionInfo, DesktopAppInfo, DesktopAppSessionHandle, DesktopCommand,
-    DesktopCommandResult, DesktopConnectInfo, DesktopElementCountInfo, DesktopNavigationInfo,
-    DesktopPlatform, DesktopScreenshotInfo, DesktopSessionHandle, DesktopTextInfo, DesktopWaitInfo,
-    LaunchOptions, boot_surface, normalize_selector_for_transport,
+    DesktopCommandResult, DesktopConnectInfo, DesktopElementCountInfo, DesktopInspectorSnapshot,
+    DesktopNavigationInfo, DesktopPlatform, DesktopScreenshotInfo, DesktopSessionHandle,
+    DesktopTextInfo, DesktopWaitInfo, LaunchOptions, boot_surface,
+    normalize_selector_for_transport,
 };
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -330,6 +331,14 @@ fn action_info(selector: String, action: &str) -> DesktopActionInfo {
         note: format!("{action} Windows element through UIA3"),
     }
 }
+
+fn inspector_snapshot(raw: &str) -> Result<DesktopInspectorSnapshot, String> {
+    let mut snapshot: DesktopInspectorSnapshot = serde_json::from_str(raw)
+        .map_err(|error| format!("Windows agent returned invalid inspector snapshot: {error}"))?;
+    snapshot.backend = "UIA3".to_string();
+    Ok(snapshot)
+}
+
 fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult, String> {
     match command {
         DesktopCommand::Connect(options) => connect(&options).map(DesktopCommandResult::Connect),
@@ -638,6 +647,19 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
                 },
             ))
         }
+        DesktopCommand::InspectorSnapshot {
+            desktop_session,
+            app_session,
+        } => {
+            let mut request = AgentRequest::new("source");
+            request.session_id = Some(&app_session.app_session_id);
+            request.value = Some("default");
+            let value = invoke_agent(&desktop_session.endpoint, &request, Some(10_000))?;
+            let raw = result_string(&value, "snapshot")?;
+            Ok(DesktopCommandResult::InspectorSnapshot(inspector_snapshot(
+                raw,
+            )?))
+        }
     }
 }
 
@@ -720,5 +742,27 @@ mod tests {
             parse_http_endpoint(DEFAULT_AGENT_ENDPOINT).unwrap(),
             ("127.0.0.1".to_string(), 8300, "/v1/command".to_string())
         );
+    }
+    #[test]
+    fn parses_canonical_uia3_inspector_snapshot() {
+        let raw = json!({
+            "version": 1,
+            "platform": "windows",
+            "backend": "uia3",
+            "root": {
+                "role": "button",
+                "name": "Save",
+                "automationId": "save-button",
+                "className": "Button",
+                "enabled": true,
+                "offscreen": false,
+                "bounds": {"x": 10, "y": 20, "width": 80, "height": 30},
+                "children": []
+            }
+        });
+        let snapshot = inspector_snapshot(&raw.to_string()).unwrap();
+        assert_eq!(snapshot.backend, "UIA3");
+        assert_eq!(snapshot.root.automation_id, "save-button");
+        assert_eq!(snapshot.root.bounds.width, 80.0);
     }
 }

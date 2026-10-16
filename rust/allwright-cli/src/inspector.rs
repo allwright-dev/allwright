@@ -62,7 +62,6 @@ struct InspectorRuntime {
 struct InspectorSurface {
     id: &'static str,
     platform: DesktopPlatform,
-    backend: &'static str,
 }
 
 impl InspectorSurface {
@@ -71,12 +70,10 @@ impl InspectorSurface {
             "desktop-windows" => Ok(Self {
                 id: "desktop-windows",
                 platform: DesktopPlatform::Windows,
-                backend: "UIA3",
             }),
             "desktop-mac" => Ok(Self {
                 id: "desktop-mac",
                 platform: DesktopPlatform::Mac,
-                backend: "XCUITest",
             }),
             _ => Err(format!(
                 "inspector surface `{value}` is not supported; expected `desktop-windows` or `desktop-mac`"
@@ -158,29 +155,27 @@ impl InspectorRuntime {
 
         let tree = invoke(
             self.surface.id,
-            DesktopCommand::AccessibilitySnapshot {
+            DesktopCommand::InspectorSnapshot {
                 desktop_session: self.desktop.clone(),
                 app_session: self.app.clone(),
-                format: "json".to_string(),
-                mode: "default".to_string(),
             },
         )?;
-        let DesktopCommandResult::AccessibilitySnapshot(tree) = tree else {
+        let DesktopCommandResult::InspectorSnapshot(tree) = tree else {
             return Err(format!(
-                "{} returned an unexpected accessibility response",
+                "{} returned an unexpected inspector snapshot response",
                 self.surface.id
             )
             .into());
         };
-        let tree: Value = serde_json::from_str(&tree.snapshot)?;
+        let backend = tree.backend.clone();
         Ok(json!({
             "image": format!(
                 "data:image/png;base64,{}",
                 base64::engine::general_purpose::STANDARD.encode(screenshot.png_data)
             ),
-            "tree": normalize_snapshot(tree)?,
+            "tree": tree,
             "surface": self.surface.id,
-            "backend": self.surface.backend,
+            "backend": backend,
         }))
     }
 
@@ -224,76 +219,6 @@ fn invoke(
             .unwrap_or_else(|| format!("{plugin_id} failed without an error message"))
             .into())
     }
-}
-
-fn normalize_snapshot(snapshot: Value) -> Result<Value, Box<dyn Error>> {
-    if snapshot.get("root").is_some() {
-        return Ok(snapshot);
-    }
-    let document = snapshot
-        .get("documents")
-        .and_then(Value::as_array)
-        .and_then(|documents| documents.first())
-        .ok_or("accessibility snapshot does not contain a document")?;
-    let root = document
-        .get("root")
-        .ok_or("accessibility snapshot document does not contain a root")?;
-    Ok(json!({
-        "version": snapshot.get("version").cloned().unwrap_or(json!(1)),
-        "platform": document.get("platform").cloned().unwrap_or(Value::Null),
-        "root": normalize_xctest_node(root),
-    }))
-}
-
-fn normalize_xctest_node(node: &Value) -> Value {
-    let properties = node.get("properties").unwrap_or(&Value::Null);
-    let states = node.get("states").unwrap_or(&Value::Null);
-    let children = node
-        .get("children")
-        .and_then(Value::as_array)
-        .map(|children| {
-            children
-                .iter()
-                .map(normalize_xctest_node)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    let bounds = properties
-        .get("frame")
-        .filter(|frame| {
-            frame.get("width").and_then(Value::as_f64).unwrap_or(0.0) > 0.0
-                && frame.get("height").and_then(Value::as_f64).unwrap_or(0.0) > 0.0
-        })
-        .cloned()
-        .or_else(|| {
-            children
-                .iter()
-                .find(|child| {
-                    child
-                        .get("className")
-                        .and_then(Value::as_str)
-                        .is_some_and(|class_name| class_name.eq_ignore_ascii_case("window"))
-                })
-                .and_then(|child| child.get("bounds"))
-                .cloned()
-        })
-        .unwrap_or_else(empty_bounds);
-    json!({
-        "role": node.get("role").cloned().unwrap_or_else(|| json!("generic")),
-        "name": node.get("name").cloned().unwrap_or_else(|| json!("")),
-        "automationId": properties.get("identifier").cloned().unwrap_or_else(|| json!("")),
-        "className": properties.get("type").cloned().unwrap_or_else(|| json!("")),
-        "enabled": !states.get("disabled").and_then(Value::as_bool).unwrap_or(false),
-        "offscreen": !properties.get("rendered").and_then(Value::as_bool).unwrap_or(true),
-        "bounds": bounds,
-        "properties": properties,
-        "states": states,
-        "children": children,
-    })
-}
-
-fn empty_bounds() -> Value {
-    json!({"x": 0, "y": 0, "width": 0, "height": 0})
 }
 
 fn handle_request(
@@ -472,6 +397,10 @@ mod tests {
         assert!(INDEX_HTML.contains("/api/snapshot"));
         assert!(INDEX_HTML.contains("/api/click"));
         assert!(INDEX_HTML.contains("Element hierarchy"));
+        assert!(INDEX_HTML.contains("app.getByRole"));
+        assert!(INDEX_HTML.contains("app.get_by_role"));
+        assert!(INDEX_HTML.contains("app.GetByRole"));
+        assert!(INDEX_HTML.contains("app.get_by_role_with_options"));
     }
 
     #[test]
@@ -479,56 +408,5 @@ mod tests {
         assert!(is_loopback_origin("http://127.0.0.1:9227"));
         assert!(is_loopback_origin("http://localhost:9227"));
         assert!(!is_loopback_origin("https://example.com"));
-    }
-
-    #[test]
-    fn normalizes_xctest_document_for_the_shared_inspector() {
-        let snapshot = json!({
-            "version": 1,
-            "documents": [{
-                "platform": "macos",
-                "root": {
-                    "role": "application",
-                    "name": "TextEdit",
-                    "states": {},
-                    "properties": {
-                        "type": "application",
-                        "rendered": true
-                    },
-                    "children": [{
-                        "role": "generic",
-                        "name": "Document",
-                        "states": {},
-                        "properties": {
-                            "type": "Window",
-                            "rendered": true,
-                            "frame": {"x": 20, "y": 40, "width": 800, "height": 600}
-                        },
-                        "children": [{
-                            "role": "button",
-                            "name": "Save",
-                            "states": {"disabled": false},
-                            "properties": {
-                                "identifier": "save-button",
-                                "type": "button",
-                                "rendered": true,
-                                "frame": {"x": 700, "y": 50, "width": 80, "height": 30}
-                            },
-                            "children": []
-                        }]
-                    }]
-                }
-            }]
-        });
-        let normalized = normalize_snapshot(snapshot).unwrap();
-        assert_eq!(normalized["root"]["bounds"]["x"], 20);
-        assert_eq!(
-            normalized["root"]["children"][0]["children"][0]["automationId"],
-            "save-button"
-        );
-        assert_eq!(
-            normalized["root"]["children"][0]["children"][0]["enabled"],
-            true
-        );
     }
 }
