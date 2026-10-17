@@ -202,9 +202,13 @@ through the Windows shell, and `--no-open` when the browser should not be
 opened automatically.
 
 All inspectors provide separate **Inspect** and **Interact** modes. Inspect mode
-selects elements without activating them. Interact mode sends clicks or taps
-from the screenshot to the live application; selected elements also expose
-double-click/double-tap, scrolling/swiping, fill, and key-press controls.
+captures the accessibility hierarchy and selects elements without activating
+them. Interact mode switches the canvas to a continuous live screen feed and
+forwards native coordinates directly to the application. Click/tap,
+double-click/double-tap, drag/swipe, wheel scrolling, typing, special keys, and
+clipboard paste therefore work on what is currently visible without depending
+on a previously captured locator. Switching back to Inspect refreshes the
+hierarchy and locator data.
 
 On macOS, pass the application bundle identifier:
 

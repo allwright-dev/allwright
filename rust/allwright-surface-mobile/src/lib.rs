@@ -313,7 +313,7 @@ pub struct MobileDownloadSavedInfo {
     pub note: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum MobileCommand {
     RegisterHook {
@@ -413,6 +413,24 @@ pub enum MobileCommand {
         direction: String,
         timeout_ms: Option<u32>,
     },
+    PointerInput {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+        action: String,
+        x: f64,
+        y: f64,
+        to_x: Option<f64>,
+        to_y: Option<f64>,
+        delta_x: Option<f64>,
+        delta_y: Option<f64>,
+        duration_ms: Option<u32>,
+    },
+    KeyboardInput {
+        browser_session: MobileBrowserSessionHandle,
+        page_session: MobilePageSessionHandle,
+        key: Option<String>,
+        text: Option<String>,
+    },
     GetText {
         browser_session: MobileBrowserSessionHandle,
         page_session: MobilePageSessionHandle,
@@ -461,6 +479,8 @@ pub enum MobileCommandResult {
     FillElement(MobileFillInfo),
     PressKey(MobilePressInfo),
     ScrollElement(MobilePressInfo),
+    PointerInput(MobilePressInfo),
+    KeyboardInput(MobilePressInfo),
     GetText(MobileTextInfo),
     GetInnerText(MobileTextInfo),
     WaitForSelector(MobileWaitForSelectorInfo),

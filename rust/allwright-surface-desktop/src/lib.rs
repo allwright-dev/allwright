@@ -103,7 +103,7 @@ pub struct DesktopScreenshotInfo {
     pub note: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum DesktopCommand {
     Connect(ConnectOptions),
@@ -169,6 +169,24 @@ pub enum DesktopCommand {
         direction: String,
         timeout_ms: Option<u32>,
     },
+    PointerInput {
+        desktop_session: DesktopSessionHandle,
+        app_session: DesktopAppSessionHandle,
+        action: String,
+        x: f64,
+        y: f64,
+        to_x: Option<f64>,
+        to_y: Option<f64>,
+        delta_x: Option<f64>,
+        delta_y: Option<f64>,
+        duration_ms: Option<u32>,
+    },
+    KeyboardInput {
+        desktop_session: DesktopSessionHandle,
+        app_session: DesktopAppSessionHandle,
+        key: Option<String>,
+        text: Option<String>,
+    },
     GetText {
         desktop_session: DesktopSessionHandle,
         app_session: DesktopAppSessionHandle,
@@ -220,6 +238,8 @@ pub enum DesktopCommandResult {
     FillElement(DesktopActionInfo),
     PressKey(DesktopActionInfo),
     ScrollElement(DesktopActionInfo),
+    PointerInput(DesktopActionInfo),
+    KeyboardInput(DesktopActionInfo),
     GetText(DesktopTextInfo),
     GetInnerText(DesktopTextInfo),
     WaitForSelector(DesktopWaitInfo),

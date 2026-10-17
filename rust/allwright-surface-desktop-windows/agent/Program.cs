@@ -31,6 +31,13 @@ internal sealed record AgentRequest(
     string? Value,
     string? Key,
     string? Text,
+    double? X,
+    double? Y,
+    double? ToX,
+    double? ToY,
+    double? DeltaX,
+    double? DeltaY,
+    uint? DurationMs,
     bool? Visible,
     uint? TimeoutMs,
     bool? FullPage,
@@ -129,6 +136,8 @@ internal static class Program
         "fill" => WithElement(request, element => { Fill(element, request.Value ?? ""); return new { }; }),
         "press" => WithElement(request, element => { element.Focus(); Press(request.Key ?? "", request.Text); return new { }; }),
         "scroll" => WithElement(request, element => { Scroll(element, request.Key ?? ""); return new { }; }),
+        "pointer" => PointerInput(request),
+        "keyboard" => KeyboardInput(request),
         "text" => WithElement(request, element => new { text = ElementText(element) }),
         "capture" => WithElement(request, element => CaptureElement(element, request)),
         "wait" => Wait(request),
@@ -136,6 +145,38 @@ internal static class Program
         "source" => Source(request),
         _ => throw new InvalidOperationException($"unknown command `{request.Command}`")
     };
+
+    private static object PointerInput(AgentRequest request)
+    {
+        var x = (int)Math.Round(request.X ?? throw new InvalidOperationException("pointer input requires x"));
+        var y = (int)Math.Round(request.Y ?? throw new InvalidOperationException("pointer input requires y"));
+        var point = new Point(x, y);
+        switch (request.Key)
+        {
+            case "tap": Mouse.LeftClick(point); break;
+            case "double_tap": Mouse.LeftDoubleClick(point); break;
+            case "swipe":
+                Mouse.Drag(point, new Point(
+                    (int)Math.Round(request.ToX ?? x),
+                    (int)Math.Round(request.ToY ?? y)), MouseButton.Left);
+                break;
+            case "scroll":
+                Mouse.MoveTo(point);
+                var vertical = request.DeltaY ?? 0;
+                var horizontal = request.DeltaX ?? 0;
+                if (Math.Abs(vertical) >= Math.Abs(horizontal) && vertical != 0) Mouse.Scroll(-Math.Sign(vertical));
+                else if (horizontal != 0) Mouse.HorizontalScroll(Math.Sign(horizontal));
+                break;
+            default: throw new InvalidOperationException($"unsupported live pointer action `{request.Key}`");
+        }
+        return new { performed = true };
+    }
+
+    private static object KeyboardInput(AgentRequest request)
+    {
+        Press(request.Key ?? "", request.Text);
+        return new { performed = true };
+    }
 
     private static object Launch(AgentRequest request)
     {

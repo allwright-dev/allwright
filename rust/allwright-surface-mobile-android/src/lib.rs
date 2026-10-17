@@ -866,6 +866,42 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             timeout_ms,
         )
         .map(MobileCommandResult::ScrollElement),
+        MobileCommand::PointerInput {
+            browser_session,
+            page_session,
+            action,
+            x,
+            y,
+            to_x,
+            to_y,
+            delta_x,
+            delta_y,
+            duration_ms,
+        } => android_pointer_input(
+            &browser_session,
+            &page_session,
+            &action,
+            x,
+            y,
+            to_x,
+            to_y,
+            delta_x,
+            delta_y,
+            duration_ms,
+        )
+        .map(MobileCommandResult::PointerInput),
+        MobileCommand::KeyboardInput {
+            browser_session,
+            page_session,
+            key,
+            text,
+        } => android_keyboard_input(
+            &browser_session,
+            &page_session,
+            key.as_deref(),
+            text.as_deref(),
+        )
+        .map(MobileCommandResult::KeyboardInput),
         MobileCommand::GetText {
             browser_session,
             page_session,
@@ -1636,6 +1672,102 @@ fn scroll_element(
         selector: snapshot.selector,
         key: direction.to_string(),
         note: format!("scrolled Android element {direction} through an ADB swipe"),
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn android_pointer_input(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    action: &str,
+    x: f64,
+    y: f64,
+    to_x: Option<f64>,
+    to_y: Option<f64>,
+    delta_x: Option<f64>,
+    delta_y: Option<f64>,
+    duration_ms: Option<u32>,
+) -> Result<MobilePressInfo, String> {
+    accessibility::validate_scope(
+        browser_session,
+        page_session,
+        "aw={\"kind\":\"role\",\"role\":\"application\"}",
+    )?;
+    if !x.is_finite() || !y.is_finite() {
+        return Err("pointer coordinates must be finite".to_string());
+    }
+    let device_id = &browser_session.device.device_id;
+    let (x, y) = (x.round() as i32, y.round() as i32);
+    match action {
+        "tap" => {
+            run_adb_for_device(
+                device_id,
+                &["shell", "input", "tap", &x.to_string(), &y.to_string()],
+            )?;
+        }
+        "double_tap" => {
+            for _ in 0..2 {
+                run_adb_for_device(
+                    device_id,
+                    &["shell", "input", "tap", &x.to_string(), &y.to_string()],
+                )?;
+                std::thread::sleep(Duration::from_millis(70));
+            }
+        }
+        "swipe" | "scroll" => {
+            let end_x = to_x.unwrap_or(x as f64 - delta_x.unwrap_or(0.0)).round() as i32;
+            let end_y = to_y.unwrap_or(y as f64 - delta_y.unwrap_or(0.0)).round() as i32;
+            run_adb_for_device(
+                device_id,
+                &[
+                    "shell",
+                    "input",
+                    "swipe",
+                    &x.to_string(),
+                    &y.to_string(),
+                    &end_x.to_string(),
+                    &end_y.to_string(),
+                    &duration_ms.unwrap_or(250).to_string(),
+                ],
+            )?;
+        }
+        _ => return Err(format!("unsupported Android pointer action `{action}`")),
+    }
+    Ok(MobilePressInfo {
+        selector: format!("coordinate({x}, {y})"),
+        key: action.to_string(),
+        note: format!("performed live Android {action} through ADB input"),
+    })
+}
+
+fn android_keyboard_input(
+    browser_session: &MobileBrowserSessionHandle,
+    page_session: &MobilePageSessionHandle,
+    key: Option<&str>,
+    text: Option<&str>,
+) -> Result<MobilePressInfo, String> {
+    accessibility::validate_scope(
+        browser_session,
+        page_session,
+        "aw={\"kind\":\"role\",\"role\":\"application\"}",
+    )?;
+    let device_id = &browser_session.device.device_id;
+    if let Some(text) = text.filter(|value| !value.is_empty()) {
+        let encoded = encode_adb_text(text);
+        if !encoded.is_empty() {
+            run_adb_for_device(device_id, &["shell", "input", "text", &encoded])?;
+        }
+    } else if let Some(key) = key {
+        let keyevent = android_keyevent_for(key)
+            .ok_or_else(|| format!("unsupported Android live key `{key}`"))?;
+        run_adb_for_device(device_id, &["shell", "input", "keyevent", keyevent])?;
+    } else {
+        return Err("keyboard input requires `key` or `text`".to_string());
+    }
+    Ok(MobilePressInfo {
+        selector: "focused element".to_string(),
+        key: key.unwrap_or("text").to_string(),
+        note: "sent live keyboard input through ADB".to_string(),
     })
 }
 

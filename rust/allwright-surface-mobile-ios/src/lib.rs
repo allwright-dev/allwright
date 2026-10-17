@@ -124,6 +124,20 @@ struct AgentRequest<'a> {
     full_page: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     files: Option<Vec<&'a str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    x: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    y: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    to_x: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    to_y: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    delta_x: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    delta_y: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    duration_ms: Option<u32>,
 }
 
 impl<'a> AgentRequest<'a> {
@@ -143,6 +157,13 @@ impl<'a> AgentRequest<'a> {
             terminate_running: None,
             full_page: None,
             files: None,
+            x: None,
+            y: None,
+            to_x: None,
+            to_y: None,
+            delta_x: None,
+            delta_y: None,
+            duration_ms: None,
         }
     }
 }
@@ -813,6 +834,23 @@ fn run_checked(command: &mut Command, description: &str) -> Result<(), String> {
             String::from_utf8_lossy(&output.stderr).trim()
         ))
     }
+}
+
+fn simulator_screenshot(device_id: &str) -> Result<Vec<u8>, String> {
+    let output = Command::new("xcrun")
+        .args(["simctl", "io", device_id, "screenshot", "--type=png", "-"])
+        .output()
+        .map_err(|error| format!("could not capture simulator screen: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "could not capture simulator screen: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    if !output.stdout.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return Err("simctl returned invalid simulator screenshot data".to_string());
+    }
+    Ok(output.stdout)
 }
 
 fn prepare_signed_device_agent(device: &PhysicalDevice) -> Result<PathBuf, String> {
@@ -2441,6 +2479,60 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
                 note: format!("scrolled iOS element {direction} through XCUITest"),
             }))
         }
+        MobileCommand::PointerInput {
+            browser_session,
+            page_session,
+            action,
+            x,
+            y,
+            to_x,
+            to_y,
+            delta_x,
+            delta_y,
+            duration_ms,
+        } => {
+            let mut request = AgentRequest::new("pointer");
+            request.session_id = Some(&page_session.page_id);
+            request.key = Some(&action);
+            request.x = Some(x);
+            request.y = Some(y);
+            request.to_x = to_x;
+            request.to_y = to_y;
+            request.delta_x = delta_x;
+            request.delta_y = delta_y;
+            request.duration_ms = duration_ms;
+            invoke_agent(
+                endpoint_from_session(&browser_session)?,
+                &request,
+                Some(10_000),
+            )?;
+            Ok(MobileCommandResult::PointerInput(MobilePressInfo {
+                selector: format!("coordinate({x:.1}, {y:.1})"),
+                key: action.clone(),
+                note: format!("performed live iOS {action} through XCUITest"),
+            }))
+        }
+        MobileCommand::KeyboardInput {
+            browser_session,
+            page_session,
+            key,
+            text,
+        } => {
+            let mut request = AgentRequest::new("keyboard");
+            request.session_id = Some(&page_session.page_id);
+            request.key = key.as_deref();
+            request.text = text.as_deref();
+            invoke_agent(
+                endpoint_from_session(&browser_session)?,
+                &request,
+                Some(10_000),
+            )?;
+            Ok(MobileCommandResult::KeyboardInput(MobilePressInfo {
+                selector: "focused element".to_string(),
+                key: key.unwrap_or_else(|| "text".to_string()),
+                note: "sent live keyboard input through XCUITest".to_string(),
+            }))
+        }
         MobileCommand::GetText {
             browser_session,
             page_session,
@@ -2482,6 +2574,15 @@ fn handle_plugin_command(command: MobileCommand) -> Result<MobileCommandResult, 
             timeout_ms,
             full_page,
         } => {
+            if !full_page
+                && browser_session.device.connection_kind == DeviceConnectionKind::Emulator
+                && let Ok(png_data) = simulator_screenshot(&browser_session.device.device_id)
+            {
+                return Ok(MobileCommandResult::Screenshot(MobileScreenshotInfo {
+                    png_data,
+                    note: "captured live iOS Simulator screen through simctl".to_string(),
+                }));
+            }
             let mut request = AgentRequest::new("screenshot");
             request.session_id = Some(&page_session.page_id);
             let screenshot_timeout = if full_page {

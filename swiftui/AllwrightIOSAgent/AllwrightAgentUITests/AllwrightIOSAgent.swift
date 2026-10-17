@@ -235,6 +235,35 @@ final class AllwrightIOSAgent {
             }
             return .success(["performed": true])
 
+        case "pointer":
+            let (_, application) = try application(for: request)
+            let action = try requiredString("key", in: request)
+            let x = try requiredNumber("x", in: request)
+            let y = try requiredNumber("y", in: request)
+            let origin = application.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+            let start = origin.withOffset(CGVector(dx: x - application.frame.minX, dy: y - application.frame.minY))
+            switch action {
+            case "tap": start.tap()
+            case "double_tap": start.doubleTap()
+            case "swipe", "scroll":
+                let toX = number("to_x", in: request) ?? x - (number("delta_x", in: request) ?? 0)
+                let toY = number("to_y", in: request) ?? y - (number("delta_y", in: request) ?? 0)
+                let end = origin.withOffset(CGVector(dx: toX - application.frame.minX, dy: toY - application.frame.minY))
+                start.press(forDuration: Double((request["duration_ms"] as? NSNumber)?.uintValue ?? 250) / 1000, thenDragTo: end)
+            default: throw AgentError("unsupported live pointer action `\(action)`")
+            }
+            return .success(["performed": true])
+
+        case "keyboard":
+            let (_, application) = try application(for: request)
+            if let text = request["text"] as? String, !text.isEmpty {
+                application.typeText(text)
+            } else {
+                let key = try requiredString("key", in: request)
+                application.typeText(keyText(key, explicitText: nil))
+            }
+            return .success(["performed": true])
+
         case "count":
             let (sessionID, application) = try application(for: request)
             let selector = try requiredString("selector", in: request)
@@ -860,10 +889,10 @@ final class AllwrightIOSAgent {
         case "escape": return XCUIKeyboardKey.escape.rawValue
         case "backspace", "delete": return XCUIKeyboardKey.delete.rawValue
         case "space": return XCUIKeyboardKey.space.rawValue
-        case "uparrow": return XCUIKeyboardKey.upArrow.rawValue
-        case "downarrow": return XCUIKeyboardKey.downArrow.rawValue
-        case "leftarrow": return XCUIKeyboardKey.leftArrow.rawValue
-        case "rightarrow": return XCUIKeyboardKey.rightArrow.rawValue
+        case "uparrow", "arrowup": return XCUIKeyboardKey.upArrow.rawValue
+        case "downarrow", "arrowdown": return XCUIKeyboardKey.downArrow.rawValue
+        case "leftarrow", "arrowleft": return XCUIKeyboardKey.leftArrow.rawValue
+        case "rightarrow", "arrowright": return XCUIKeyboardKey.rightArrow.rawValue
         default: return key
         }
     }
@@ -871,6 +900,17 @@ final class AllwrightIOSAgent {
     private func requiredString(_ key: String, in object: [String: Any], allowEmpty: Bool = false) throws -> String {
         guard let value = object[key] as? String, allowEmpty || !value.isEmpty else {
             throw AgentError("request requires `\(key)`")
+        }
+        return value
+    }
+
+    private func number(_ key: String, in object: [String: Any]) -> Double? {
+        (object[key] as? NSNumber)?.doubleValue
+    }
+
+    private func requiredNumber(_ key: String, in object: [String: Any]) throws -> Double {
+        guard let value = number(key, in: object), value.isFinite else {
+            throw AgentError("request requires finite numeric `\(key)`")
         }
         return value
     }

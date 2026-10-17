@@ -15,8 +15,11 @@ allwright inspector desktop-windows "C:\Windows\System32\notepad.exe"
 
 The inspector starts a loopback-only web application, opens it in the default
 browser, and exposes the current screenshot, UIA3 hierarchy, element details,
-suggested locators, and an element click action. A URL can be used as the target
-to inspect the foreground browser window.
+suggested locators, and native interaction. Inspect mode works from an explicit
+hierarchy capture; Interact mode continuously refreshes the application image
+and forwards pointer, swipe/drag, wheel, keyboard, and paste input directly to
+the native surface. A URL can be used as the target to inspect the foreground
+browser window.
 
 Inspect a native macOS application by bundle identifier:
 

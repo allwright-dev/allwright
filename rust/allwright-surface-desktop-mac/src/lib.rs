@@ -75,6 +75,20 @@ struct AgentRequest<'a> {
     full_page: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     terminate_running: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    x: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    y: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    to_x: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    to_y: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    delta_x: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    delta_y: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    duration_ms: Option<u32>,
 }
 
 impl<'a> AgentRequest<'a> {
@@ -94,6 +108,13 @@ impl<'a> AgentRequest<'a> {
             timeout_ms: None,
             full_page: None,
             terminate_running: None,
+            x: None,
+            y: None,
+            to_x: None,
+            to_y: None,
+            delta_x: None,
+            delta_y: None,
+            duration_ms: None,
         }
     }
 }
@@ -812,6 +833,50 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
             )?;
             Ok(DesktopCommandResult::ScrollElement(action_info(
                 selector, "scrolled",
+            )))
+        }
+        DesktopCommand::PointerInput {
+            desktop_session,
+            app_session,
+            action,
+            x,
+            y,
+            to_x,
+            to_y,
+            delta_x,
+            delta_y,
+            duration_ms,
+        } => {
+            let mut request = AgentRequest::new("pointer");
+            request.session_id = Some(&app_session.app_session_id);
+            request.key = Some(&action);
+            request.x = Some(x);
+            request.y = Some(y);
+            request.to_x = to_x;
+            request.to_y = to_y;
+            request.delta_x = delta_x;
+            request.delta_y = delta_y;
+            request.duration_ms = duration_ms;
+            invoke_agent(&desktop_session.endpoint, &request, Some(10_000))?;
+            Ok(DesktopCommandResult::PointerInput(action_info(
+                format!("coordinate({x:.1}, {y:.1})"),
+                &format!("performed live {action} at"),
+            )))
+        }
+        DesktopCommand::KeyboardInput {
+            desktop_session,
+            app_session,
+            key,
+            text,
+        } => {
+            let mut request = AgentRequest::new("keyboard");
+            request.session_id = Some(&app_session.app_session_id);
+            request.key = key.as_deref();
+            request.text = text.as_deref();
+            invoke_agent(&desktop_session.endpoint, &request, Some(10_000))?;
+            Ok(DesktopCommandResult::KeyboardInput(action_info(
+                "focused element".to_string(),
+                "sent live keyboard input to",
             )))
         }
         DesktopCommand::GetText {

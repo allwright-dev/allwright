@@ -229,24 +229,9 @@ impl InspectorRuntime {
     }
 
     fn snapshot(&self) -> Result<Value, Box<dyn Error>> {
-        let (png_data, tree) = match &self.session {
+        let png_data = self.screenshot()?;
+        let tree = match &self.session {
             InspectorSession::Desktop { desktop, app } => {
-                let screenshot = invoke_desktop(
-                    self.surface.id(),
-                    DesktopCommand::Screenshot {
-                        desktop_session: desktop.clone(),
-                        app_session: app.clone(),
-                        timeout_ms: Some(10_000),
-                        full_page: false,
-                    },
-                )?;
-                let DesktopCommandResult::Screenshot(screenshot) = screenshot else {
-                    return Err(format!(
-                        "{} returned an unexpected screenshot response",
-                        self.surface.id()
-                    )
-                    .into());
-                };
                 let tree = invoke_desktop(
                     self.surface.id(),
                     DesktopCommand::InspectorSnapshot {
@@ -261,25 +246,9 @@ impl InspectorRuntime {
                     )
                     .into());
                 };
-                (screenshot.png_data, tree)
+                tree
             }
             InspectorSession::Mobile { browser, page } => {
-                let screenshot = invoke_mobile(
-                    self.surface.id(),
-                    MobileCommand::Screenshot {
-                        browser_session: browser.clone(),
-                        page_session: page.clone(),
-                        timeout_ms: Some(30_000),
-                        full_page: false,
-                    },
-                )?;
-                let MobileCommandResult::Screenshot(screenshot) = screenshot else {
-                    return Err(format!(
-                        "{} returned an unexpected screenshot response",
-                        self.surface.id()
-                    )
-                    .into());
-                };
                 let tree = invoke_mobile(
                     self.surface.id(),
                     MobileCommand::InspectorSnapshot {
@@ -294,7 +263,7 @@ impl InspectorRuntime {
                     )
                     .into());
                 };
-                (screenshot.png_data, tree)
+                tree
             }
         };
         let backend = tree.backend.clone();
@@ -307,6 +276,106 @@ impl InspectorRuntime {
             "surface": self.surface.id(),
             "backend": backend,
         }))
+    }
+
+    fn screenshot(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+        match &self.session {
+            InspectorSession::Desktop { desktop, app } => {
+                let result = invoke_desktop(
+                    self.surface.id(),
+                    DesktopCommand::Screenshot {
+                        desktop_session: desktop.clone(),
+                        app_session: app.clone(),
+                        timeout_ms: Some(10_000),
+                        full_page: false,
+                    },
+                )?;
+                let DesktopCommandResult::Screenshot(screenshot) = result else {
+                    return Err(format!(
+                        "{} returned an unexpected screenshot response",
+                        self.surface.id()
+                    )
+                    .into());
+                };
+                Ok(screenshot.png_data)
+            }
+            InspectorSession::Mobile { browser, page } => {
+                let result = invoke_mobile(
+                    self.surface.id(),
+                    MobileCommand::Screenshot {
+                        browser_session: browser.clone(),
+                        page_session: page.clone(),
+                        timeout_ms: Some(30_000),
+                        full_page: false,
+                    },
+                )?;
+                let MobileCommandResult::Screenshot(screenshot) = result else {
+                    return Err(format!(
+                        "{} returned an unexpected screenshot response",
+                        self.surface.id()
+                    )
+                    .into());
+                };
+                Ok(screenshot.png_data)
+            }
+        }
+    }
+
+    fn live_input(&self, input: InspectorInputRequest) -> Result<(), Box<dyn Error>> {
+        if !matches!(input.kind.as_str(), "pointer" | "keyboard") {
+            return Err(format!("unsupported live input kind `{}`", input.kind).into());
+        }
+        match &self.session {
+            InspectorSession::Desktop { desktop, app } => {
+                let command = if input.kind == "keyboard" {
+                    DesktopCommand::KeyboardInput {
+                        desktop_session: desktop.clone(),
+                        app_session: app.clone(),
+                        key: input.key,
+                        text: input.text,
+                    }
+                } else {
+                    DesktopCommand::PointerInput {
+                        desktop_session: desktop.clone(),
+                        app_session: app.clone(),
+                        action: input.action.ok_or("pointer input requires an action")?,
+                        x: input.x.ok_or("pointer input requires x")?,
+                        y: input.y.ok_or("pointer input requires y")?,
+                        to_x: input.to_x,
+                        to_y: input.to_y,
+                        delta_x: input.delta_x,
+                        delta_y: input.delta_y,
+                        duration_ms: input.duration_ms,
+                    }
+                };
+                invoke_desktop(self.surface.id(), command)?;
+            }
+            InspectorSession::Mobile { browser, page } => {
+                let command = if input.kind == "keyboard" {
+                    MobileCommand::KeyboardInput {
+                        browser_session: browser.clone(),
+                        page_session: page.clone(),
+                        key: input.key,
+                        text: input.text,
+                    }
+                } else {
+                    MobileCommand::PointerInput {
+                        browser_session: browser.clone(),
+                        page_session: page.clone(),
+                        action: input.action.ok_or("pointer input requires an action")?,
+                        x: input.x.ok_or("pointer input requires x")?,
+                        y: input.y.ok_or("pointer input requires y")?,
+                        to_x: input.to_x,
+                        to_y: input.to_y,
+                        delta_x: input.delta_x,
+                        delta_y: input.delta_y,
+                        duration_ms: input.duration_ms,
+                    }
+                };
+                invoke_mobile(self.surface.id(), command)?;
+            }
+        }
+        Ok(())
     }
 
     fn action(
@@ -551,6 +620,15 @@ fn handle_request(
             let body = serde_json::to_vec(&runtime.snapshot()?)?;
             write_response(stream, "200 OK", "application/json", &body)?;
         }
+        ("GET", "/api/frame") => {
+            let png = runtime.screenshot()?;
+            write_response(stream, "200 OK", "image/png", &png)?;
+        }
+        ("POST", "/api/input") => {
+            let payload: InspectorInputRequest = serde_json::from_slice(&request.body)?;
+            runtime.live_input(payload)?;
+            write_response(stream, "200 OK", "application/json", br#"{"ok":true}"#)?;
+        }
         ("POST", "/api/click") => {
             let payload: Value = serde_json::from_slice(&request.body)?;
             let selector = payload
@@ -601,6 +679,21 @@ struct InspectorActionRequest {
     key: Option<String>,
     text: Option<String>,
     direction: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct InspectorInputRequest {
+    kind: String,
+    action: Option<String>,
+    x: Option<f64>,
+    y: Option<f64>,
+    to_x: Option<f64>,
+    to_y: Option<f64>,
+    delta_x: Option<f64>,
+    delta_y: Option<f64>,
+    duration_ms: Option<u32>,
+    key: Option<String>,
+    text: Option<String>,
 }
 
 struct HttpRequest {
@@ -740,7 +833,11 @@ mod tests {
         assert!(INDEX_HTML.contains(">Interact</button>"));
         assert!(INDEX_HTML.contains("double_click"));
         assert!(INDEX_HTML.contains("wheelInteract"));
-        assert!(INDEX_HTML.contains("touchEnd"));
+        assert!(INDEX_HTML.contains("pointerFinish"));
+        assert!(INDEX_HTML.contains("/api/frame"));
+        assert!(INDEX_HTML.contains("/api/input"));
+        assert!(INDEX_HTML.contains("streamFrames"));
+        assert!(INDEX_HTML.contains("keyboardInteract"));
         assert!(INDEX_HTML.contains("Text to fill"));
         assert!(INDEX_HTML.contains("Press key"));
         assert!(INDEX_HTML.contains("app.getByRole"));
@@ -763,6 +860,24 @@ mod tests {
         assert_eq!(action.value.as_deref(), Some("person@example.com"));
         assert!(action.key.is_none());
         assert!(action.direction.is_none());
+    }
+
+    #[test]
+    fn parses_live_pointer_and_keyboard_input() {
+        let pointer: InspectorInputRequest = serde_json::from_str(
+            r#"{"kind":"pointer","action":"swipe","x":10.5,"y":20,"to_x":30,"to_y":40,"duration_ms":250}"#,
+        )
+        .unwrap();
+        assert_eq!(pointer.kind, "pointer");
+        assert_eq!(pointer.action.as_deref(), Some("swipe"));
+        assert_eq!(pointer.x, Some(10.5));
+        assert_eq!(pointer.to_y, Some(40.0));
+
+        let keyboard: InspectorInputRequest =
+            serde_json::from_str(r#"{"kind":"keyboard","text":"hello"}"#).unwrap();
+        assert_eq!(keyboard.kind, "keyboard");
+        assert_eq!(keyboard.text.as_deref(), Some("hello"));
+        assert!(keyboard.key.is_none());
     }
 
     #[test]

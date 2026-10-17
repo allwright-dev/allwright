@@ -67,6 +67,12 @@ fn invoke_desktop(command: DesktopCommand) -> Result<DesktopCommandResult, Strin
         | DesktopCommand::ScrollElement {
             desktop_session, ..
         }
+        | DesktopCommand::PointerInput {
+            desktop_session, ..
+        }
+        | DesktopCommand::KeyboardInput {
+            desktop_session, ..
+        }
         | DesktopCommand::GetText {
             desktop_session, ..
         }
@@ -431,6 +437,12 @@ fn mobile_plugin_id_for_command(command: &MobileCommand) -> Result<&'static str,
             browser_session, ..
         }
         | MobileCommand::ScrollElement {
+            browser_session, ..
+        }
+        | MobileCommand::PointerInput {
+            browser_session, ..
+        }
+        | MobileCommand::KeyboardInput {
             browser_session, ..
         }
         | MobileCommand::GetText {
