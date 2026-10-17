@@ -7,8 +7,8 @@ opaque desktop and app-session handles.
 The release archive contains the plugin dylib plus an unsigned prebuilt
 `.xctestrun`, `AllwrightAgentUITests-Runner.app`, and runtime entitlement
 template. On first `desktop.mac.connect(...)`, the plugin copies the agent into
-a local cache, ad-hoc signs only that copy, and starts it on port 8200. No CI or
-user certificate is selected. Set `agent_endpoint` in a client, or set both
+a local cache, ad-hoc signs only that copy, and starts it on a private dynamic
+loopback port. No CI or user certificate is selected. Set `agent_endpoint` in a client, or set both
 `ALLWRIGHT_MAC_AGENT_XCTESTRUN` and `ALLWRIGHT_MAC_AGENT_ENTITLEMENTS` for
 plugin development, to use explicit agent artifacts instead.
 

@@ -15,16 +15,18 @@ use std::env;
 use std::ffi::{CStr, CString, c_char};
 use std::fs;
 use std::io::{Read, Write};
-use std::net::{Shutdown, TcpStream};
+use std::net::{Shutdown, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+#[cfg(test)]
 const DEFAULT_AGENT_ENDPOINT: &str = "http://127.0.0.1:8200";
 const AGENT_ENTITLEMENTS_FILENAME: &str = "AllwrightAgentUITests.mac-runtime.entitlements";
 static AGENT_PROCESS: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
+static AGENT_ENDPOINT: OnceLock<Mutex<Option<String>>> = OnceLock::new();
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DesktopMacPlugin;
@@ -319,12 +321,70 @@ fn stop_owned_agent() -> Result<(), String> {
         let _ = child.kill();
         let _ = child.wait();
     }
+    *AGENT_ENDPOINT
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .map_err(|_| "macOS agent endpoint lock is poisoned".to_string())? = None;
     Ok(())
 }
 
-fn start_bundled_agent() -> Result<(), String> {
+fn owned_agent_endpoint() -> Result<Option<String>, String> {
+    let mut process = AGENT_PROCESS
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .map_err(|_| "macOS agent process lock is poisoned".to_string())?;
+    let Some(child) = process.as_mut() else {
+        return Ok(None);
+    };
+    match child.try_wait() {
+        Ok(None) => AGENT_ENDPOINT
+            .get_or_init(|| Mutex::new(None))
+            .lock()
+            .map_err(|_| "macOS agent endpoint lock is poisoned".to_string())
+            .map(|endpoint| endpoint.clone()),
+        Ok(Some(_)) => {
+            process.take();
+            *AGENT_ENDPOINT
+                .get_or_init(|| Mutex::new(None))
+                .lock()
+                .map_err(|_| "macOS agent endpoint lock is poisoned".to_string())? = None;
+            Ok(None)
+        }
+        Err(error) => Err(format!(
+            "could not inspect owned macOS agent process: {error}"
+        )),
+    }
+}
+
+fn available_agent_endpoint() -> Result<(String, u16), String> {
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .map_err(|error| format!("could not reserve a macOS agent port: {error}"))?;
+    let port = listener
+        .local_addr()
+        .map_err(|error| format!("could not read reserved macOS agent port: {error}"))?
+        .port();
+    Ok((format!("http://127.0.0.1:{port}"), port))
+}
+
+fn configure_agent_port(xctestrun: &Path, port: u16) -> Result<(), String> {
+    run_checked(
+        Command::new("plutil")
+            .args([
+                "-replace",
+                "TestConfigurations.0.TestTargets.0.EnvironmentVariables.ALLWRIGHT_XCTEST_AGENT_PORT",
+                "-string",
+            ])
+            .arg(port.to_string())
+            .arg(xctestrun),
+        "configure the macOS agent port",
+    )
+}
+
+fn start_bundled_agent() -> Result<String, String> {
     stop_owned_agent()?;
     let xctestrun = prepare_locally_signed_agent()?;
+    let (endpoint, port) = available_agent_endpoint()?;
+    configure_agent_port(&xctestrun, port)?;
     let child = Command::new("xcodebuild")
         .arg("test-without-building")
         .arg("-xctestrun")
@@ -350,25 +410,39 @@ fn start_bundled_agent() -> Result<(), String> {
         .get_or_init(|| Mutex::new(None))
         .lock()
         .map_err(|_| "macOS agent process lock is poisoned".to_string())? = Some(child);
-    Ok(())
+    *AGENT_ENDPOINT
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .map_err(|_| "macOS agent endpoint lock is poisoned".to_string())? = Some(endpoint.clone());
+    Ok(endpoint)
 }
 
 fn connect(options: &ConnectOptions) -> Result<DesktopConnectInfo, String> {
     if options.platform != DesktopPlatform::Mac {
         return Err("desktop-mac only supports the macOS platform".to_string());
     }
-    let endpoint = options
+    let configured_endpoint = options
         .agent_endpoint
         .as_deref()
         .filter(|endpoint| !endpoint.trim().is_empty())
-        .unwrap_or(DEFAULT_AGENT_ENDPOINT)
-        .trim_end_matches('/')
-        .to_string();
-    let mut status = invoke_agent(&endpoint, &AgentRequest::new("status"), Some(1_000));
-    let mut started_bundled_agent = false;
-    if status.is_err() && endpoint == DEFAULT_AGENT_ENDPOINT {
-        start_bundled_agent()?;
-        started_bundled_agent = true;
+        .map(|endpoint| endpoint.trim_end_matches('/').to_string());
+    let (endpoint, mut status, started_bundled_agent) = if let Some(endpoint) = configured_endpoint
+    {
+        let status = invoke_agent(&endpoint, &AgentRequest::new("status"), Some(1_000));
+        (endpoint, status, false)
+    } else if let Some(endpoint) = owned_agent_endpoint()? {
+        let status = invoke_agent(&endpoint, &AgentRequest::new("status"), Some(1_000));
+        if status.is_ok() {
+            (endpoint, status, false)
+        } else {
+            let endpoint = start_bundled_agent()?;
+            (endpoint, Err("macOS agent is starting".to_string()), true)
+        }
+    } else {
+        let endpoint = start_bundled_agent()?;
+        (endpoint, Err("macOS agent is starting".to_string()), true)
+    };
+    if started_bundled_agent {
         let deadline = Instant::now()
             + Duration::from_millis(options.timeout_ms.unwrap_or(30_000).max(1) as u64);
         while Instant::now() < deadline {

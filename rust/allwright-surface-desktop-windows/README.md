@@ -1,7 +1,7 @@
 # allwright-surface-desktop-windows
 
 Runtime-loaded Windows desktop plugin for Allwright. The plugin starts a bundled,
-self-contained .NET agent on loopback port `8300`; the agent uses FlaUI's UIA3
+self-contained .NET agent on a private dynamic loopback port; the agent uses FlaUI's UIA3
 backend to automate Win32, WinForms, WPF, UWP, and WinUI applications.
 
 The agent is deliberately isolated from the engine process. Windows UI Automation

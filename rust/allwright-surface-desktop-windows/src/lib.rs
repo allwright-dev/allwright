@@ -15,7 +15,7 @@ use std::{
     env,
     ffi::{CStr, CString, c_char},
     io::{Read, Write},
-    net::{Shutdown, TcpStream},
+    net::{Shutdown, TcpListener, TcpStream},
     path::PathBuf,
     process::{Child, Command, Stdio},
     sync::{Mutex, OnceLock},
@@ -23,8 +23,10 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(test)]
 const DEFAULT_AGENT_ENDPOINT: &str = "http://127.0.0.1:8300";
 static AGENT_PROCESS: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
+static AGENT_ENDPOINT: OnceLock<Mutex<Option<String>>> = OnceLock::new();
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DesktopWindowsPlugin;
@@ -211,46 +213,109 @@ fn bundled_agent_path() -> Result<PathBuf, String> {
     let path = plugin_install_root()?.join("agent/Allwright.WindowsAgent.exe");
     path.is_file().then_some(path.clone()).ok_or_else(|| format!("the desktop-windows plugin archive is missing {}; reinstall it with `allwright plugin install desktop-windows`", path.display()))
 }
-fn start_bundled_agent() -> Result<(), String> {
-    if env::consts::OS != "windows" {
-        return Err("desktop-windows only supports Windows".to_string());
-    }
+fn stop_owned_agent() -> Result<(), String> {
     let mut process = AGENT_PROCESS
         .get_or_init(|| Mutex::new(None))
         .lock()
         .map_err(|_| "Windows agent process lock is poisoned".to_string())?;
-    if let Some(child) = process.as_mut() {
-        if child.try_wait().ok().flatten().is_none() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
+    if let Some(mut child) = process.take() {
+        let _ = child.kill();
+        let _ = child.wait();
     }
-    *process = Some(
+    *AGENT_ENDPOINT
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .map_err(|_| "Windows agent endpoint lock is poisoned".to_string())? = None;
+    Ok(())
+}
+fn owned_agent_endpoint() -> Result<Option<String>, String> {
+    let mut process = AGENT_PROCESS
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .map_err(|_| "Windows agent process lock is poisoned".to_string())?;
+    let Some(child) = process.as_mut() else {
+        return Ok(None);
+    };
+    match child.try_wait() {
+        Ok(None) => AGENT_ENDPOINT
+            .get_or_init(|| Mutex::new(None))
+            .lock()
+            .map_err(|_| "Windows agent endpoint lock is poisoned".to_string())
+            .map(|endpoint| endpoint.clone()),
+        Ok(Some(_)) => {
+            process.take();
+            *AGENT_ENDPOINT
+                .get_or_init(|| Mutex::new(None))
+                .lock()
+                .map_err(|_| "Windows agent endpoint lock is poisoned".to_string())? = None;
+            Ok(None)
+        }
+        Err(error) => Err(format!(
+            "could not inspect owned Windows agent process: {error}"
+        )),
+    }
+}
+fn available_agent_endpoint() -> Result<(String, u16), String> {
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .map_err(|error| format!("could not reserve a Windows agent port: {error}"))?;
+    let port = listener
+        .local_addr()
+        .map_err(|error| format!("could not read reserved Windows agent port: {error}"))?
+        .port();
+    Ok((format!("http://127.0.0.1:{port}"), port))
+}
+fn start_bundled_agent() -> Result<String, String> {
+    if env::consts::OS != "windows" {
+        return Err("desktop-windows only supports Windows".to_string());
+    }
+    stop_owned_agent()?;
+    let (endpoint, port) = available_agent_endpoint()?;
+    *AGENT_PROCESS
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .map_err(|_| "Windows agent process lock is poisoned".to_string())? = Some(
         Command::new(bundled_agent_path()?)
             .arg("--port")
-            .arg("8300")
+            .arg(port.to_string())
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
             .map_err(|e| format!("could not launch bundled Windows agent: {e}"))?,
     );
-    Ok(())
+    *AGENT_ENDPOINT
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .map_err(|_| "Windows agent endpoint lock is poisoned".to_string())? =
+        Some(endpoint.clone());
+    Ok(endpoint)
 }
 fn connect(options: &ConnectOptions) -> Result<DesktopConnectInfo, String> {
     if options.platform != DesktopPlatform::Windows {
         return Err("desktop-windows only supports Windows".to_string());
     }
-    let endpoint = options
+    let configured_endpoint = options
         .agent_endpoint
         .as_deref()
-        .filter(|v| !v.trim().is_empty())
-        .unwrap_or(DEFAULT_AGENT_ENDPOINT)
-        .trim_end_matches('/')
-        .to_string();
-    let mut status = invoke_agent(&endpoint, &AgentRequest::new("status"), Some(1_000));
-    if status.is_err() && endpoint == DEFAULT_AGENT_ENDPOINT {
-        start_bundled_agent()?;
+        .filter(|endpoint| !endpoint.trim().is_empty())
+        .map(|endpoint| endpoint.trim_end_matches('/').to_string());
+    let (endpoint, mut status, started_bundled_agent) = if let Some(endpoint) = configured_endpoint
+    {
+        let status = invoke_agent(&endpoint, &AgentRequest::new("status"), Some(1_000));
+        (endpoint, status, false)
+    } else if let Some(endpoint) = owned_agent_endpoint()? {
+        let status = invoke_agent(&endpoint, &AgentRequest::new("status"), Some(1_000));
+        if status.is_ok() {
+            (endpoint, status, false)
+        } else {
+            let endpoint = start_bundled_agent()?;
+            (endpoint, Err("Windows agent is starting".to_string()), true)
+        }
+    } else {
+        let endpoint = start_bundled_agent()?;
+        (endpoint, Err("Windows agent is starting".to_string()), true)
+    };
+    if started_bundled_agent {
         let deadline = Instant::now()
             + Duration::from_millis(options.timeout_ms.unwrap_or(30_000).max(1) as u64);
         while Instant::now() < deadline {

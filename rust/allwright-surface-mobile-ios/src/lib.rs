@@ -460,6 +460,40 @@ fn store_agent_process(child: Child) -> Result<(), String> {
     Ok(())
 }
 
+fn owned_agent_is_running() -> Result<bool, String> {
+    let process = AGENT_PROCESS.get_or_init(|| Mutex::new(None));
+    let mut process = process
+        .lock()
+        .map_err(|_| "iOS agent process lock is poisoned".to_string())?;
+    let Some(child) = process.as_mut() else {
+        return Ok(false);
+    };
+    match child.try_wait() {
+        Ok(None) => Ok(true),
+        Ok(Some(_)) => {
+            process.take();
+            Ok(false)
+        }
+        Err(error) => Err(format!(
+            "could not inspect owned iOS agent process: {error}"
+        )),
+    }
+}
+
+fn terminate_stale_simulator_agent(simulator_id: &str) {
+    let _ = Command::new("xcrun")
+        .args([
+            "simctl",
+            "terminate",
+            simulator_id,
+            "dev.allwright.AllwrightAgentUITests.xctrunner",
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
 fn start_simulator_agent(
     requested_device: Option<&str>,
 ) -> Result<(String, String, String), String> {
@@ -467,6 +501,9 @@ fn start_simulator_agent(
     let _ = bundled_agent_runner(IosTargetKind::Simulator)?;
     let (simulator_id, simulator_name) = available_simulator(requested_device)?;
     stop_owned_agent()?;
+    // A previous CLI can be gone while its XCTest runner still answers briefly
+    // on port 8100. Never let a new inspector inherit that dying runner.
+    terminate_stale_simulator_agent(&simulator_id);
     let child = Command::new("xcodebuild")
         .arg("test-without-building")
         .arg("-xctestrun")
@@ -1084,25 +1121,28 @@ fn connect_agent(
     options: &ConnectOptions,
     configured_endpoint: &str,
 ) -> Result<(Value, String), String> {
-    match invoke_agent(
-        configured_endpoint,
-        &AgentRequest::new("status"),
-        options.timeout_ms,
-    ) {
-        Ok(status) if status_matches_request(&status, options.device.as_deref()) => {
-            return Ok((status, configured_endpoint.to_string()));
+    let may_reuse = configured_endpoint != DEFAULT_AGENT_ENDPOINT || owned_agent_is_running()?;
+    if may_reuse {
+        match invoke_agent(
+            configured_endpoint,
+            &AgentRequest::new("status"),
+            options.timeout_ms,
+        ) {
+            Ok(status) if status_matches_request(&status, options.device.as_deref()) => {
+                return Ok((status, configured_endpoint.to_string()));
+            }
+            Ok(_) if configured_endpoint != DEFAULT_AGENT_ENDPOINT => {
+                return Err(format!(
+                    "iOS agent at `{configured_endpoint}` is not attached to requested device `{}`",
+                    options.device.as_deref().unwrap_or("<unspecified>")
+                ));
+            }
+            Err(initial_error) if configured_endpoint != DEFAULT_AGENT_ENDPOINT => {
+                return Err(initial_error);
+            }
+            Err(_) => {}
+            Ok(_) => {}
         }
-        Ok(_) if configured_endpoint != DEFAULT_AGENT_ENDPOINT => {
-            return Err(format!(
-                "iOS agent at `{configured_endpoint}` is not attached to requested device `{}`",
-                options.device.as_deref().unwrap_or("<unspecified>")
-            ));
-        }
-        Err(initial_error) if configured_endpoint != DEFAULT_AGENT_ENDPOINT => {
-            return Err(initial_error);
-        }
-        Err(_) => {}
-        Ok(_) => {}
     }
 
     let (_, device_name, endpoint) = match available_simulator(options.device.as_deref()) {
