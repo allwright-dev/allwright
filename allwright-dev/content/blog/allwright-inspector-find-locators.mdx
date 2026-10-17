@@ -46,28 +46,75 @@ app.getByRole("button", { name: "Sign Up", exact: true })
 These are the same locators the client libraries already use, so what you copy
 works as is.
 
-## Run it
+## Start it, surface by surface
 
-The inspector works on the four native surfaces. Install the plugin for the
-surface you need first (`allwright plugin install mobile-android`, and so on).
+You need the `allwright` CLI. If you don't have it, follow the install steps in
+the [repo README](https://github.com/allwright-dev/allwright), or run
+`allwright update` to move an existing install to v0.1.34. Then install the
+plugin for the surface you want to inspect and start the inspector with your
+app as the target.
+
+### Android
+
+You need `adb` and a running emulator or a connected device.
 
 ```bash
-# Android: local APK or a URL; --device picks an emulator or serial
-allwright inspector mobile-android ./sample.apk --device emulator-5554
-
-# iOS: .app, .zip, .ipa, or a URL; --device picks a Simulator or UDID
-allwright inspector mobile-ios ./Flights-simulator.ipa --device "iPhone 17 Pro"
-
-# macOS: bundle identifier
-allwright inspector desktop-mac com.apple.TextEdit
-
-# Windows: executable path
-allwright inspector desktop-windows "C:\Windows\System32\notepad.exe"
+allwright plugin install mobile-android
+allwright inspector mobile-android ./sample.apk
+allwright inspector mobile-android https://allwright.dev/sample.apk --device emulator-5554
 ```
 
-It opens `http://127.0.0.1:9227` in your browser. Pass `--no-open` to just
-print the address. The server only listens on loopback, and it refuses any
-other address.
+The target is a local APK or a download URL. allwright installs and launches
+it. `--device` takes an ADB serial or a configured name; leave it off to use
+the default connected device.
+
+### iOS
+
+You need a Mac with Xcode and either an iOS Simulator runtime or a registered
+iPhone.
+
+```bash
+allwright plugin install mobile-ios
+allwright inspector mobile-ios ./Flights-simulator.ipa
+allwright inspector mobile-ios https://allwright.dev/Flights-simulator.ipa --device "iPhone 17 Pro"
+```
+
+The target is a `.app`, `.zip`, `.ipa`, or a URL. `--device` takes a Simulator
+name or UDID, or a physical device UDID; leave it off for the default available
+Simulator.
+
+### macOS
+
+You need macOS 14 or newer, Xcode, and UI automation (Accessibility)
+permission for your terminal.
+
+```bash
+allwright plugin install desktop-mac
+allwright inspector desktop-mac com.apple.TextEdit
+allwright inspector desktop-mac com.apple.Safari --url https://allwright.dev
+```
+
+The target is the app's bundle identifier. It must already be installed.
+`--url` opens a URL in the app.
+
+### Windows
+
+You need Windows x64. There is nothing else to install.
+
+```powershell
+allwright plugin install desktop-windows
+allwright inspector desktop-windows "C:\Windows\System32\notepad.exe"
+allwright inspector desktop-windows "https://allwright.dev"
+```
+
+The target is an executable path, a command such as `notepad.exe`, or a
+packaged-app ID. A URL inspects the foreground browser window.
+
+### Once it's running
+
+The inspector prints its address and opens `http://127.0.0.1:9227` in your
+browser. Pass `--no-open` to only print the address. It listens on loopback
+only and refuses any other address. Press Ctrl+C in the terminal to stop it.
 
 ## Inspect and Interact
 

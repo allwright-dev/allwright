@@ -25,6 +25,37 @@ export const metadata: Metadata = {
   },
 };
 
+const INSPECTOR_SURFACES = [
+  {
+    name: "Android",
+    needs: "Needs adb and an emulator or connected device.",
+    commands: `allwright plugin install mobile-android
+allwright inspector mobile-android ./sample.apk`,
+    note: "Pass a local APK or a download URL. --device picks an emulator or serial.",
+  },
+  {
+    name: "iOS",
+    needs: "Needs a Mac with Xcode and a Simulator or registered iPhone.",
+    commands: `allwright plugin install mobile-ios
+allwright inspector mobile-ios ./Flights-simulator.ipa`,
+    note: "Pass a .app, .zip, .ipa, or URL. --device picks a Simulator name or UDID.",
+  },
+  {
+    name: "macOS",
+    needs: "Needs macOS 14+, Xcode, and Accessibility permission.",
+    commands: `allwright plugin install desktop-mac
+allwright inspector desktop-mac com.apple.TextEdit`,
+    note: "Pass the app's bundle identifier. --url opens a URL in the app.",
+  },
+  {
+    name: "Windows",
+    needs: "Needs Windows x64. Nothing else to install.",
+    commands: `allwright plugin install desktop-windows
+allwright inspector desktop-windows "C:\\Windows\\System32\\notepad.exe"`,
+    note: "Pass an executable path or a command like notepad.exe.",
+  },
+];
+
 const INIT_FLAGS = [
   { flag: "--yes / -y", does: "Accept defaults (TypeScript, Web) without prompting" },
   { flag: "--typescript / --javascript", does: "Skip the language prompt" },
@@ -215,22 +246,40 @@ export default function Quickstart() {
         </div>
       </section>
 
-      <section
-        aria-label="find locators"
-        className="mx-auto mt-14 w-full max-w-3xl rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl sm:mt-16 sm:p-8"
-      >
-        <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
-          Not sure what to click? Use the inspector
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
-          Testing a native app? Run{" "}
-          <code className="font-mono">allwright inspector mobile-android ./app.apk</code>{" "}
-          (or <code className="font-mono">mobile-ios</code>,{" "}
-          <code className="font-mono">desktop-mac</code>,{" "}
-          <code className="font-mono">desktop-windows</code>), click an element
-          in the screenshot, and copy its locator in your language.{" "}
+      <section aria-label="find locators with the inspector" className="mx-auto mt-14 w-full sm:mt-16">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
+            Not sure what to click? Start the inspector
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
+            With the <code className="font-mono">allwright</code> CLI installed,
+            add the plugin for your surface, then start the inspector. It opens
+            at <code className="font-mono">http://127.0.0.1:9227</code>; click an
+            element in the screenshot and copy its locator in your language.
+            Web pages aren&apos;t covered yet.
+          </p>
+        </div>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          {INSPECTOR_SURFACES.map((surface) => (
+            <div
+              key={surface.name}
+              className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl"
+            >
+              <h3 className="text-base font-semibold text-[var(--ink)]">{surface.name}</h3>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{surface.needs}</p>
+              <pre className="mt-4 overflow-x-auto rounded-xl border border-[var(--line)] bg-[var(--background)]/60 p-3 font-mono text-xs leading-6 text-[var(--ink)]">
+                {surface.commands}
+              </pre>
+              <p className="mt-3 text-xs leading-5 text-[var(--muted)]">{surface.note}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mx-auto mt-6 max-w-[56ch] text-center text-sm leading-6 text-[var(--muted)]">
+          Add <code className="font-mono">--no-open</code> to print the address
+          instead of opening a browser. Use Interact mode to navigate to the
+          screen you want, then switch back to Inspect to pick an element.{" "}
           <Link href="/blog/allwright-inspector-find-locators" className="font-medium text-[var(--accent-2)] hover:underline">
-            See how it works →
+            Full walkthrough →
           </Link>
         </p>
       </section>
