@@ -216,6 +216,26 @@ export default function Quickstart() {
       </section>
 
       <section
+        aria-label="find locators"
+        className="mx-auto mt-14 w-full max-w-3xl rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl sm:mt-16 sm:p-8"
+      >
+        <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
+          Not sure what to click? Use the inspector
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
+          Testing a native app? Run{" "}
+          <code className="font-mono">allwright inspector mobile-android ./app.apk</code>{" "}
+          (or <code className="font-mono">mobile-ios</code>,{" "}
+          <code className="font-mono">desktop-mac</code>,{" "}
+          <code className="font-mono">desktop-windows</code>), click an element
+          in the screenshot, and copy its locator in your language.{" "}
+          <Link href="/blog/allwright-inspector-find-locators" className="font-medium text-[var(--accent-2)] hover:underline">
+            See how it works →
+          </Link>
+        </p>
+      </section>
+
+      <section
         aria-label="get started"
         className="mx-auto mt-14 flex w-full flex-col items-center gap-4 rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-8 text-center backdrop-blur-xl sm:mt-16"
       >

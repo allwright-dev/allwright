@@ -15,6 +15,27 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "v0.1.28 – v0.1.34",
+    date: "2026-10-17",
+    title: "Allwright Inspector: find locators visually",
+    highlights: [
+      "New allwright inspector command opens a local browser UI for a live application and shows its screenshot, accessibility hierarchy, element details, and ready-to-paste locator code. Click an element in the screenshot or the tree to select it. It works for desktop-windows, desktop-mac, mobile-android, and mobile-ios.",
+      "Locator code is generated for all five clients at once: TypeScript, Python, Java, Go, and Rust. Elements with an accessibility id suggest getByTestId; everything else suggests getByRole with its accessible name. Copy with one click.",
+      "Inspect and Interact are separate modes. Inspect captures the hierarchy and selects elements without activating them. Interact switches to a continuous live screen feed and forwards click/tap, double-click, drag/swipe, wheel scrolling, typing, special keys, and paste straight to the app. Selected elements can also be clicked, double-clicked, scrolled, filled, or sent a key press to confirm a locator works before it goes into a test.",
+      "Pass an application path or bundle identifier (Windows, macOS), or a local or downloadable APK / iOS app artifact (Android, iOS). --device picks an emulator, Simulator, or device, --url opens a URL in the app, and --no-open prints the address instead of launching a browser. The inspector listens on loopback only.",
+    ],
+  },
+  {
+    version: "v0.1.26 – v0.1.27",
+    date: "2026-10-15",
+    title: "Windows scaffolding and home-directory fixes",
+    highlights: [
+      "npm init allwright installs dependencies correctly on Windows, where package managers are exposed as .cmd shims.",
+      "allwright finds its home directory on Windows through USERPROFILE or HOMEDRIVE/HOMEPATH when HOME is not set, and ALLWRIGHT_HOME overrides the location everywhere.",
+      "macOS and Windows apps can capture a full scroll-and-stitch screenshot of their primary scrollable region, matching web and mobile.",
+    ],
+  },
+  {
     version: "v0.1.25",
     date: "2026-10-06",
     title: "One API across web, mobile, and desktop",

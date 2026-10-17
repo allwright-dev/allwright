@@ -402,6 +402,26 @@ export default function Availability() {
         </div>
       </section>
 
+      <section aria-label="allwright inspector" className="mx-auto mt-14 w-full sm:mt-16">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
+            Allwright Inspector
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base">
+            <code className="font-mono">allwright inspector</code> opens a local
+            UI that shows a live app, its accessibility tree, and locator code
+            in TypeScript, Python, Java, Go, and Rust. It is available for
+            Android, iOS, macOS, and Windows apps; web pages are not covered
+            yet. Inspect mode selects elements without activating them, and
+            Interact mode forwards clicks, swipes, scrolling, typing, and paste
+            to the live app.{" "}
+            <Link href="/blog/allwright-inspector-find-locators" className="font-medium text-[var(--accent-2)] hover:underline">
+              Read the walkthrough →
+            </Link>
+          </p>
+        </div>
+      </section>
+
       <section aria-label="web capabilities" className="mx-auto mt-14 w-full sm:mt-16">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">

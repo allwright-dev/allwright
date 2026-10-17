@@ -774,6 +774,63 @@ function DefaultHero({ variant }: { variant?: HeroVariant }) {
   );
 }
 
+function InspectorHero({ variant }: { variant?: HeroVariant }) {
+  return (
+    <HeroFrame
+      variant={variant}
+      label="An app window with a highlighted button on the left, an accessibility tree in the middle with the matching row selected, and a locator code panel on the right showing app.getByRole"
+    >
+      <defs>
+        <ArrowMarker id="hero-insp-arrow" />
+      </defs>
+
+      {/* App screenshot */}
+      <rect x={90} y={80} width={240} height={300} rx={22} fill="var(--background)" stroke="currentColor" strokeWidth="1.2" />
+      <rect x={120} y={120} width={180} height={18} rx={9} fill="var(--line)" />
+      <rect x={120} y={160} width={180} height={18} rx={9} fill="var(--line)" />
+      <rect x={116} y={218} width={188} height={46} rx={14} fill="var(--accent-soft)" stroke="var(--accent-2)" strokeWidth="2" strokeDasharray="6 4" />
+      <text x={210} y={247} textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--accent-2)">
+        Sign Up
+      </text>
+      <text x={210} y={52} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--ink)">
+        Live app
+      </text>
+
+      <line x1={340} y1={241} x2={440} y2={241} stroke="currentColor" strokeWidth="1.4" markerEnd="url(#hero-insp-arrow)" />
+
+      {/* Accessibility tree */}
+      <rect x={450} y={80} width={290} height={300} rx={18} fill="var(--card)" stroke="currentColor" strokeWidth="1.2" />
+      <text x={595} y={52} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--ink)">
+        Accessibility tree
+      </text>
+      {["window", "  group", "    text", "    textfield", "    button"].map((row, i) => (
+        <g key={row}>
+          {i === 4 && <rect x={462} y={104 + i * 44} width={266} height={34} rx={8} fill="var(--accent-soft)" stroke="var(--accent-2)" strokeWidth="1.4" />}
+          <text x={478} y={127 + i * 44} fontSize="14" fontFamily="var(--font-mono)" fill={i === 4 ? "var(--accent-2)" : "var(--muted)"} xmlSpace="preserve">
+            {row.replace(/ /g, "\u00a0")}
+          </text>
+        </g>
+      ))}
+
+      <line x1={750} y1={241} x2={850} y2={241} stroke="currentColor" strokeWidth="1.4" markerEnd="url(#hero-insp-arrow)" />
+
+      {/* Locator code */}
+      <rect x={860} y={150} width={260} height={180} rx={18} fill="var(--accent-soft)" stroke="var(--accent-2)" strokeWidth="1.6" />
+      <text x={990} y={52} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--ink)">
+        Locator code
+      </text>
+      {["TypeScript", "Python", "Java", "Go", "Rust"].map((lang, i) => (
+        <text key={lang} x={880} y={182 + i * 26} fontSize="13" fontFamily="var(--font-mono)" fill="var(--accent-2)">
+          {lang}
+        </text>
+      ))}
+      <text x={990} y={110} textAnchor="middle" fontSize="13" fontFamily="var(--font-mono)" fill="var(--muted)">
+        app.getByRole("button", …)
+      </text>
+    </HeroFrame>
+  );
+}
+
 const heroRegistry: Record<string, (props: { variant?: HeroVariant }) => React.ReactElement> = {
   "get-started-with-typescript": TypeScriptHero,
   "why-allwright-if-playwright-exists": EngineHero,
@@ -785,6 +842,7 @@ const heroRegistry: Record<string, (props: { variant?: HeroVariant }) => React.R
   "iframes-as-pages": IframesHero,
   "ios-testing-simulators-and-devices": IosHero,
   "web-mobile-desktop-one-api": SurfacesHero,
+  "allwright-inspector-find-locators": InspectorHero,
 };
 
 export function HeroImage({ slug, variant }: { slug: string; variant?: HeroVariant }) {

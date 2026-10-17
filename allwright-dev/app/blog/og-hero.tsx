@@ -499,6 +499,40 @@ function SurfacesOgDiagram() {
   );
 }
 
+function InspectorOgDiagram() {
+  const { width, height } = DIAGRAM_SIZE;
+  const midY = 132;
+
+  return (
+    <div style={{ position: "relative", width, height, display: "flex" }}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ position: "absolute", left: 0, top: 0 }}>
+        {/* App */}
+        <rect x={0} y={midY - 90} width={90} height={180} rx={16} fill="none" stroke={LINE} strokeWidth={2} />
+        <rect x={14} y={midY + 10} width={62} height={26} rx={8} fill="rgba(14,159,142,0.16)" stroke={BRAND_TO} strokeWidth={2} strokeDasharray="4 3" />
+        <line x1={98} y1={midY} x2={128} y2={midY} stroke={MUTED} strokeWidth={2} />
+        {/* Tree */}
+        <rect x={136} y={midY - 90} width={100} height={180} rx={14} fill="none" stroke={LINE} strokeWidth={2} />
+        <rect x={146} y={midY + 44} width={80} height={24} rx={6} fill="rgba(14,159,142,0.16)" stroke={BRAND_TO} strokeWidth={1.5} />
+        <line x1={244} y1={midY} x2={274} y2={midY} stroke={BRAND_TO} strokeWidth={2} />
+        {/* Code */}
+        <rect x={282} y={midY - 60} width={104} height={120} rx={14} fill="rgba(14,159,142,0.16)" stroke={BRAND_TO} strokeWidth={2} />
+      </svg>
+
+      <div style={{ position: "absolute", left: 14, top: midY + 14, width: 62, display: "flex", justifyContent: "center", fontSize: 11, fontWeight: 700, color: INK_SOFT }}>
+        Sign Up
+      </div>
+      <div style={{ position: "absolute", left: 136, top: midY - 108, width: 100, display: "flex", justifyContent: "center", fontSize: 12, fontWeight: 600, color: INK }}>
+        tree
+      </div>
+      <div style={{ position: "absolute", left: 282, top: midY - 50, width: 104, display: "flex", flexDirection: "column", alignItems: "center", fontSize: 12, fontWeight: 600, color: INK }}>
+        <div style={{ display: "flex" }}>getByRole</div>
+        <div style={{ display: "flex", color: MUTED, marginTop: 4 }}>TS · Py · Java</div>
+        <div style={{ display: "flex", color: MUTED, marginTop: 2 }}>Go · Rust</div>
+      </div>
+    </div>
+  );
+}
+
 const ogHeroRegistry: Record<string, () => React.ReactElement> = {
   "get-started-with-typescript": TypeScriptOgDiagram,
   "why-allwright-if-playwright-exists": EngineOgDiagram,
@@ -510,6 +544,7 @@ const ogHeroRegistry: Record<string, () => React.ReactElement> = {
   "iframes-as-pages": IframesOgDiagram,
   "ios-testing-simulators-and-devices": IosOgDiagram,
   "web-mobile-desktop-one-api": SurfacesOgDiagram,
+  "allwright-inspector-find-locators": InspectorOgDiagram,
 };
 
 /** Returns the post's diagram element for its social-preview card, or null for posts without one (their card falls back to a text-only layout). */

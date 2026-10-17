@@ -1,0 +1,117 @@
+---
+title: "Allwright Inspector: find locators by pointing"
+description: "A new allwright inspector command shows your running app next to its accessibility tree and writes the locator for you in five languages."
+date: "2026-10-17"
+author: "The allwright team"
+published: true
+tags: ["inspector", "locators", "ios", "android", "macos", "windows", "release", "changelog"]
+keywords:
+  [
+    "mobile app locator inspector",
+    "find locators android ios",
+    "appium inspector alternative",
+    "native app accessibility tree viewer",
+    "playwright codegen for mobile",
+    "allwright inspector",
+    "ui automation locator finder",
+  ]
+---
+
+Writing a test for a native app usually stalls on one question: what do I
+click? You guess a label, run the test, watch it fail, and guess again.
+
+As of v0.1.34, allwright ships an answer. `allwright inspector` opens a local
+page that shows your running app next to its accessibility tree. Click an
+element and it hands you the locator, ready to paste into your test.
+
+## What it does
+
+- **Shows the live app** as a screenshot, with the full accessibility
+  hierarchy beside it.
+- **Highlights the element** you select, whether you click it in the
+  screenshot or in the tree.
+- **Lists its properties**: role, name, accessibility id, class, enabled
+  state, and bounds.
+- **Writes the locator** in TypeScript, Python, Java, Go, and Rust at the same
+  time, with a copy button on each.
+
+An element with an accessibility id gets `getByTestId`. Anything else gets
+`getByRole` with its accessible name. For example, in TypeScript:
+
+```ts
+app.getByTestId("login-button")
+app.getByRole("button", { name: "Sign Up", exact: true })
+```
+
+These are the same locators the client libraries already use, so what you copy
+works as is.
+
+## Run it
+
+The inspector works on the four native surfaces. Install the plugin for the
+surface you need first (`allwright plugin install mobile-android`, and so on).
+
+```bash
+# Android: local APK or a URL; --device picks an emulator or serial
+allwright inspector mobile-android ./sample.apk --device emulator-5554
+
+# iOS: .app, .zip, .ipa, or a URL; --device picks a Simulator or UDID
+allwright inspector mobile-ios ./Flights-simulator.ipa --device "iPhone 17 Pro"
+
+# macOS: bundle identifier
+allwright inspector desktop-mac com.apple.TextEdit
+
+# Windows: executable path
+allwright inspector desktop-windows "C:\Windows\System32\notepad.exe"
+```
+
+It opens `http://127.0.0.1:9227` in your browser. Pass `--no-open` to just
+print the address. The server only listens on loopback, and it refuses any
+other address.
+
+## Inspect and Interact
+
+The inspector has two modes.
+
+**Inspect** captures the hierarchy and lets you select elements without
+touching the app. This is where you hunt for locators.
+
+**Interact** switches the canvas to a live screen feed. Click or tap,
+double-click, drag to swipe, scroll with the wheel, type, press special keys,
+and paste. Everything is forwarded straight to the app, so you can get to the
+screen you want to inspect: log in, open a menu, dismiss a dialog. Switch back
+to Inspect and the hierarchy refreshes.
+
+A selected element also has its own controls: click, double-click, scroll
+up or down, fill with text, and press a key. That lets you confirm a locator
+resolves to the right element before it goes into a test.
+
+## A typical session
+
+1. Start the inspector against your app.
+2. Switch to Interact and navigate to the screen under test.
+3. Switch back to Inspect and click the element you need.
+4. Check it with the Click / tap button.
+5. Copy the locator for your language into the test.
+
+## What it doesn't do yet
+
+- **Web pages.** The inspector covers Android, iOS, macOS, and Windows. Web
+  already has `getByRole`, `getByText`, and friends, but there is no visual
+  picker for it yet.
+- **It suggests one locator per element**, based on role and name or
+  accessibility id. If your app has duplicate labels, you will want to narrow
+  the locator by hand.
+- **It needs the usual prerequisites** for each surface: Xcode for iOS and
+  macOS (plus Accessibility permission on macOS), and `adb` with an
+  emulator or device for Android.
+
+The [Availability](/availability) page tracks this alongside everything else.
+
+## Try it
+
+Run `allwright update` to get v0.1.34, then point the inspector at an app.
+The [Changelog](/changelog) lists everything in v0.1.28 to v0.1.34, and the
+[repo README](https://github.com/allwright-dev/allwright) has the full
+inspector reference. If a locator comes out wrong, open an issue and tell us
+which element it was.

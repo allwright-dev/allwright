@@ -248,6 +248,30 @@ export default function Home() {
       </section>
 
       <section
+        aria-label="allwright inspector"
+        className="relative mx-auto mt-14 flex w-full flex-col items-center gap-4 rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-8 text-center backdrop-blur-xl sm:mt-16"
+      >
+        <p className="font-mono text-[0.8rem] uppercase tracking-[0.14em] text-[var(--accent-2)]">
+          New: Allwright Inspector
+        </p>
+        <h2 className="text-xl font-semibold text-[var(--ink)] sm:text-2xl">
+          Point at an element. Get the locator.
+        </h2>
+        <p className="max-w-[52ch] text-sm leading-6 text-[var(--muted)]">
+          <code className="font-mono">allwright inspector</code> shows your
+          running Android, iOS, macOS, or Windows app next to its accessibility
+          tree, then writes the locator for you in TypeScript, Python, Java,
+          Go, or Rust.
+        </p>
+        <Link
+          href="/blog/allwright-inspector-find-locators"
+          className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--card)] px-6 py-3 text-sm font-medium text-[var(--ink)] transition hover:-translate-y-0.5 hover:border-[var(--accent-2)]"
+        >
+          Read the announcement
+        </Link>
+      </section>
+
+      <section
         aria-label="why allwright"
         className="relative mx-auto mt-14 w-full rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-6 backdrop-blur-xl sm:mt-16 sm:p-10"
       >
