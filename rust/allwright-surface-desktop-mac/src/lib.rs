@@ -310,6 +310,25 @@ fn prepare_locally_signed_agent() -> Result<PathBuf, String> {
         .ok_or_else(|| "the bundled macOS xctestrun has no file name".to_string())?;
     let xctestrun = signed_root.join(xctestrun_name);
     let runner = signed_root.join("Release/AllwrightAgentUITests-Runner.app");
+    let runner_info = runner.join("Contents/Info.plist");
+    let usage_description = "Allwright captures the inspected application window without including windows that cover it.";
+    if run_checked(
+        Command::new("plutil")
+            .args(["-replace", "NSScreenCaptureUsageDescription", "-string"])
+            .arg(usage_description)
+            .arg(&runner_info),
+        "update the macOS runner screen-capture usage description",
+    )
+    .is_err()
+    {
+        run_checked(
+            Command::new("plutil")
+                .args(["-insert", "NSScreenCaptureUsageDescription", "-string"])
+                .arg(usage_description)
+                .arg(&runner_info),
+            "add the macOS runner screen-capture usage description",
+        )?;
+    }
     run_checked(
         Command::new("codesign")
             .args([

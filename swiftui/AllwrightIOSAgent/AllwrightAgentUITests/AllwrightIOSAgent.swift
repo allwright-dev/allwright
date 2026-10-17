@@ -4,6 +4,7 @@ import Network
 import UIKit
 #elseif os(macOS)
 import AppKit
+import ScreenCaptureKit
 #endif
 import XCTest
 
@@ -382,10 +383,20 @@ final class AllwrightIOSAgent {
             throw AgentError("selector did not become \(visible ? "visible" : "hidden") before timeout")
 
         case "screenshot":
-            let (_, application) = try application(for: request)
+            let (sessionID, application) = try application(for: request)
             let fullPage = request["full_page"] as? Bool ?? false
             let target = screenshotTarget(application)
-            let png = fullPage ? fullPageScreenshot(target: target) : target.screenshot().pngRepresentation
+            let png: Data
+#if os(macOS)
+            png = fullPage
+                ? fullPageScreenshot(target: target)
+                : try isolatedWindowScreenshot(
+                    bundleIdentifier: applicationBundleIDs[sessionID],
+                    target: target
+                )
+#else
+            png = fullPage ? fullPageScreenshot(target: target) : target.screenshot().pngRepresentation
+#endif
             return .success(["png_base64": png.base64EncodedString()])
 
         case "file_chooser_status":
@@ -728,6 +739,123 @@ final class AllwrightIOSAgent {
         return application
 #endif
     }
+
+#if os(macOS)
+    /// XCUElement.screenshot() crops the composited desktop, so a window in
+    /// front of the application is included in the result. ScreenCaptureKit's
+    /// desktop-independent window filter renders only the requested window.
+    private func isolatedWindowScreenshot(
+        bundleIdentifier: String?,
+        target: XCUIElement
+    ) throws -> Data {
+        let processID = bundleIdentifier.flatMap {
+            NSRunningApplication.runningApplications(withBundleIdentifier: $0).first?.processIdentifier
+        }
+        let targetFrame = target.frame
+        let contentSemaphore = DispatchSemaphore(value: 0)
+        var shareableContent: SCShareableContent?
+        var shareableContentError: Error?
+
+        SCShareableContent.getExcludingDesktopWindows(
+            false,
+            onScreenWindowsOnly: false
+        ) { content, error in
+            shareableContent = content
+            shareableContentError = error
+            contentSemaphore.signal()
+        }
+        guard contentSemaphore.wait(timeout: .now() + 5) == .success else {
+            throw AgentError("timed out while finding the isolated macOS application window")
+        }
+        guard let content = shareableContent else {
+            let detail = shareableContentError?.localizedDescription ?? "capture access was denied"
+            throw AgentError(
+                "isolated macOS window capture requires Screen Recording permission: \(detail). "
+                    + "Allow AllwrightAgentUITests-Runner (or Xcode) in System Settings > Privacy & Security "
+                    + "> Screen & System Audio Recording, then restart the inspector"
+            )
+        }
+
+        // Do not require the owner PID to match. Framework apps, browsers,
+        // launchers, and remote-desktop clients may create the actual window
+        // in a child/helper process. XCU already gave us the authoritative
+        // target frame, so geometry identifies the window and PID only breaks
+        // close ties.
+        let candidates = content.windows.filter { window in
+            window.frame.width > 1
+                && window.frame.height > 1
+                && !window.frame.intersection(targetFrame).isNull
+                && windowGeometryDistance(window.frame, target: targetFrame) <= 0.15
+        }
+        guard let window = candidates.max(by: { lhs, rhs in
+            windowMatchScore(lhs, target: targetFrame, preferredProcessID: processID)
+                < windowMatchScore(rhs, target: targetFrame, preferredProcessID: processID)
+        }) else {
+            throw AgentError("the macOS window server did not expose the inspected application window")
+        }
+
+        let scale = NSScreen.screens.map(\.backingScaleFactor).max() ?? 1
+        let configuration = SCStreamConfiguration()
+        configuration.width = max(1, Int((window.frame.width * scale).rounded()))
+        configuration.height = max(1, Int((window.frame.height * scale).rounded()))
+        configuration.showsCursor = false
+        configuration.ignoreShadowsSingleWindow = true
+        let filter = SCContentFilter(desktopIndependentWindow: window)
+        let imageSemaphore = DispatchSemaphore(value: 0)
+        var capturedImage: CGImage?
+        var captureError: Error?
+        SCScreenshotManager.captureImage(
+            contentFilter: filter,
+            configuration: configuration
+        ) { image, error in
+            capturedImage = image
+            captureError = error
+            imageSemaphore.signal()
+        }
+        guard imageSemaphore.wait(timeout: .now() + 5) == .success else {
+            throw AgentError("timed out while capturing the isolated macOS application window")
+        }
+        guard let capturedImage else {
+            throw AgentError(
+                "could not capture the isolated macOS application window: "
+                    + (captureError?.localizedDescription ?? "unknown ScreenCaptureKit error")
+            )
+        }
+        guard let png = NSBitmapImageRep(cgImage: capturedImage).representation(
+            using: .png,
+            properties: [:]
+        ) else {
+            throw AgentError("could not encode the isolated macOS application window as PNG")
+        }
+        return png
+    }
+
+    private func windowGeometryDistance(_ frame: CGRect, target: CGRect) -> CGFloat {
+        let sizeDifference = (
+            abs(frame.width - target.width) + abs(frame.height - target.height)
+        ) / max(1, target.width + target.height)
+        let originDistance = hypot(frame.minX - target.minX, frame.minY - target.minY)
+            / max(1, hypot(target.width, target.height))
+        return sizeDifference + originDistance
+    }
+
+    private func windowMatchScore(
+        _ window: SCWindow,
+        target: CGRect,
+        preferredProcessID: pid_t?
+    ) -> CGFloat {
+        let frame = window.frame
+        let intersection = frame.intersection(target)
+        let targetArea = max(1, target.width * target.height)
+        let overlapRatio = intersection.isNull
+            ? 0
+            : (intersection.width * intersection.height) / targetArea
+        let geometryDistance = windowGeometryDistance(frame, target: target)
+        let processPreference: CGFloat = preferredProcessID != nil
+            && window.owningApplication?.processID == preferredProcessID ? 0.1 : 0
+        return overlapRatio - geometryDistance + processPreference
+    }
+#endif
 
     private func fullPageScreenshot(target: XCUIElement) -> Data {
 #if os(macOS)

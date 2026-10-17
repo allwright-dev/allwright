@@ -57,6 +57,21 @@ internal static class Program
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
 
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr window, out WindowRect rectangle);
+
+    [DllImport("user32.dll")]
+    private static extern bool PrintWindow(IntPtr window, IntPtr deviceContext, uint flags);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WindowRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
     [STAThread]
     private static void Main(string[] args)
     {
@@ -303,7 +318,7 @@ internal static class Program
         var root = Session(request).Root;
         if (request.FullPage != true)
         {
-            return new { png_base64 = Convert.ToBase64String(CapturePng(root)) };
+            return new { png_base64 = Convert.ToBase64String(CaptureWindowPng(root)) };
         }
 
         var scrollable = root.FindAllDescendants().Prepend(root)
@@ -365,6 +380,41 @@ internal static class Program
             return File.ReadAllBytes(path);
         }
         finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    private static byte[] CaptureWindowPng(AutomationElement element)
+    {
+        var handle = new IntPtr(element.Properties.NativeWindowHandle.ValueOrDefault);
+        if (handle == IntPtr.Zero || !GetWindowRect(handle, out var rectangle))
+            throw new InvalidOperationException(
+                "the Windows agent could not resolve the inspected application's native window handle");
+        var width = rectangle.Right - rectangle.Left;
+        var height = rectangle.Bottom - rectangle.Top;
+        if (width <= 0 || height <= 0)
+            throw new InvalidOperationException("the inspected Windows application window has invalid bounds");
+
+        using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        var rendered = false;
+        using (var graphics = Graphics.FromImage(bitmap))
+        {
+            var deviceContext = graphics.GetHdc();
+            try
+            {
+                // PW_RENDERFULLCONTENT asks DWM to render this window even
+                // when another window covers it. Some classic Win32 apps only
+                // implement the original PrintWindow behavior, so try both.
+                rendered = PrintWindow(handle, deviceContext, 2)
+                    || PrintWindow(handle, deviceContext, 0);
+            }
+            finally { graphics.ReleaseHdc(deviceContext); }
+        }
+        if (!rendered)
+            throw new InvalidOperationException(
+                "Windows could not render the inspected application window independently; "
+                    + "the agent will not fall back to an occluded desktop crop");
+        using var stream = new MemoryStream();
+        bitmap.Save(stream, ImageFormat.Png);
+        return stream.ToArray();
     }
 
     private static byte[] StitchScreenshots(IReadOnlyList<byte[]> shots)

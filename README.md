@@ -219,7 +219,12 @@ allwright inspector desktop-mac com.apple.Safari --url https://allwright.dev
 
 The macOS inspector uses the same interface and locator workflow, backed by the
 XCUITest accessibility hierarchy. Xcode and UI automation permission are
-required, just as they are for the regular `desktop-mac` surface.
+required, just as they are for the regular `desktop-mac` surface. Allow
+`AllwrightAgentUITests-Runner` (or Xcode, when macOS attributes the test runner
+to its host) under **Privacy & Security > Screen & System Audio Recording**.
+The inspector captures the application window independently, so the inspector
+browser and other overlapping windows do not appear in Inspect or Interact
+mode.
 
 For an Android emulator or connected device, pass a local APK or a downloadable
 APK URL. Use `--device` to select a device by ADB serial or configured name; when
