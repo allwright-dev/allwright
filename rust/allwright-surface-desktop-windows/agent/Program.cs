@@ -46,6 +46,9 @@ internal sealed class AppSession
         Id = id;
         AppId = appId;
         LaunchProcessId = launchProcessId;
+        LaunchCompanyName = launchProcessId is int launchPid
+            ? ProcessCompanyName(launchPid)
+            : null;
         InitialRoot = initialRoot;
         if (launchProcessId > 0) ProcessIds.Add(launchProcessId.Value);
         if (initialRoot is not null)
@@ -58,11 +61,22 @@ internal sealed class AppSession
     public string Id { get; }
     public string AppId { get; }
     public int? LaunchProcessId { get; }
+    public string? LaunchCompanyName { get; }
     public AutomationElement? InitialRoot { get; set; }
     public HashSet<int> ProcessIds { get; } = new();
     public HashSet<string> PreexistingWindowIds { get; } = new(StringComparer.Ordinal);
     public bool SawOwnedForeground { get; set; }
     public string? MainWindowId { get; set; }
+
+    private static string? ProcessCompanyName(int processId)
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(processId);
+            return process.MainModule?.FileVersionInfo.CompanyName?.Trim();
+        }
+        catch { return null; }
+    }
 }
 
 internal sealed record WindowCandidate(
@@ -118,7 +132,15 @@ internal static class Program
     [DllImport("kernel32.dll")]
     private static extern bool CloseHandle(IntPtr handle);
 
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint desiredAccess, bool inheritHandle, uint processId);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+
     private const uint SnapshotProcesses = 0x00000002;
+    private const uint SynchronizeProcess = 0x00100000;
+    private const uint InfiniteWait = 0xffffffff;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct WindowRect
@@ -156,6 +178,10 @@ internal static class Program
         var port = 8300;
         var portIndex = Array.IndexOf(args, "--port");
         if (portIndex >= 0 && portIndex + 1 < args.Length) port = int.Parse(args[portIndex + 1]);
+        var parentIndex = Array.IndexOf(args, "--parent-pid");
+        if (parentIndex >= 0 && parentIndex + 1 < args.Length
+            && uint.TryParse(args[parentIndex + 1], out var parentProcessId))
+            StartParentWatchdog(parentProcessId);
         var listener = new TcpListener(IPAddress.Loopback, port);
         listener.Start();
         while (true)
@@ -163,6 +189,27 @@ internal static class Program
             using var client = listener.AcceptTcpClient();
             Handle(client);
         }
+    }
+
+    private static void StartParentWatchdog(uint parentProcessId)
+    {
+        var thread = new Thread(() =>
+        {
+            var parent = OpenProcess(SynchronizeProcess, false, parentProcessId);
+            if (parent == IntPtr.Zero)
+            {
+                Environment.Exit(0);
+                return;
+            }
+            try { _ = WaitForSingleObject(parent, InfiniteWait); }
+            finally { _ = CloseHandle(parent); }
+            Environment.Exit(0);
+        })
+        {
+            IsBackground = true,
+            Name = "Allwright parent-process watchdog"
+        };
+        thread.Start();
     }
 
     private static void Handle(TcpClient client)
@@ -965,16 +1012,19 @@ internal static class Program
         }
         else if (foregroundId is not null
             && session.SawOwnedForeground
+            && candidates.Count == 0
             && !session.PreexistingWindowIds.Contains(foregroundId))
         {
             // Launchers such as SAP and Office can display a splash from the
             // launched process and then ask an already-running broker process
             // to create the real window. That process is not necessarily a
             // descendant, so adopt the newly activated successor HWND after
-            // we have observed an owned foreground window. Pre-launch HWNDs
-            // are excluded to avoid attaching to an unrelated existing app.
+            // we have observed an owned foreground window and that window
+            // family has disappeared. The successor must still have the same
+            // application identity; otherwise opening the inspector browser
+            // would incorrectly retarget the session to that topmost window.
             var successor = desktopWindows.FirstOrDefault(window => window.Id == foregroundId);
-            if (successor is not null)
+            if (successor is not null && MatchesApplicationIdentity(session, successor))
             {
                 session.ProcessIds.Add(successor.ProcessId);
                 candidates[successor.Id] = successor;
@@ -993,6 +1043,33 @@ internal static class Program
         if (session.InitialRoot is null && windows.Length > 0)
             session.InitialRoot = windows[0].Root;
         return windows;
+    }
+
+    private static bool MatchesApplicationIdentity(AppSession session, WindowCandidate window)
+    {
+        if (session.AppId.Contains('!', StringComparison.Ordinal)) return false;
+        var expected = Path.GetFileNameWithoutExtension(session.AppId).Trim().ToLowerInvariant();
+        if (expected.Length == 0) return false;
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(window.ProcessId);
+            var actual = process.ProcessName.Trim().ToLowerInvariant();
+            if (actual == expected) return true;
+            var successorCompany = process.MainModule?.FileVersionInfo.CompanyName?.Trim();
+            if (string.IsNullOrWhiteSpace(session.LaunchCompanyName)
+                || !string.Equals(
+                    session.LaunchCompanyName,
+                    successorCompany,
+                    StringComparison.OrdinalIgnoreCase))
+                return false;
+            var commonPrefix = 0;
+            while (commonPrefix < expected.Length
+                && commonPrefix < actual.Length
+                && expected[commonPrefix] == actual[commonPrefix])
+                commonPrefix++;
+            return commonPrefix >= 3;
+        }
+        catch { return false; }
     }
 
     private static IReadOnlyList<WindowCandidate> EnumerateDesktopWindows()

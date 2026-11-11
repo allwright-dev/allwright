@@ -902,8 +902,12 @@ async fn handle_browser_command(
                 web_lib::close_browser_process(process_id).map_err(Status::internal)?;
             } else if let Some(EngineBrowserSessionHandle::Mobile(_)) = surface_session {
                 // Mobile sessions currently have no process to tear down at the engine layer.
-            } else if let Some(EngineBrowserSessionHandle::Desktop(_)) = surface_session {
-                // The desktop agent lifecycle belongs to the loaded plugin.
+            } else if let Some(EngineBrowserSessionHandle::Desktop(desktop_session)) =
+                surface_session
+            {
+                web_lib::disconnect_desktop(&desktop_session)
+                    .await
+                    .map_err(Status::internal)?;
             }
             Ok(CommandOutcome {
                 event: browser_event(
@@ -3271,6 +3275,21 @@ impl EngineService for EngineGrpcService {
                         break;
                     }
                 }
+            }
+
+            let desktop_session = {
+                let state = state.lock().await;
+                state
+                    .browser_sessions
+                    .get(&session_id)
+                    .and_then(|session| session.surface_session.clone())
+                    .and_then(|session| match session {
+                        EngineBrowserSessionHandle::Desktop(desktop) => Some(desktop),
+                        _ => None,
+                    })
+            };
+            if let Some(desktop_session) = desktop_session {
+                let _ = web_lib::disconnect_desktop(&desktop_session).await;
             }
 
             let mut state = state.lock().await;

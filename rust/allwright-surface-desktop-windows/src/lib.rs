@@ -12,6 +12,7 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
+    collections::HashSet,
     env,
     ffi::{CStr, CString, c_char},
     io::{Read, Write},
@@ -27,6 +28,7 @@ use std::{
 const DEFAULT_AGENT_ENDPOINT: &str = "http://127.0.0.1:8300";
 static AGENT_PROCESS: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
 static AGENT_ENDPOINT: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+static OWNED_DESKTOP_SESSIONS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DesktopWindowsPlugin;
@@ -295,6 +297,11 @@ fn start_bundled_agent() -> Result<String, String> {
     if env::consts::OS != "windows" {
         return Err("desktop-windows only supports Windows".to_string());
     }
+    OWNED_DESKTOP_SESSIONS
+        .get_or_init(|| Mutex::new(HashSet::new()))
+        .lock()
+        .map_err(|_| "Windows desktop session lock is poisoned".to_string())?
+        .clear();
     stop_owned_agent()?;
     let (endpoint, port) = available_agent_endpoint()?;
     *AGENT_PROCESS
@@ -304,6 +311,8 @@ fn start_bundled_agent() -> Result<String, String> {
         Command::new(bundled_agent_path()?)
             .arg("--port")
             .arg(port.to_string())
+            .arg("--parent-pid")
+            .arg(std::process::id().to_string())
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -353,16 +362,47 @@ fn connect(options: &ConnectOptions) -> Result<DesktopConnectInfo, String> {
             thread::sleep(Duration::from_millis(200));
         }
     }
-    let status = status.map_err(|e| {
-        format!("{e}; the UIA3 agent did not become ready in the interactive Windows session")
-    })?;
+    let status = match status {
+        Ok(status) => status,
+        Err(error) => {
+            if started_bundled_agent {
+                let _ = stop_owned_agent();
+            }
+            return Err(format!(
+                "{error}; the UIA3 agent did not become ready in the interactive Windows session"
+            ));
+        }
+    };
+    let host_name = match result_string(&status, "host_name") {
+        Ok(host_name) => host_name.to_string(),
+        Err(error) => {
+            if started_bundled_agent {
+                let _ = stop_owned_agent();
+            }
+            return Err(error);
+        }
+    };
+    let session_id = unique_id("windows-uia3");
+    let owns_endpoint = AGENT_ENDPOINT
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .map_err(|_| "Windows agent endpoint lock is poisoned".to_string())?
+        .as_deref()
+        == Some(endpoint.as_str());
+    if owns_endpoint {
+        OWNED_DESKTOP_SESSIONS
+            .get_or_init(|| Mutex::new(HashSet::new()))
+            .lock()
+            .map_err(|_| "Windows desktop session lock is poisoned".to_string())?
+            .insert(session_id.clone());
+    }
     Ok(DesktopConnectInfo {
-        host_name: result_string(&status, "host_name")?.to_string(),
+        host_name,
         note: "connected to the native Allwright UIA3 agent".to_string(),
         desktop_session: DesktopSessionHandle {
             platform: DesktopPlatform::Windows,
             endpoint,
-            session_id: unique_id("windows-uia3"),
+            session_id,
         },
         initial_app: DesktopAppInfo {
             note: "Windows desktop connected; launch an application before using the context"
@@ -374,6 +414,22 @@ fn connect(options: &ConnectOptions) -> Result<DesktopConnectInfo, String> {
             },
         },
     })
+}
+fn disconnect(desktop: &DesktopSessionHandle) -> Result<(), String> {
+    let should_stop = {
+        let mut sessions = OWNED_DESKTOP_SESSIONS
+            .get_or_init(|| Mutex::new(HashSet::new()))
+            .lock()
+            .map_err(|_| "Windows desktop session lock is poisoned".to_string())?;
+        if !sessions.remove(&desktop.session_id) {
+            return Ok(());
+        }
+        sessions.is_empty()
+    };
+    if should_stop {
+        stop_owned_agent()?;
+    }
+    Ok(())
 }
 fn launch_app(
     desktop: &DesktopSessionHandle,
@@ -436,6 +492,10 @@ fn inspector_snapshot(raw: &str) -> Result<InspectorSnapshot, String> {
 fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult, String> {
     match command {
         DesktopCommand::Connect(options) => connect(&options).map(DesktopCommandResult::Connect),
+        DesktopCommand::Disconnect { desktop_session } => {
+            disconnect(&desktop_session)?;
+            Ok(DesktopCommandResult::Disconnect)
+        }
         DesktopCommand::LaunchApp {
             desktop_session,
             options,

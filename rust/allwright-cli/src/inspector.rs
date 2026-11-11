@@ -66,6 +66,19 @@ struct InspectorRuntime {
     selected_desktop_window: Mutex<Option<String>>,
 }
 
+impl Drop for InspectorRuntime {
+    fn drop(&mut self) {
+        if let InspectorSession::Desktop { desktop, .. } = &self.session {
+            let _ = invoke_desktop(
+                self.surface.id(),
+                DesktopCommand::Disconnect {
+                    desktop_session: desktop.clone(),
+                },
+            );
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 enum InspectorSurface {
     Desktop {

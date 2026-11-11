@@ -676,6 +676,7 @@ fn inspector_bounds(value: &Value) -> Option<InspectorBounds> {
 fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult, String> {
     match command {
         DesktopCommand::Connect(options) => connect(&options).map(DesktopCommandResult::Connect),
+        DesktopCommand::Disconnect { .. } => Ok(DesktopCommandResult::Disconnect),
         DesktopCommand::LaunchApp {
             desktop_session,
             options,

@@ -37,7 +37,8 @@ struct DesktopPluginEnvelope {
 fn invoke_desktop(command: DesktopCommand) -> Result<DesktopCommandResult, String> {
     let plugin_id = match &command {
         DesktopCommand::Connect(options) => options.platform.plugin_id(),
-        DesktopCommand::LaunchApp {
+        DesktopCommand::Disconnect { desktop_session }
+        | DesktopCommand::LaunchApp {
             desktop_session, ..
         }
         | DesktopCommand::CloseApp {
@@ -128,6 +129,17 @@ pub async fn connect_desktop(options: DesktopConnectOptions) -> Result<DesktopCo
     match invoke_desktop_expected(DesktopCommand::Connect(options)).await? {
         DesktopCommandResult::Connect(result) => Ok(result),
         _ => Err("desktop plugin returned an unexpected connect response".to_string()),
+    }
+}
+
+pub async fn disconnect_desktop(desktop_session: &DesktopSessionHandle) -> Result<(), String> {
+    match invoke_desktop_expected(DesktopCommand::Disconnect {
+        desktop_session: desktop_session.clone(),
+    })
+    .await?
+    {
+        DesktopCommandResult::Disconnect => Ok(()),
+        _ => Err("desktop plugin returned an unexpected disconnect response".to_string()),
     }
 }
 

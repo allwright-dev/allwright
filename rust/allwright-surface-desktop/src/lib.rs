@@ -116,6 +116,9 @@ pub struct DesktopScreenshotInfo {
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum DesktopCommand {
     Connect(ConnectOptions),
+    Disconnect {
+        desktop_session: DesktopSessionHandle,
+    },
     LaunchApp {
         desktop_session: DesktopSessionHandle,
         options: LaunchOptions,
@@ -255,6 +258,7 @@ pub enum DesktopCommand {
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum DesktopCommandResult {
     Connect(DesktopConnectInfo),
+    Disconnect,
     LaunchApp(DesktopAppInfo),
     CloseApp,
     NavigateApp(DesktopNavigationInfo),
@@ -347,6 +351,19 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<DesktopCommand>(&json).unwrap(),
             windows
+        );
+
+        let disconnect = DesktopCommand::Disconnect {
+            desktop_session: DesktopSessionHandle {
+                platform: DesktopPlatform::Windows,
+                endpoint: "http://127.0.0.1:8300".to_string(),
+                session_id: "desktop-windows-1".to_string(),
+            },
+        };
+        let json = serde_json::to_string(&disconnect).unwrap();
+        assert_eq!(
+            serde_json::from_str::<DesktopCommand>(&json).unwrap(),
+            disconnect
         );
 
         let navigate = DesktopCommand::NavigateApp {
