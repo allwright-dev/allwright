@@ -1,13 +1,15 @@
 # allwright-surface-desktop-windows
 
 Runtime-loaded Windows desktop plugin for Allwright. The plugin starts a bundled,
-self-contained .NET agent on a private dynamic loopback port; the agent uses FlaUI's UIA3
-backend to automate Win32, WinForms, WPF, UWP, and WinUI applications.
+self-contained .NET agent on a private dynamic loopback port. The agent uses Microsoft
+UI Automation 3 COM APIs directly, with Allwright-owned selectors, input, capture,
+window discovery, and provider timeouts for Win32, WinForms, WPF, UWP, and WinUI apps.
 
 The agent is deliberately isolated from the engine process. Windows UI Automation
 is COM-based and a non-responsive application can wedge an automation call; the
-sidecar boundary lets the engine time out a request and replace the agent without
-embedding UIA state in core. Requests use typed JSON over loopback HTTP. No Appium,
+sidecar boundary and bounded provider calls keep Win32 window discovery, capture,
+and live input available when an accessibility provider is slow. Requests use typed
+JSON over loopback HTTP. No FlaUI, Appium,
 WinAppDriver, Developer Mode, or separately installed .NET runtime is required.
 
 Supported shared desktop operations are app launch/close, Playwright-style native

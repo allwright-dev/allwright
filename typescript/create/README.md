@@ -58,7 +58,7 @@ process running Xcode.
 
 The Desktop Windows starter configures Notepad and writes a lazy `windowsApp`
 screenshot test. Its first run installs `desktop-windows` and starts the bundled,
-self-contained FlaUI UIA3 agent. It requires an interactive Windows 10 or newer
+self-contained Allwright UIA3 agent. It requires an interactive Windows 10 or newer
 desktop session; no separate Appium, WinAppDriver, or .NET installation is needed.
 
 Dependencies are installed automatically with the package manager that ran the initializer. Existing lockfiles take precedence; use `--package-manager npm|yarn|pnpm|bun` to override detection, or `--no-install` to scaffold without installing.

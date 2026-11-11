@@ -19,7 +19,7 @@ test.skipIf(!!process.env.ALLWRIGHT_WINDOWS_APP_ID)(
 );
 
 test.skipIf(process.platform !== "win32" || !process.env.ALLWRIGHT_WINDOWS_APP_ID)(
-  "windowsApp lazily starts the FlaUI agent and launches the configured app",
+  "windowsApp lazily starts the Allwright UIA3 agent and launches the configured app",
   { timeout: 90_000 },
   async ({ windowsApp }) => {
     const screenshot = await windowsApp.screenshot();

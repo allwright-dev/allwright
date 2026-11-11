@@ -108,16 +108,28 @@ fn install_plugin_inner(
         format!("unknown plugin `{plugin_id}`. Supported plugins: {supported}")
     })?;
     ensure_plugin_install_supported(plugin_id)?;
-    let target_version = resolve_target_version(package.version, version_override)?;
+    let version_request = plugin_install_version_request(explicit_install, version_override);
+    let target_version = resolve_target_version(package.version, version_request)?;
     let runtime_artifact = plugin_runtime_artifact_path(plugin_id)?;
-    if plugin_install_is_complete(plugin_id, &runtime_artifact)
-        && installed_plugin_version(plugin_id)?.as_deref() == Some(target_version.as_str())
-    {
+    let installed_version = installed_plugin_version(plugin_id)?;
+    let installation_is_current = plugin_install_is_complete(plugin_id, &runtime_artifact)
+        && installed_version.as_deref() == Some(target_version.as_str());
+    // Automatic availability checks should reuse a complete matching install.
+    // An explicit `plugin install` is a refresh operation: release assets can be
+    // replaced under the same version, and bundled agents are not represented by
+    // the manifest's version field alone.
+    if should_reuse_plugin_install(installation_is_current, explicit_install) {
         return Ok(InstalledPlugin {
             id: plugin_id.to_string(),
             package_name: package.package_name.to_string(),
             version: target_version,
         });
+    }
+
+    if installation_is_current {
+        println!(
+            "Refreshing plugin `{plugin_id}` at version {target_version} because installation was explicitly requested..."
+        );
     }
 
     if !explicit_install && !auto_install_enabled() {
@@ -154,6 +166,24 @@ fn install_plugin_inner(
         package_name: package.package_name.to_string(),
         version: target_version,
     })
+}
+
+fn should_reuse_plugin_install(installation_is_current: bool, explicit_install: bool) -> bool {
+    installation_is_current && !explicit_install
+}
+
+fn plugin_install_version_request<'a>(
+    explicit_install: bool,
+    version_override: Option<&'a str>,
+) -> Option<&'a str> {
+    let requested = version_override
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if explicit_install && requested.is_none() {
+        Some("latest")
+    } else {
+        requested
+    }
 }
 
 fn invoke_plugin_library(
@@ -335,7 +365,7 @@ fn install_plugin_package(
     }
     if plugin_id == "desktop-windows" && !bundled_windows_agent_is_complete(&install_root) {
         return Err(format!(
-            "downloaded plugin `desktop-windows` from {package_name}@{version} but its bundled FlaUI agent is incomplete"
+            "downloaded plugin `desktop-windows` from {package_name}@{version} but its bundled UI Automation agent is incomplete"
         ));
     }
     println!("Verified runtime artifact `{runtime_artifact}`.");
@@ -760,6 +790,27 @@ fn normalize_release_version(raw: &str) -> String {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn explicit_install_refreshes_an_already_current_plugin() {
+        assert!(should_reuse_plugin_install(true, false));
+        assert!(!should_reuse_plugin_install(true, true));
+        assert!(!should_reuse_plugin_install(false, false));
+    }
+
+    #[test]
+    fn explicit_install_defaults_to_latest_but_automatic_install_stays_pinned() {
+        assert_eq!(plugin_install_version_request(true, None), Some("latest"));
+        assert_eq!(
+            plugin_install_version_request(true, Some("  ")),
+            Some("latest")
+        );
+        assert_eq!(
+            plugin_install_version_request(true, Some("v0.2.2")),
+            Some("v0.2.2")
+        );
+        assert_eq!(plugin_install_version_request(false, None), None);
+    }
 
     #[test]
     fn windows_install_requires_self_contained_agent() {

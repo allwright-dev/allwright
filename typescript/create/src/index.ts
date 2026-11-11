@@ -552,7 +552,7 @@ function generatedReadmeContents(surfaces: SurfaceId[]): string {
   if (hasSurface(surfaces, "desktop-windows")) {
     nextSteps.push(
       `${step++}. Run the suite from an interactive Windows 10 or newer desktop session.`,
-      `${step++}. The first Windows run installs the desktop plugin, starts its bundled FlaUI UIA3 agent, and launches Notepad.`,
+      `${step++}. The first Windows run installs the desktop plugin, starts its bundled Allwright UIA3 agent, and launches Notepad.`,
     );
   }
 

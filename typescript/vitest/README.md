@@ -177,7 +177,7 @@ Use `ALLWRIGHT_MAC_AGENT_ENDPOINT` for an external agent or
 `ALLWRIGHT_MAC_APP_ID` to override the configured bundle identifier.
 
 Windows apps use an executable path, command name, or packaged-app AUMID. The
-fixture starts the bundled FlaUI UIA3 agent and launches the app lazily:
+fixture starts the bundled Allwright UIA3 agent and launches the app lazily:
 
 ```yaml
 # allwright.config.yaml

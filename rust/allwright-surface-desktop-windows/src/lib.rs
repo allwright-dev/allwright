@@ -40,7 +40,7 @@ pub fn descriptor() -> SurfacePluginDescriptor {
         id: "desktop-windows",
         family: SurfaceFamily::Desktop,
         version: env!("CARGO_PKG_VERSION"),
-        description: "Windows desktop surface plugin backed by a bundled FlaUI UIA3 agent.",
+        description: "Windows desktop surface plugin backed by Allwright's bundled UIA3 agent.",
     }
 }
 
@@ -358,7 +358,7 @@ fn connect(options: &ConnectOptions) -> Result<DesktopConnectInfo, String> {
     })?;
     Ok(DesktopConnectInfo {
         host_name: result_string(&status, "host_name")?.to_string(),
-        note: "connected to the native Allwright FlaUI UIA3 agent".to_string(),
+        note: "connected to the native Allwright UIA3 agent".to_string(),
         desktop_session: DesktopSessionHandle {
             platform: DesktopPlatform::Windows,
             endpoint,
@@ -784,6 +784,7 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
             r.session_id = Some(&app_session.app_session_id);
             r.window_id = app_session.window_id.as_deref();
             r.value = Some(&mode);
+            r.timeout_ms = Some(8_000);
             let value = invoke_agent(&desktop_session.endpoint, &r, Some(10_000))?;
             let raw = result_string(&value, "snapshot")?;
             let snapshot = match format.as_str() {
@@ -820,6 +821,7 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
             request.session_id = Some(&app_session.app_session_id);
             request.window_id = app_session.window_id.as_deref();
             request.value = Some("default");
+            request.timeout_ms = Some(8_000);
             let value = invoke_agent(&desktop_session.endpoint, &request, Some(10_000))?;
             let raw = result_string(&value, "snapshot")?;
             Ok(DesktopCommandResult::InspectorSnapshot(inspector_snapshot(

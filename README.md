@@ -78,7 +78,7 @@ Today, the plugin ecosystem looks like this:
 - `web` and `mobile-android`: installable runtime surface plugins loaded by the core at runtime
 - `mobile-ios`: an experimental installable macOS plugin with bundled, auto-started headless XCUITest runners for iOS Simulators and physical devices; device runners are re-signed locally from the user's Apple development credentials
 - `desktop-mac`: installable macOS plugin with a bundled, auto-started XCUITest runner
-- `desktop-windows`: installable Windows x64 plugin with a bundled, self-contained FlaUI UIA3 agent
+- `desktop-windows`: installable Windows x64 plugin with a bundled, self-contained Allwright UIA3 agent
 - `desktop-linux`: planned surface plugin with a publishable crate boundary, but not yet an installable runtime artifact
 
 What `plugin install` means today:
@@ -217,6 +217,9 @@ a named window to pin screenshots, hierarchy capture, locator actions, and live
 input to that stable window. If a pinned window closes, the inspector falls
 back to following the current main window. Live mode detects a handoff before
 forwarding more coordinates and refreshes the hierarchy and window bounds.
+Tabbed or single-instance Windows applications such as modern Notepad are
+supported even when the short-lived launcher exits and activates a tab in an
+already-running application process.
 
 On macOS, pass the application bundle identifier:
 
@@ -567,7 +570,7 @@ browser.close()
 - `rust/allwright-surface-mobile-ios`: publishable `mobile-ios` surface crate
 - `rust/allwright-surface-desktop`: shared desktop surface abstractions
 - `rust/allwright-surface-desktop-mac`: runtime-loaded macOS plugin backed by a bundled XCUITest runner
-- `rust/allwright-surface-desktop-windows`: runtime-loaded Windows plugin backed by a bundled FlaUI UIA3 sidecar
+- `rust/allwright-surface-desktop-windows`: runtime-loaded Windows plugin backed by a bundled Allwright UIA3/Win32 sidecar
 - `rust/allwright-surface-desktop-linux`: publishable `desktop-linux` surface crate
 - `go/`: published Go client `allwright.dev` and Go playground
 - `java/`: published Java client `dev.allwright:allwright` on Maven Central
@@ -619,7 +622,7 @@ That tag triggers `.github/workflows/release-surface-plugins.yml`, which publish
 - `allwright-surface-mobile-android` plugin archives for the current OS matrix
 - `allwright-surface-mobile-ios` plugin archives with Simulator and physical-device XCUITest runners for both macOS architectures
 - `allwright-surface-desktop-mac` plugin archives with a macOS XCUITest runner for both macOS architectures
-- `allwright-surface-desktop-windows` plugin archives with a self-contained FlaUI UIA3 agent for Windows x64
+- `allwright-surface-desktop-windows` plugin archives with a self-contained Allwright UIA3 agent for Windows x64
 - crates.io publish for every Rust core, CLI, and surface-plugin crate after syncing and verifying every crate version from the tag
 
 - Linux `x86_64-unknown-linux-gnu`

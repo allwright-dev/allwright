@@ -295,6 +295,28 @@ impl InspectorRuntime {
         }))
     }
 
+    fn snapshot_with_window_retry(&self) -> Result<Value, Box<dyn Error>> {
+        if !matches!(self.session, InspectorSession::Desktop { .. }) {
+            return self.snapshot();
+        }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            match self.snapshot() {
+                Ok(snapshot) => return Ok(snapshot),
+                Err(error) if is_transient_desktop_window_error(error.as_ref()) => {
+                    if std::time::Instant::now() >= deadline {
+                        return Err(error);
+                    }
+                }
+                Err(error) => return Err(error),
+            }
+            // A launcher or splash HWND can disappear between listing windows,
+            // capturing it, and reading its hierarchy. Resolve the dynamic main
+            // window again instead of leaving the inspector stuck on that HWND.
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+    }
+
     fn select_desktop_window(&self, window_id: Option<String>) -> Result<Value, Box<dyn Error>> {
         if !matches!(self.session, InspectorSession::Desktop { .. }) {
             return Err("window selection is only supported by desktop inspectors".into());
@@ -304,7 +326,7 @@ impl InspectorRuntime {
             .selected_desktop_window
             .lock()
             .map_err(|_| "desktop inspector window selection lock is poisoned")? = normalized;
-        self.snapshot()
+        self.snapshot_with_window_retry()
     }
 
     fn window_state(&self) -> Result<Value, Box<dyn Error>> {
@@ -762,7 +784,7 @@ fn handle_request(
             INDEX_HTML.as_bytes(),
         )?,
         ("GET", "/api/snapshot") => {
-            let body = serde_json::to_vec(&runtime.snapshot()?)?;
+            let body = serde_json::to_vec(&runtime.snapshot_with_window_retry()?)?;
             write_response(stream, "200 OK", "application/json", &body)?;
         }
         ("GET", "/api/frame") => {
@@ -937,6 +959,19 @@ fn is_loopback_origin(origin: &str) -> bool {
     ["http://127.0.0.1:", "http://localhost:", "http://[::1]:"]
         .iter()
         .any(|prefix| origin.starts_with(prefix))
+}
+
+fn is_transient_desktop_window_error(error: &(dyn Error + 'static)) -> bool {
+    let message = error.to_string().to_lowercase();
+    [
+        "closed or no longer belongs",
+        "does not currently expose a window",
+        "does not currently expose a main window",
+        "native window handle",
+        "could not render the inspected application window",
+    ]
+    .iter()
+    .any(|fragment| message.contains(fragment))
 }
 
 fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {

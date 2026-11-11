@@ -75,7 +75,7 @@ enum PluginCommand {
     Install {
         /// Plugin id such as `web` or `mobile-android`, or `all`
         plugin: String,
-        /// Override the registered plugin version
+        /// Install a specific release instead of the latest
         #[arg(long)]
         version: Option<String>,
     },
@@ -367,7 +367,10 @@ fn handle_plugin_command(command: PluginCommand) -> Result<(), Box<dyn Error>> {
                         if entry.version == plugin.version {
                             format!("installed@{}", entry.version)
                         } else {
-                            format!("outdated@{} (expected@{})", entry.version, plugin.version)
+                            format!(
+                                "installed@{} (CLI default@{})",
+                                entry.version, plugin.version
+                            )
                         }
                     })
                     .unwrap_or_else(|| "available".to_string());
@@ -395,6 +398,9 @@ fn handle_plugin_command(command: PluginCommand) -> Result<(), Box<dyn Error>> {
                     installed.id, installed.package_name, installed.version
                 );
             }
+            println!(
+                "Restart any running allwright server or inspector to load the refreshed plugin artifacts."
+            );
             println!("Plugin manifest: {}", plugin_manifest_path()?.display());
         }
         PluginCommand::Invoke {
