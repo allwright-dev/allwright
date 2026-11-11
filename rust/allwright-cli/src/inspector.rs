@@ -1069,10 +1069,14 @@ mod tests {
         assert!(INDEX_HTML.contains("keyboardInteract"));
         assert!(INDEX_HTML.contains("Text to fill"));
         assert!(INDEX_HTML.contains("Press key"));
-        assert!(INDEX_HTML.contains("app.getByRole"));
-        assert!(INDEX_HTML.contains("app.get_by_role"));
-        assert!(INDEX_HTML.contains("app.GetByRole"));
-        assert!(INDEX_HTML.contains("app.get_by_role_with_options"));
+        assert!(INDEX_HTML.contains("getByRole"));
+        assert!(INDEX_HTML.contains("get_by_role"));
+        assert!(INDEX_HTML.contains("GetByRole"));
+        assert!(INDEX_HTML.contains("get_by_role_with_options"));
+        assert!(INDEX_HTML.contains("function uniqueLocatorPlan(n)"));
+        assert!(INDEX_HTML.contains("directUniqueSegment"));
+        assert!(INDEX_HTML.contains("No unique locator can be formed"));
+        assert!(INDEX_HTML.contains("Unique locator code"));
         assert!(INDEX_HTML.contains("object-fit:contain"));
         assert!(INDEX_HTML.contains("function fitStage()"));
         assert!(INDEX_HTML.contains("window.addEventListener('resize',fitStage)"));
