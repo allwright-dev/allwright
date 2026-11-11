@@ -180,7 +180,7 @@ fn github_repository() -> String {
 }
 
 fn latest_release_tag(repository: &str) -> Result<String, Box<dyn Error>> {
-    let url = format!("https://api.github.com/repos/{repository}/releases/latest");
+    let url = format!("https://api.github.com/repos/{repository}/releases?per_page=100");
     let client = release_http_client()?;
     let mut request = client.get(&url).header(
         "User-Agent",
@@ -193,12 +193,40 @@ fn latest_release_tag(repository: &str) -> Result<String, Box<dyn Error>> {
     }
     println!("Checking the latest allwright release...");
     let body = request.send()?.error_for_status()?.text()?;
-    let response: serde_json::Value = serde_json::from_str(&body)?;
-    let tag = response
-        .get("tag_name")
-        .and_then(serde_json::Value::as_str)
-        .ok_or("GitHub latest-release response did not contain tag_name")?;
-    normalize_release_tag(tag)
+    let releases: serde_json::Value = serde_json::from_str(&body)?;
+    select_latest_release_tag(&releases)
+        .ok_or_else(|| "GitHub releases did not contain a non-draft semantic version".into())
+}
+
+fn select_latest_release_tag(releases: &serde_json::Value) -> Option<String> {
+    releases
+        .as_array()?
+        .iter()
+        .filter(|release| {
+            !release
+                .get("draft")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false)
+        })
+        .filter_map(|release| {
+            let tag = release.get("tag_name")?.as_str()?.trim();
+            let version = semantic_release_version(tag)?;
+            let stable = !tag.trim_start_matches('v').contains('-');
+            Some((version, stable, tag))
+        })
+        .max_by_key(|(version, stable, _)| (*version, *stable))
+        .and_then(|(_, _, tag)| normalize_release_tag(tag).ok())
+}
+
+fn semantic_release_version(tag: &str) -> Option<(u64, u64, u64)> {
+    let core = tag.trim().trim_start_matches('v').split('-').next()?;
+    let mut parts = core.split('.');
+    let version = (
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+    );
+    parts.next().is_none().then_some(version)
 }
 
 fn normalize_release_tag(version: &str) -> Result<String, Box<dyn Error>> {
@@ -914,6 +942,19 @@ mod tests {
             pinned.command,
             Some(CliCommand::Update { version: Some(version) }) if version == "v1.2.3"
         ));
+    }
+
+    #[test]
+    fn update_latest_includes_non_draft_prereleases() {
+        let releases = serde_json::json!([
+            {"tag_name": "v0.2.0", "draft": false, "prerelease": false},
+            {"tag_name": "v0.2.2", "draft": false, "prerelease": true},
+            {"tag_name": "v0.3.0", "draft": true, "prerelease": false}
+        ]);
+        assert_eq!(
+            select_latest_release_tag(&releases).as_deref(),
+            Some("v0.2.2")
+        );
     }
 
     #[test]

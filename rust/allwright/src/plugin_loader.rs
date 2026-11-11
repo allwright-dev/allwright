@@ -156,7 +156,7 @@ pub async fn list_desktop_windows(
     })
     .await?
     {
-        DesktopCommandResult::ListWindows(result) => Ok(result),
+        DesktopCommandResult::ListWindows { windows } => Ok(windows),
         _ => Err("desktop plugin returned an unexpected window-list response".to_string()),
     }
 }
@@ -186,7 +186,7 @@ pub async fn register_desktop_window_hook(
     })
     .await?
     {
-        DesktopCommandResult::RegisterWindowHook(hook_id) => Ok(hook_id),
+        DesktopCommandResult::RegisterWindowHook { hook_id } => Ok(hook_id),
         _ => Err("desktop plugin returned an unexpected window-hook response".to_string()),
     }
 }

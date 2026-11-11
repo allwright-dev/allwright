@@ -1083,7 +1083,7 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
                     .unwrap_or(Value::Array(vec![])),
             )
             .map_err(|error| format!("macOS agent returned invalid window data: {error}"))?;
-            Ok(DesktopCommandResult::ListWindows(windows))
+            Ok(DesktopCommandResult::ListWindows { windows })
         }
         DesktopCommand::CloseWindow {
             desktop_session,
@@ -1106,9 +1106,9 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
             let mut request = AgentRequest::new("register_window_hook");
             request.session_id = Some(&app_session.app_session_id);
             let value = invoke_agent(&desktop_session.endpoint, &request, Some(10_000))?;
-            Ok(DesktopCommandResult::RegisterWindowHook(
-                result_string(&value, "hook_id")?.to_string(),
-            ))
+            Ok(DesktopCommandResult::RegisterWindowHook {
+                hook_id: result_string(&value, "hook_id")?.to_string(),
+            })
         }
         DesktopCommand::WaitForWindowHook {
             desktop_session,

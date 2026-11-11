@@ -273,9 +273,9 @@ pub enum DesktopCommandResult {
     Screenshot(DesktopScreenshotInfo),
     AccessibilitySnapshot(AccessibilitySnapshotInfo),
     InspectorSnapshot(InspectorSnapshot),
-    ListWindows(Vec<DesktopWindowInfo>),
+    ListWindows { windows: Vec<DesktopWindowInfo> },
     CloseWindow,
-    RegisterWindowHook(String),
+    RegisterWindowHook { hook_id: String },
     WaitForWindowHook(DesktopWindowInfo),
 }
 
@@ -388,6 +388,31 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<DesktopCommand>(&json).unwrap(),
             screenshot
+        );
+    }
+
+    #[test]
+    fn sequence_and_scalar_results_round_trip_with_internal_tags() {
+        let windows = DesktopCommandResult::ListWindows {
+            windows: vec![DesktopWindowInfo {
+                window_id: "hwnd-42".to_string(),
+                title: "SAP Logon".to_string(),
+                is_main: true,
+            }],
+        };
+        let json = serde_json::to_string(&windows).unwrap();
+        assert_eq!(
+            serde_json::from_str::<DesktopCommandResult>(&json).unwrap(),
+            windows
+        );
+
+        let hook = DesktopCommandResult::RegisterWindowHook {
+            hook_id: "window-hook-1".to_string(),
+        };
+        let json = serde_json::to_string(&hook).unwrap();
+        assert_eq!(
+            serde_json::from_str::<DesktopCommandResult>(&json).unwrap(),
+            hook
         );
     }
 }

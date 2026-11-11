@@ -369,7 +369,7 @@ fn resolve_release_tag() -> Result<String> {
 fn fetch_latest_release_tag() -> Result<String> {
     let repository = env::var(ALLWRIGHT_REPOSITORY_ENV_VAR)
         .unwrap_or_else(|_| DEFAULT_RELEASE_REPOSITORY.to_string());
-    let url = format!("https://api.github.com/repos/{repository}/releases/latest");
+    let url = format!("https://api.github.com/repos/{repository}/releases?per_page=100");
     let response = release_client()?
         .get(url)
         .send()
@@ -384,11 +384,40 @@ fn fetch_latest_release_tag() -> Result<String> {
             "failed to decode latest allwright release metadata: {error}"
         ))
     })?;
-    let tag = payload
-        .get("tag_name")
-        .and_then(Value::as_str)
-        .ok_or_else(|| Error::new("latest allwright release metadata did not include tag_name"))?;
-    Ok(tag.to_string())
+    select_latest_release_tag(&payload).ok_or_else(|| {
+        Error::new("allwright releases did not include a non-draft semantic version")
+    })
+}
+
+fn select_latest_release_tag(releases: &Value) -> Option<String> {
+    releases
+        .as_array()?
+        .iter()
+        .filter(|release| {
+            !release
+                .get("draft")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
+        .filter_map(|release| {
+            let tag = release.get("tag_name")?.as_str()?.trim();
+            let version = semantic_release_version(tag)?;
+            let stable = !tag.trim_start_matches('v').contains('-');
+            Some((version, stable, tag))
+        })
+        .max_by_key(|(version, stable, _)| (*version, *stable))
+        .map(|(_, _, tag)| normalize_release_tag(tag))
+}
+
+fn semantic_release_version(tag: &str) -> Option<(u64, u64, u64)> {
+    let core = tag.trim().trim_start_matches('v').split('-').next()?;
+    let mut parts = core.split('.');
+    let version = (
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+    );
+    parts.next().is_none().then_some(version)
 }
 
 fn cli_asset_name(version_tag: &str) -> Result<String> {

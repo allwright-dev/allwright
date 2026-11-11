@@ -362,7 +362,7 @@ impl InspectorRuntime {
                 app_session: app.clone(),
             },
         )?;
-        let DesktopCommandResult::ListWindows(windows) = result else {
+        let DesktopCommandResult::ListWindows { windows } = result else {
             return Err(format!(
                 "{} returned an unexpected desktop windows response",
                 self.surface.id()

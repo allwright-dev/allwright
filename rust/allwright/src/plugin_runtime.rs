@@ -465,7 +465,10 @@ fn resolve_target_version(
 
 fn resolve_latest_release_tag() -> Result<String, String> {
     let repository = release_repository();
-    let url = format!("{GITHUB_API_BASE_URL}/{repository}/releases/latest");
+    // GitHub's `/releases/latest` endpoint excludes prereleases. Allwright
+    // publishes usable plugin artifacts on prerelease releases as well, so use
+    // the release collection and select the highest non-draft semantic version.
+    let url = format!("{GITHUB_API_BASE_URL}/{repository}/releases?per_page=100");
     let client = release_client()?;
     let response = client
         .get(&url)
@@ -477,13 +480,40 @@ fn resolve_latest_release_tag() -> Result<String, String> {
         .map_err(|error| format!("failed to read latest allwright release metadata: {error}"))?;
     let payload: serde_json::Value = serde_json::from_str(&payload_text)
         .map_err(|error| format!("failed to decode latest allwright release metadata: {error}"))?;
-    let tag = payload
-        .get("tag_name")
-        .and_then(|value| value.as_str())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| "latest allwright release metadata did not include tag_name".to_string())?;
-    Ok(tag.to_string())
+    select_latest_release_tag(&payload).ok_or_else(|| {
+        "allwright release metadata did not include a non-draft semantic version".to_string()
+    })
+}
+
+fn select_latest_release_tag(payload: &serde_json::Value) -> Option<String> {
+    payload
+        .as_array()?
+        .iter()
+        .filter(|release| {
+            !release
+                .get("draft")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false)
+        })
+        .filter_map(|release| {
+            let tag = release.get("tag_name")?.as_str()?.trim();
+            let version = semantic_release_version(tag)?;
+            let stable = !tag.trim_start_matches('v').contains('-');
+            Some((version, stable, tag))
+        })
+        .max_by_key(|(version, stable, _)| (*version, *stable))
+        .map(|(_, _, tag)| tag.to_string())
+}
+
+fn semantic_release_version(tag: &str) -> Option<(u64, u64, u64)> {
+    let core = tag.trim().trim_start_matches('v').split('-').next()?;
+    let mut parts = core.split('.');
+    let version = (
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+    );
+    parts.next().is_none().then_some(version)
 }
 
 fn release_client() -> Result<Client, String> {
@@ -810,6 +840,20 @@ mod tests {
             Some("v0.2.2")
         );
         assert_eq!(plugin_install_version_request(false, None), None);
+    }
+
+    #[test]
+    fn latest_plugin_release_includes_prereleases_and_excludes_drafts() {
+        let releases = serde_json::json!([
+            {"tag_name": "v0.2.0", "draft": false, "prerelease": false},
+            {"tag_name": "v0.2.2", "draft": false, "prerelease": true},
+            {"tag_name": "v0.3.0", "draft": true, "prerelease": false},
+            {"tag_name": "not-a-version", "draft": false}
+        ]);
+        assert_eq!(
+            select_latest_release_tag(&releases).as_deref(),
+            Some("v0.2.2")
+        );
     }
 
     #[test]

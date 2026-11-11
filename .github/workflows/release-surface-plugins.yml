@@ -283,7 +283,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             archive_ext: zip
             binary_name: allwright.exe
-          - runner: macos-14
+          - runner: macos-15
             target: aarch64-apple-darwin
             archive_ext: tar.gz
             binary_name: allwright
@@ -371,14 +371,16 @@ jobs:
   release-desktop-mac-plugin:
     name: Release desktop-mac plugin (${{ matrix.target }})
     needs: ensure-github-release
-    runs-on: macos-14
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - target: aarch64-apple-darwin
+          - runner: macos-15
+            target: aarch64-apple-darwin
             xcode_arch: arm64
-          - target: x86_64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
             xcode_arch: x86_64
 
     steps:
@@ -484,7 +486,7 @@ jobs:
       - name: Build plugin library
         run: cargo build -p allwright-surface-desktop-windows --release --target x86_64-pc-windows-msvc
 
-      - name: Publish self-contained FlaUI agent
+      - name: Publish self-contained UI Automation agent
         run: dotnet publish rust/allwright-surface-desktop-windows/agent/Allwright.WindowsAgent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o target/windows-agent
 
       - name: Package release asset
@@ -525,7 +527,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             archive_ext: zip
             library_name: allwright_surface_web.dll
-          - runner: macos-14
+          - runner: macos-15
             target: aarch64-apple-darwin
             archive_ext: tar.gz
             library_name: liballwright_surface_web.dylib
@@ -604,7 +606,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             archive_ext: zip
             library_name: allwright_surface_mobile_android.dll
-          - runner: macos-14
+          - runner: macos-15
             target: aarch64-apple-darwin
             archive_ext: tar.gz
             library_name: liballwright_surface_mobile_android.dylib
@@ -670,13 +672,15 @@ jobs:
   release-mobile-ios-plugin:
     name: Release mobile-ios plugin (${{ matrix.target }})
     needs: ensure-github-release
-    runs-on: macos-14
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - aarch64-apple-darwin
-          - x86_64-apple-darwin
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
 
     steps:
       - name: Check out repository
