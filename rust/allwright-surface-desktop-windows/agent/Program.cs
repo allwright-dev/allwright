@@ -64,8 +64,7 @@ internal sealed class AppSession
     public string? LaunchCompanyName { get; }
     public AutomationElement? InitialRoot { get; set; }
     public HashSet<int> ProcessIds { get; } = new();
-    public HashSet<string> PreexistingWindowIds { get; } = new(StringComparer.Ordinal);
-    public bool SawOwnedForeground { get; set; }
+    public bool SawOwnedWindow { get; set; }
     public string? MainWindowId { get; set; }
 
     private static string? ProcessCompanyName(int processId)
@@ -359,7 +358,6 @@ internal static class Program
         var timeout = TimeSpan.FromMilliseconds(request.TimeoutMs ?? 30_000);
         var id = $"windows-app-{Guid.NewGuid():N}";
         var session = new AppSession(id, appId, null, launchProcessId);
-        session.PreexistingWindowIds.UnionWith(existingWindowIds);
         Sessions[id] = session;
         try
         {
@@ -458,17 +456,32 @@ internal static class Program
         var timeout = TimeSpan.FromMilliseconds(request.TimeoutMs ?? 10_000);
         var deadline = DateTime.UtcNow + timeout;
         Exception? last = null;
+        var lastObservation = "the application window was not inspected";
         do
         {
             try
             {
-                var element = FindAll(Root(request), selector).FirstOrDefault();
-                if (element is not null && !element.Properties.IsOffscreen.ValueOrDefault) return operation(element);
+                var root = Root(request);
+                var matches = FindAll(root, selector);
+                var element = matches
+                    .FirstOrDefault(candidate => !candidate.Properties.IsOffscreen.ValueOrDefault);
+                if (element is not null) return operation(element);
+                var title = root.Properties.Name.ValueOrDefault ?? "";
+                var processId = root.Properties.ProcessId.ValueOrDefault;
+                lastObservation = matches.Length == 0
+                    ? $"zero matches in window `{title}` (process {processId})"
+                    : $"{matches.Length} matches were all offscreen in window `{title}` (process {processId})";
             }
-            catch (Exception error) { last = error; }
+            catch (Exception error)
+            {
+                last = error;
+                lastObservation = error.Message;
+            }
             Thread.Sleep(100);
         } while (DateTime.UtcNow < deadline);
-        throw new InvalidOperationException($"no visible Windows element matched `{selector}` before timeout", last);
+        throw new InvalidOperationException(
+            $"no visible Windows element matched `{selector}` before timeout; last observation: {lastObservation}",
+            last);
     }
 
     private static object Wait(AgentRequest request)
@@ -1006,23 +1019,24 @@ internal static class Program
 
         var foreground = GetForegroundWindow();
         var foregroundId = foreground == IntPtr.Zero ? null : WindowId(foreground);
-        if (foregroundId is not null && candidates.ContainsKey(foregroundId))
+        if (candidates.Count > 0)
         {
-            session.SawOwnedForeground = true;
+            session.SawOwnedWindow = true;
         }
         else if (foregroundId is not null
-            && session.SawOwnedForeground
-            && candidates.Count == 0
-            && !session.PreexistingWindowIds.Contains(foregroundId))
+            && session.SawOwnedWindow)
         {
             // Launchers such as SAP and Office can display a splash from the
             // launched process and then ask an already-running broker process
             // to create the real window. That process is not necessarily a
             // descendant, so adopt the newly activated successor HWND after
-            // we have observed an owned foreground window and that window
-            // family has disappeared. The successor must still have the same
-            // application identity; otherwise opening the inspector browser
-            // would incorrectly retarget the session to that topmost window.
+            // we have observed an owned application window. The successor
+            // must still have the same application identity; otherwise
+            // opening the inspector browser would incorrectly retarget the
+            // session to that topmost window. This also handles launchers
+            // that leave a hidden or auxiliary splash HWND alive.
+            // Identity verification also permits a broker to reuse an HWND
+            // that existed before launch, as SAP GUI commonly does.
             var successor = desktopWindows.FirstOrDefault(window => window.Id == foregroundId);
             if (successor is not null && MatchesApplicationIdentity(session, successor))
             {
