@@ -84,6 +84,10 @@ internal static class Program
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetProcessDpiAwarenessContext(IntPtr dpiContext);
+
     private delegate bool EnumWindowsCallback(IntPtr window, IntPtr parameter);
 
     [DllImport("user32.dll")]
@@ -142,6 +146,11 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        // UIA element rectangles are physical screen coordinates. Without
+        // per-monitor awareness, Win32 virtualizes GetWindowRect while
+        // PrintWindow still renders device pixels, displacing inspector
+        // highlights and pointer input on scaled or mixed-DPI displays.
+        _ = SetProcessDpiAwarenessContext(new IntPtr(-4)); // PER_MONITOR_AWARE_V2
         var port = 8300;
         var portIndex = Array.IndexOf(args, "--port");
         if (portIndex >= 0 && portIndex + 1 < args.Length) port = int.Parse(args[portIndex + 1]);
