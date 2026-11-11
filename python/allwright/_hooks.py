@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, Iterable, TypeVar
 
 if TYPE_CHECKING:
+    from ._desktop import DesktopWindow
     from ._page import Page
     from ._types import CommandOptions
 
@@ -80,12 +81,14 @@ class _Hooks:
     new_page: HookType[Page]
     file_chooser: HookType[FileChooser]
     download: HookType[Download]
+    window: HookType[DesktopWindow]
 
     def __init__(self) -> None:
         self.dialog = HookType("dialog")
         self.new_page = HookType("new_page")
         self.file_chooser = HookType("file_chooser")
         self.download = HookType("download")
+        self.window = HookType("window")
 
 
 hooks = _Hooks()

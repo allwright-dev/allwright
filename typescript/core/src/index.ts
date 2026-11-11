@@ -54,6 +54,8 @@ export type {
   HighlightResult,
   LaunchOptions,
   NativeApp,
+  DesktopApp,
+  DesktopWindow,
   NativeAppLocator,
   MobileAndroidConnectOptions,
   MobileAndroidDevice,
@@ -69,11 +71,13 @@ export type {
   LocatorInfo,
   MobileSurfaceNamespace,
   DesktopMacApp,
+  DesktopMacWindow,
   DesktopMacConnectOptions,
   DesktopMacDesktop,
   DesktopMacLaunchOptions,
   DesktopMacLocator,
   DesktopWindowsApp,
+  DesktopWindowsWindow,
   DesktopWindowsConnectOptions,
   DesktopWindowsDesktop,
   DesktopWindowsLaunchOptions,
@@ -101,6 +105,7 @@ export const hooks = {
   newPage: Object.freeze({ name: "newPage" }) as HookType<Page>,
   fileChooser: Object.freeze({ name: "fileChooser" }) as HookType<FileChooser>,
   download: Object.freeze({ name: "download" }) as HookType<Download>,
+  window: Object.freeze({ name: "window" }) as HookType<import("./types.js").DesktopWindow>,
 };
 export { mobile };
 export { desktop };

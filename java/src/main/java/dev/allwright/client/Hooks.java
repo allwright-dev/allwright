@@ -36,6 +36,12 @@ public final class Hooks {
         }
         throw new AllwrightException("download hook completed with an invalid result");
     });
+    public static final HookType<DesktopWindow> WINDOW = new HookType<>("window", (app, event) -> {
+        if (!event.hasDesktopWindow() || !event.getDesktopWindow().hasWindow()) {
+            throw new AllwrightException("desktop window hook completed with an invalid result");
+        }
+        return ((DesktopApp) app).windowFromInfo(event.getDesktopWindow().getWindow());
+    });
 
     private Hooks() {}
 }

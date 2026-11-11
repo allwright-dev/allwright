@@ -4,6 +4,7 @@ import Network
 import UIKit
 #elseif os(macOS)
 import AppKit
+import Darwin
 import ScreenCaptureKit
 #endif
 import XCTest
@@ -20,6 +21,10 @@ final class AllwrightIOSAgent {
     private var applicationBundleIDs: [String: String] = [:]
     private var snapshotReferences: [String: [String: SnapshotReference]] = [:]
     private var snapshotGenerations: [String: Int] = [:]
+#if os(macOS)
+    private var desktopWindowHooks: [String: DesktopWindowHook] = [:]
+    private var desktopProcessFamilies: [String: Set<pid_t>] = [:]
+#endif
 
     private var platformLabel: String {
 #if os(macOS)
@@ -164,6 +169,12 @@ final class AllwrightIOSAgent {
             let sessionID = UUID().uuidString
             applications[sessionID] = application
             applicationBundleIDs[sessionID] = bundleID
+#if os(macOS)
+            desktopProcessFamilies[sessionID] = Set(
+                NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+                    .map(\.processIdentifier)
+            )
+#endif
             return .success(["session_id": sessionID, "bundle_id": bundleID])
 
         case "close":
@@ -173,7 +184,48 @@ final class AllwrightIOSAgent {
             applicationBundleIDs.removeValue(forKey: sessionID)
             snapshotReferences.removeValue(forKey: sessionID)
             snapshotGenerations.removeValue(forKey: sessionID)
+#if os(macOS)
+            desktopWindowHooks = desktopWindowHooks.filter { $0.value.sessionID != sessionID }
+            desktopProcessFamilies.removeValue(forKey: sessionID)
+#endif
             return .success(["closed": true])
+
+#if os(macOS)
+        case "windows":
+            let (sessionID, application) = try application(for: request)
+            return .success(["windows": desktopWindows(sessionID: sessionID, primary: application).map(\.object)])
+
+        case "register_window_hook":
+            let (sessionID, application) = try application(for: request)
+            let hookID = "window-hook-\(UUID().uuidString)"
+            desktopWindowHooks[hookID] = DesktopWindowHook(
+                sessionID: sessionID,
+                knownWindowIDs: Set(desktopWindows(sessionID: sessionID, primary: application).map(\.id))
+            )
+            return .success(["hook_id": hookID])
+
+        case "wait_window_hook":
+            let (sessionID, application) = try application(for: request)
+            let hookID = try requiredString("hook_id", in: request)
+            guard let hook = desktopWindowHooks[hookID], hook.sessionID == sessionID else {
+                throw AgentError("unknown or foreign macOS window hook `\(hookID)`")
+            }
+            let deadline = Date().addingTimeInterval(seconds(request["timeout_ms"]))
+            repeat {
+                if let created = desktopWindows(sessionID: sessionID, primary: application)
+                    .first(where: { !hook.knownWindowIDs.contains($0.id) }) {
+                    desktopWindowHooks.removeValue(forKey: hookID)
+                    return .success(created.object)
+                }
+                Thread.sleep(forTimeInterval: 0.1)
+            } while Date() < deadline
+            throw AgentError("no new macOS application window appeared before timeout")
+
+        case "close_window":
+            let (_, _, window) = try desktopTarget(for: request)
+            window.typeKey("w", modifierFlags: .command)
+            return .success(["window_id": try requiredString("window_id", in: request)])
+#endif
 
         case "open_url":
 #if os(macOS)
@@ -237,26 +289,26 @@ final class AllwrightIOSAgent {
             return .success(["performed": true])
 
         case "pointer":
-            let (_, application) = try application(for: request)
+            let (_, _, root) = try automationTarget(for: request)
             let action = try requiredString("key", in: request)
             let x = try requiredNumber("x", in: request)
             let y = try requiredNumber("y", in: request)
-            let origin = application.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-            let start = origin.withOffset(CGVector(dx: x - application.frame.minX, dy: y - application.frame.minY))
+            let origin = root.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+            let start = origin.withOffset(CGVector(dx: x - root.frame.minX, dy: y - root.frame.minY))
             switch action {
             case "tap": start.tap()
             case "double_tap": start.doubleTap()
             case "swipe", "scroll":
                 let toX = number("to_x", in: request) ?? x - (number("delta_x", in: request) ?? 0)
                 let toY = number("to_y", in: request) ?? y - (number("delta_y", in: request) ?? 0)
-                let end = origin.withOffset(CGVector(dx: toX - application.frame.minX, dy: toY - application.frame.minY))
+                let end = origin.withOffset(CGVector(dx: toX - root.frame.minX, dy: toY - root.frame.minY))
                 start.press(forDuration: Double((request["duration_ms"] as? NSNumber)?.uintValue ?? 250) / 1000, thenDragTo: end)
             default: throw AgentError("unsupported live pointer action `\(action)`")
             }
             return .success(["performed": true])
 
         case "keyboard":
-            let (_, application) = try application(for: request)
+            let (_, application, _) = try automationTarget(for: request)
             if let text = request["text"] as? String, !text.isEmpty {
                 application.typeText(text)
             } else {
@@ -266,12 +318,12 @@ final class AllwrightIOSAgent {
             return .success(["performed": true])
 
         case "count":
-            let (sessionID, application) = try application(for: request)
+            let (sessionID, application, root) = try automationTarget(for: request)
             let selector = try requiredString("selector", in: request)
             if selector.hasPrefix("ref=") {
-                return .success(["count": (try? referencedElement(selector, sessionID: sessionID, application: application)) == nil ? 0 : 1])
+                return .success(["count": (try? referencedElement(selector, sessionID: sessionID, application: application, root: root)) == nil ? 0 : 1])
             }
-            return .success(["count": query(selector, in: application).count])
+            return .success(["count": query(selector, in: root).count])
 
         case "text":
             let element = try resolvedElement(for: request)
@@ -316,8 +368,8 @@ final class AllwrightIOSAgent {
                 case "selected", "checked": value = String(element.isSelected)
                 case "focused":
 #if os(macOS)
-                    let (_, application) = try application(for: request)
-                    let focused = application.descendants(matching: .any).matching(
+                    let (_, _, root) = try automationTarget(for: request)
+                    let focused = root.descendants(matching: .any).matching(
                         NSPredicate(format: "hasKeyboardFocus == true")
                     ).firstMatch
                     value = String(
@@ -347,21 +399,21 @@ final class AllwrightIOSAgent {
             }
 
         case "wait":
-            let (sessionID, application) = try application(for: request)
+            let (sessionID, application, root) = try automationTarget(for: request)
             let selector = try requiredString("selector", in: request)
             let visible = request["visible"] as? Bool ?? true
             let timeout = seconds(request["timeout_ms"])
             if selector.hasPrefix("ref=") {
                 let deadline = Date().addingTimeInterval(timeout)
                 repeat {
-                    let element = try? referencedElement(selector, sessionID: sessionID, application: application)
+                    let element = try? referencedElement(selector, sessionID: sessionID, application: application, root: root)
                     let isVisible = element?.exists == true && element?.isHittable == true
                     if isVisible == visible { return .success(["visible": visible]) }
                     RunLoop.current.run(until: Date().addingTimeInterval(0.05))
                 } while Date() < deadline
                 throw AgentError("reference did not become \(visible ? "visible" : "hidden") before timeout")
             }
-            let element = query(selector, in: application).firstMatch
+            let element = query(selector, in: root).firstMatch
             if visible {
                 let expectation = XCTNSPredicateExpectation(
                     predicate: NSPredicate(format: "exists == true AND hittable == true"),
@@ -383,9 +435,8 @@ final class AllwrightIOSAgent {
             throw AgentError("selector did not become \(visible ? "visible" : "hidden") before timeout")
 
         case "screenshot":
-            let (sessionID, application) = try application(for: request)
+            let (sessionID, _, target) = try automationTarget(for: request)
             let fullPage = request["full_page"] as? Bool ?? false
-            let target = screenshotTarget(application)
             let png: Data
 #if os(macOS)
             png = fullPage
@@ -437,12 +488,12 @@ final class AllwrightIOSAgent {
             return .success(["selected": names])
 
         case "source":
-            let (sessionID, application) = try application(for: request)
+            let (sessionID, application, root) = try automationTarget(for: request)
             let mode = request["value"] as? String ?? "default"
             guard ["default", "ai", "autoexpect", "codegen"].contains(mode) else {
                 throw AgentError("invalid accessibility snapshot mode `\(mode)`")
             }
-            let document = accessibilityDocument(sessionID: sessionID, application: application, mode: mode)
+            let document = accessibilityDocument(sessionID: sessionID, application: application, root: root, mode: mode)
             let data = try JSONSerialization.data(withJSONObject: document)
             return .success(["snapshot": String(decoding: data, as: UTF8.self)])
 
@@ -459,15 +510,26 @@ final class AllwrightIOSAgent {
         return (sessionID, application)
     }
 
+    private func automationTarget(
+        for request: [String: Any]
+    ) throws -> (String, XCUIApplication, XCUIElement) {
+#if os(macOS)
+        return try desktopTarget(for: request)
+#else
+        let (sessionID, application) = try application(for: request)
+        return (sessionID, application, application)
+#endif
+    }
+
     private func resolvedElement(
         for request: [String: Any],
         requiringActionability: Bool = false
     ) throws -> XCUIElement {
-        let (sessionID, application) = try application(for: request)
+        let (sessionID, application, root) = try automationTarget(for: request)
         let selector = try requiredString("selector", in: request)
         let element = selector.hasPrefix("ref=")
-            ? try referencedElement(selector, sessionID: sessionID, application: application)
-            : query(selector, in: application).firstMatch
+            ? try referencedElement(selector, sessionID: sessionID, application: application, root: root)
+            : query(selector, in: root).firstMatch
         let timeout = seconds(request["timeout_ms"])
         if requiringActionability {
             let expectation = XCTNSPredicateExpectation(
@@ -486,7 +548,8 @@ final class AllwrightIOSAgent {
     private func referencedElement(
         _ selector: String,
         sessionID: String,
-        application: XCUIApplication
+        application: XCUIApplication,
+        root: XCUIElement
     ) throws -> XCUIElement {
         guard !selector.contains(" >> ") else {
             throw AgentError("snapshot references must be standalone ref=<id> selectors")
@@ -496,10 +559,10 @@ final class AllwrightIOSAgent {
             let available = snapshotReferences[sessionID]?.keys.sorted().joined(separator: ",") ?? "none"
             throw AgentError("stale or foreign \(platformLabel) snapshot reference `\(referenceID)` (available: \(available)); capture a new AI accessibility snapshot")
         }
-        guard debugHierarchySignature(application.debugDescription) == reference.hierarchySignature else {
+        guard debugHierarchySignature(root.debugDescription) == reference.hierarchySignature else {
             throw AgentError("stale \(platformLabel) snapshot reference: accessibility hierarchy changed; capture a new AI snapshot")
         }
-        var query = application.descendants(matching: reference.type)
+        var query = root.descendants(matching: reference.type)
         if !reference.identifier.isEmpty {
             query = query.matching(identifier: reference.identifier)
         } else {
@@ -518,9 +581,10 @@ final class AllwrightIOSAgent {
     private func accessibilityDocument(
         sessionID: String,
         application: XCUIApplication,
+        root: XCUIElement,
         mode: String
     ) -> [String: Any] {
-        let hierarchy = application.debugDescription
+        let hierarchy = root.debugDescription
         let hierarchySignature = debugHierarchySignature(hierarchy)
         let generation = (snapshotGenerations[sessionID] ?? 0) + 1
         snapshotGenerations[sessionID] = generation
@@ -587,7 +651,7 @@ final class AllwrightIOSAgent {
 #else
         let platform = "ios"
 #endif
-        let applicationFrame = screenshotTarget(application).frame
+        let applicationFrame = root.frame
         var document: [String: Any] = [
             "contextId": sessionID,
             "parentContextId": NSNull(),
@@ -730,6 +794,104 @@ final class AllwrightIOSAgent {
     private func elementTypeName(_ type: XCUIElement.ElementType) -> String {
         String(describing: type)
     }
+
+#if os(macOS)
+    private func desktopTarget(
+        for request: [String: Any]
+    ) throws -> (String, XCUIApplication, XCUIElement) {
+        let (sessionID, primary) = try application(for: request)
+        let windows = desktopWindows(sessionID: sessionID, primary: primary)
+        if let windowID = request["window_id"] as? String, !windowID.isEmpty {
+            guard let target = windows.first(where: { $0.id == windowID }) else {
+                throw AgentError("desktop window `\(windowID)` is closed or no longer belongs to the application session")
+            }
+            return (sessionID, target.application, target.element)
+        }
+        guard let main = windows.first(where: \.isMain) ?? windows.first else {
+            throw AgentError("the application does not currently expose a main window")
+        }
+        return (sessionID, main.application, main.element)
+    }
+
+    private func desktopWindows(
+        sessionID: String,
+        primary: XCUIApplication
+    ) -> [DesktopWindowTarget] {
+        let primaryBundleID = applicationBundleIDs[sessionID] ?? ""
+        var applicationsByBundleID: [String: XCUIApplication] = [primaryBundleID: primary]
+        var trackedProcessIDs = desktopProcessFamilies[sessionID] ?? []
+        trackedProcessIDs.formUnion(
+            NSRunningApplication.runningApplications(withBundleIdentifier: primaryBundleID)
+                .map(\.processIdentifier)
+        )
+        if !primaryBundleID.isEmpty {
+            for running in NSWorkspace.shared.runningApplications {
+                guard let bundleID = running.bundleIdentifier, bundleID != primaryBundleID else { continue }
+                let sameBundleFamily = bundleID.hasPrefix(primaryBundleID + ".")
+                    || primaryBundleID.hasPrefix(bundleID + ".")
+                let isDescendant = trackedProcessIDs.contains {
+                    process(running.processIdentifier, descendsFrom: $0)
+                }
+                guard sameBundleFamily || isDescendant else { continue }
+                trackedProcessIDs.insert(running.processIdentifier)
+                applicationsByBundleID[bundleID] = XCUIApplication(bundleIdentifier: bundleID)
+            }
+        }
+        desktopProcessFamilies[sessionID] = trackedProcessIDs
+
+        var targets: [DesktopWindowTarget] = []
+        for (bundleID, application) in applicationsByBundleID {
+            for (index, window) in application.windows.allElementsBoundByIndex.enumerated() where window.exists {
+                let frame = window.frame
+                guard frame.width > 0, frame.height > 0 else { continue }
+                let windowIdentity = window.identifier.isEmpty
+                    ? "label:\(window.label)|index:\(index)"
+                    : "identifier:\(window.identifier)"
+                let identity = "\(bundleID)|\(windowIdentity)"
+                let encoded = Data(identity.utf8).base64EncodedString()
+                    .replacingOccurrences(of: "+", with: "-")
+                    .replacingOccurrences(of: "/", with: "_")
+                    .replacingOccurrences(of: "=", with: "")
+                targets.append(DesktopWindowTarget(
+                    id: "window-\(encoded)",
+                    title: window.label.isEmpty ? window.identifier : window.label,
+                    bundleIdentifier: bundleID,
+                    application: application,
+                    element: window,
+                    isPrimaryApplication: bundleID == primaryBundleID,
+                    isMain: false
+                ))
+            }
+        }
+        targets.sort {
+            let leftArea = $0.element.frame.width * $0.element.frame.height
+            let rightArea = $1.element.frame.width * $1.element.frame.height
+            if leftArea != rightArea { return leftArea > rightArea }
+            return $0.id < $1.id
+        }
+        let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        let mainIndex = targets.firstIndex(where: { $0.element.hasFocus }) ?? targets.firstIndex {
+            $0.bundleIdentifier == frontmostBundleID
+        } ?? targets.indices.first
+        if let mainIndex { targets[mainIndex].isMain = true }
+        return targets
+    }
+
+    private func process(_ processID: pid_t, descendsFrom ancestorProcessID: pid_t) -> Bool {
+        var current = processID
+        var visited = Set<pid_t>()
+        while current > 1, visited.insert(current).inserted {
+            if current == ancestorProcessID { return true }
+            var info = proc_bsdinfo()
+            let size = MemoryLayout<proc_bsdinfo>.size
+            guard proc_pidinfo(current, PROC_PIDTBSDINFO, 0, &info, Int32(size)) == size else {
+                return false
+            }
+            current = pid_t(info.pbi_ppid)
+        }
+        return current == ancestorProcessID
+    }
+#endif
 
     private func screenshotTarget(_ application: XCUIApplication) -> XCUIElement {
 #if os(macOS)
@@ -997,9 +1159,9 @@ final class AllwrightIOSAgent {
     }
 #endif
 
-    private func query(_ selector: String, in application: XCUIApplication) -> XCUIElementQuery {
+    private func query(_ selector: String, in root: XCUIElement) -> XCUIElementQuery {
         let segments = Selector.parseAll(selector)
-        var candidates = application.descendants(matching: .any)
+        var candidates = root.descendants(matching: .any)
         for (index, segment) in segments.enumerated() {
             if index > 0 {
                 candidates = candidates.descendants(matching: .any)
@@ -1325,3 +1487,24 @@ private struct AgentError: LocalizedError {
     let errorDescription: String?
     init(_ message: String) { errorDescription = message }
 }
+
+#if os(macOS)
+private struct DesktopWindowHook {
+    let sessionID: String
+    let knownWindowIDs: Set<String>
+}
+
+private struct DesktopWindowTarget {
+    let id: String
+    let title: String
+    let bundleIdentifier: String
+    let application: XCUIApplication
+    let element: XCUIElement
+    let isPrimaryApplication: Bool
+    var isMain: Bool
+
+    var object: [String: Any] {
+        ["window_id": id, "title": title, "is_main": isMain]
+    }
+}
+#endif

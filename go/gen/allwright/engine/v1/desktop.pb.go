@@ -334,6 +334,314 @@ func (x *DesktopAppLaunchedEvent) GetNote() string {
 	return ""
 }
 
+type ListDesktopWindowsCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDesktopWindowsCommand) Reset() {
+	*x = ListDesktopWindowsCommand{}
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDesktopWindowsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDesktopWindowsCommand) ProtoMessage() {}
+
+func (x *ListDesktopWindowsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDesktopWindowsCommand.ProtoReflect.Descriptor instead.
+func (*ListDesktopWindowsCommand) Descriptor() ([]byte, []int) {
+	return file_surfaces_desktop_v1_desktop_proto_rawDescGZIP(), []int{4}
+}
+
+type CloseDesktopWindowCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloseDesktopWindowCommand) Reset() {
+	*x = CloseDesktopWindowCommand{}
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloseDesktopWindowCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloseDesktopWindowCommand) ProtoMessage() {}
+
+func (x *CloseDesktopWindowCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloseDesktopWindowCommand.ProtoReflect.Descriptor instead.
+func (*CloseDesktopWindowCommand) Descriptor() ([]byte, []int) {
+	return file_surfaces_desktop_v1_desktop_proto_rawDescGZIP(), []int{5}
+}
+
+type RegisterDesktopWindowHook struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterDesktopWindowHook) Reset() {
+	*x = RegisterDesktopWindowHook{}
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterDesktopWindowHook) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterDesktopWindowHook) ProtoMessage() {}
+
+func (x *RegisterDesktopWindowHook) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterDesktopWindowHook.ProtoReflect.Descriptor instead.
+func (*RegisterDesktopWindowHook) Descriptor() ([]byte, []int) {
+	return file_surfaces_desktop_v1_desktop_proto_rawDescGZIP(), []int{6}
+}
+
+type DesktopWindowInfo struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ContextSessionId string                 `protobuf:"bytes,1,opt,name=context_session_id,json=contextSessionId,proto3" json:"context_session_id,omitempty"`
+	WindowId         string                 `protobuf:"bytes,2,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
+	Title            string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	IsMain           bool                   `protobuf:"varint,4,opt,name=is_main,json=isMain,proto3" json:"is_main,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *DesktopWindowInfo) Reset() {
+	*x = DesktopWindowInfo{}
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DesktopWindowInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DesktopWindowInfo) ProtoMessage() {}
+
+func (x *DesktopWindowInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DesktopWindowInfo.ProtoReflect.Descriptor instead.
+func (*DesktopWindowInfo) Descriptor() ([]byte, []int) {
+	return file_surfaces_desktop_v1_desktop_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *DesktopWindowInfo) GetContextSessionId() string {
+	if x != nil {
+		return x.ContextSessionId
+	}
+	return ""
+}
+
+func (x *DesktopWindowInfo) GetWindowId() string {
+	if x != nil {
+		return x.WindowId
+	}
+	return ""
+}
+
+func (x *DesktopWindowInfo) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *DesktopWindowInfo) GetIsMain() bool {
+	if x != nil {
+		return x.IsMain
+	}
+	return false
+}
+
+type DesktopWindowsResolvedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Windows       []*DesktopWindowInfo   `protobuf:"bytes,1,rep,name=windows,proto3" json:"windows,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DesktopWindowsResolvedEvent) Reset() {
+	*x = DesktopWindowsResolvedEvent{}
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DesktopWindowsResolvedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DesktopWindowsResolvedEvent) ProtoMessage() {}
+
+func (x *DesktopWindowsResolvedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DesktopWindowsResolvedEvent.ProtoReflect.Descriptor instead.
+func (*DesktopWindowsResolvedEvent) Descriptor() ([]byte, []int) {
+	return file_surfaces_desktop_v1_desktop_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *DesktopWindowsResolvedEvent) GetWindows() []*DesktopWindowInfo {
+	if x != nil {
+		return x.Windows
+	}
+	return nil
+}
+
+type DesktopWindowClosedEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WindowId      string                 `protobuf:"bytes,1,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DesktopWindowClosedEvent) Reset() {
+	*x = DesktopWindowClosedEvent{}
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DesktopWindowClosedEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DesktopWindowClosedEvent) ProtoMessage() {}
+
+func (x *DesktopWindowClosedEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DesktopWindowClosedEvent.ProtoReflect.Descriptor instead.
+func (*DesktopWindowClosedEvent) Descriptor() ([]byte, []int) {
+	return file_surfaces_desktop_v1_desktop_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *DesktopWindowClosedEvent) GetWindowId() string {
+	if x != nil {
+		return x.WindowId
+	}
+	return ""
+}
+
+type DesktopWindowHookResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Window        *DesktopWindowInfo     `protobuf:"bytes,1,opt,name=window,proto3" json:"window,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DesktopWindowHookResult) Reset() {
+	*x = DesktopWindowHookResult{}
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DesktopWindowHookResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DesktopWindowHookResult) ProtoMessage() {}
+
+func (x *DesktopWindowHookResult) ProtoReflect() protoreflect.Message {
+	mi := &file_surfaces_desktop_v1_desktop_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DesktopWindowHookResult.ProtoReflect.Descriptor instead.
+func (*DesktopWindowHookResult) Descriptor() ([]byte, []int) {
+	return file_surfaces_desktop_v1_desktop_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *DesktopWindowHookResult) GetWindow() *DesktopWindowInfo {
+	if x != nil {
+		return x.Window
+	}
+	return nil
+}
+
 var File_surfaces_desktop_v1_desktop_proto protoreflect.FileDescriptor
 
 const file_surfaces_desktop_v1_desktop_proto_rawDesc = "" +
@@ -360,7 +668,21 @@ const file_surfaces_desktop_v1_desktop_proto_rawDesc = "" +
 	"\x17DesktopAppLaunchedEvent\x12$\n" +
 	"\x0eapp_session_id\x18\x01 \x01(\tR\fappSessionId\x12\x15\n" +
 	"\x06app_id\x18\x02 \x01(\tR\x05appId\x12\x12\n" +
-	"\x04note\x18\x03 \x01(\tR\x04note*k\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"\x1b\n" +
+	"\x19ListDesktopWindowsCommand\"\x1b\n" +
+	"\x19CloseDesktopWindowCommand\"\x1b\n" +
+	"\x19RegisterDesktopWindowHook\"\x8d\x01\n" +
+	"\x11DesktopWindowInfo\x12,\n" +
+	"\x12context_session_id\x18\x01 \x01(\tR\x10contextSessionId\x12\x1b\n" +
+	"\twindow_id\x18\x02 \x01(\tR\bwindowId\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x17\n" +
+	"\ais_main\x18\x04 \x01(\bR\x06isMain\"_\n" +
+	"\x1bDesktopWindowsResolvedEvent\x12@\n" +
+	"\awindows\x18\x01 \x03(\v2&.allwright.engine.v1.DesktopWindowInfoR\awindows\"7\n" +
+	"\x18DesktopWindowClosedEvent\x12\x1b\n" +
+	"\twindow_id\x18\x01 \x01(\tR\bwindowId\"Y\n" +
+	"\x17DesktopWindowHookResult\x12>\n" +
+	"\x06window\x18\x01 \x01(\v2&.allwright.engine.v1.DesktopWindowInfoR\x06window*k\n" +
 	"\x0fDesktopPlatform\x12 \n" +
 	"\x1cDESKTOP_PLATFORM_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14DESKTOP_PLATFORM_MAC\x10\x01\x12\x1c\n" +
@@ -380,25 +702,34 @@ func file_surfaces_desktop_v1_desktop_proto_rawDescGZIP() []byte {
 }
 
 var file_surfaces_desktop_v1_desktop_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_surfaces_desktop_v1_desktop_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_surfaces_desktop_v1_desktop_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_surfaces_desktop_v1_desktop_proto_goTypes = []any{
-	(DesktopPlatform)(0),            // 0: allwright.engine.v1.DesktopPlatform
-	(*ConnectDesktopCommand)(nil),   // 1: allwright.engine.v1.ConnectDesktopCommand
-	(*DesktopConnectedEvent)(nil),   // 2: allwright.engine.v1.DesktopConnectedEvent
-	(*LaunchDesktopAppCommand)(nil), // 3: allwright.engine.v1.LaunchDesktopAppCommand
-	(*DesktopAppLaunchedEvent)(nil), // 4: allwright.engine.v1.DesktopAppLaunchedEvent
-	(*CommandRetryOptions)(nil),     // 5: allwright.engine.v1.CommandRetryOptions
+	(DesktopPlatform)(0),                // 0: allwright.engine.v1.DesktopPlatform
+	(*ConnectDesktopCommand)(nil),       // 1: allwright.engine.v1.ConnectDesktopCommand
+	(*DesktopConnectedEvent)(nil),       // 2: allwright.engine.v1.DesktopConnectedEvent
+	(*LaunchDesktopAppCommand)(nil),     // 3: allwright.engine.v1.LaunchDesktopAppCommand
+	(*DesktopAppLaunchedEvent)(nil),     // 4: allwright.engine.v1.DesktopAppLaunchedEvent
+	(*ListDesktopWindowsCommand)(nil),   // 5: allwright.engine.v1.ListDesktopWindowsCommand
+	(*CloseDesktopWindowCommand)(nil),   // 6: allwright.engine.v1.CloseDesktopWindowCommand
+	(*RegisterDesktopWindowHook)(nil),   // 7: allwright.engine.v1.RegisterDesktopWindowHook
+	(*DesktopWindowInfo)(nil),           // 8: allwright.engine.v1.DesktopWindowInfo
+	(*DesktopWindowsResolvedEvent)(nil), // 9: allwright.engine.v1.DesktopWindowsResolvedEvent
+	(*DesktopWindowClosedEvent)(nil),    // 10: allwright.engine.v1.DesktopWindowClosedEvent
+	(*DesktopWindowHookResult)(nil),     // 11: allwright.engine.v1.DesktopWindowHookResult
+	(*CommandRetryOptions)(nil),         // 12: allwright.engine.v1.CommandRetryOptions
 }
 var file_surfaces_desktop_v1_desktop_proto_depIdxs = []int32{
-	0, // 0: allwright.engine.v1.ConnectDesktopCommand.platform:type_name -> allwright.engine.v1.DesktopPlatform
-	5, // 1: allwright.engine.v1.ConnectDesktopCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	0, // 2: allwright.engine.v1.DesktopConnectedEvent.platform:type_name -> allwright.engine.v1.DesktopPlatform
-	5, // 3: allwright.engine.v1.LaunchDesktopAppCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	0,  // 0: allwright.engine.v1.ConnectDesktopCommand.platform:type_name -> allwright.engine.v1.DesktopPlatform
+	12, // 1: allwright.engine.v1.ConnectDesktopCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	0,  // 2: allwright.engine.v1.DesktopConnectedEvent.platform:type_name -> allwright.engine.v1.DesktopPlatform
+	12, // 3: allwright.engine.v1.LaunchDesktopAppCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	8,  // 4: allwright.engine.v1.DesktopWindowsResolvedEvent.windows:type_name -> allwright.engine.v1.DesktopWindowInfo
+	8,  // 5: allwright.engine.v1.DesktopWindowHookResult.window:type_name -> allwright.engine.v1.DesktopWindowInfo
+	6,  // [6:6] is the sub-list for method output_type
+	6,  // [6:6] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_surfaces_desktop_v1_desktop_proto_init() }
@@ -415,7 +746,7 @@ func file_surfaces_desktop_v1_desktop_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_surfaces_desktop_v1_desktop_proto_rawDesc), len(file_surfaces_desktop_v1_desktop_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -57,6 +57,38 @@ pub struct DesktopAppLaunchedEvent {
     #[prost(string, tag = "3")]
     pub note: ::prost::alloc::string::String,
 }
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct ListDesktopWindowsCommand {}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct CloseDesktopWindowCommand {}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct RegisterDesktopWindowHook {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DesktopWindowInfo {
+    #[prost(string, tag = "1")]
+    pub context_session_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub window_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub title: ::prost::alloc::string::String,
+    #[prost(bool, tag = "4")]
+    pub is_main: bool,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DesktopWindowsResolvedEvent {
+    #[prost(message, repeated, tag = "1")]
+    pub windows: ::prost::alloc::vec::Vec<DesktopWindowInfo>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DesktopWindowClosedEvent {
+    #[prost(string, tag = "1")]
+    pub window_id: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DesktopWindowHookResult {
+    #[prost(message, optional, tag = "1")]
+    pub window: ::core::option::Option<DesktopWindowInfo>,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum DesktopPlatform {
@@ -565,7 +597,7 @@ pub struct ContextSessionCommand {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_command::Command",
-        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28"
+        tags = "3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30"
     )]
     pub command: ::core::option::Option<context_session_command::Command>,
 }
@@ -625,6 +657,10 @@ pub mod context_session_command {
         Capture(super::CaptureCommand),
         #[prost(message, tag = "28")]
         HandleDialog(super::HandleDialogCommand),
+        #[prost(message, tag = "29")]
+        ListDesktopWindows(super::ListDesktopWindowsCommand),
+        #[prost(message, tag = "30")]
+        CloseDesktopWindow(super::CloseDesktopWindowCommand),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -640,7 +676,7 @@ pub struct ContextSessionEvent {
     pub context_session_id: ::prost::alloc::string::String,
     #[prost(
         oneof = "context_session_event::Event",
-        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30"
+        tags = "2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32"
     )]
     pub event: ::core::option::Option<context_session_event::Event>,
 }
@@ -706,6 +742,10 @@ pub mod context_session_event {
         CaptureResolved(super::CaptureResolvedEvent),
         #[prost(message, tag = "30")]
         DialogHandled(super::DialogHandledEvent),
+        #[prost(message, tag = "31")]
+        DesktopWindowsResolved(super::DesktopWindowsResolvedEvent),
+        #[prost(message, tag = "32")]
+        DesktopWindowClosed(super::DesktopWindowClosedEvent),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -730,7 +770,7 @@ pub struct ContextSessionErrorEvent {
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct RegisterHookCommand {
-    #[prost(oneof = "register_hook_command::Hook", tags = "1, 2, 3, 4, 5, 6")]
+    #[prost(oneof = "register_hook_command::Hook", tags = "1, 2, 3, 4, 5, 6, 7")]
     pub hook: ::core::option::Option<register_hook_command::Hook>,
 }
 /// Nested message and enum types in `RegisterHookCommand`.
@@ -749,6 +789,8 @@ pub mod register_hook_command {
         MobileDownload(super::RegisterMobileDownloadHook),
         #[prost(message, tag = "6")]
         Dialog(super::RegisterDialogHook),
+        #[prost(message, tag = "7")]
+        DesktopWindow(super::RegisterDesktopWindowHook),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -767,7 +809,7 @@ pub struct HookRegisteredEvent {
 pub struct HookCompletedEvent {
     #[prost(string, tag = "1")]
     pub hook_id: ::prost::alloc::string::String,
-    #[prost(oneof = "hook_completed_event::Result", tags = "2, 3, 4, 5, 6, 7")]
+    #[prost(oneof = "hook_completed_event::Result", tags = "2, 3, 4, 5, 6, 7, 8")]
     pub result: ::core::option::Option<hook_completed_event::Result>,
 }
 /// Nested message and enum types in `HookCompletedEvent`.
@@ -786,6 +828,8 @@ pub mod hook_completed_event {
         MobileDownload(super::MobileDownloadHookResult),
         #[prost(message, tag = "7")]
         Dialog(super::DialogHookResult),
+        #[prost(message, tag = "8")]
+        DesktopWindow(super::DesktopWindowHookResult),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

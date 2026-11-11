@@ -12,6 +12,7 @@ import {
   type MobileAndroidLaunchOptions,
   type MobileAndroidApp,
   type NativeApp,
+  type DesktopApp,
   type NativeAppLocator,
   type MobileIosConnectOptions,
   type MobileIosDevice,
@@ -534,6 +535,17 @@ function createLazyMobileApp(appResource: LazyResource<NativeApp>): NativeApp {
   return lazyApp;
 }
 
+function createLazyDesktopApp(appResource: LazyResource<DesktopApp>): DesktopApp {
+  return Object.assign(createLazyMobileApp(appResource), {
+    async windows() {
+      return (await appResource.get()).windows();
+    },
+    async mainWindow() {
+      return (await appResource.get()).mainWindow();
+    },
+  });
+}
+
 function createLazyMobileLocator(
   appResource: LazyResource<NativeApp>,
   selectorFactory: () => Promise<string>,
@@ -663,7 +675,7 @@ function createLazyMacosDesktop(
       return getLazySyncProperty(desktopResource, "sessionId");
     },
     app() {
-      return createLazyMobileApp(initialAppResource);
+      return createLazyDesktopApp(initialAppResource);
     },
     async launch(options: DesktopMacLaunchOptions) {
       return (await desktopResource.get()).launch(options);
@@ -681,7 +693,7 @@ function createLazyWindowsDesktop(
       return getLazySyncProperty(desktopResource, "sessionId");
     },
     app() {
-      return createLazyMobileApp(initialAppResource);
+      return createLazyDesktopApp(initialAppResource);
     },
     async launch(options: DesktopWindowsLaunchOptions) {
       return (await desktopResource.get()).launch(options);
@@ -818,7 +830,7 @@ export const test = base.extend<AllwrightVitestContext>({
       return (await _macosResource.get()).launch(launchOptions);
     });
 
-    await use(createLazyMobileApp(appResource));
+    await use(createLazyDesktopApp(appResource));
   },
 
   windows: async ({ _windowsResource }, use) => {
@@ -832,7 +844,7 @@ export const test = base.extend<AllwrightVitestContext>({
       return (await _windowsResource.get()).launch(launchOptions);
     });
 
-    await use(createLazyMobileApp(appResource));
+    await use(createLazyDesktopApp(appResource));
   },
 });
 

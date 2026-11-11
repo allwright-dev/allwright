@@ -23,6 +23,8 @@ namespace Allwright.WindowsAgent;
 internal sealed record AgentRequest(
     string Command,
     string? SessionId,
+    string? WindowId,
+    string? HookId,
     string? AppId,
     string? Url,
     string? Selector,
@@ -43,7 +45,36 @@ internal sealed record AgentRequest(
     bool? FullPage,
     bool? TerminateRunning);
 
-internal sealed record AppSession(string Id, string AppId, FlaApplication? Application, AutomationElement Root);
+internal sealed class AppSession
+{
+    public AppSession(string id, string appId, FlaApplication? application, AutomationElement? initialRoot)
+    {
+        Id = id;
+        AppId = appId;
+        Application = application;
+        InitialRoot = initialRoot;
+        if (initialRoot is not null)
+        {
+            var processId = initialRoot.Properties.ProcessId.ValueOrDefault;
+            if (processId > 0) ProcessIds.Add(processId);
+        }
+        try
+        {
+            if (application is not null && application.ProcessId > 0) ProcessIds.Add(application.ProcessId);
+        }
+        catch { }
+    }
+
+    public string Id { get; }
+    public string AppId { get; }
+    public FlaApplication? Application { get; }
+    public AutomationElement? InitialRoot { get; set; }
+    public HashSet<int> ProcessIds { get; } = new();
+    public string? MainWindowId { get; set; }
+}
+
+internal sealed record WindowCandidate(string Id, string Title, AutomationElement Root, double Area);
+internal sealed record WindowHook(string SessionId, HashSet<string> KnownWindowIds);
 
 internal static class Program
 {
@@ -53,15 +84,34 @@ internal static class Program
     };
     private static readonly UIA3Automation Automation = new();
     private static readonly Dictionary<string, AppSession> Sessions = new();
+    private static readonly Dictionary<string, WindowHook> WindowHooks = new();
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(IntPtr window);
 
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr window, out WindowRect rectangle);
 
     [DllImport("user32.dll")]
     private static extern bool PrintWindow(IntPtr window, IntPtr deviceContext, uint flags);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr CreateToolhelp32Snapshot(uint flags, uint processId);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool Process32First(IntPtr snapshot, ref ProcessEntry entry);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool Process32Next(IntPtr snapshot, ref ProcessEntry entry);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool CloseHandle(IntPtr handle);
+
+    private const uint SnapshotProcesses = 0x00000002;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct WindowRect
@@ -70,6 +120,22 @@ internal static class Program
         public int Top;
         public int Right;
         public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct ProcessEntry
+    {
+        public uint Size;
+        public uint Usage;
+        public uint ProcessId;
+        public IntPtr DefaultHeapId;
+        public uint ModuleId;
+        public uint Threads;
+        public uint ParentProcessId;
+        public int BasePriority;
+        public uint Flags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        public string ExecutableFile;
     }
 
     [STAThread]
@@ -145,7 +211,11 @@ internal static class Program
         "launch" => Launch(request),
         "close" => Close(request),
         "open_url" => OpenUrl(request),
-        "count" => new { count = FindAll(Session(request).Root, Required(request.Selector, "selector")).Length },
+        "windows" => Windows(request),
+        "register_window_hook" => RegisterWindowHook(request),
+        "wait_window_hook" => WaitForWindowHook(request),
+        "close_window" => CloseWindow(request),
+        "count" => new { count = FindAll(Root(request), Required(request.Selector, "selector")).Length },
         "click" => WithElement(request, element => { element.Click(); return new { }; }),
         "focus" => WithElement(request, element => { element.Focus(); return new { }; }),
         "fill" => WithElement(request, element => { Fill(element, request.Value ?? ""); return new { }; }),
@@ -209,11 +279,21 @@ internal static class Program
             ? FlaApplication.LaunchStoreApp(appId)
             : FlaApplication.Launch(appId);
         var timeout = TimeSpan.FromMilliseconds(request.TimeoutMs ?? 30_000);
-        var root = app.GetMainWindow(Automation, timeout)
-            ?? throw new InvalidOperationException($"application `{appId}` did not expose a main window before timeout");
         var id = $"windows-app-{Guid.NewGuid():N}";
-        Sessions[id] = new AppSession(id, appId, app, root);
-        return new { session_id = id, process_id = app.ProcessId };
+        var session = new AppSession(id, appId, app, null);
+        Sessions[id] = session;
+        try
+        {
+            WaitForProcessFamilyWindow(session, timeout);
+            SettleMainWindow(session, timeout);
+        }
+        catch
+        {
+            Sessions.Remove(id);
+            try { app.Close(); } catch { }
+            throw;
+        }
+        return new { session_id = id, process_id = session.ProcessIds.FirstOrDefault() };
     }
 
     private static object LaunchUrl(string url, uint? timeoutMs)
@@ -255,6 +335,7 @@ internal static class Program
         catch { }
         var id = $"windows-app-{Guid.NewGuid():N}";
         Sessions[id] = new AppSession(id, url, application, root);
+        SettleMainWindow(Sessions[id], TimeSpan.FromMilliseconds(timeoutMs ?? 30_000));
         return new { session_id = id, process_id = process?.Id };
     }
 
@@ -262,6 +343,11 @@ internal static class Program
     {
         var session = Session(request);
         Sessions.Remove(session.Id);
+        foreach (var hookId in WindowHooks
+            .Where(entry => entry.Value.SessionId == session.Id)
+            .Select(entry => entry.Key)
+            .ToArray())
+            WindowHooks.Remove(hookId);
         if (session.Application is not null)
             try { session.Application.Close(); } catch { session.Application.Kill(); }
         return new { };
@@ -290,7 +376,7 @@ internal static class Program
         {
             try
             {
-                var element = FindAll(Session(request).Root, selector).FirstOrDefault();
+                var element = FindAll(Root(request), selector).FirstOrDefault();
                 if (element is not null && !element.Properties.IsOffscreen.ValueOrDefault) return operation(element);
             }
             catch (Exception error) { last = error; }
@@ -306,7 +392,7 @@ internal static class Program
         var deadline = DateTime.UtcNow.AddMilliseconds(request.TimeoutMs ?? 10_000);
         do
         {
-            var visible = FindAll(Session(request).Root, selector).Any(e => !e.Properties.IsOffscreen.ValueOrDefault);
+            var visible = FindAll(Root(request), selector).Any(e => !e.Properties.IsOffscreen.ValueOrDefault);
             if (visible == expected) return new { visible };
             Thread.Sleep(100);
         } while (DateTime.UtcNow < deadline);
@@ -315,7 +401,7 @@ internal static class Program
 
     private static object Screenshot(AgentRequest request)
     {
-        var root = Session(request).Root;
+        var root = Root(request);
         if (request.FullPage != true)
         {
             return new { png_base64 = Convert.ToBase64String(CaptureWindowPng(root)) };
@@ -488,7 +574,7 @@ internal static class Program
             ["version"] = 1,
             ["platform"] = "windows",
             ["backend"] = "uia3",
-            ["root"] = SnapshotElement(Session(request).Root, 0)
+            ["root"] = SnapshotElement(Root(request), 0)
         };
         return new { snapshot = snapshot.ToJsonString(JsonOptions) };
     }
@@ -718,6 +804,192 @@ internal static class Program
             ? new { x = rectangle.X, y = rectangle.Y, width = rectangle.Width, height = rectangle.Height }
             : null;
         return new { bounding_box = box, selected_options = Array.Empty<object>() };
+    }
+
+    private static object Windows(AgentRequest request)
+    {
+        var session = Session(request);
+        var windows = ResolveWindows(session);
+        return new
+        {
+            windows = windows.Select(window => new
+            {
+                window_id = window.Id,
+                title = window.Title,
+                is_main = window.Id == session.MainWindowId
+            }).ToArray()
+        };
+    }
+
+    private static object RegisterWindowHook(AgentRequest request)
+    {
+        var session = Session(request);
+        var hookId = $"window-hook-{Guid.NewGuid():N}";
+        WindowHooks[hookId] = new WindowHook(
+            session.Id,
+            ResolveWindows(session).Select(window => window.Id).ToHashSet(StringComparer.Ordinal));
+        return new { hook_id = hookId };
+    }
+
+    private static object WaitForWindowHook(AgentRequest request)
+    {
+        var session = Session(request);
+        var hookId = Required(request.HookId, "hook_id");
+        if (!WindowHooks.TryGetValue(hookId, out var hook) || hook.SessionId != session.Id)
+            throw new InvalidOperationException($"unknown or foreign Windows window hook `{hookId}`");
+        var deadline = DateTime.UtcNow.AddMilliseconds(request.TimeoutMs ?? 30_000);
+        do
+        {
+            var windows = ResolveWindows(session);
+            var created = windows.FirstOrDefault(window => !hook.KnownWindowIds.Contains(window.Id));
+            if (created is not null)
+            {
+                WindowHooks.Remove(hookId);
+                return new
+                {
+                    window_id = created.Id,
+                    title = created.Title,
+                    is_main = created.Id == session.MainWindowId
+                };
+            }
+            Thread.Sleep(100);
+        } while (DateTime.UtcNow < deadline);
+        throw new InvalidOperationException("no new Windows application window appeared before timeout");
+    }
+
+    private static object CloseWindow(AgentRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.WindowId))
+            throw new InvalidOperationException("close_window requires window_id");
+        var window = Root(request);
+        window.AsWindow().Close();
+        return new { window_id = request.WindowId };
+    }
+
+    private static AutomationElement Root(AgentRequest request)
+    {
+        var session = Session(request);
+        var windows = ResolveWindows(session);
+        if (!string.IsNullOrWhiteSpace(request.WindowId))
+            return windows.FirstOrDefault(window => window.Id == request.WindowId)?.Root
+                ?? throw new InvalidOperationException(
+                    $"desktop window `{request.WindowId}` is closed or no longer belongs to the application session");
+        return windows.FirstOrDefault(window => window.Id == session.MainWindowId)?.Root
+            ?? throw new InvalidOperationException("the application does not currently expose a main window");
+    }
+
+    private static IReadOnlyList<WindowCandidate> ResolveWindows(AppSession session)
+    {
+        RefreshProcessFamily(session);
+        var candidates = new Dictionary<string, WindowCandidate>(StringComparer.Ordinal);
+        try
+        {
+            foreach (var element in Automation.GetDesktop().FindAllChildren(
+                Automation.ConditionFactory.ByControlType(ControlType.Window)))
+            {
+                try
+                {
+                    var processId = element.Properties.ProcessId.ValueOrDefault;
+                    if (!session.ProcessIds.Contains(processId)) continue;
+                    AddWindowCandidate(candidates, element);
+                }
+                catch { }
+            }
+        }
+        catch { }
+        if (session.InitialRoot is not null)
+            try { AddWindowCandidate(candidates, session.InitialRoot); } catch { }
+
+        var windows = candidates.Values
+            .OrderByDescending(window => window.Area)
+            .ToArray();
+        var foreground = GetForegroundWindow();
+        var foregroundId = foreground == IntPtr.Zero ? null : WindowId(foreground);
+        session.MainWindowId = windows.FirstOrDefault(window => window.Id == foregroundId)?.Id
+            ?? windows.FirstOrDefault()?.Id;
+        if (session.InitialRoot is null && windows.Length > 0)
+            session.InitialRoot = windows[0].Root;
+        return windows;
+    }
+
+    private static void WaitForProcessFamilyWindow(AppSession session, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        do
+        {
+            if (ResolveWindows(session).Count > 0) return;
+            Thread.Sleep(100);
+        } while (DateTime.UtcNow < deadline);
+        throw new InvalidOperationException(
+            $"application `{session.AppId}` and its descendant processes did not expose a top-level window before timeout");
+    }
+
+    private static void AddWindowCandidate(
+        IDictionary<string, WindowCandidate> candidates,
+        AutomationElement element)
+    {
+        var handleValue = element.Properties.NativeWindowHandle.ValueOrDefault;
+        if (handleValue == 0) return;
+        if (!IsWindow(new IntPtr(handleValue))) return;
+        var bounds = element.Properties.BoundingRectangle.ValueOrDefault;
+        if (bounds.Width <= 0 || bounds.Height <= 0) return;
+        var id = WindowId(new IntPtr(handleValue));
+        candidates[id] = new WindowCandidate(
+            id,
+            element.Properties.Name.ValueOrDefault ?? "",
+            element,
+            bounds.Width * bounds.Height);
+    }
+
+    private static string WindowId(IntPtr handle) => $"hwnd-{handle.ToInt64():x}";
+
+    private static void SettleMainWindow(AppSession session, TimeSpan launchTimeout)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromMilliseconds(
+            Math.Min(Math.Max(launchTimeout.TotalMilliseconds, 250), 1_500));
+        string? previous = null;
+        var stableSince = DateTime.UtcNow;
+        do
+        {
+            _ = ResolveWindows(session);
+            if (session.MainWindowId != previous)
+            {
+                previous = session.MainWindowId;
+                stableSince = DateTime.UtcNow;
+            }
+            if (previous is not null && DateTime.UtcNow - stableSince >= TimeSpan.FromMilliseconds(400))
+                return;
+            Thread.Sleep(100);
+        } while (DateTime.UtcNow < deadline);
+    }
+
+    private static void RefreshProcessFamily(AppSession session)
+    {
+        var snapshot = CreateToolhelp32Snapshot(SnapshotProcesses, 0);
+        if (snapshot == new IntPtr(-1)) return;
+        try
+        {
+            var entries = new List<ProcessEntry>();
+            var entry = new ProcessEntry { Size = (uint)Marshal.SizeOf<ProcessEntry>(), ExecutableFile = "" };
+            if (Process32First(snapshot, ref entry))
+            {
+                do
+                {
+                    entries.Add(entry);
+                    entry.Size = (uint)Marshal.SizeOf<ProcessEntry>();
+                } while (Process32Next(snapshot, ref entry));
+            }
+            var changed = true;
+            while (changed)
+            {
+                changed = false;
+                foreach (var process in entries)
+                    if (session.ProcessIds.Contains((int)process.ParentProcessId)
+                        && session.ProcessIds.Add((int)process.ProcessId))
+                        changed = true;
+            }
+        }
+        finally { CloseHandle(snapshot); }
     }
 
     private static AppSession Session(AgentRequest request)

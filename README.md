@@ -210,6 +210,14 @@ clipboard paste therefore work on what is currently visible without depending
 on a previously captured locator. Switching back to Inspect refreshes the
 hierarchy and locator data.
 
+Desktop inspectors also expose a **Window** selector. **Follow main window** is
+the default and automatically follows splash-screen handoffs and replacement
+main windows, including windows created by descendant/helper processes. Choose
+a named window to pin screenshots, hierarchy capture, locator actions, and live
+input to that stable window. If a pinned window closes, the inspector falls
+back to following the current main window. Live mode detects a handoff before
+forwarding more coordinates and refreshes the hierarchy and window bounds.
+
 On macOS, pass the application bundle identifier:
 
 ```bash
@@ -327,6 +335,36 @@ permission enabled for the process running Xcode.
 
 Windows uses the matching lazy `windowsApp` fixture. The configured `id` can be
 an executable path, a command such as `notepad.exe`, or a packaged-app AUMID:
+
+Desktop applications are long-lived sessions; their top-level windows are
+stable contexts, similar to pages in a browser. This handles applications that
+first show a splash screen, replace their main window, or create a window in a
+helper process:
+
+```ts
+import { desktop, hooks } from "@allwright.dev/core";
+
+const host = await desktop.mac.connect();
+const app = await host.launch({ appId: "com.example.Editor" });
+
+const windowHook = await app.registerHook(hooks.window);
+await app.getByRole("button", { name: "Open workspace" }).click();
+const workspace = await windowHook.wait({ timeoutMs: 10_000 });
+
+console.log(workspace.title, workspace.windowId);
+await workspace.getByRole("textbox", { name: "Search" }).fill("allwright");
+
+const current = await app.windows();
+const main = await app.mainWindow();
+await current.find((window) => !window.isMain)?.close();
+```
+
+The inherited actions on `app` target its current live main window, so existing
+code follows a splash-to-main handoff. Use a returned `DesktopWindow` when a
+test must stay attached to one specific window. Window hooks are one-shot and
+must be registered before the triggering action. Python exposes `hooks.window`,
+Java `Hooks.WINDOW`, Go `Hooks.Window`, and Rust `WINDOW` through the same
+register-then-wait lifecycle.
 
 ```yaml
 desktop:

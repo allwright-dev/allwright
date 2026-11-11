@@ -21,8 +21,9 @@ type HookOwner interface {
 	hookOwner()
 }
 
-func (*Tab) hookOwner()       {}
-func (*NativeApp) hookOwner() {}
+func (*Tab) hookOwner()        {}
+func (*NativeApp) hookOwner()  {}
+func (*DesktopApp) hookOwner() {}
 
 type Hook[T any] struct {
 	page     *Tab
@@ -472,6 +473,7 @@ var Hooks = struct {
 	NewPage     HookType[*Page]
 	FileChooser HookType[*FileChooser]
 	Download    HookType[*Download]
+	Window      HookType[*DesktopWindow]
 }{
 	Dialog: HookType[*Dialog]{name: "dialog", decode: func(owner any, completed *enginev1.HookCompletedEvent) (*Dialog, error) {
 		page, ok := owner.(*Page)
@@ -539,9 +541,23 @@ var Hooks = struct {
 			return nil, fmt.Errorf("download hook completed with an invalid result")
 		},
 	},
+	Window: HookType[*DesktopWindow]{
+		name: "window",
+		decode: func(owner any, completed *enginev1.HookCompletedEvent) (*DesktopWindow, error) {
+			app, ok := owner.(*DesktopApp)
+			result, valid := completed.GetResult().(*enginev1.HookCompletedEvent_DesktopWindow)
+			if !ok || !valid || result.DesktopWindow.GetWindow() == nil {
+				return nil, fmt.Errorf("desktop window hook completed with an invalid result")
+			}
+			return app.windowFromInfo(result.DesktopWindow.GetWindow())
+		},
+	},
 }
 
 func RegisterHook[T any](ctx context.Context, owner HookOwner, hookType HookType[T]) (*Hook[T], error) {
+	if app, ok := owner.(*DesktopApp); ok {
+		return registerDesktopHook(ctx, app, hookType)
+	}
 	if app, ok := owner.(*NativeApp); ok {
 		return registerAndroidHook(ctx, app, hookType)
 	}
@@ -602,6 +618,69 @@ func RegisterHook[T any](ctx context.Context, owner HookOwner, hookType HookType
 			return hook, nil
 		case *enginev1.ContextSessionEvent_Error:
 			return nil, fmt.Errorf("page session error while registering hook: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func registerDesktopHook[T any](ctx context.Context, app *DesktopApp, hookType HookType[T]) (*Hook[T], error) {
+	if app == nil || app.NativeApp == nil {
+		return nil, fmt.Errorf("desktop app is nil")
+	}
+	if hookType.name != "window" {
+		return nil, fmt.Errorf("hook type %s is not supported by desktop apps", hookType.name)
+	}
+	if err := app.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	register := &enginev1.RegisterHookCommand{Hook: &enginev1.RegisterHookCommand_DesktopWindow{
+		DesktopWindow: &enginev1.RegisterDesktopWindowHook{},
+	}}
+	if err := app.stream.Send(&enginev1.ContextSessionCommand{SurfaceSessionId: app.surfaceSessionID,
+		ContextSessionId: app.sessionID, Command: &enginev1.ContextSessionCommand_RegisterHook{RegisterHook: register}}); err != nil {
+		return nil, err
+	}
+	for {
+		event, err := app.stream.Recv()
+		if err != nil {
+			return nil, err
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.ContextSessionEvent_HookRegistered:
+			hook := &Hook[T]{id: payload.HookRegistered.GetHookId(), hookType: hookType}
+			hook.waitFn = func(waitCtx context.Context, options ...CommandOptions) (T, error) {
+				return waitDesktopHook(waitCtx, app, hook.id, hookType, options...)
+			}
+			return hook, nil
+		case *enginev1.ContextSessionEvent_Error:
+			return nil, fmt.Errorf("desktop hook registration failed: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func waitDesktopHook[T any](ctx context.Context, app *DesktopApp, hookID string, hookType HookType[T], options ...CommandOptions) (T, error) {
+	var zero T
+	if err := app.ensureStream(ctx); err != nil {
+		return zero, err
+	}
+	commandOptions := firstCommandOptions(options)
+	if err := app.stream.Send(&enginev1.ContextSessionCommand{SurfaceSessionId: app.surfaceSessionID,
+		ContextSessionId: app.sessionID, Command: &enginev1.ContextSessionCommand_WaitForHook{WaitForHook: &enginev1.WaitForHookCommand{
+			HookId: hookID, RetryOptions: retryOptionsProto(commandOptions.Timeout),
+		}}}); err != nil {
+		return zero, err
+	}
+	for {
+		event, err := app.stream.Recv()
+		if err != nil {
+			return zero, err
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.ContextSessionEvent_HookCompleted:
+			if payload.HookCompleted.GetHookId() == hookID {
+				return hookType.decode(app, payload.HookCompleted)
+			}
+		case *enginev1.ContextSessionEvent_Error:
+			return zero, fmt.Errorf("desktop hook wait failed: %s", payload.Error.GetMessage())
 		}
 	}
 }

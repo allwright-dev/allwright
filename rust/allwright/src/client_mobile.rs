@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::{
@@ -15,15 +16,16 @@ use crate::proto::surface_session_command::Command as SurfaceCommand;
 use crate::proto::surface_session_event::Event as SurfaceEvent;
 use crate::proto::{
     AccessibilitySnapshotCommand, AppLaunchedEvent, CaptureCommand, ClickElementCommand,
-    ConnectDesktopCommand, ConnectMobileCommand, ContextSessionCommand, CountElementsCommand,
-    DesktopAppLaunchedEvent, DesktopConnectedEvent, DesktopPlatform as ProtoDesktopPlatform,
-    FillElementCommand, FocusElementCommand, GetInnerTextCommand, GetTextContentCommand,
-    LaunchAppCommand, LaunchDesktopAppCommand, MobileConnectedEvent,
+    CloseDesktopWindowCommand, ConnectDesktopCommand, ConnectMobileCommand, ContextSessionCommand,
+    CountElementsCommand, DesktopAppLaunchedEvent, DesktopConnectedEvent,
+    DesktopPlatform as ProtoDesktopPlatform, DesktopWindowInfo, FillElementCommand,
+    FocusElementCommand, GetInnerTextCommand, GetTextContentCommand, LaunchAppCommand,
+    LaunchDesktopAppCommand, ListDesktopWindowsCommand, MobileConnectedEvent,
     MobilePlatform as ProtoMobilePlatform, NavigatePageCommand, PressKeyCommand,
-    ReadFileChunkCommand, RegisterHookCommand, RegisterMobileDownloadHook,
-    RegisterMobileFileChooserHook, SaveMobileDownloadCommand, ScreenshotCommand,
-    SetMobileFileChooserFilesCommand, SurfaceSessionCommand, UploadFileChunkCommand,
-    WaitForHookCommand, WaitForSelectorCommand,
+    ReadFileChunkCommand, RegisterDesktopWindowHook, RegisterHookCommand,
+    RegisterMobileDownloadHook, RegisterMobileFileChooserHook, SaveMobileDownloadCommand,
+    ScreenshotCommand, SetMobileFileChooserFilesCommand, SurfaceSessionCommand,
+    UploadFileChunkCommand, WaitForHookCommand, WaitForSelectorCommand,
 };
 
 use super::hook::{DownloadHook, FileChooserHook};
@@ -168,9 +170,31 @@ pub struct DesktopMacLaunchOptions {
 pub type DesktopWindowsConnectOptions = DesktopMacConnectOptions;
 pub type DesktopWindowsLaunchOptions = DesktopMacLaunchOptions;
 
-pub type MacApp = NativeApp;
+#[derive(Clone)]
+pub struct DesktopApp {
+    app: NativeApp,
+}
+
+#[derive(Clone)]
+pub struct DesktopWindow {
+    app: NativeApp,
+    window_id: String,
+    title: String,
+    is_main: bool,
+}
+
+#[derive(Clone, Copy)]
+pub struct WindowHook;
+pub const WINDOW: WindowHook = WindowHook;
+
+pub struct DesktopWindowHook {
+    app: DesktopApp,
+    id: String,
+}
+
+pub type MacApp = DesktopApp;
 pub type MacLocator = NativeLocator;
-pub type WindowsApp = NativeApp;
+pub type WindowsApp = DesktopApp;
 pub type WindowsLocator = NativeLocator;
 
 #[derive(Clone)]
@@ -393,9 +417,9 @@ pub mod ios {
 pub mod desktop {
     use super::*;
     pub use super::{
-        DesktopMacConnectOptions, DesktopMacLaunchOptions, DesktopWindowsConnectOptions,
-        DesktopWindowsLaunchOptions, MacApp, MacDesktop, MacLocator, WindowsApp, WindowsDesktop,
-        WindowsLocator,
+        DesktopApp, DesktopMacConnectOptions, DesktopMacLaunchOptions, DesktopWindow,
+        DesktopWindowHook, DesktopWindowsConnectOptions, DesktopWindowsLaunchOptions, MacApp,
+        MacDesktop, MacLocator, WINDOW, WindowHook, WindowsApp, WindowsDesktop, WindowsLocator,
     };
 
     pub mod mac {
@@ -537,7 +561,9 @@ impl MacDesktop {
     }
 
     pub fn app(&self) -> MacApp {
-        self.inner.app()
+        DesktopApp {
+            app: self.inner.app(),
+        }
     }
 
     pub async fn launch(&self, options: DesktopMacLaunchOptions) -> Result<MacApp> {
@@ -574,9 +600,209 @@ impl MacDesktop {
                     if let Ok(mut current_app) = self.inner.inner.current_app.lock() {
                         *current_app = app.clone();
                     }
-                    return Ok(app);
+                    return Ok(DesktopApp { app });
                 }
                 Some(SurfaceEvent::Error(error)) => return Err(Error::new(error.message)),
+                _ => {}
+            }
+        }
+    }
+}
+
+impl Deref for DesktopApp {
+    type Target = NativeApp;
+    fn deref(&self) -> &Self::Target {
+        &self.app
+    }
+}
+
+impl Deref for DesktopWindow {
+    type Target = NativeApp;
+    fn deref(&self) -> &Self::Target {
+        &self.app
+    }
+}
+
+impl DesktopApp {
+    pub async fn windows(&self) -> Result<Vec<DesktopWindow>> {
+        let mut state = self.app.inner.state.lock().await;
+        let handle = self.app.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.app.inner.session_id)?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.app.inner.surface_session_id.clone(),
+                context_session_id: self.app.inner.session_id.clone(),
+                command: Some(ContextCommand::ListDesktopWindows(
+                    ListDesktopWindowsCommand {},
+                )),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send ListDesktopWindowsCommand"))?;
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("desktop app session closed while listing windows")
+                })?;
+            match event.event {
+                Some(ContextEvent::DesktopWindowsResolved(resolved)) => {
+                    return resolved
+                        .windows
+                        .into_iter()
+                        .map(|info| self.window(info))
+                        .collect();
+                }
+                Some(ContextEvent::Error(error)) => return Err(Error::new(error.message)),
+                _ => {}
+            }
+        }
+    }
+
+    pub async fn main_window(&self) -> Result<DesktopWindow> {
+        self.windows()
+            .await?
+            .into_iter()
+            .find(|window| window.is_main)
+            .ok_or_else(|| {
+                Error::new("desktop application does not currently expose a main window")
+            })
+    }
+
+    pub async fn register_hook(&self, _hook_type: WindowHook) -> Result<DesktopWindowHook> {
+        let mut state = self.app.inner.state.lock().await;
+        let handle = self.app.ensure_handle(&mut state).await?;
+        ensure_android_app_open(handle, &self.app.inner.session_id)?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.app.inner.surface_session_id.clone(),
+                context_session_id: self.app.inner.session_id.clone(),
+                command: Some(ContextCommand::RegisterHook(RegisterHookCommand {
+                    hook: Some(RegisterHook::DesktopWindow(RegisterDesktopWindowHook {})),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send desktop RegisterHookCommand"))?;
+        loop {
+            let event = handle.events.message().await?.ok_or_else(|| {
+                Error::new("desktop app session closed while registering window hook")
+            })?;
+            match event.event {
+                Some(ContextEvent::HookRegistered(event)) => {
+                    return Ok(DesktopWindowHook {
+                        app: self.clone(),
+                        id: event.hook_id,
+                    });
+                }
+                Some(ContextEvent::Error(error)) => return Err(Error::new(error.message)),
+                _ => {}
+            }
+        }
+    }
+
+    fn window(&self, info: DesktopWindowInfo) -> Result<DesktopWindow> {
+        if info.context_session_id.is_empty() || info.window_id.is_empty() {
+            return Err(Error::new(
+                "desktop window result is missing its context or window id",
+            ));
+        }
+        Ok(DesktopWindow {
+            app: NativeApp {
+                inner: Arc::new(NativeAppInner {
+                    runtime: Arc::clone(&self.app.inner.runtime),
+                    surface_session_id: self.app.inner.surface_session_id.clone(),
+                    session_id: info.context_session_id,
+                    state: AsyncMutex::new(NativeAppState::default()),
+                }),
+            },
+            window_id: info.window_id,
+            title: info.title,
+            is_main: info.is_main,
+        })
+    }
+}
+
+impl DesktopWindow {
+    pub fn window_id(&self) -> &str {
+        &self.window_id
+    }
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+    pub fn is_main(&self) -> bool {
+        self.is_main
+    }
+
+    pub async fn close(&self) -> Result<()> {
+        let mut state = self.app.inner.state.lock().await;
+        let handle = self.app.ensure_handle(&mut state).await?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.app.inner.surface_session_id.clone(),
+                context_session_id: self.app.inner.session_id.clone(),
+                command: Some(ContextCommand::CloseDesktopWindow(
+                    CloseDesktopWindowCommand {},
+                )),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send CloseDesktopWindowCommand"))?;
+        loop {
+            let event =
+                handle.events.message().await?.ok_or_else(|| {
+                    Error::new("desktop window session closed while closing window")
+                })?;
+            match event.event {
+                Some(ContextEvent::DesktopWindowClosed(event))
+                    if event.window_id == self.window_id =>
+                {
+                    return Ok(());
+                }
+                Some(ContextEvent::Error(error)) => return Err(Error::new(error.message)),
+                _ => {}
+            }
+        }
+    }
+}
+
+impl DesktopWindowHook {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+    pub async fn wait(&self) -> Result<DesktopWindow> {
+        self.wait_with_options(CommandOptions::default()).await
+    }
+    pub async fn wait_with_options(&self, options: CommandOptions) -> Result<DesktopWindow> {
+        let mut state = self.app.app.inner.state.lock().await;
+        let handle = self.app.app.ensure_handle(&mut state).await?;
+        handle
+            .command_tx
+            .send(ContextSessionCommand {
+                surface_session_id: self.app.app.inner.surface_session_id.clone(),
+                context_session_id: self.app.app.inner.session_id.clone(),
+                command: Some(ContextCommand::WaitForHook(WaitForHookCommand {
+                    hook_id: self.id.clone(),
+                    retry_options: command_retry_options(options.timeout_ms),
+                })),
+            })
+            .await
+            .map_err(|_| Error::new("failed to send desktop WaitForHookCommand"))?;
+        loop {
+            let event = handle.events.message().await?.ok_or_else(|| {
+                Error::new("desktop app session closed while waiting for window hook")
+            })?;
+            match event.event {
+                Some(ContextEvent::HookCompleted(event)) if event.hook_id == self.id => {
+                    let Some(HookCompletionResult::DesktopWindow(result)) = event.result else {
+                        return Err(Error::new("desktop window hook returned an invalid result"));
+                    };
+                    return self.app.window(
+                        result
+                            .window
+                            .ok_or_else(|| Error::new("desktop window hook returned no window"))?,
+                    );
+                }
+                Some(ContextEvent::Error(error)) => return Err(Error::new(error.message)),
                 _ => {}
             }
         }

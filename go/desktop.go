@@ -21,9 +21,18 @@ type DesktopMacLaunchOptions struct {
 type DesktopWindowsConnectOptions = DesktopMacConnectOptions
 type DesktopWindowsLaunchOptions = DesktopMacLaunchOptions
 
-type MacApp = NativeApp
+type DesktopApp struct{ *NativeApp }
+
+type DesktopWindow struct {
+	*NativeApp
+	windowID string
+	title    string
+	main     bool
+}
+
+type MacApp = DesktopApp
 type MacLocator = NativeLocator
-type WindowsApp = NativeApp
+type WindowsApp = DesktopApp
 type WindowsLocator = NativeLocator
 type WindowsDesktop = MacDesktop
 
@@ -91,7 +100,7 @@ func (d *MacDesktop) Launch(ctx context.Context, options DesktopMacLaunchOptions
 		}
 		switch payload := event.GetEvent().(type) {
 		case *enginev1.SurfaceSessionEvent_DesktopAppLaunched:
-			d.app = &MacApp{runtime: d.runtime, surfaceSessionID: d.surfaceSessionID, sessionID: payload.DesktopAppLaunched.GetAppSessionId()}
+			d.app = newDesktopApp(d.runtime, d.surfaceSessionID, payload.DesktopAppLaunched.GetAppSessionId())
 			return d.app, nil
 		case *enginev1.SurfaceSessionEvent_Closed:
 			d.closed = true
@@ -144,10 +153,114 @@ func connectDesktop(ctx context.Context, options DesktopMacConnectOptions, platf
 			}
 			return &MacDesktop{
 				runtime: runtime, stream: stream, sessionID: sessionID, surfaceSessionID: event.GetSessionId(),
-				app: &MacApp{runtime: runtime, surfaceSessionID: event.GetSessionId(), sessionID: payload.DesktopConnected.GetInitialAppSessionId()},
+				app: newDesktopApp(runtime, event.GetSessionId(), payload.DesktopConnected.GetInitialAppSessionId()),
 			}, nil
 		case *enginev1.SurfaceSessionEvent_Error:
 			return nil, fmt.Errorf("%s desktop connect error: %s", label, payload.Error.GetMessage())
 		}
 	}
+}
+
+func newDesktopApp(runtime *runtimeClient, surfaceSessionID, sessionID string) *DesktopApp {
+	return &DesktopApp{NativeApp: &NativeApp{runtime: runtime, surfaceSessionID: surfaceSessionID, sessionID: sessionID}}
+}
+
+func (app *DesktopApp) Windows(ctx context.Context) ([]*DesktopWindow, error) {
+	if app == nil || app.NativeApp == nil {
+		return nil, fmt.Errorf("desktop app is nil")
+	}
+	if err := app.ensureStream(ctx); err != nil {
+		return nil, err
+	}
+	if err := app.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: app.surfaceSessionID, ContextSessionId: app.sessionID,
+		Command: &enginev1.ContextSessionCommand_ListDesktopWindows{ListDesktopWindows: &enginev1.ListDesktopWindowsCommand{}},
+	}); err != nil {
+		return nil, fmt.Errorf("send ListDesktopWindowsCommand: %w", err)
+	}
+	for {
+		event, err := app.stream.Recv()
+		if err != nil {
+			return nil, err
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.ContextSessionEvent_DesktopWindowsResolved:
+			windows := make([]*DesktopWindow, 0, len(payload.DesktopWindowsResolved.GetWindows()))
+			for _, info := range payload.DesktopWindowsResolved.GetWindows() {
+				window, err := app.windowFromInfo(info)
+				if err != nil {
+					return nil, err
+				}
+				windows = append(windows, window)
+			}
+			return windows, nil
+		case *enginev1.ContextSessionEvent_Error:
+			return nil, fmt.Errorf("list desktop windows: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func (app *DesktopApp) MainWindow(ctx context.Context) (*DesktopWindow, error) {
+	windows, err := app.Windows(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, window := range windows {
+		if window.main {
+			return window, nil
+		}
+	}
+	return nil, fmt.Errorf("desktop application does not currently expose a main window")
+}
+
+func (window *DesktopWindow) WindowID() string {
+	if window == nil {
+		return ""
+	}
+	return window.windowID
+}
+func (window *DesktopWindow) Title() string {
+	if window == nil {
+		return ""
+	}
+	return window.title
+}
+func (window *DesktopWindow) IsMain() bool { return window != nil && window.main }
+
+func (window *DesktopWindow) Close(ctx context.Context) error {
+	if window == nil || window.NativeApp == nil {
+		return fmt.Errorf("desktop window is nil")
+	}
+	if err := window.ensureStream(ctx); err != nil {
+		return err
+	}
+	if err := window.stream.Send(&enginev1.ContextSessionCommand{
+		SurfaceSessionId: window.surfaceSessionID, ContextSessionId: window.sessionID,
+		Command: &enginev1.ContextSessionCommand_CloseDesktopWindow{CloseDesktopWindow: &enginev1.CloseDesktopWindowCommand{}},
+	}); err != nil {
+		return err
+	}
+	for {
+		event, err := window.stream.Recv()
+		if err != nil {
+			return err
+		}
+		switch payload := event.GetEvent().(type) {
+		case *enginev1.ContextSessionEvent_DesktopWindowClosed:
+			if payload.DesktopWindowClosed.GetWindowId() == window.windowID {
+				window.closed = true
+				return nil
+			}
+		case *enginev1.ContextSessionEvent_Error:
+			return fmt.Errorf("close desktop window: %s", payload.Error.GetMessage())
+		}
+	}
+}
+
+func (app *DesktopApp) windowFromInfo(info *enginev1.DesktopWindowInfo) (*DesktopWindow, error) {
+	if info == nil || info.GetContextSessionId() == "" || info.GetWindowId() == "" {
+		return nil, fmt.Errorf("desktop window result is missing its context or window id")
+	}
+	return &DesktopWindow{NativeApp: &NativeApp{runtime: app.runtime, surfaceSessionID: app.surfaceSessionID,
+		sessionID: info.GetContextSessionId()}, windowID: info.GetWindowId(), title: info.GetTitle(), main: info.GetIsMain()}, nil
 }

@@ -22,6 +22,8 @@ from ._mobile import (
     mobile,
 )
 from ._desktop import (
+    DesktopApp,
+    DesktopWindow,
     DesktopMacConnectOptions,
     DesktopMacLaunchOptions,
     MacApp,

@@ -118,6 +118,8 @@ type ContextSessionCommand struct {
 	//	*ContextSessionCommand_ResolveFrame
 	//	*ContextSessionCommand_Capture
 	//	*ContextSessionCommand_HandleDialog
+	//	*ContextSessionCommand_ListDesktopWindows
+	//	*ContextSessionCommand_CloseDesktopWindow
 	Command       isContextSessionCommand_Command `protobuf_oneof:"command"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -408,6 +410,24 @@ func (x *ContextSessionCommand) GetHandleDialog() *HandleDialogCommand {
 	return nil
 }
 
+func (x *ContextSessionCommand) GetListDesktopWindows() *ListDesktopWindowsCommand {
+	if x != nil {
+		if x, ok := x.Command.(*ContextSessionCommand_ListDesktopWindows); ok {
+			return x.ListDesktopWindows
+		}
+	}
+	return nil
+}
+
+func (x *ContextSessionCommand) GetCloseDesktopWindow() *CloseDesktopWindowCommand {
+	if x != nil {
+		if x, ok := x.Command.(*ContextSessionCommand_CloseDesktopWindow); ok {
+			return x.CloseDesktopWindow
+		}
+	}
+	return nil
+}
+
 type isContextSessionCommand_Command interface {
 	isContextSessionCommand_Command()
 }
@@ -516,6 +536,14 @@ type ContextSessionCommand_HandleDialog struct {
 	HandleDialog *HandleDialogCommand `protobuf:"bytes,28,opt,name=handle_dialog,json=handleDialog,proto3,oneof"`
 }
 
+type ContextSessionCommand_ListDesktopWindows struct {
+	ListDesktopWindows *ListDesktopWindowsCommand `protobuf:"bytes,29,opt,name=list_desktop_windows,json=listDesktopWindows,proto3,oneof"`
+}
+
+type ContextSessionCommand_CloseDesktopWindow struct {
+	CloseDesktopWindow *CloseDesktopWindowCommand `protobuf:"bytes,30,opt,name=close_desktop_window,json=closeDesktopWindow,proto3,oneof"`
+}
+
 func (*ContextSessionCommand_Ping) isContextSessionCommand_Command() {}
 
 func (*ContextSessionCommand_Close) isContextSessionCommand_Command() {}
@@ -567,6 +595,10 @@ func (*ContextSessionCommand_ResolveFrame) isContextSessionCommand_Command() {}
 func (*ContextSessionCommand_Capture) isContextSessionCommand_Command() {}
 
 func (*ContextSessionCommand_HandleDialog) isContextSessionCommand_Command() {}
+
+func (*ContextSessionCommand_ListDesktopWindows) isContextSessionCommand_Command() {}
+
+func (*ContextSessionCommand_CloseDesktopWindow) isContextSessionCommand_Command() {}
 
 type ContextSessionPingCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -682,6 +714,8 @@ type ContextSessionEvent struct {
 	//	*ContextSessionEvent_FrameResolved
 	//	*ContextSessionEvent_CaptureResolved
 	//	*ContextSessionEvent_DialogHandled
+	//	*ContextSessionEvent_DesktopWindowsResolved
+	//	*ContextSessionEvent_DesktopWindowClosed
 	Event         isContextSessionEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -992,6 +1026,24 @@ func (x *ContextSessionEvent) GetDialogHandled() *DialogHandledEvent {
 	return nil
 }
 
+func (x *ContextSessionEvent) GetDesktopWindowsResolved() *DesktopWindowsResolvedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*ContextSessionEvent_DesktopWindowsResolved); ok {
+			return x.DesktopWindowsResolved
+		}
+	}
+	return nil
+}
+
+func (x *ContextSessionEvent) GetDesktopWindowClosed() *DesktopWindowClosedEvent {
+	if x != nil {
+		if x, ok := x.Event.(*ContextSessionEvent_DesktopWindowClosed); ok {
+			return x.DesktopWindowClosed
+		}
+	}
+	return nil
+}
+
 type isContextSessionEvent_Event interface {
 	isContextSessionEvent_Event()
 }
@@ -1112,6 +1164,14 @@ type ContextSessionEvent_DialogHandled struct {
 	DialogHandled *DialogHandledEvent `protobuf:"bytes,30,opt,name=dialog_handled,json=dialogHandled,proto3,oneof"`
 }
 
+type ContextSessionEvent_DesktopWindowsResolved struct {
+	DesktopWindowsResolved *DesktopWindowsResolvedEvent `protobuf:"bytes,31,opt,name=desktop_windows_resolved,json=desktopWindowsResolved,proto3,oneof"`
+}
+
+type ContextSessionEvent_DesktopWindowClosed struct {
+	DesktopWindowClosed *DesktopWindowClosedEvent `protobuf:"bytes,32,opt,name=desktop_window_closed,json=desktopWindowClosed,proto3,oneof"`
+}
+
 func (*ContextSessionEvent_Attached) isContextSessionEvent_Event() {}
 
 func (*ContextSessionEvent_Pong) isContextSessionEvent_Event() {}
@@ -1169,6 +1229,10 @@ func (*ContextSessionEvent_FrameResolved) isContextSessionEvent_Event() {}
 func (*ContextSessionEvent_CaptureResolved) isContextSessionEvent_Event() {}
 
 func (*ContextSessionEvent_DialogHandled) isContextSessionEvent_Event() {}
+
+func (*ContextSessionEvent_DesktopWindowsResolved) isContextSessionEvent_Event() {}
+
+func (*ContextSessionEvent_DesktopWindowClosed) isContextSessionEvent_Event() {}
 
 type ContextSessionAttachedEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1356,6 +1420,7 @@ type RegisterHookCommand struct {
 	//	*RegisterHookCommand_MobileFileChooser
 	//	*RegisterHookCommand_MobileDownload
 	//	*RegisterHookCommand_Dialog
+	//	*RegisterHookCommand_DesktopWindow
 	Hook          isRegisterHookCommand_Hook `protobuf_oneof:"hook"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1452,6 +1517,15 @@ func (x *RegisterHookCommand) GetDialog() *RegisterDialogHook {
 	return nil
 }
 
+func (x *RegisterHookCommand) GetDesktopWindow() *RegisterDesktopWindowHook {
+	if x != nil {
+		if x, ok := x.Hook.(*RegisterHookCommand_DesktopWindow); ok {
+			return x.DesktopWindow
+		}
+	}
+	return nil
+}
+
 type isRegisterHookCommand_Hook interface {
 	isRegisterHookCommand_Hook()
 }
@@ -1480,6 +1554,10 @@ type RegisterHookCommand_Dialog struct {
 	Dialog *RegisterDialogHook `protobuf:"bytes,6,opt,name=dialog,proto3,oneof"`
 }
 
+type RegisterHookCommand_DesktopWindow struct {
+	DesktopWindow *RegisterDesktopWindowHook `protobuf:"bytes,7,opt,name=desktop_window,json=desktopWindow,proto3,oneof"`
+}
+
 func (*RegisterHookCommand_NewPage) isRegisterHookCommand_Hook() {}
 
 func (*RegisterHookCommand_FileChooser) isRegisterHookCommand_Hook() {}
@@ -1491,6 +1569,8 @@ func (*RegisterHookCommand_MobileFileChooser) isRegisterHookCommand_Hook() {}
 func (*RegisterHookCommand_MobileDownload) isRegisterHookCommand_Hook() {}
 
 func (*RegisterHookCommand_Dialog) isRegisterHookCommand_Hook() {}
+
+func (*RegisterHookCommand_DesktopWindow) isRegisterHookCommand_Hook() {}
 
 type WaitForHookCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1599,6 +1679,7 @@ type HookCompletedEvent struct {
 	//	*HookCompletedEvent_MobileFileChooser
 	//	*HookCompletedEvent_MobileDownload
 	//	*HookCompletedEvent_Dialog
+	//	*HookCompletedEvent_DesktopWindow
 	Result        isHookCompletedEvent_Result `protobuf_oneof:"result"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1702,6 +1783,15 @@ func (x *HookCompletedEvent) GetDialog() *DialogHookResult {
 	return nil
 }
 
+func (x *HookCompletedEvent) GetDesktopWindow() *DesktopWindowHookResult {
+	if x != nil {
+		if x, ok := x.Result.(*HookCompletedEvent_DesktopWindow); ok {
+			return x.DesktopWindow
+		}
+	}
+	return nil
+}
+
 type isHookCompletedEvent_Result interface {
 	isHookCompletedEvent_Result()
 }
@@ -1730,6 +1820,10 @@ type HookCompletedEvent_Dialog struct {
 	Dialog *DialogHookResult `protobuf:"bytes,7,opt,name=dialog,proto3,oneof"`
 }
 
+type HookCompletedEvent_DesktopWindow struct {
+	DesktopWindow *DesktopWindowHookResult `protobuf:"bytes,8,opt,name=desktop_window,json=desktopWindow,proto3,oneof"`
+}
+
 func (*HookCompletedEvent_NewPage) isHookCompletedEvent_Result() {}
 
 func (*HookCompletedEvent_FileChooser) isHookCompletedEvent_Result() {}
@@ -1741,6 +1835,8 @@ func (*HookCompletedEvent_MobileFileChooser) isHookCompletedEvent_Result() {}
 func (*HookCompletedEvent_MobileDownload) isHookCompletedEvent_Result() {}
 
 func (*HookCompletedEvent_Dialog) isHookCompletedEvent_Result() {}
+
+func (*HookCompletedEvent_DesktopWindow) isHookCompletedEvent_Result() {}
 
 type UploadFileChunkCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -3844,7 +3940,7 @@ var File_core_v1_context_proto protoreflect.FileDescriptor
 
 const file_core_v1_context_proto_rawDesc = "" +
 	"\n" +
-	"\x15core/v1/context.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a\x1fsurfaces/mobile/v1/mobile.proto\x1a\x19surfaces/web/v1/web.proto\"\x95\x12\n" +
+	"\x15core/v1/context.proto\x12\x13allwright.engine.v1\x1a\x14core/v1/common.proto\x1a!surfaces/desktop/v1/desktop.proto\x1a\x1fsurfaces/mobile/v1/mobile.proto\x1a\x19surfaces/web/v1/web.proto\"\xdd\x13\n" +
 	"\x15ContextSessionCommand\x12,\n" +
 	"\x12surface_session_id\x18\x01 \x01(\tR\x10surfaceSessionId\x12,\n" +
 	"\x12context_session_id\x18\x02 \x01(\tR\x10contextSessionId\x12D\n" +
@@ -3876,11 +3972,13 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\x14save_mobile_download\x18\x19 \x01(\v2..allwright.engine.v1.SaveMobileDownloadCommandH\x00R\x12saveMobileDownload\x12O\n" +
 	"\rresolve_frame\x18\x1a \x01(\v2(.allwright.engine.v1.ResolveFrameCommandH\x00R\fresolveFrame\x12?\n" +
 	"\acapture\x18\x1b \x01(\v2#.allwright.engine.v1.CaptureCommandH\x00R\acapture\x12O\n" +
-	"\rhandle_dialog\x18\x1c \x01(\v2(.allwright.engine.v1.HandleDialogCommandH\x00R\fhandleDialogB\t\n" +
+	"\rhandle_dialog\x18\x1c \x01(\v2(.allwright.engine.v1.HandleDialogCommandH\x00R\fhandleDialog\x12b\n" +
+	"\x14list_desktop_windows\x18\x1d \x01(\v2..allwright.engine.v1.ListDesktopWindowsCommandH\x00R\x12listDesktopWindows\x12b\n" +
+	"\x14close_desktop_window\x18\x1e \x01(\v2..allwright.engine.v1.CloseDesktopWindowCommandH\x00R\x12closeDesktopWindowB\t\n" +
 	"\acommand\"5\n" +
 	"\x19ContextSessionPingCommand\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"\x1c\n" +
-	"\x1aCloseContextSessionCommand\"\xda\x14\n" +
+	"\x1aCloseContextSessionCommand\"\xad\x16\n" +
 	"\x13ContextSessionEvent\x12,\n" +
 	"\x12context_session_id\x18\x01 \x01(\tR\x10contextSessionId\x12N\n" +
 	"\battached\x18\x02 \x01(\v20.allwright.engine.v1.ContextSessionAttachedEventH\x00R\battached\x12B\n" +
@@ -3914,7 +4012,9 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\x15mobile_download_saved\x18\x1b \x01(\v2-.allwright.engine.v1.MobileDownloadSavedEventH\x00R\x13mobileDownloadSaved\x12P\n" +
 	"\x0eframe_resolved\x18\x1c \x01(\v2'.allwright.engine.v1.FrameResolvedEventH\x00R\rframeResolved\x12V\n" +
 	"\x10capture_resolved\x18\x1d \x01(\v2).allwright.engine.v1.CaptureResolvedEventH\x00R\x0fcaptureResolved\x12P\n" +
-	"\x0edialog_handled\x18\x1e \x01(\v2'.allwright.engine.v1.DialogHandledEventH\x00R\rdialogHandledB\a\n" +
+	"\x0edialog_handled\x18\x1e \x01(\v2'.allwright.engine.v1.DialogHandledEventH\x00R\rdialogHandled\x12l\n" +
+	"\x18desktop_windows_resolved\x18\x1f \x01(\v20.allwright.engine.v1.DesktopWindowsResolvedEventH\x00R\x16desktopWindowsResolved\x12c\n" +
+	"\x15desktop_window_closed\x18  \x01(\v2-.allwright.engine.v1.DesktopWindowClosedEventH\x00R\x13desktopWindowClosedB\a\n" +
 	"\x05event\"1\n" +
 	"\x1bContextSessionAttachedEvent\x12\x12\n" +
 	"\x04note\x18\x01 \x01(\tR\x04note\"3\n" +
@@ -3923,21 +4023,22 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\x19ContextSessionClosedEvent\x12\x16\n" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\"4\n" +
 	"\x18ContextSessionErrorEvent\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\"\x85\x04\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"\xde\x04\n" +
 	"\x13RegisterHookCommand\x12E\n" +
 	"\bnew_page\x18\x01 \x01(\v2(.allwright.engine.v1.RegisterNewPageHookH\x00R\anewPage\x12Q\n" +
 	"\ffile_chooser\x18\x02 \x01(\v2,.allwright.engine.v1.RegisterFileChooserHookH\x00R\vfileChooser\x12G\n" +
 	"\bdownload\x18\x03 \x01(\v2).allwright.engine.v1.RegisterDownloadHookH\x00R\bdownload\x12d\n" +
 	"\x13mobile_file_chooser\x18\x04 \x01(\v22.allwright.engine.v1.RegisterMobileFileChooserHookH\x00R\x11mobileFileChooser\x12Z\n" +
 	"\x0fmobile_download\x18\x05 \x01(\v2/.allwright.engine.v1.RegisterMobileDownloadHookH\x00R\x0emobileDownload\x12A\n" +
-	"\x06dialog\x18\x06 \x01(\v2'.allwright.engine.v1.RegisterDialogHookH\x00R\x06dialogB\x06\n" +
+	"\x06dialog\x18\x06 \x01(\v2'.allwright.engine.v1.RegisterDialogHookH\x00R\x06dialog\x12W\n" +
+	"\x0edesktop_window\x18\a \x01(\v2..allwright.engine.v1.RegisterDesktopWindowHookH\x00R\rdesktopWindowB\x06\n" +
 	"\x04hook\"\x93\x01\n" +
 	"\x12WaitForHookCommand\x12\x17\n" +
 	"\ahook_id\x18\x01 \x01(\tR\x06hookId\x12R\n" +
 	"\rretry_options\x18\x02 \x01(\v2(.allwright.engine.v1.CommandRetryOptionsH\x00R\fretryOptions\x88\x01\x01B\x10\n" +
 	"\x0e_retry_options\".\n" +
 	"\x13HookRegisteredEvent\x12\x17\n" +
-	"\ahook_id\x18\x01 \x01(\tR\x06hookId\"\x93\x04\n" +
+	"\ahook_id\x18\x01 \x01(\tR\x06hookId\"\xea\x04\n" +
 	"\x12HookCompletedEvent\x12\x17\n" +
 	"\ahook_id\x18\x01 \x01(\tR\x06hookId\x12C\n" +
 	"\bnew_page\x18\x02 \x01(\v2&.allwright.engine.v1.NewPageHookResultH\x00R\anewPage\x12O\n" +
@@ -3945,7 +4046,8 @@ const file_core_v1_context_proto_rawDesc = "" +
 	"\bdownload\x18\x04 \x01(\v2'.allwright.engine.v1.DownloadHookResultH\x00R\bdownload\x12b\n" +
 	"\x13mobile_file_chooser\x18\x05 \x01(\v20.allwright.engine.v1.MobileFileChooserHookResultH\x00R\x11mobileFileChooser\x12X\n" +
 	"\x0fmobile_download\x18\x06 \x01(\v2-.allwright.engine.v1.MobileDownloadHookResultH\x00R\x0emobileDownload\x12?\n" +
-	"\x06dialog\x18\a \x01(\v2%.allwright.engine.v1.DialogHookResultH\x00R\x06dialogB\b\n" +
+	"\x06dialog\x18\a \x01(\v2%.allwright.engine.v1.DialogHookResultH\x00R\x06dialog\x12U\n" +
+	"\x0edesktop_window\x18\b \x01(\v2,.allwright.engine.v1.DesktopWindowHookResultH\x00R\rdesktopWindowB\b\n" +
 	"\x06result\"\x8d\x01\n" +
 	"\x16UploadFileChunkCommand\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
@@ -4196,25 +4298,31 @@ var file_core_v1_context_proto_goTypes = []any{
 	(*SaveMobileDownloadCommand)(nil),          // 51: allwright.engine.v1.SaveMobileDownloadCommand
 	(*ResolveFrameCommand)(nil),                // 52: allwright.engine.v1.ResolveFrameCommand
 	(*HandleDialogCommand)(nil),                // 53: allwright.engine.v1.HandleDialogCommand
-	(*FileChooserFilesSetEvent)(nil),           // 54: allwright.engine.v1.FileChooserFilesSetEvent
-	(*DownloadSavedEvent)(nil),                 // 55: allwright.engine.v1.DownloadSavedEvent
-	(*MobileFileChooserFilesSetEvent)(nil),     // 56: allwright.engine.v1.MobileFileChooserFilesSetEvent
-	(*MobileDownloadSavedEvent)(nil),           // 57: allwright.engine.v1.MobileDownloadSavedEvent
-	(*FrameResolvedEvent)(nil),                 // 58: allwright.engine.v1.FrameResolvedEvent
-	(*DialogHandledEvent)(nil),                 // 59: allwright.engine.v1.DialogHandledEvent
-	(*RegisterNewPageHook)(nil),                // 60: allwright.engine.v1.RegisterNewPageHook
-	(*RegisterFileChooserHook)(nil),            // 61: allwright.engine.v1.RegisterFileChooserHook
-	(*RegisterDownloadHook)(nil),               // 62: allwright.engine.v1.RegisterDownloadHook
-	(*RegisterMobileFileChooserHook)(nil),      // 63: allwright.engine.v1.RegisterMobileFileChooserHook
-	(*RegisterMobileDownloadHook)(nil),         // 64: allwright.engine.v1.RegisterMobileDownloadHook
-	(*RegisterDialogHook)(nil),                 // 65: allwright.engine.v1.RegisterDialogHook
-	(*CommandRetryOptions)(nil),                // 66: allwright.engine.v1.CommandRetryOptions
-	(*NewPageHookResult)(nil),                  // 67: allwright.engine.v1.NewPageHookResult
-	(*FileChooserHookResult)(nil),              // 68: allwright.engine.v1.FileChooserHookResult
-	(*DownloadHookResult)(nil),                 // 69: allwright.engine.v1.DownloadHookResult
-	(*MobileFileChooserHookResult)(nil),        // 70: allwright.engine.v1.MobileFileChooserHookResult
-	(*MobileDownloadHookResult)(nil),           // 71: allwright.engine.v1.MobileDownloadHookResult
-	(*DialogHookResult)(nil),                   // 72: allwright.engine.v1.DialogHookResult
+	(*ListDesktopWindowsCommand)(nil),          // 54: allwright.engine.v1.ListDesktopWindowsCommand
+	(*CloseDesktopWindowCommand)(nil),          // 55: allwright.engine.v1.CloseDesktopWindowCommand
+	(*FileChooserFilesSetEvent)(nil),           // 56: allwright.engine.v1.FileChooserFilesSetEvent
+	(*DownloadSavedEvent)(nil),                 // 57: allwright.engine.v1.DownloadSavedEvent
+	(*MobileFileChooserFilesSetEvent)(nil),     // 58: allwright.engine.v1.MobileFileChooserFilesSetEvent
+	(*MobileDownloadSavedEvent)(nil),           // 59: allwright.engine.v1.MobileDownloadSavedEvent
+	(*FrameResolvedEvent)(nil),                 // 60: allwright.engine.v1.FrameResolvedEvent
+	(*DialogHandledEvent)(nil),                 // 61: allwright.engine.v1.DialogHandledEvent
+	(*DesktopWindowsResolvedEvent)(nil),        // 62: allwright.engine.v1.DesktopWindowsResolvedEvent
+	(*DesktopWindowClosedEvent)(nil),           // 63: allwright.engine.v1.DesktopWindowClosedEvent
+	(*RegisterNewPageHook)(nil),                // 64: allwright.engine.v1.RegisterNewPageHook
+	(*RegisterFileChooserHook)(nil),            // 65: allwright.engine.v1.RegisterFileChooserHook
+	(*RegisterDownloadHook)(nil),               // 66: allwright.engine.v1.RegisterDownloadHook
+	(*RegisterMobileFileChooserHook)(nil),      // 67: allwright.engine.v1.RegisterMobileFileChooserHook
+	(*RegisterMobileDownloadHook)(nil),         // 68: allwright.engine.v1.RegisterMobileDownloadHook
+	(*RegisterDialogHook)(nil),                 // 69: allwright.engine.v1.RegisterDialogHook
+	(*RegisterDesktopWindowHook)(nil),          // 70: allwright.engine.v1.RegisterDesktopWindowHook
+	(*CommandRetryOptions)(nil),                // 71: allwright.engine.v1.CommandRetryOptions
+	(*NewPageHookResult)(nil),                  // 72: allwright.engine.v1.NewPageHookResult
+	(*FileChooserHookResult)(nil),              // 73: allwright.engine.v1.FileChooserHookResult
+	(*DownloadHookResult)(nil),                 // 74: allwright.engine.v1.DownloadHookResult
+	(*MobileFileChooserHookResult)(nil),        // 75: allwright.engine.v1.MobileFileChooserHookResult
+	(*MobileDownloadHookResult)(nil),           // 76: allwright.engine.v1.MobileDownloadHookResult
+	(*DialogHookResult)(nil),                   // 77: allwright.engine.v1.DialogHookResult
+	(*DesktopWindowHookResult)(nil),            // 78: allwright.engine.v1.DesktopWindowHookResult
 }
 var file_core_v1_context_proto_depIdxs = []int32{
 	2,  // 0: allwright.engine.v1.ContextSessionCommand.ping:type_name -> allwright.engine.v1.ContextSessionPingCommand
@@ -4243,70 +4351,76 @@ var file_core_v1_context_proto_depIdxs = []int32{
 	52, // 23: allwright.engine.v1.ContextSessionCommand.resolve_frame:type_name -> allwright.engine.v1.ResolveFrameCommand
 	44, // 24: allwright.engine.v1.ContextSessionCommand.capture:type_name -> allwright.engine.v1.CaptureCommand
 	53, // 25: allwright.engine.v1.ContextSessionCommand.handle_dialog:type_name -> allwright.engine.v1.HandleDialogCommand
-	5,  // 26: allwright.engine.v1.ContextSessionEvent.attached:type_name -> allwright.engine.v1.ContextSessionAttachedEvent
-	6,  // 27: allwright.engine.v1.ContextSessionEvent.pong:type_name -> allwright.engine.v1.ContextSessionPongEvent
-	7,  // 28: allwright.engine.v1.ContextSessionEvent.closed:type_name -> allwright.engine.v1.ContextSessionClosedEvent
-	8,  // 29: allwright.engine.v1.ContextSessionEvent.error:type_name -> allwright.engine.v1.ContextSessionErrorEvent
-	29, // 30: allwright.engine.v1.ContextSessionEvent.navigated:type_name -> allwright.engine.v1.PageNavigatedEvent
-	30, // 31: allwright.engine.v1.ContextSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
-	31, // 32: allwright.engine.v1.ContextSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
-	32, // 33: allwright.engine.v1.ContextSessionEvent.element_counted:type_name -> allwright.engine.v1.ElementCountedEvent
-	33, // 34: allwright.engine.v1.ContextSessionEvent.elements_highlighted:type_name -> allwright.engine.v1.ElementsHighlightedEvent
-	34, // 35: allwright.engine.v1.ContextSessionEvent.element_focused:type_name -> allwright.engine.v1.ElementFocusedEvent
-	35, // 36: allwright.engine.v1.ContextSessionEvent.element_filled:type_name -> allwright.engine.v1.ElementFilledEvent
-	36, // 37: allwright.engine.v1.ContextSessionEvent.element_hovered:type_name -> allwright.engine.v1.ElementHoveredEvent
-	37, // 38: allwright.engine.v1.ContextSessionEvent.key_pressed:type_name -> allwright.engine.v1.KeyPressedEvent
-	38, // 39: allwright.engine.v1.ContextSessionEvent.text_content_resolved:type_name -> allwright.engine.v1.TextContentResolvedEvent
-	39, // 40: allwright.engine.v1.ContextSessionEvent.inner_text_resolved:type_name -> allwright.engine.v1.InnerTextResolvedEvent
-	40, // 41: allwright.engine.v1.ContextSessionEvent.selector_wait_satisfied:type_name -> allwright.engine.v1.SelectorWaitSatisfiedEvent
-	41, // 42: allwright.engine.v1.ContextSessionEvent.screenshot_captured:type_name -> allwright.engine.v1.ScreenshotCapturedEvent
-	43, // 43: allwright.engine.v1.ContextSessionEvent.accessibility_snapshot_captured:type_name -> allwright.engine.v1.AccessibilitySnapshotCapturedEvent
-	11, // 44: allwright.engine.v1.ContextSessionEvent.hook_registered:type_name -> allwright.engine.v1.HookRegisteredEvent
-	12, // 45: allwright.engine.v1.ContextSessionEvent.hook_completed:type_name -> allwright.engine.v1.HookCompletedEvent
-	54, // 46: allwright.engine.v1.ContextSessionEvent.file_chooser_files_set:type_name -> allwright.engine.v1.FileChooserFilesSetEvent
-	55, // 47: allwright.engine.v1.ContextSessionEvent.download_saved:type_name -> allwright.engine.v1.DownloadSavedEvent
-	14, // 48: allwright.engine.v1.ContextSessionEvent.file_uploaded:type_name -> allwright.engine.v1.FileUploadedEvent
-	16, // 49: allwright.engine.v1.ContextSessionEvent.file_chunk:type_name -> allwright.engine.v1.FileChunkEvent
-	56, // 50: allwright.engine.v1.ContextSessionEvent.mobile_file_chooser_files_set:type_name -> allwright.engine.v1.MobileFileChooserFilesSetEvent
-	57, // 51: allwright.engine.v1.ContextSessionEvent.mobile_download_saved:type_name -> allwright.engine.v1.MobileDownloadSavedEvent
-	58, // 52: allwright.engine.v1.ContextSessionEvent.frame_resolved:type_name -> allwright.engine.v1.FrameResolvedEvent
-	47, // 53: allwright.engine.v1.ContextSessionEvent.capture_resolved:type_name -> allwright.engine.v1.CaptureResolvedEvent
-	59, // 54: allwright.engine.v1.ContextSessionEvent.dialog_handled:type_name -> allwright.engine.v1.DialogHandledEvent
-	60, // 55: allwright.engine.v1.RegisterHookCommand.new_page:type_name -> allwright.engine.v1.RegisterNewPageHook
-	61, // 56: allwright.engine.v1.RegisterHookCommand.file_chooser:type_name -> allwright.engine.v1.RegisterFileChooserHook
-	62, // 57: allwright.engine.v1.RegisterHookCommand.download:type_name -> allwright.engine.v1.RegisterDownloadHook
-	63, // 58: allwright.engine.v1.RegisterHookCommand.mobile_file_chooser:type_name -> allwright.engine.v1.RegisterMobileFileChooserHook
-	64, // 59: allwright.engine.v1.RegisterHookCommand.mobile_download:type_name -> allwright.engine.v1.RegisterMobileDownloadHook
-	65, // 60: allwright.engine.v1.RegisterHookCommand.dialog:type_name -> allwright.engine.v1.RegisterDialogHook
-	66, // 61: allwright.engine.v1.WaitForHookCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	67, // 62: allwright.engine.v1.HookCompletedEvent.new_page:type_name -> allwright.engine.v1.NewPageHookResult
-	68, // 63: allwright.engine.v1.HookCompletedEvent.file_chooser:type_name -> allwright.engine.v1.FileChooserHookResult
-	69, // 64: allwright.engine.v1.HookCompletedEvent.download:type_name -> allwright.engine.v1.DownloadHookResult
-	70, // 65: allwright.engine.v1.HookCompletedEvent.mobile_file_chooser:type_name -> allwright.engine.v1.MobileFileChooserHookResult
-	71, // 66: allwright.engine.v1.HookCompletedEvent.mobile_download:type_name -> allwright.engine.v1.MobileDownloadHookResult
-	72, // 67: allwright.engine.v1.HookCompletedEvent.dialog:type_name -> allwright.engine.v1.DialogHookResult
-	66, // 68: allwright.engine.v1.NavigatePageCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	66, // 69: allwright.engine.v1.ClickElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	66, // 70: allwright.engine.v1.CountElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	66, // 71: allwright.engine.v1.HighlightElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	66, // 72: allwright.engine.v1.FocusElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	66, // 73: allwright.engine.v1.FillElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	66, // 74: allwright.engine.v1.HoverElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	66, // 75: allwright.engine.v1.PressKeyCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	66, // 76: allwright.engine.v1.GetTextContentCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	66, // 77: allwright.engine.v1.GetInnerTextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	66, // 78: allwright.engine.v1.WaitForSelectorCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	66, // 79: allwright.engine.v1.ScreenshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	66, // 80: allwright.engine.v1.AccessibilitySnapshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	0,  // 81: allwright.engine.v1.CaptureCommand.kind:type_name -> allwright.engine.v1.CaptureKind
-	66, // 82: allwright.engine.v1.CaptureCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
-	45, // 83: allwright.engine.v1.CaptureResolvedEvent.selected_options:type_name -> allwright.engine.v1.CapturedOption
-	46, // 84: allwright.engine.v1.CaptureResolvedEvent.bounding_box:type_name -> allwright.engine.v1.BoundingBox
-	85, // [85:85] is the sub-list for method output_type
-	85, // [85:85] is the sub-list for method input_type
-	85, // [85:85] is the sub-list for extension type_name
-	85, // [85:85] is the sub-list for extension extendee
-	0,  // [0:85] is the sub-list for field type_name
+	54, // 26: allwright.engine.v1.ContextSessionCommand.list_desktop_windows:type_name -> allwright.engine.v1.ListDesktopWindowsCommand
+	55, // 27: allwright.engine.v1.ContextSessionCommand.close_desktop_window:type_name -> allwright.engine.v1.CloseDesktopWindowCommand
+	5,  // 28: allwright.engine.v1.ContextSessionEvent.attached:type_name -> allwright.engine.v1.ContextSessionAttachedEvent
+	6,  // 29: allwright.engine.v1.ContextSessionEvent.pong:type_name -> allwright.engine.v1.ContextSessionPongEvent
+	7,  // 30: allwright.engine.v1.ContextSessionEvent.closed:type_name -> allwright.engine.v1.ContextSessionClosedEvent
+	8,  // 31: allwright.engine.v1.ContextSessionEvent.error:type_name -> allwright.engine.v1.ContextSessionErrorEvent
+	29, // 32: allwright.engine.v1.ContextSessionEvent.navigated:type_name -> allwright.engine.v1.PageNavigatedEvent
+	30, // 33: allwright.engine.v1.ContextSessionEvent.chromium_bidi_injection:type_name -> allwright.engine.v1.ChromiumBidiInjectionEvent
+	31, // 34: allwright.engine.v1.ContextSessionEvent.element_clicked:type_name -> allwright.engine.v1.ElementClickedEvent
+	32, // 35: allwright.engine.v1.ContextSessionEvent.element_counted:type_name -> allwright.engine.v1.ElementCountedEvent
+	33, // 36: allwright.engine.v1.ContextSessionEvent.elements_highlighted:type_name -> allwright.engine.v1.ElementsHighlightedEvent
+	34, // 37: allwright.engine.v1.ContextSessionEvent.element_focused:type_name -> allwright.engine.v1.ElementFocusedEvent
+	35, // 38: allwright.engine.v1.ContextSessionEvent.element_filled:type_name -> allwright.engine.v1.ElementFilledEvent
+	36, // 39: allwright.engine.v1.ContextSessionEvent.element_hovered:type_name -> allwright.engine.v1.ElementHoveredEvent
+	37, // 40: allwright.engine.v1.ContextSessionEvent.key_pressed:type_name -> allwright.engine.v1.KeyPressedEvent
+	38, // 41: allwright.engine.v1.ContextSessionEvent.text_content_resolved:type_name -> allwright.engine.v1.TextContentResolvedEvent
+	39, // 42: allwright.engine.v1.ContextSessionEvent.inner_text_resolved:type_name -> allwright.engine.v1.InnerTextResolvedEvent
+	40, // 43: allwright.engine.v1.ContextSessionEvent.selector_wait_satisfied:type_name -> allwright.engine.v1.SelectorWaitSatisfiedEvent
+	41, // 44: allwright.engine.v1.ContextSessionEvent.screenshot_captured:type_name -> allwright.engine.v1.ScreenshotCapturedEvent
+	43, // 45: allwright.engine.v1.ContextSessionEvent.accessibility_snapshot_captured:type_name -> allwright.engine.v1.AccessibilitySnapshotCapturedEvent
+	11, // 46: allwright.engine.v1.ContextSessionEvent.hook_registered:type_name -> allwright.engine.v1.HookRegisteredEvent
+	12, // 47: allwright.engine.v1.ContextSessionEvent.hook_completed:type_name -> allwright.engine.v1.HookCompletedEvent
+	56, // 48: allwright.engine.v1.ContextSessionEvent.file_chooser_files_set:type_name -> allwright.engine.v1.FileChooserFilesSetEvent
+	57, // 49: allwright.engine.v1.ContextSessionEvent.download_saved:type_name -> allwright.engine.v1.DownloadSavedEvent
+	14, // 50: allwright.engine.v1.ContextSessionEvent.file_uploaded:type_name -> allwright.engine.v1.FileUploadedEvent
+	16, // 51: allwright.engine.v1.ContextSessionEvent.file_chunk:type_name -> allwright.engine.v1.FileChunkEvent
+	58, // 52: allwright.engine.v1.ContextSessionEvent.mobile_file_chooser_files_set:type_name -> allwright.engine.v1.MobileFileChooserFilesSetEvent
+	59, // 53: allwright.engine.v1.ContextSessionEvent.mobile_download_saved:type_name -> allwright.engine.v1.MobileDownloadSavedEvent
+	60, // 54: allwright.engine.v1.ContextSessionEvent.frame_resolved:type_name -> allwright.engine.v1.FrameResolvedEvent
+	47, // 55: allwright.engine.v1.ContextSessionEvent.capture_resolved:type_name -> allwright.engine.v1.CaptureResolvedEvent
+	61, // 56: allwright.engine.v1.ContextSessionEvent.dialog_handled:type_name -> allwright.engine.v1.DialogHandledEvent
+	62, // 57: allwright.engine.v1.ContextSessionEvent.desktop_windows_resolved:type_name -> allwright.engine.v1.DesktopWindowsResolvedEvent
+	63, // 58: allwright.engine.v1.ContextSessionEvent.desktop_window_closed:type_name -> allwright.engine.v1.DesktopWindowClosedEvent
+	64, // 59: allwright.engine.v1.RegisterHookCommand.new_page:type_name -> allwright.engine.v1.RegisterNewPageHook
+	65, // 60: allwright.engine.v1.RegisterHookCommand.file_chooser:type_name -> allwright.engine.v1.RegisterFileChooserHook
+	66, // 61: allwright.engine.v1.RegisterHookCommand.download:type_name -> allwright.engine.v1.RegisterDownloadHook
+	67, // 62: allwright.engine.v1.RegisterHookCommand.mobile_file_chooser:type_name -> allwright.engine.v1.RegisterMobileFileChooserHook
+	68, // 63: allwright.engine.v1.RegisterHookCommand.mobile_download:type_name -> allwright.engine.v1.RegisterMobileDownloadHook
+	69, // 64: allwright.engine.v1.RegisterHookCommand.dialog:type_name -> allwright.engine.v1.RegisterDialogHook
+	70, // 65: allwright.engine.v1.RegisterHookCommand.desktop_window:type_name -> allwright.engine.v1.RegisterDesktopWindowHook
+	71, // 66: allwright.engine.v1.WaitForHookCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	72, // 67: allwright.engine.v1.HookCompletedEvent.new_page:type_name -> allwright.engine.v1.NewPageHookResult
+	73, // 68: allwright.engine.v1.HookCompletedEvent.file_chooser:type_name -> allwright.engine.v1.FileChooserHookResult
+	74, // 69: allwright.engine.v1.HookCompletedEvent.download:type_name -> allwright.engine.v1.DownloadHookResult
+	75, // 70: allwright.engine.v1.HookCompletedEvent.mobile_file_chooser:type_name -> allwright.engine.v1.MobileFileChooserHookResult
+	76, // 71: allwright.engine.v1.HookCompletedEvent.mobile_download:type_name -> allwright.engine.v1.MobileDownloadHookResult
+	77, // 72: allwright.engine.v1.HookCompletedEvent.dialog:type_name -> allwright.engine.v1.DialogHookResult
+	78, // 73: allwright.engine.v1.HookCompletedEvent.desktop_window:type_name -> allwright.engine.v1.DesktopWindowHookResult
+	71, // 74: allwright.engine.v1.NavigatePageCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	71, // 75: allwright.engine.v1.ClickElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	71, // 76: allwright.engine.v1.CountElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	71, // 77: allwright.engine.v1.HighlightElementsCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	71, // 78: allwright.engine.v1.FocusElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	71, // 79: allwright.engine.v1.FillElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	71, // 80: allwright.engine.v1.HoverElementCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	71, // 81: allwright.engine.v1.PressKeyCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	71, // 82: allwright.engine.v1.GetTextContentCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	71, // 83: allwright.engine.v1.GetInnerTextCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	71, // 84: allwright.engine.v1.WaitForSelectorCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	71, // 85: allwright.engine.v1.ScreenshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	71, // 86: allwright.engine.v1.AccessibilitySnapshotCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	0,  // 87: allwright.engine.v1.CaptureCommand.kind:type_name -> allwright.engine.v1.CaptureKind
+	71, // 88: allwright.engine.v1.CaptureCommand.retry_options:type_name -> allwright.engine.v1.CommandRetryOptions
+	45, // 89: allwright.engine.v1.CaptureResolvedEvent.selected_options:type_name -> allwright.engine.v1.CapturedOption
+	46, // 90: allwright.engine.v1.CaptureResolvedEvent.bounding_box:type_name -> allwright.engine.v1.BoundingBox
+	91, // [91:91] is the sub-list for method output_type
+	91, // [91:91] is the sub-list for method input_type
+	91, // [91:91] is the sub-list for extension type_name
+	91, // [91:91] is the sub-list for extension extendee
+	0,  // [0:91] is the sub-list for field type_name
 }
 
 func init() { file_core_v1_context_proto_init() }
@@ -4315,6 +4429,7 @@ func file_core_v1_context_proto_init() {
 		return
 	}
 	file_core_v1_common_proto_init()
+	file_surfaces_desktop_v1_desktop_proto_init()
 	file_surfaces_mobile_v1_mobile_proto_init()
 	file_surfaces_web_v1_web_proto_init()
 	file_core_v1_context_proto_msgTypes[0].OneofWrappers = []any{
@@ -4344,6 +4459,8 @@ func file_core_v1_context_proto_init() {
 		(*ContextSessionCommand_ResolveFrame)(nil),
 		(*ContextSessionCommand_Capture)(nil),
 		(*ContextSessionCommand_HandleDialog)(nil),
+		(*ContextSessionCommand_ListDesktopWindows)(nil),
+		(*ContextSessionCommand_CloseDesktopWindow)(nil),
 	}
 	file_core_v1_context_proto_msgTypes[3].OneofWrappers = []any{
 		(*ContextSessionEvent_Attached)(nil),
@@ -4375,6 +4492,8 @@ func file_core_v1_context_proto_init() {
 		(*ContextSessionEvent_FrameResolved)(nil),
 		(*ContextSessionEvent_CaptureResolved)(nil),
 		(*ContextSessionEvent_DialogHandled)(nil),
+		(*ContextSessionEvent_DesktopWindowsResolved)(nil),
+		(*ContextSessionEvent_DesktopWindowClosed)(nil),
 	}
 	file_core_v1_context_proto_msgTypes[8].OneofWrappers = []any{
 		(*RegisterHookCommand_NewPage)(nil),
@@ -4383,6 +4502,7 @@ func file_core_v1_context_proto_init() {
 		(*RegisterHookCommand_MobileFileChooser)(nil),
 		(*RegisterHookCommand_MobileDownload)(nil),
 		(*RegisterHookCommand_Dialog)(nil),
+		(*RegisterHookCommand_DesktopWindow)(nil),
 	}
 	file_core_v1_context_proto_msgTypes[9].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[11].OneofWrappers = []any{
@@ -4392,6 +4512,7 @@ func file_core_v1_context_proto_init() {
 		(*HookCompletedEvent_MobileFileChooser)(nil),
 		(*HookCompletedEvent_MobileDownload)(nil),
 		(*HookCompletedEvent_Dialog)(nil),
+		(*HookCompletedEvent_DesktopWindow)(nil),
 	}
 	file_core_v1_context_proto_msgTypes[16].OneofWrappers = []any{}
 	file_core_v1_context_proto_msgTypes[17].OneofWrappers = []any{}

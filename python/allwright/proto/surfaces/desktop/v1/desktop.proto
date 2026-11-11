@@ -39,3 +39,26 @@ message DesktopAppLaunchedEvent {
   string app_id = 2;
   string note = 3;
 }
+
+message ListDesktopWindowsCommand {}
+message CloseDesktopWindowCommand {}
+message RegisterDesktopWindowHook {}
+
+message DesktopWindowInfo {
+  string context_session_id = 1;
+  string window_id = 2;
+  string title = 3;
+  bool is_main = 4;
+}
+
+message DesktopWindowsResolvedEvent {
+  repeated DesktopWindowInfo windows = 1;
+}
+
+message DesktopWindowClosedEvent {
+  string window_id = 1;
+}
+
+message DesktopWindowHookResult {
+  DesktopWindowInfo window = 1;
+}

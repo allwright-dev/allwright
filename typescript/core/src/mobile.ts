@@ -49,6 +49,11 @@ export class NativeAppImpl implements NativeApp {
     this.#surfaceSessionId = surfaceSessionId;
   }
 
+  protected get runtimeClient(): RuntimeClient { return this.#runtime; }
+  protected get nativeSurfaceSessionId(): string { return this.#surfaceSessionId; }
+  protected contextHandle(): Promise<PageHandle> { return this.#getHandle(); }
+  protected assertContextOpen(handle: PageHandle): void { this.#ensureOpen(handle); }
+
   locator(selector: string): NativeAppLocator {
     return new NativeAppLocatorImpl(this, normalizeMobileSelectorForTransport(selector));
   }

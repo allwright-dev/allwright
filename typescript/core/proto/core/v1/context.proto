@@ -6,6 +6,7 @@ option java_package = "dev.allwright.engine.v1";
 option java_multiple_files = true;
 
 import "core/v1/common.proto";
+import "surfaces/desktop/v1/desktop.proto";
 import "surfaces/mobile/v1/mobile.proto";
 import "surfaces/web/v1/web.proto";
 
@@ -40,6 +41,8 @@ message ContextSessionCommand {
     ResolveFrameCommand resolve_frame = 26;
     CaptureCommand capture = 27;
     HandleDialogCommand handle_dialog = 28;
+    ListDesktopWindowsCommand list_desktop_windows = 29;
+    CloseDesktopWindowCommand close_desktop_window = 30;
   }
 }
 
@@ -82,6 +85,8 @@ message ContextSessionEvent {
     FrameResolvedEvent frame_resolved = 28;
     CaptureResolvedEvent capture_resolved = 29;
     DialogHandledEvent dialog_handled = 30;
+    DesktopWindowsResolvedEvent desktop_windows_resolved = 31;
+    DesktopWindowClosedEvent desktop_window_closed = 32;
   }
 }
 
@@ -109,6 +114,7 @@ message RegisterHookCommand {
     RegisterMobileFileChooserHook mobile_file_chooser = 4;
     RegisterMobileDownloadHook mobile_download = 5;
     RegisterDialogHook dialog = 6;
+    RegisterDesktopWindowHook desktop_window = 7;
   }
 }
 
@@ -131,6 +137,7 @@ message HookCompletedEvent {
     MobileFileChooserHookResult mobile_file_chooser = 5;
     MobileDownloadHookResult mobile_download = 6;
     DialogHookResult dialog = 7;
+    DesktopWindowHookResult desktop_window = 8;
   }
 }
 

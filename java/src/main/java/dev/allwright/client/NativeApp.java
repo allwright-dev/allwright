@@ -729,14 +729,17 @@ public class NativeApp implements HookContext {
         }
     }
 
-    private RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> ensureStream() {
+    protected final RuntimeSupport.RuntimeClient runtime() { return runtime; }
+    protected final String surfaceSessionId() { return surfaceSessionId; }
+
+    protected RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> ensureStream() {
         if (stream == null) {
             stream = new RuntimeSupport.StreamHandle<>(runtime.asyncStub()::contextSession);
         }
         return stream;
     }
 
-    private void ensureOpen() {
+    protected void ensureOpen() {
         if (closed) {
             throw new AllwrightException("native app session " + sessionId + " is closed");
         }

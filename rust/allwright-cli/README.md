@@ -21,6 +21,13 @@ and forwards pointer, swipe/drag, wheel, keyboard, and paste input directly to
 the native surface. A URL can be used as the target to inspect the foreground
 browser window.
 
+Desktop sessions can expose multiple top-level windows. The inspector's Window
+selector defaults to **Follow main window**, automatically following splash or
+launcher handoffs and windows created by helper processes. Selecting a specific
+window pins screenshots, hierarchy, locator actions, and live input to its
+stable window identity; closing that window returns the inspector to the live
+main window.
+
 Inspect a native macOS application by bundle identifier:
 
 ```bash

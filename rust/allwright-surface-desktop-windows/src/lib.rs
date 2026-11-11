@@ -6,7 +6,7 @@ use allwright_surface_desktop::{
     ConnectOptions, DesktopActionInfo, DesktopAppInfo, DesktopAppSessionHandle, DesktopCommand,
     DesktopCommandResult, DesktopConnectInfo, DesktopElementCountInfo, DesktopNavigationInfo,
     DesktopPlatform, DesktopScreenshotInfo, DesktopSessionHandle, DesktopTextInfo, DesktopWaitInfo,
-    LaunchOptions, boot_surface, normalize_selector_for_transport,
+    DesktopWindowInfo, LaunchOptions, boot_surface, normalize_selector_for_transport,
 };
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -49,6 +49,10 @@ struct AgentRequest<'a> {
     command: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     session_id: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    window_id: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hook_id: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     app_id: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -93,6 +97,8 @@ impl<'a> AgentRequest<'a> {
         Self {
             command,
             session_id: None,
+            window_id: None,
+            hook_id: None,
             app_id: None,
             url: None,
             selector: None,
@@ -364,6 +370,7 @@ fn connect(options: &ConnectOptions) -> Result<DesktopConnectInfo, String> {
             app_session: DesktopAppSessionHandle {
                 app_session_id: unique_id("windows-pending"),
                 app_id: None,
+                window_id: None,
             },
         },
     })
@@ -385,6 +392,7 @@ fn launch_app(
         app_session: DesktopAppSessionHandle {
             app_session_id: result_string(&result, "session_id")?.to_string(),
             app_id: Some(options.app_id.clone()),
+            window_id: None,
         },
     })
 }
@@ -402,6 +410,7 @@ fn agent_action(
     let normalized = normalize_selector_for_transport(selector);
     let mut request = AgentRequest::new(command);
     request.session_id = Some(&app.app_session_id);
+    request.window_id = app.window_id.as_deref();
     request.selector = Some(&normalized);
     request.value = value;
     request.key = key;
@@ -469,6 +478,7 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
             let selector = normalize_selector_for_transport(&selector);
             let mut request = AgentRequest::new("capture");
             request.session_id = Some(&app_session.app_session_id);
+            request.window_id = app_session.window_id.as_deref();
             request.selector = Some(&selector);
             request.kind = Some(&kind);
             request.attribute_name = Some(&attribute_name);
@@ -628,6 +638,7 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
         } => {
             let mut request = AgentRequest::new("pointer");
             request.session_id = Some(&app_session.app_session_id);
+            request.window_id = app_session.window_id.as_deref();
             request.key = Some(&action);
             request.x = Some(x);
             request.y = Some(y);
@@ -650,6 +661,7 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
         } => {
             let mut request = AgentRequest::new("keyboard");
             request.session_id = Some(&app_session.app_session_id);
+            request.window_id = app_session.window_id.as_deref();
             request.key = key.as_deref();
             request.text = text.as_deref();
             invoke_agent(&desktop_session.endpoint, &request, Some(10_000))?;
@@ -745,6 +757,7 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
             let mut r = AgentRequest::new("screenshot");
             let agent_timeout_ms = timeout_ms.or(full_page.then_some(30_000));
             r.session_id = Some(&app_session.app_session_id);
+            r.window_id = app_session.window_id.as_deref();
             r.timeout_ms = agent_timeout_ms;
             r.full_page = Some(full_page);
             let value = invoke_agent(&desktop_session.endpoint, &r, agent_timeout_ms)?;
@@ -769,6 +782,7 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
         } => {
             let mut r = AgentRequest::new("source");
             r.session_id = Some(&app_session.app_session_id);
+            r.window_id = app_session.window_id.as_deref();
             r.value = Some(&mode);
             let value = invoke_agent(&desktop_session.endpoint, &r, Some(10_000))?;
             let raw = result_string(&value, "snapshot")?;
@@ -804,12 +818,69 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
         } => {
             let mut request = AgentRequest::new("source");
             request.session_id = Some(&app_session.app_session_id);
+            request.window_id = app_session.window_id.as_deref();
             request.value = Some("default");
             let value = invoke_agent(&desktop_session.endpoint, &request, Some(10_000))?;
             let raw = result_string(&value, "snapshot")?;
             Ok(DesktopCommandResult::InspectorSnapshot(inspector_snapshot(
                 raw,
             )?))
+        }
+        DesktopCommand::ListWindows {
+            desktop_session,
+            app_session,
+        } => {
+            let mut request = AgentRequest::new("windows");
+            request.session_id = Some(&app_session.app_session_id);
+            let value = invoke_agent(&desktop_session.endpoint, &request, Some(10_000))?;
+            let windows = serde_json::from_value::<Vec<DesktopWindowInfo>>(
+                value
+                    .get("windows")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
+            )
+            .map_err(|error| format!("Windows agent returned invalid window data: {error}"))?;
+            Ok(DesktopCommandResult::ListWindows(windows))
+        }
+        DesktopCommand::CloseWindow {
+            desktop_session,
+            app_session,
+        } => {
+            let window_id = app_session
+                .window_id
+                .as_deref()
+                .ok_or_else(|| "close_window requires a desktop window handle".to_string())?;
+            let mut request = AgentRequest::new("close_window");
+            request.session_id = Some(&app_session.app_session_id);
+            request.window_id = Some(window_id);
+            invoke_agent(&desktop_session.endpoint, &request, Some(10_000))?;
+            Ok(DesktopCommandResult::CloseWindow)
+        }
+        DesktopCommand::RegisterWindowHook {
+            desktop_session,
+            app_session,
+        } => {
+            let mut request = AgentRequest::new("register_window_hook");
+            request.session_id = Some(&app_session.app_session_id);
+            let value = invoke_agent(&desktop_session.endpoint, &request, Some(10_000))?;
+            Ok(DesktopCommandResult::RegisterWindowHook(
+                result_string(&value, "hook_id")?.to_string(),
+            ))
+        }
+        DesktopCommand::WaitForWindowHook {
+            desktop_session,
+            app_session,
+            hook_id,
+            timeout_ms,
+        } => {
+            let mut request = AgentRequest::new("wait_window_hook");
+            request.session_id = Some(&app_session.app_session_id);
+            request.hook_id = Some(&hook_id);
+            request.timeout_ms = timeout_ms;
+            let value = invoke_agent(&desktop_session.endpoint, &request, timeout_ms)?;
+            let window = serde_json::from_value::<DesktopWindowInfo>(value)
+                .map_err(|error| format!("Windows agent returned invalid window data: {error}"))?;
+            Ok(DesktopCommandResult::WaitForWindowHook(window))
         }
     }
 }

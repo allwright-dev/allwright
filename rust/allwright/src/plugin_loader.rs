@@ -9,7 +9,7 @@ use allwright_surface_desktop::{
     ConnectOptions as DesktopConnectOptions, DesktopActionInfo, DesktopAppInfo,
     DesktopAppSessionHandle, DesktopCommand, DesktopCommandResult, DesktopConnectInfo,
     DesktopElementCountInfo, DesktopNavigationInfo, DesktopScreenshotInfo, DesktopSessionHandle,
-    DesktopTextInfo, DesktopWaitInfo, LaunchOptions as DesktopLaunchOptions,
+    DesktopTextInfo, DesktopWaitInfo, DesktopWindowInfo, LaunchOptions as DesktopLaunchOptions,
 };
 use allwright_surface_mobile::{
     ConnectOptions as MobileConnectOptions, MobileBrowserSessionHandle, MobileClickInfo,
@@ -90,6 +90,18 @@ fn invoke_desktop(command: DesktopCommand) -> Result<DesktopCommandResult, Strin
         }
         | DesktopCommand::InspectorSnapshot {
             desktop_session, ..
+        }
+        | DesktopCommand::ListWindows {
+            desktop_session, ..
+        }
+        | DesktopCommand::CloseWindow {
+            desktop_session, ..
+        }
+        | DesktopCommand::RegisterWindowHook {
+            desktop_session, ..
+        }
+        | DesktopCommand::WaitForWindowHook {
+            desktop_session, ..
         } => desktop_session.platform.plugin_id(),
     };
     let request_json = serde_json::to_string(&command)
@@ -131,6 +143,70 @@ pub async fn launch_desktop_app(
     {
         DesktopCommandResult::LaunchApp(result) => Ok(result),
         _ => Err("desktop plugin returned an unexpected launch response".to_string()),
+    }
+}
+
+pub async fn list_desktop_windows(
+    desktop_session: &DesktopSessionHandle,
+    app_session: &DesktopAppSessionHandle,
+) -> Result<Vec<DesktopWindowInfo>, String> {
+    match invoke_desktop_expected(DesktopCommand::ListWindows {
+        desktop_session: desktop_session.clone(),
+        app_session: app_session.clone(),
+    })
+    .await?
+    {
+        DesktopCommandResult::ListWindows(result) => Ok(result),
+        _ => Err("desktop plugin returned an unexpected window-list response".to_string()),
+    }
+}
+
+pub async fn close_desktop_window(
+    desktop_session: &DesktopSessionHandle,
+    app_session: &DesktopAppSessionHandle,
+) -> Result<(), String> {
+    match invoke_desktop_expected(DesktopCommand::CloseWindow {
+        desktop_session: desktop_session.clone(),
+        app_session: app_session.clone(),
+    })
+    .await?
+    {
+        DesktopCommandResult::CloseWindow => Ok(()),
+        _ => Err("desktop plugin returned an unexpected close-window response".to_string()),
+    }
+}
+
+pub async fn register_desktop_window_hook(
+    desktop_session: &DesktopSessionHandle,
+    app_session: &DesktopAppSessionHandle,
+) -> Result<String, String> {
+    match invoke_desktop_expected(DesktopCommand::RegisterWindowHook {
+        desktop_session: desktop_session.clone(),
+        app_session: app_session.clone(),
+    })
+    .await?
+    {
+        DesktopCommandResult::RegisterWindowHook(hook_id) => Ok(hook_id),
+        _ => Err("desktop plugin returned an unexpected window-hook response".to_string()),
+    }
+}
+
+pub async fn wait_for_desktop_window_hook(
+    desktop_session: &DesktopSessionHandle,
+    app_session: &DesktopAppSessionHandle,
+    hook_id: &str,
+    timeout_ms: Option<u32>,
+) -> Result<DesktopWindowInfo, String> {
+    match invoke_desktop_expected(DesktopCommand::WaitForWindowHook {
+        desktop_session: desktop_session.clone(),
+        app_session: app_session.clone(),
+        hook_id: hook_id.to_string(),
+        timeout_ms,
+    })
+    .await?
+    {
+        DesktopCommandResult::WaitForWindowHook(window) => Ok(window),
+        _ => Err("desktop plugin returned an unexpected window-hook result".to_string()),
     }
 }
 

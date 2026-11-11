@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 
+from ._hooks import Hook, HookType
 from ._mobile import NativeApp, NativeLocator
 from ._proto import engine_pb2
 from ._transport import RuntimeClient, StreamHandle
@@ -26,10 +27,115 @@ class DesktopMacLaunchOptions:
         self.timeout_ms = timeout_ms
 
 
-MacApp = NativeApp
 MacLocator = NativeLocator
-WindowsApp = NativeApp
 WindowsLocator = NativeLocator
+
+
+class DesktopWindow(NativeApp):
+    def __init__(self, runtime: RuntimeClient, surface_session_id: str, session_id: str,
+                 window_id: str, title: str, is_main: bool) -> None:
+        super().__init__(runtime, surface_session_id, session_id)
+        self.window_id, self.title, self.is_main = window_id, title, is_main
+
+    def close(self) -> None:
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self._surface_session_id,
+                context_session_id=self._session_id,
+                close_desktop_window=engine_pb2.CloseDesktopWindowCommand(),
+            ))
+            while True:
+                event = handle.recv("close desktop window")
+                kind = event.WhichOneof("event")
+                if kind == "desktop_window_closed" and event.desktop_window_closed.window_id == self.window_id:
+                    self._closed = True
+                    return
+                if kind == "error":
+                    raise AllwrightError(event.error.message)
+
+
+class DesktopApp(NativeApp):
+    def windows(self) -> list[DesktopWindow]:
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self._surface_session_id,
+                context_session_id=self._session_id,
+                list_desktop_windows=engine_pb2.ListDesktopWindowsCommand(),
+            ))
+            while True:
+                event = handle.recv("list desktop windows")
+                kind = event.WhichOneof("event")
+                if kind == "desktop_windows_resolved":
+                    return [self._window(result) for result in event.desktop_windows_resolved.windows]
+                if kind == "error":
+                    raise AllwrightError(event.error.message)
+
+    def main_window(self) -> DesktopWindow:
+        for window in self.windows():
+            if window.is_main:
+                return window
+        raise AllwrightError("desktop application does not currently expose a main window")
+
+    def register_hook(self, hook_type: HookType):
+        if hook_type.name != "window":
+            return super().register_hook(hook_type)
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self._surface_session_id,
+                context_session_id=self._session_id,
+                register_hook=engine_pb2.RegisterHookCommand(
+                    desktop_window=engine_pb2.RegisterDesktopWindowHook()
+                ),
+            ))
+            while True:
+                event = handle.recv("register desktop window hook")
+                kind = event.WhichOneof("event")
+                if kind == "hook_registered":
+                    return Hook(self, event.hook_registered.hook_id, hook_type)
+                if kind == "error":
+                    raise AllwrightError(event.error.message)
+
+    def _wait_for_hook(self, hook_id, hook_type, options):
+        if hook_type.name != "window":
+            return super()._wait_for_hook(hook_id, hook_type, options)
+        from ._runtime import retry_options
+
+        with self._lock:
+            handle = self._ensure_handle()
+            self._ensure_open()
+            handle.send(engine_pb2.ContextSessionCommand(
+                surface_session_id=self._surface_session_id,
+                context_session_id=self._session_id,
+                wait_for_hook=engine_pb2.WaitForHookCommand(
+                    hook_id=hook_id,
+                    retry_options=retry_options(getattr(options, "timeout_ms", None)),
+                ),
+            ))
+            while True:
+                event = handle.recv("wait for desktop window hook")
+                kind = event.WhichOneof("event")
+                if kind == "hook_completed" and event.hook_completed.hook_id == hook_id:
+                    if event.hook_completed.WhichOneof("result") != "desktop_window":
+                        raise AllwrightError("desktop window hook returned an invalid result")
+                    return self._window(event.hook_completed.desktop_window.window)
+                if kind == "error":
+                    raise AllwrightError(event.error.message)
+
+    def _window(self, result) -> DesktopWindow:
+        if not result.context_session_id or not result.window_id:
+            raise AllwrightError("desktop window result is missing its context or window id")
+        return DesktopWindow(self._runtime, self._surface_session_id, result.context_session_id,
+                             result.window_id, result.title, result.is_main)
+
+
+MacApp = DesktopApp
+WindowsApp = DesktopApp
 
 
 class MacDesktop:
@@ -47,7 +153,7 @@ class MacDesktop:
         self._closed = False
         self._session_id = session_id
         self._surface_session_id = surface_session_id
-        self._app = NativeApp(runtime, surface_session_id, initial_app_session_id)
+        self._app = DesktopApp(runtime, surface_session_id, initial_app_session_id)
 
     @property
     def session_id(self) -> str:
@@ -73,7 +179,7 @@ class MacDesktop:
                 event = self._stream.recv("receive macOS app launch event")
                 match event.WhichOneof("event"):
                     case "desktop_app_launched":
-                        self._app = NativeApp(
+                        self._app = DesktopApp(
                             self._runtime,
                             self._surface_session_id,
                             event.desktop_app_launched.app_session_id,

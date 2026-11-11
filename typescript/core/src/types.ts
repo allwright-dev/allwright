@@ -274,6 +274,18 @@ export interface NativeApp {
   registerHook<T>(type: HookType<T>): Promise<Hook<T>>;
 }
 
+export interface DesktopWindow extends NativeApp {
+  readonly windowId: string;
+  readonly title: string;
+  readonly isMain: boolean;
+  close(): Promise<void>;
+}
+
+export interface DesktopApp extends NativeApp {
+  windows(): Promise<DesktopWindow[]>;
+  mainWindow(): Promise<DesktopWindow>;
+}
+
 // Platform names remain aliases for source compatibility while the common
 // native app contract stays independent of whichever surface implemented it first.
 export type MobileAndroidLocator = NativeAppLocator;
@@ -331,7 +343,8 @@ export interface DesktopMacLaunchOptions {
   timeoutMs?: number;
 }
 
-export type DesktopMacApp = NativeApp;
+export type DesktopMacApp = DesktopApp;
+export type DesktopMacWindow = DesktopWindow;
 export type DesktopMacLocator = NativeAppLocator;
 
 export interface DesktopMacDesktop {
@@ -342,7 +355,8 @@ export interface DesktopMacDesktop {
 
 export type DesktopWindowsConnectOptions = DesktopMacConnectOptions;
 export type DesktopWindowsLaunchOptions = DesktopMacLaunchOptions;
-export type DesktopWindowsApp = NativeApp;
+export type DesktopWindowsApp = DesktopApp;
+export type DesktopWindowsWindow = DesktopWindow;
 export type DesktopWindowsLocator = NativeAppLocator;
 export interface DesktopWindowsDesktop {
   readonly sessionId: string;
@@ -619,7 +633,24 @@ export interface ContextSessionEvent {
       suggestedFilename?: string;
       note?: string;
     };
+    desktopWindow?: {
+      window?: {
+        contextSessionId?: string;
+        windowId?: string;
+        title?: string;
+        isMain?: boolean;
+      };
+    };
   };
+  desktopWindowsResolved?: {
+    windows?: Array<{
+      contextSessionId?: string;
+      windowId?: string;
+      title?: string;
+      isMain?: boolean;
+    }>;
+  };
+  desktopWindowClosed?: { windowId?: string };
   fileChooserFilesSet?: {
     fileChooserId?: string;
     fileIds?: string[];
@@ -750,6 +781,7 @@ export interface RegisterHookRequest {
     download?: Record<string, never>;
     mobileFileChooser?: Record<string, never>;
     mobileDownload?: Record<string, never>;
+    desktopWindow?: Record<string, never>;
   };
 }
 
@@ -1029,6 +1061,18 @@ export interface CloseContextRequest {
   close: Record<string, never>;
 }
 
+export interface ListDesktopWindowsRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
+  listDesktopWindows: Record<string, never>;
+}
+
+export interface CloseDesktopWindowRequest {
+  surfaceSessionId: string;
+  contextSessionId: string;
+  closeDesktopWindow: Record<string, never>;
+}
+
 export type SurfaceSessionRequest =
   | LaunchBrowserRequest
   | LaunchChromeRequest
@@ -1066,6 +1110,8 @@ export type ContextSessionRequest =
   | WaitForSelectorRequest
   | AccessibilitySnapshotRequest
   | ScreenshotRequest
+  | ListDesktopWindowsRequest
+  | CloseDesktopWindowRequest
   | CloseContextRequest;
 
 export type SurfaceSessionStream = grpc.ClientDuplexStream<SurfaceSessionRequest, SurfaceSessionEvent>;

@@ -1,6 +1,6 @@
 use allwright_surface_desktop::{
     ConnectOptions as DesktopConnectOptions, DesktopAppSessionHandle, DesktopCommand,
-    DesktopCommandResult, DesktopPlatform, DesktopSessionHandle,
+    DesktopCommandResult, DesktopPlatform, DesktopSessionHandle, DesktopWindowInfo,
     LaunchOptions as DesktopLaunchOptions,
 };
 use allwright_surface_mobile::{
@@ -15,6 +15,7 @@ use std::error::Error;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::process::{Command, Stdio};
+use std::sync::Mutex;
 
 const INDEX_HTML: &str = include_str!("inspector.html");
 
@@ -62,6 +63,7 @@ pub fn run(
 struct InspectorRuntime {
     surface: InspectorSurface,
     session: InspectorSession,
+    selected_desktop_window: Mutex<Option<String>>,
 }
 
 #[derive(Clone, Copy)]
@@ -225,18 +227,23 @@ impl InspectorRuntime {
                 }
             }
         };
-        Ok(Self { surface, session })
+        Ok(Self {
+            surface,
+            session,
+            selected_desktop_window: Mutex::new(None),
+        })
     }
 
     fn snapshot(&self) -> Result<Value, Box<dyn Error>> {
-        let png_data = self.screenshot()?;
-        let tree = match &self.session {
+        let (png_data, tree, windows, selected_window_id, current_window_id) = match &self.session {
             InspectorSession::Desktop { desktop, app } => {
+                let (target, windows, selected_window_id) = self.desktop_target(app)?;
+                let png_data = self.desktop_screenshot(desktop, &target)?;
                 let tree = invoke_desktop(
                     self.surface.id(),
                     DesktopCommand::InspectorSnapshot {
                         desktop_session: desktop.clone(),
-                        app_session: app.clone(),
+                        app_session: target.clone(),
                     },
                 )?;
                 let DesktopCommandResult::InspectorSnapshot(tree) = tree else {
@@ -246,9 +253,16 @@ impl InspectorRuntime {
                     )
                     .into());
                 };
-                tree
+                (
+                    png_data,
+                    tree,
+                    Some(windows),
+                    selected_window_id,
+                    target.window_id,
+                )
             }
             InspectorSession::Mobile { browser, page } => {
+                let png_data = self.screenshot()?;
                 let tree = invoke_mobile(
                     self.surface.id(),
                     MobileCommand::InspectorSnapshot {
@@ -263,7 +277,7 @@ impl InspectorRuntime {
                     )
                     .into());
                 };
-                tree
+                (png_data, tree, None, None, None)
             }
         };
         let backend = tree.backend.clone();
@@ -275,29 +289,124 @@ impl InspectorRuntime {
             "tree": tree,
             "surface": self.surface.id(),
             "backend": backend,
+            "windows": windows,
+            "selectedWindowId": selected_window_id,
+            "currentWindowId": current_window_id,
         }))
     }
 
+    fn select_desktop_window(&self, window_id: Option<String>) -> Result<Value, Box<dyn Error>> {
+        if !matches!(self.session, InspectorSession::Desktop { .. }) {
+            return Err("window selection is only supported by desktop inspectors".into());
+        }
+        let normalized = window_id.filter(|value| !value.trim().is_empty());
+        *self
+            .selected_desktop_window
+            .lock()
+            .map_err(|_| "desktop inspector window selection lock is poisoned")? = normalized;
+        self.snapshot()
+    }
+
+    fn window_state(&self) -> Result<Value, Box<dyn Error>> {
+        let InspectorSession::Desktop { app, .. } = &self.session else {
+            return Ok(json!({"windows": null}));
+        };
+        let (target, windows, selected_window_id) = self.desktop_target(app)?;
+        Ok(json!({
+            "windows": windows,
+            "selectedWindowId": selected_window_id,
+            "currentWindowId": target.window_id,
+        }))
+    }
+
+    fn desktop_target(
+        &self,
+        app: &DesktopAppSessionHandle,
+    ) -> Result<
+        (
+            DesktopAppSessionHandle,
+            Vec<DesktopWindowInfo>,
+            Option<String>,
+        ),
+        Box<dyn Error>,
+    > {
+        let InspectorSession::Desktop { desktop, .. } = &self.session else {
+            return Err("desktop target requested for a mobile inspector".into());
+        };
+        let result = invoke_desktop(
+            self.surface.id(),
+            DesktopCommand::ListWindows {
+                desktop_session: desktop.clone(),
+                app_session: app.clone(),
+            },
+        )?;
+        let DesktopCommandResult::ListWindows(windows) = result else {
+            return Err(format!(
+                "{} returned an unexpected desktop windows response",
+                self.surface.id()
+            )
+            .into());
+        };
+        let mut selected = self
+            .selected_desktop_window
+            .lock()
+            .map_err(|_| "desktop inspector window selection lock is poisoned")?;
+        let chosen = selected
+            .as_deref()
+            .and_then(|id| windows.iter().find(|window| window.window_id == id));
+        let chosen = if let Some(chosen) = chosen {
+            chosen
+        } else {
+            if selected.is_some() {
+                *selected = None;
+            }
+            windows
+                .iter()
+                .find(|window| window.is_main)
+                .or_else(|| windows.first())
+                .ok_or("the desktop application does not currently expose a window")?
+        };
+        let selected_window_id = selected.clone();
+        let mut target = app.clone();
+        target.window_id = Some(chosen.window_id.clone());
+        drop(selected);
+        Ok((target, windows, selected_window_id))
+    }
+
+    fn desktop_screenshot(
+        &self,
+        desktop: &DesktopSessionHandle,
+        app: &DesktopAppSessionHandle,
+    ) -> Result<Vec<u8>, Box<dyn Error>> {
+        let result = invoke_desktop(
+            self.surface.id(),
+            DesktopCommand::Screenshot {
+                desktop_session: desktop.clone(),
+                app_session: app.clone(),
+                timeout_ms: Some(10_000),
+                full_page: false,
+            },
+        )?;
+        let DesktopCommandResult::Screenshot(screenshot) = result else {
+            return Err(format!(
+                "{} returned an unexpected screenshot response",
+                self.surface.id()
+            )
+            .into());
+        };
+        Ok(screenshot.png_data)
+    }
+
     fn screenshot(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+        Ok(self.frame()?.0)
+    }
+
+    fn frame(&self) -> Result<(Vec<u8>, Option<String>), Box<dyn Error>> {
         match &self.session {
             InspectorSession::Desktop { desktop, app } => {
-                let result = invoke_desktop(
-                    self.surface.id(),
-                    DesktopCommand::Screenshot {
-                        desktop_session: desktop.clone(),
-                        app_session: app.clone(),
-                        timeout_ms: Some(10_000),
-                        full_page: false,
-                    },
-                )?;
-                let DesktopCommandResult::Screenshot(screenshot) = result else {
-                    return Err(format!(
-                        "{} returned an unexpected screenshot response",
-                        self.surface.id()
-                    )
-                    .into());
-                };
-                Ok(screenshot.png_data)
+                let (target, _, _) = self.desktop_target(app)?;
+                let window_id = target.window_id.clone();
+                Ok((self.desktop_screenshot(desktop, &target)?, window_id))
             }
             InspectorSession::Mobile { browser, page } => {
                 let result = invoke_mobile(
@@ -316,7 +425,7 @@ impl InspectorRuntime {
                     )
                     .into());
                 };
-                Ok(screenshot.png_data)
+                Ok((screenshot.png_data, None))
             }
         }
     }
@@ -327,6 +436,10 @@ impl InspectorRuntime {
         }
         match &self.session {
             InspectorSession::Desktop { desktop, app } => {
+                let (mut app, _, _) = self.desktop_target(app)?;
+                if let Some(window_id) = &input.window_id {
+                    app.window_id = Some(window_id.clone());
+                }
                 let command = if input.kind == "keyboard" {
                     DesktopCommand::KeyboardInput {
                         desktop_session: desktop.clone(),
@@ -386,23 +499,27 @@ impl InspectorRuntime {
         key: Option<String>,
         text: Option<String>,
         direction: Option<String>,
+        window_id: Option<String>,
     ) -> Result<Value, Box<dyn Error>> {
         match action {
-            "click" => self.click_element(&selector)?,
+            "click" => self.click_element(&selector, window_id.as_deref())?,
             "double_click" => {
-                self.click_element(&selector)?;
+                self.click_element(&selector, window_id.as_deref())?;
                 std::thread::sleep(std::time::Duration::from_millis(75));
-                self.click_element(&selector)?;
+                self.click_element(&selector, window_id.as_deref())?;
             }
-            "fill" => {
-                self.fill_element(&selector, value.as_deref().ok_or("fill requires a value")?)?
-            }
+            "fill" => self.fill_element(
+                &selector,
+                value.as_deref().ok_or("fill requires a value")?,
+                window_id.as_deref(),
+            )?,
             "press" => self.press_key(
                 &selector,
                 key.as_deref()
                     .filter(|key| !key.trim().is_empty())
                     .ok_or("press requires a non-empty key")?,
                 text.as_deref(),
+                window_id.as_deref(),
             )?,
             "scroll" => self.scroll_element(
                 &selector,
@@ -410,6 +527,7 @@ impl InspectorRuntime {
                     .as_deref()
                     .filter(|direction| matches!(*direction, "up" | "down" | "left" | "right"))
                     .ok_or("scroll requires an up, down, left, or right direction")?,
+                window_id.as_deref(),
             )?,
             _ => return Err(format!("unsupported inspector action `{action}`").into()),
         }
@@ -417,9 +535,13 @@ impl InspectorRuntime {
         self.snapshot()
     }
 
-    fn click_element(&self, selector: &str) -> Result<(), Box<dyn Error>> {
+    fn click_element(&self, selector: &str, window_id: Option<&str>) -> Result<(), Box<dyn Error>> {
         match &self.session {
             InspectorSession::Desktop { desktop, app } => {
+                let (mut app, _, _) = self.desktop_target(app)?;
+                if let Some(window_id) = window_id {
+                    app.window_id = Some(window_id.to_string());
+                }
                 invoke_desktop(
                     self.surface.id(),
                     DesktopCommand::ClickElement {
@@ -445,9 +567,18 @@ impl InspectorRuntime {
         Ok(())
     }
 
-    fn fill_element(&self, selector: &str, value: &str) -> Result<(), Box<dyn Error>> {
+    fn fill_element(
+        &self,
+        selector: &str,
+        value: &str,
+        window_id: Option<&str>,
+    ) -> Result<(), Box<dyn Error>> {
         match &self.session {
             InspectorSession::Desktop { desktop, app } => {
+                let (mut app, _, _) = self.desktop_target(app)?;
+                if let Some(window_id) = window_id {
+                    app.window_id = Some(window_id.to_string());
+                }
                 invoke_desktop(
                     self.surface.id(),
                     DesktopCommand::FillElement {
@@ -480,9 +611,14 @@ impl InspectorRuntime {
         selector: &str,
         key: &str,
         text: Option<&str>,
+        window_id: Option<&str>,
     ) -> Result<(), Box<dyn Error>> {
         match &self.session {
             InspectorSession::Desktop { desktop, app } => {
+                let (mut app, _, _) = self.desktop_target(app)?;
+                if let Some(window_id) = window_id {
+                    app.window_id = Some(window_id.to_string());
+                }
                 invoke_desktop(
                     self.surface.id(),
                     DesktopCommand::PressKey {
@@ -512,9 +648,18 @@ impl InspectorRuntime {
         Ok(())
     }
 
-    fn scroll_element(&self, selector: &str, direction: &str) -> Result<(), Box<dyn Error>> {
+    fn scroll_element(
+        &self,
+        selector: &str,
+        direction: &str,
+        window_id: Option<&str>,
+    ) -> Result<(), Box<dyn Error>> {
         match &self.session {
             InspectorSession::Desktop { desktop, app } => {
+                let (mut app, _, _) = self.desktop_target(app)?;
+                if let Some(window_id) = window_id {
+                    app.window_id = Some(window_id.to_string());
+                }
                 invoke_desktop(
                     self.surface.id(),
                     DesktopCommand::ScrollElement {
@@ -621,8 +766,21 @@ fn handle_request(
             write_response(stream, "200 OK", "application/json", &body)?;
         }
         ("GET", "/api/frame") => {
-            let png = runtime.screenshot()?;
-            write_response(stream, "200 OK", "image/png", &png)?;
+            let (png, window_id) = runtime.frame()?;
+            let headers = window_id
+                .as_deref()
+                .map(|id| vec![("X-Allwright-Window-Id", id)])
+                .unwrap_or_default();
+            write_response_with_headers(stream, "200 OK", "image/png", &png, &headers)?;
+        }
+        ("GET", "/api/windows") => {
+            let body = serde_json::to_vec(&runtime.window_state()?)?;
+            write_response(stream, "200 OK", "application/json", &body)?;
+        }
+        ("POST", "/api/window") => {
+            let payload: InspectorWindowRequest = serde_json::from_slice(&request.body)?;
+            let body = serde_json::to_vec(&runtime.select_desktop_window(payload.window_id)?)?;
+            write_response(stream, "200 OK", "application/json", &body)?;
         }
         ("POST", "/api/input") => {
             let payload: InspectorInputRequest = serde_json::from_slice(&request.body)?;
@@ -643,6 +801,7 @@ fn handle_request(
                 None,
                 None,
                 None,
+                None,
             )?)?;
             write_response(stream, "200 OK", "application/json", &body)?;
         }
@@ -658,6 +817,7 @@ fn handle_request(
                 payload.key,
                 payload.text,
                 payload.direction,
+                payload.window_id,
             )?)?;
             write_response(stream, "200 OK", "application/json", &body)?;
         }
@@ -679,6 +839,14 @@ struct InspectorActionRequest {
     key: Option<String>,
     text: Option<String>,
     direction: Option<String>,
+    #[serde(rename = "windowId")]
+    window_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct InspectorWindowRequest {
+    #[serde(rename = "windowId")]
+    window_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -694,6 +862,8 @@ struct InspectorInputRequest {
     duration_ms: Option<u32>,
     key: Option<String>,
     text: Option<String>,
+    #[serde(rename = "windowId")]
+    window_id: Option<String>,
 }
 
 struct HttpRequest {
@@ -781,11 +951,31 @@ fn write_response(
     content_type: &str,
     body: &[u8],
 ) -> std::io::Result<()> {
+    write_response_with_headers(stream, status, content_type, body, &[])
+}
+
+fn write_response_with_headers(
+    stream: &mut TcpStream,
+    status: &str,
+    content_type: &str,
+    body: &[u8],
+    headers: &[(&str, &str)],
+) -> std::io::Result<()> {
     write!(
         stream,
-        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\n\r\n",
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\n",
         body.len()
     )?;
+    for (name, value) in headers {
+        if name.contains(['\r', '\n']) || value.contains(['\r', '\n']) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "HTTP response header contains a line break",
+            ));
+        }
+        write!(stream, "{name}: {value}\r\n")?;
+    }
+    write!(stream, "\r\n")?;
     stream.write_all(body)
 }
 
@@ -836,6 +1026,10 @@ mod tests {
         assert!(INDEX_HTML.contains("pointerFinish"));
         assert!(INDEX_HTML.contains("/api/frame"));
         assert!(INDEX_HTML.contains("/api/input"));
+        assert!(INDEX_HTML.contains("/api/window"));
+        assert!(INDEX_HTML.contains("/api/windows"));
+        assert!(INDEX_HTML.contains("Follow main window"));
+        assert!(INDEX_HTML.contains("X-Allwright-Window-Id"));
         assert!(INDEX_HTML.contains("streamFrames"));
         assert!(INDEX_HTML.contains("keyboardInteract"));
         assert!(INDEX_HTML.contains("Text to fill"));
@@ -878,6 +1072,16 @@ mod tests {
         assert_eq!(keyboard.kind, "keyboard");
         assert_eq!(keyboard.text.as_deref(), Some("hello"));
         assert!(keyboard.key.is_none());
+    }
+
+    #[test]
+    fn parses_explicit_and_follow_main_window_selection() {
+        let explicit: InspectorWindowRequest =
+            serde_json::from_str(r#"{"windowId":"hwnd-42"}"#).unwrap();
+        assert_eq!(explicit.window_id.as_deref(), Some("hwnd-42"));
+
+        let follow: InspectorWindowRequest = serde_json::from_str(r#"{"windowId":null}"#).unwrap();
+        assert!(follow.window_id.is_none());
     }
 
     #[test]

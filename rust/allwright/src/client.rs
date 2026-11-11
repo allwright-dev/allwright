@@ -40,6 +40,7 @@ pub use hook::{
 };
 pub use launch::{chromium, firefox, launch_browser, launch_chrome, launch_firefox};
 pub use mobile::desktop;
+pub use mobile::{DesktopApp, DesktopWindow, DesktopWindowHook, WINDOW, WindowHook};
 pub use runtime::{ping, set_server_addr, shutdown};
 pub use types::*;
 

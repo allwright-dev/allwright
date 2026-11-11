@@ -48,6 +48,15 @@ pub struct DesktopSessionHandle {
 pub struct DesktopAppSessionHandle {
     pub app_session_id: String,
     pub app_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DesktopWindowInfo {
+    pub window_id: String,
+    pub title: String,
+    pub is_main: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -222,6 +231,24 @@ pub enum DesktopCommand {
         desktop_session: DesktopSessionHandle,
         app_session: DesktopAppSessionHandle,
     },
+    ListWindows {
+        desktop_session: DesktopSessionHandle,
+        app_session: DesktopAppSessionHandle,
+    },
+    CloseWindow {
+        desktop_session: DesktopSessionHandle,
+        app_session: DesktopAppSessionHandle,
+    },
+    RegisterWindowHook {
+        desktop_session: DesktopSessionHandle,
+        app_session: DesktopAppSessionHandle,
+    },
+    WaitForWindowHook {
+        desktop_session: DesktopSessionHandle,
+        app_session: DesktopAppSessionHandle,
+        hook_id: String,
+        timeout_ms: Option<u32>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -246,6 +273,10 @@ pub enum DesktopCommandResult {
     Screenshot(DesktopScreenshotInfo),
     AccessibilitySnapshot(AccessibilitySnapshotInfo),
     InspectorSnapshot(InspectorSnapshot),
+    ListWindows(Vec<DesktopWindowInfo>),
+    CloseWindow,
+    RegisterWindowHook(String),
+    WaitForWindowHook(DesktopWindowInfo),
 }
 
 pub fn shared_descriptor() -> SurfacePluginDescriptor {
@@ -327,6 +358,7 @@ mod tests {
             app_session: DesktopAppSessionHandle {
                 app_session_id: "app-1".to_string(),
                 app_id: Some("notepad.exe".to_string()),
+                window_id: None,
             },
             url: "allwright://flights/42".to_string(),
             timeout_ms: Some(10_000),
@@ -346,6 +378,7 @@ mod tests {
             app_session: DesktopAppSessionHandle {
                 app_session_id: "app-2".to_string(),
                 app_id: Some("dev.allwright.fixture".to_string()),
+                window_id: None,
             },
             timeout_ms: Some(30_000),
             full_page: true,

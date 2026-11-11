@@ -99,6 +99,7 @@ struct HookState {
 enum EngineHookRegistration {
     Web(HookRegistration),
     Mobile(MobileHookRegistration),
+    Desktop(String),
 }
 
 #[derive(Debug)]
@@ -1267,6 +1268,123 @@ async fn handle_tab_command(
                 should_close: false,
             })
         }
+        Some(ContextCommand::ListDesktopWindows(_)) => {
+            let (
+                EngineBrowserSessionHandle::Desktop(desktop_session),
+                EnginePageSessionHandle::Desktop(app_session),
+            ) = (&surface_session, &page_session)
+            else {
+                return Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: "windows() requires a desktop application session".to_string(),
+                        }),
+                    )],
+                    should_close: false,
+                });
+            };
+            let result = web_lib::list_desktop_windows(desktop_session, app_session).await;
+            let event = match result {
+                Ok(windows) => {
+                    let mut engine_state = state.lock().await;
+                    let mut resolved = Vec::with_capacity(windows.len());
+                    for window in windows {
+                        let context_id = engine_state
+                            .tab_sessions
+                            .iter()
+                            .find_map(|(id, session)| match &session.page_session {
+                                EnginePageSessionHandle::Desktop(handle)
+                                    if session.surface_session_id == surface_session_id
+                                        && handle.app_session_id == app_session.app_session_id
+                                        && handle.window_id.as_deref()
+                                            == Some(window.window_id.as_str()) =>
+                                {
+                                    Some(id.clone())
+                                }
+                                _ => None,
+                            })
+                            .unwrap_or_else(|| {
+                                let id = next_context_session_id();
+                                engine_state.tab_sessions.insert(
+                                    id.clone(),
+                                    TabSessionState {
+                                        surface_session_id: surface_session_id.clone(),
+                                        page_session: EnginePageSessionHandle::Desktop(
+                                            DesktopAppSessionHandle {
+                                                app_session_id: app_session.app_session_id.clone(),
+                                                app_id: app_session.app_id.clone(),
+                                                window_id: Some(window.window_id.clone()),
+                                            },
+                                        ),
+                                        current_url: None,
+                                    },
+                                );
+                                id
+                            });
+                        resolved.push(proto::DesktopWindowInfo {
+                            context_session_id: context_id,
+                            window_id: window.window_id,
+                            title: window.title,
+                            is_main: window.is_main,
+                        });
+                    }
+                    ContextEvent::DesktopWindowsResolved(proto::DesktopWindowsResolvedEvent {
+                        windows: resolved,
+                    })
+                }
+                Err(message) => ContextEvent::Error(ContextSessionErrorEvent { message }),
+            };
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(&context_session_id, event)],
+                should_close: false,
+            })
+        }
+        Some(ContextCommand::CloseDesktopWindow(_)) => {
+            let (
+                EngineBrowserSessionHandle::Desktop(desktop_session),
+                EnginePageSessionHandle::Desktop(window_session),
+            ) = (&surface_session, &page_session)
+            else {
+                return Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: "close() requires a desktop window session".to_string(),
+                        }),
+                    )],
+                    should_close: false,
+                });
+            };
+            let Some(window_id) = window_session.window_id.clone() else {
+                return Ok(TabCommandOutcome {
+                    events: vec![tab_event(
+                        &context_session_id,
+                        ContextEvent::Error(ContextSessionErrorEvent {
+                            message: "the application main-window alias cannot be closed as a stable window"
+                                .to_string(),
+                        }),
+                    )],
+                    should_close: false,
+                });
+            };
+            let event = match web_lib::close_desktop_window(desktop_session, window_session).await {
+                Ok(()) => {
+                    let mut engine_state = state.lock().await;
+                    engine_state.tab_sessions.remove(&context_session_id);
+                    engine_state
+                        .hooks
+                        .retain(|_, hook| hook.context_session_id != context_session_id);
+                    ContextEvent::DesktopWindowClosed(proto::DesktopWindowClosedEvent { window_id })
+                }
+                Err(message) => ContextEvent::Error(ContextSessionErrorEvent { message }),
+            };
+            let should_close = matches!(event, ContextEvent::DesktopWindowClosed(_));
+            Ok(TabCommandOutcome {
+                events: vec![tab_event(&context_session_id, event)],
+                should_close,
+            })
+        }
         Some(ContextCommand::RegisterHook(RegisterHookCommand { hook })) => {
             let registration = match (hook, &surface_session, &page_session) {
                 (
@@ -1311,6 +1429,13 @@ async fn handle_tab_command(
                 ) => web_lib::register_mobile_hook(browser, page, MobileHookType::Download)
                     .await
                     .map(EngineHookRegistration::Mobile),
+                (
+                    Some(RegisterHook::DesktopWindow(_)),
+                    EngineBrowserSessionHandle::Desktop(desktop),
+                    EnginePageSessionHandle::Desktop(app),
+                ) => web_lib::register_desktop_window_hook(desktop, app)
+                    .await
+                    .map(EngineHookRegistration::Desktop),
                 (None, _, _) => Err("register_hook requires a typed hook payload".to_string()),
                 _ => Err("hook type is not supported by this context surface".to_string()),
             };
@@ -1362,6 +1487,98 @@ async fn handle_tab_command(
                     should_close: false,
                 });
             };
+            if let EngineHookRegistration::Desktop(backend_hook_id) = &hook.registration {
+                let (
+                    EngineBrowserSessionHandle::Desktop(desktop_session),
+                    EnginePageSessionHandle::Desktop(app_session),
+                ) = (&surface_session, &page_session)
+                else {
+                    return Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent {
+                                message: "desktop window hook session is not available".to_string(),
+                            }),
+                        )],
+                        should_close: false,
+                    });
+                };
+                let timeout_ms = retry_options
+                    .as_ref()
+                    .and_then(|options| options.timeout_ms)
+                    .and_then(|value| u32::try_from(value).ok());
+                let result = web_lib::wait_for_desktop_window_hook(
+                    desktop_session,
+                    app_session,
+                    backend_hook_id,
+                    timeout_ms,
+                )
+                .await;
+                return match result {
+                    Ok(window) => {
+                        let mut state = state.lock().await;
+                        state.hooks.remove(&hook_id);
+                        let new_context_session_id = state
+                            .tab_sessions
+                            .iter()
+                            .find_map(|(id, session)| match &session.page_session {
+                                EnginePageSessionHandle::Desktop(handle)
+                                    if session.surface_session_id == surface_session_id
+                                        && handle.app_session_id == app_session.app_session_id
+                                        && handle.window_id.as_deref()
+                                            == Some(window.window_id.as_str()) =>
+                                {
+                                    Some(id.clone())
+                                }
+                                _ => None,
+                            })
+                            .unwrap_or_else(|| {
+                                let id = next_context_session_id();
+                                state.tab_sessions.insert(
+                                    id.clone(),
+                                    TabSessionState {
+                                        surface_session_id: surface_session_id.clone(),
+                                        page_session: EnginePageSessionHandle::Desktop(
+                                            DesktopAppSessionHandle {
+                                                app_session_id: app_session.app_session_id.clone(),
+                                                app_id: app_session.app_id.clone(),
+                                                window_id: Some(window.window_id.clone()),
+                                            },
+                                        ),
+                                        current_url: None,
+                                    },
+                                );
+                                id
+                            });
+                        Ok(TabCommandOutcome {
+                            events: vec![tab_event(
+                                &context_session_id,
+                                ContextEvent::HookCompleted(HookCompletedEvent {
+                                    hook_id,
+                                    result: Some(HookCompletionResult::DesktopWindow(
+                                        proto::DesktopWindowHookResult {
+                                            window: Some(proto::DesktopWindowInfo {
+                                                context_session_id: new_context_session_id,
+                                                window_id: window.window_id,
+                                                title: window.title,
+                                                is_main: window.is_main,
+                                            }),
+                                        },
+                                    )),
+                                }),
+                            )],
+                            should_close: false,
+                        })
+                    }
+                    Err(message) => Ok(TabCommandOutcome {
+                        events: vec![tab_event(
+                            &context_session_id,
+                            ContextEvent::Error(ContextSessionErrorEvent { message }),
+                        )],
+                        should_close: false,
+                    }),
+                };
+            }
             if let EngineHookRegistration::Mobile(registration) = &hook.registration {
                 let EngineBrowserSessionHandle::Mobile(mobile_session) = &surface_session else {
                     return Ok(TabCommandOutcome {
@@ -1428,7 +1645,7 @@ async fn handle_tab_command(
                 };
             }
             let EngineHookRegistration::Web(registration) = &hook.registration else {
-                unreachable!("mobile hook returned above")
+                unreachable!("mobile and desktop hooks returned above")
             };
             let EngineBrowserSessionHandle::Web(surface_session) = &surface_session else {
                 return Ok(TabCommandOutcome {
@@ -1915,9 +2132,15 @@ async fn handle_tab_command(
                     EngineBrowserSessionHandle::Desktop(surface_session),
                     EnginePageSessionHandle::Desktop(page_session),
                 ) => {
-                    web_lib::close_desktop_app(surface_session, page_session)
-                        .await
-                        .map_err(Status::internal)?;
+                    if page_session.window_id.is_some() {
+                        web_lib::close_desktop_window(surface_session, page_session)
+                            .await
+                            .map_err(Status::internal)?;
+                    } else {
+                        web_lib::close_desktop_app(surface_session, page_session)
+                            .await
+                            .map_err(Status::internal)?;
+                    }
                 }
                 _ => {
                     return Ok(TabCommandOutcome {
