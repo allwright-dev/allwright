@@ -8,6 +8,8 @@ use std::ffi::{CStr, CString, c_char};
 use std::fs;
 use std::io::{Cursor, Read, Write};
 use std::net::SocketAddr;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 #[cfg(windows)]
@@ -19,6 +21,40 @@ use zip::ZipArchive;
 mod inspector;
 
 const DEFAULT_GITHUB_REPOSITORY: &str = "allwright-dev/allwright";
+
+#[cfg(any(windows, test))]
+const WINDOWS_UPDATE_SCRIPT: &str = r#"param([int]$ParentProcessId, [string]$StagedPath, [string]$TargetPath)
+$ErrorActionPreference = 'Stop'
+$BackupPath = "$TargetPath.old-$ParentProcessId"
+$ErrorLogPath = "$TargetPath.update-error.log"
+Wait-Process -Id $ParentProcessId -ErrorAction SilentlyContinue
+try {
+    $LastUpdateError = $null
+    for ($attempt = 0; $attempt -lt 100; $attempt++) {
+        $TargetMoved = $false
+        try {
+            Remove-Item -LiteralPath $BackupPath -Force -ErrorAction SilentlyContinue
+            Move-Item -LiteralPath $TargetPath -Destination $BackupPath -Force -ErrorAction Stop
+            $TargetMoved = $true
+            Move-Item -LiteralPath $StagedPath -Destination $TargetPath -Force -ErrorAction Stop
+            $TargetMoved = $false
+            Remove-Item -LiteralPath $BackupPath -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $ErrorLogPath -Force -ErrorAction SilentlyContinue
+            exit 0
+        } catch {
+            $LastUpdateError = $_
+            if ($TargetMoved -and !(Test-Path -LiteralPath $TargetPath) -and (Test-Path -LiteralPath $BackupPath)) {
+                Move-Item -LiteralPath $BackupPath -Destination $TargetPath -Force -ErrorAction SilentlyContinue
+            }
+            Start-Sleep -Milliseconds 200
+        }
+    }
+    Set-Content -LiteralPath $ErrorLogPath -Value "Allwright update failed: $LastUpdateError" -Force
+    exit 1
+} finally {
+    Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+}
+"#;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -342,28 +378,16 @@ fn replace_current_executable(
     })?;
 
     let script = env::temp_dir().join(format!("allwright-update-{}.ps1", std::process::id()));
-    fs::write(
-        &script,
-        r#"param([int]$ParentProcessId, [string]$StagedPath, [string]$TargetPath)
-Wait-Process -Id $ParentProcessId -ErrorAction SilentlyContinue
-try {
-    for ($attempt = 0; $attempt -lt 50; $attempt++) {
-        try {
-            Copy-Item -LiteralPath $StagedPath -Destination $TargetPath -Force -ErrorAction Stop
-            Remove-Item -LiteralPath $StagedPath -Force -ErrorAction SilentlyContinue
-            exit 0
-        } catch {
-            Start-Sleep -Milliseconds 100
-        }
-    }
-    exit 1
-} finally {
-    Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
-}
-"#,
-    )?;
-    Command::new("powershell.exe")
-        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
+    fs::write(&script, WINDOWS_UPDATE_SCRIPT)?;
+    let mut updater = Command::new("powershell.exe");
+    updater
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+        ])
         .arg(&script)
         .arg("-ParentProcessId")
         .arg(std::process::id().to_string())
@@ -374,7 +398,9 @@ try {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .spawn()?;
+        // Keep the deferred updater alive after this CLI and its console exit.
+        .creation_flags(0x0800_0000 | 0x0000_0200 | 0x0000_0008);
+    updater.spawn()?;
     println!(
         "Downloaded allwright {target_version}; the executable at {} will be replaced when this command exits.",
         current_executable.display()
@@ -942,6 +968,23 @@ mod tests {
             pinned.command,
             Some(CliCommand::Update { version: Some(version) }) if version == "v1.2.3"
         ));
+    }
+
+    #[test]
+    fn windows_update_renames_the_locked_binary_before_installing_the_stage() {
+        assert!(
+            WINDOWS_UPDATE_SCRIPT
+                .contains("Move-Item -LiteralPath $TargetPath -Destination $BackupPath")
+        );
+        assert!(
+            WINDOWS_UPDATE_SCRIPT
+                .contains("Move-Item -LiteralPath $StagedPath -Destination $TargetPath")
+        );
+        assert!(
+            !WINDOWS_UPDATE_SCRIPT
+                .contains("Copy-Item -LiteralPath $StagedPath -Destination $TargetPath")
+        );
+        assert!(WINDOWS_UPDATE_SCRIPT.contains("update-error.log"));
     }
 
     #[test]

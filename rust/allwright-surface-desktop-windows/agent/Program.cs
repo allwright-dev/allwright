@@ -60,6 +60,8 @@ internal sealed class AppSession
     public int? LaunchProcessId { get; }
     public AutomationElement? InitialRoot { get; set; }
     public HashSet<int> ProcessIds { get; } = new();
+    public HashSet<string> PreexistingWindowIds { get; } = new(StringComparer.Ordinal);
+    public bool SawOwnedForeground { get; set; }
     public string? MainWindowId { get; set; }
 }
 
@@ -310,6 +312,7 @@ internal static class Program
         var timeout = TimeSpan.FromMilliseconds(request.TimeoutMs ?? 30_000);
         var id = $"windows-app-{Guid.NewGuid():N}";
         var session = new AppSession(id, appId, null, launchProcessId);
+        session.PreexistingWindowIds.UnionWith(existingWindowIds);
         Sessions[id] = session;
         try
         {
@@ -710,10 +713,10 @@ internal static class Program
     {
         var type = role.Trim().ToLowerInvariant() switch
         {
-            "button" => ControlType.Button, "textbox" or "input" or "textarea" => ControlType.Edit,
-            "checkbox" => ControlType.CheckBox, "radio" => ControlType.RadioButton,
+            "button" => ControlType.Button, "edit" or "textbox" or "input" or "textarea" => ControlType.Edit,
+            "checkbox" => ControlType.CheckBox, "radio" or "radiobutton" => ControlType.RadioButton,
             "combobox" => ControlType.ComboBox, "list" => ControlType.List,
-            "listitem" => ControlType.ListItem, "link" or "a" => ControlType.Hyperlink,
+            "listitem" => ControlType.ListItem, "link" or "hyperlink" or "a" => ControlType.Hyperlink,
             "img" or "image" => ControlType.Image, "text" or "heading" => ControlType.Text,
             "window" => ControlType.Window, _ => ControlType.Custom
         };
@@ -721,8 +724,8 @@ internal static class Program
     }
 
     private static bool IsRole(string value) => value.Trim().ToLowerInvariant() is
-        "button" or "textbox" or "input" or "textarea" or "checkbox" or "radio" or
-        "combobox" or "list" or "listitem" or "link" or "a" or "img" or "image" or
+        "button" or "edit" or "textbox" or "input" or "textarea" or "checkbox" or "radio" or
+        "radiobutton" or "combobox" or "list" or "listitem" or "link" or "hyperlink" or "a" or "img" or "image" or
         "text" or "heading" or "window";
 
     private static AutomationElement[] FindSemantic(AutomationElement root, JsonObject spec)
@@ -946,18 +949,45 @@ internal static class Program
     private static IReadOnlyList<WindowCandidate> ResolveWindows(AppSession session)
     {
         RefreshProcessFamily(session);
+        var desktopWindows = EnumerateDesktopWindows();
         var candidates = new Dictionary<string, WindowCandidate>(StringComparer.Ordinal);
-        foreach (var window in EnumerateDesktopWindows())
+        foreach (var window in desktopWindows)
             if (session.ProcessIds.Contains(window.ProcessId))
                 candidates[window.Id] = window;
         if (session.InitialRoot is not null)
             try { AddWindowCandidate(candidates, session.InitialRoot); } catch { }
 
+        var foreground = GetForegroundWindow();
+        var foregroundId = foreground == IntPtr.Zero ? null : WindowId(foreground);
+        if (foregroundId is not null && candidates.ContainsKey(foregroundId))
+        {
+            session.SawOwnedForeground = true;
+        }
+        else if (foregroundId is not null
+            && session.SawOwnedForeground
+            && !session.PreexistingWindowIds.Contains(foregroundId))
+        {
+            // Launchers such as SAP and Office can display a splash from the
+            // launched process and then ask an already-running broker process
+            // to create the real window. That process is not necessarily a
+            // descendant, so adopt the newly activated successor HWND after
+            // we have observed an owned foreground window. Pre-launch HWNDs
+            // are excluded to avoid attaching to an unrelated existing app.
+            var successor = desktopWindows.FirstOrDefault(window => window.Id == foregroundId);
+            if (successor is not null)
+            {
+                session.ProcessIds.Add(successor.ProcessId);
+                candidates[successor.Id] = successor;
+                RefreshProcessFamily(session);
+                foreach (var window in desktopWindows)
+                    if (session.ProcessIds.Contains(window.ProcessId))
+                        candidates[window.Id] = window;
+            }
+        }
+
         var windows = candidates.Values
             .OrderByDescending(window => window.Area)
             .ToArray();
-        var foreground = GetForegroundWindow();
-        var foregroundId = foreground == IntPtr.Zero ? null : WindowId(foreground);
         session.MainWindowId = windows.FirstOrDefault(window => window.Id == foregroundId)?.Id
             ?? windows.FirstOrDefault()?.Id;
         if (session.InitialRoot is null && windows.Length > 0)

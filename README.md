@@ -139,9 +139,11 @@ allwright update
 Use `allwright update --version vX.Y.Z` to install a specific release. The updater downloads the
 same platform archive as the installer, validates the new binary before replacing the currently
 running executable, and honors `ALLWRIGHT_REPOSITORY` and `ALLWRIGHT_GITHUB_TOKEN` for alternate
-or private release repositories. On Windows, replacement completes immediately after the update
-command exits because Windows locks the running executable. Restart an already-running
-`allwright serve` process after updating; new server processes use the updated embedded core.
+or private release repositories. On Windows, a detached updater renames the locked old executable
+and moves the staged binary into its place immediately after the update command exits. If that swap
+cannot complete, it leaves `<installation>.update-error.log` beside the executable instead of
+failing silently. Restart an already-running `allwright serve` process after updating; new server
+processes use the updated embedded core.
 
 or:
 
