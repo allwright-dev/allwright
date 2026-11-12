@@ -309,7 +309,10 @@ final class AllwrightIOSAgent {
             return .success(["performed": true])
 
         case "pointer":
-            let (_, _, root) = try automationTarget(for: request)
+            let (_, application, root) = try automationTarget(for: request)
+#if os(macOS)
+            application.activate()
+#endif
             let action = try requiredString("key", in: request)
             let x = try requiredNumber("x", in: request)
             let y = try requiredNumber("y", in: request)
@@ -335,6 +338,9 @@ final class AllwrightIOSAgent {
 
         case "keyboard":
             let (_, application, _) = try automationTarget(for: request)
+#if os(macOS)
+            application.activate()
+#endif
             if let text = request["text"] as? String, !text.isEmpty {
                 application.typeText(text)
             } else {
@@ -552,6 +558,9 @@ final class AllwrightIOSAgent {
         requiringActionability: Bool = false
     ) throws -> XCUIElement {
         let (sessionID, application, root) = try automationTarget(for: request)
+#if os(macOS)
+        if requiringActionability { application.activate() }
+#endif
         let selector = try requiredString("selector", in: request)
         let element = selector.hasPrefix("ref=")
             ? try referencedElement(selector, sessionID: sessionID, application: application, root: root)

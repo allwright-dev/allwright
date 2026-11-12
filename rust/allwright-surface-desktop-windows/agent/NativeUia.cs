@@ -263,6 +263,7 @@ internal sealed class AutomationElement
             return;
         }
         var bounds = Properties.BoundingRectangle.ValueOrDefault;
+        WindowRoot().AsWindow().Activate();
         var point = new System.Drawing.Point(
             (int)Math.Round(bounds.X + bounds.Width / 2), (int)Math.Round(bounds.Y + bounds.Height / 2));
         for (var index = 0; index < clickCount; index++)
@@ -431,6 +432,45 @@ internal sealed class NativeWindow
         var handle = new IntPtr(element.Properties.NativeWindowHandle.ValueOrDefault);
         if (handle != IntPtr.Zero) PostMessage(handle, 0x0010, IntPtr.Zero, IntPtr.Zero);
     }
+    public void Activate()
+    {
+        var handle = new IntPtr(element.Properties.NativeWindowHandle.ValueOrDefault);
+        if (handle == IntPtr.Zero)
+            throw new InvalidOperationException("the Windows input target has no native window handle");
+        if (IsIconic(handle)) _ = ShowWindowAsync(handle, 9);
+
+        var currentThread = GetCurrentThreadId();
+        var targetThread = GetWindowThreadProcessId(handle, out var targetProcessId);
+        var foreground = GetForegroundWindow();
+        var foregroundThread = foreground == IntPtr.Zero
+            ? 0
+            : GetWindowThreadProcessId(foreground, out _);
+        var attachedTarget = targetThread != 0 && targetThread != currentThread
+            && AttachThreadInput(currentThread, targetThread, true);
+        var attachedForeground = foregroundThread != 0
+            && foregroundThread != currentThread
+            && foregroundThread != targetThread
+            && AttachThreadInput(currentThread, foregroundThread, true);
+        try
+        {
+            _ = BringWindowToTop(handle);
+            _ = SetForegroundWindow(handle);
+            _ = SetFocus(handle);
+        }
+        finally
+        {
+            if (attachedForeground) _ = AttachThreadInput(currentThread, foregroundThread, false);
+            if (attachedTarget) _ = AttachThreadInput(currentThread, targetThread, false);
+        }
+
+        Thread.Sleep(50);
+        var actualForeground = GetForegroundWindow();
+        if (actualForeground == IntPtr.Zero) return;
+        _ = GetWindowThreadProcessId(actualForeground, out var actualProcessId);
+        if (actualProcessId != targetProcessId)
+            throw new InvalidOperationException(
+                "Windows refused to activate the inspected application window; input was not sent to the inspector");
+    }
     [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam);
     public static int ProcessId(IntPtr handle)
     {
@@ -461,6 +501,14 @@ internal sealed class NativeWindow
     }
     [StructLayout(LayoutKind.Sequential)] private struct Rect { public int Left, Top, Right, Bottom; }
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr handle, out uint processId);
+    [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint attach, uint attachTo, bool value);
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern bool BringWindowToTop(IntPtr handle);
+    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr handle);
+    [DllImport("user32.dll")] private static extern IntPtr SetFocus(IntPtr handle);
+    [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr handle);
+    [DllImport("user32.dll")] private static extern bool ShowWindowAsync(IntPtr handle, int command);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr handle, System.Text.StringBuilder text, int max);
     [DllImport("user32.dll")] private static extern int GetWindowTextLength(IntPtr handle);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr handle, System.Text.StringBuilder text, int max);

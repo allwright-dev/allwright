@@ -276,11 +276,11 @@ internal static class Program
         "wait_window_hook" => WaitForWindowHook(request),
         "close_window" => CloseWindow(request),
         "count" => new { count = FindAll(Root(request), Required(request.Selector, "selector")).Length },
-        "click" => WithElement(request, element => { element.Click(request.Button ?? "left", request.ClickCount ?? 1); return new { }; }),
-        "focus" => WithElement(request, element => { element.Focus(); return new { }; }),
-        "fill" => WithElement(request, element => { Fill(element, request.Value ?? ""); return new { }; }),
-        "press" => WithElement(request, element => { element.Focus(); Press(request.Key ?? "", request.Text); return new { }; }),
-        "scroll" => WithElement(request, element => { Scroll(element, request.Key ?? ""); return new { }; }),
+        "click" => WithActiveElement(request, element => { element.Click(request.Button ?? "left", request.ClickCount ?? 1); return new { }; }),
+        "focus" => WithActiveElement(request, element => { element.Focus(); return new { }; }),
+        "fill" => WithActiveElement(request, element => { Fill(element, request.Value ?? ""); return new { }; }),
+        "press" => WithActiveElement(request, element => { element.Focus(); Press(request.Key ?? "", request.Text); return new { }; }),
+        "scroll" => WithActiveElement(request, element => { Scroll(element, request.Key ?? ""); return new { }; }),
         "pointer" => PointerInput(request),
         "keyboard" => KeyboardInput(request),
         "text" => WithElement(request, element => new { text = ElementText(element) }),
@@ -293,6 +293,7 @@ internal static class Program
 
     private static object PointerInput(AgentRequest request)
     {
+        Root(request).AsWindow().Activate();
         var x = (int)Math.Round(request.X ?? throw new InvalidOperationException("pointer input requires x"));
         var y = (int)Math.Round(request.Y ?? throw new InvalidOperationException("pointer input requires y"));
         var point = new Point(x, y);
@@ -320,6 +321,7 @@ internal static class Program
 
     private static object KeyboardInput(AgentRequest request)
     {
+        Root(request).AsWindow().Activate();
         Press(request.Key ?? "", request.Text);
         return new { performed = true };
     }
@@ -486,6 +488,15 @@ internal static class Program
             $"no visible Windows element matched `{selector}` before timeout; last observation: {lastObservation}",
             last);
     }
+
+    private static object WithActiveElement(
+        AgentRequest request,
+        Func<AutomationElement, object> operation) =>
+        WithElement(request, element =>
+        {
+            element.WindowRoot().AsWindow().Activate();
+            return operation(element);
+        });
 
     private static object Wait(AgentRequest request)
     {
