@@ -468,21 +468,52 @@ fn resolve_latest_release_tag() -> Result<String, String> {
     // GitHub's `/releases/latest` endpoint excludes prereleases. Allwright
     // publishes usable plugin artifacts on prerelease releases as well, so use
     // the release collection and select the highest non-draft semantic version.
-    let url = format!("{GITHUB_API_BASE_URL}/{repository}/releases?per_page=100");
     let client = release_client()?;
-    let response = client
+    if let Ok(token) = env::var(ALLWRIGHT_GITHUB_TOKEN_ENV_VAR)
+        && !token.trim().is_empty()
+    {
+        let url = format!("{GITHUB_API_BASE_URL}/{repository}/releases?per_page=100");
+        if let Ok(response) = client
+            .get(&url)
+            .bearer_auth(token.trim())
+            .send()
+            .and_then(|response| response.error_for_status())
+            && let Ok(body) = response.text()
+            && let Ok(payload) = serde_json::from_str::<serde_json::Value>(&body)
+            && let Some(tag) = select_latest_release_tag(&payload)
+        {
+            return Ok(tag);
+        }
+        eprintln!("Authenticated GitHub API lookup failed; falling back to the releases page.");
+    }
+
+    let url = format!("https://github.com/{repository}/releases");
+    let html = client
         .get(&url)
         .send()
         .and_then(|response| response.error_for_status())
-        .map_err(|error| format!("failed to resolve latest allwright release: {error}"))?;
-    let payload_text = response
+        .map_err(|error| format!("failed to read allwright releases page: {error}"))?
         .text()
-        .map_err(|error| format!("failed to read latest allwright release metadata: {error}"))?;
-    let payload: serde_json::Value = serde_json::from_str(&payload_text)
-        .map_err(|error| format!("failed to decode latest allwright release metadata: {error}"))?;
-    select_latest_release_tag(&payload).ok_or_else(|| {
-        "allwright release metadata did not include a non-draft semantic version".to_string()
-    })
+        .map_err(|error| format!("failed to decode allwright releases page: {error}"))?;
+    select_latest_release_tag_from_html(&repository, &html)
+        .ok_or_else(|| "allwright releases page did not include a semantic version".to_string())
+}
+
+fn select_latest_release_tag_from_html(repository: &str, html: &str) -> Option<String> {
+    let marker = format!("/{repository}/releases/tag/");
+    html.match_indices(&marker)
+        .filter_map(|(index, _)| {
+            let tail = &html[index + marker.len()..];
+            let tag = tail
+                .split(['\"', '\'', '?', '#', '<', '/', '&'])
+                .next()?
+                .trim();
+            let version = semantic_release_version(tag)?;
+            let stable = !tag.trim_start_matches('v').contains('-');
+            Some((version, stable, tag))
+        })
+        .max_by_key(|(version, stable, _)| (*version, *stable))
+        .map(|(_, _, tag)| tag.to_string())
 }
 
 fn select_latest_release_tag(payload: &serde_json::Value) -> Option<String> {
@@ -853,6 +884,18 @@ mod tests {
         assert_eq!(
             select_latest_release_tag(&releases).as_deref(),
             Some("v0.2.2")
+        );
+    }
+
+    #[test]
+    fn latest_plugin_release_can_be_resolved_without_the_github_api() {
+        let html = r#"
+            <a href="/allwright-dev/allwright/releases/tag/v0.2.7">v0.2.7</a>
+            <a href="/allwright-dev/allwright/releases/tag/v0.2.9">v0.2.9</a>
+        "#;
+        assert_eq!(
+            select_latest_release_tag_from_html("allwright-dev/allwright", html).as_deref(),
+            Some("v0.2.9")
         );
     }
 

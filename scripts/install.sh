@@ -40,22 +40,35 @@ esac
 
 target="${arch_part}-${os_part}"
 
+github_auth_args=()
+if [[ -n "${ALLWRIGHT_GITHUB_TOKEN:-}" ]]; then
+  github_auth_args=(-H "Authorization: Bearer ${ALLWRIGHT_GITHUB_TOKEN}")
+fi
+
 if [[ "$version" == "latest" ]]; then
-  if command -v python3 >/dev/null 2>&1; then
-    version="$(python3 - "$repo" <<'PY'
+  if [[ -n "${ALLWRIGHT_GITHUB_TOKEN:-}" ]]; then
+    if command -v python3 >/dev/null 2>&1; then
+      version="$(ALLWRIGHT_INSTALL_REPOSITORY="$repo" python3 <<'PY'
 import json
-import sys
+import os
 import urllib.request
 
-repository = sys.argv[1]
-with urllib.request.urlopen(f"https://api.github.com/repos/{repository}/releases/latest") as response:
-    data = json.load(response)
-print(data["tag_name"])
+repository = os.environ["ALLWRIGHT_INSTALL_REPOSITORY"]
+request = urllib.request.Request(
+    f"https://api.github.com/repos/{repository}/releases/latest",
+    headers={"Authorization": f"Bearer {os.environ['ALLWRIGHT_GITHUB_TOKEN']}"},
+)
+with urllib.request.urlopen(request) as response:
+    print(json.load(response)["tag_name"])
 PY
 )"
+    else
+      echo "python3 is required for authenticated latest-release resolution" >&2
+      exit 1
+    fi
   else
-    echo "python3 is required when ALLWRIGHT_VERSION is not set" >&2
-    exit 1
+    latest_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' "https://github.com/${repo}/releases/latest")"
+    version="${latest_url##*/}"
   fi
 fi
 
@@ -64,7 +77,7 @@ download_url="https://github.com/${repo}/releases/download/${version}/${asset_na
 archive_path="$tmp_dir/${asset_name}"
 
 echo "Downloading ${download_url}"
-curl -fL "$download_url" -o "$archive_path"
+curl -fL "${github_auth_args[@]}" "$download_url" -o "$archive_path"
 
 mkdir -p "$install_root"
 tar -xzf "$archive_path" -C "$tmp_dir"

@@ -216,22 +216,47 @@ fn github_repository() -> String {
 }
 
 fn latest_release_tag(repository: &str) -> Result<String, Box<dyn Error>> {
-    let url = format!("https://api.github.com/repos/{repository}/releases?per_page=100");
     let client = release_http_client()?;
-    let mut request = client.get(&url).header(
-        "User-Agent",
-        format!("allwright-cli/{}", env!("CARGO_PKG_VERSION")),
-    );
+    println!("Checking the latest allwright release...");
     if let Ok(token) = env::var("ALLWRIGHT_GITHUB_TOKEN")
         && !token.trim().is_empty()
     {
-        request = request.bearer_auth(token);
+        let url = format!("https://api.github.com/repos/{repository}/releases?per_page=100");
+        if let Ok(response) = client
+            .get(&url)
+            .bearer_auth(token.trim())
+            .send()
+            .and_then(|response| response.error_for_status())
+            && let Ok(body) = response.text()
+            && let Ok(releases) = serde_json::from_str::<serde_json::Value>(&body)
+            && let Some(tag) = select_latest_release_tag(&releases)
+        {
+            return Ok(tag);
+        }
+        eprintln!("Authenticated GitHub API lookup failed; falling back to the releases page.");
     }
-    println!("Checking the latest allwright release...");
-    let body = request.send()?.error_for_status()?.text()?;
-    let releases: serde_json::Value = serde_json::from_str(&body)?;
-    select_latest_release_tag(&releases)
-        .ok_or_else(|| "GitHub releases did not contain a non-draft semantic version".into())
+
+    let url = format!("https://github.com/{repository}/releases");
+    let body = client.get(&url).send()?.error_for_status()?.text()?;
+    select_latest_release_tag_from_html(repository, &body)
+        .ok_or_else(|| "GitHub releases page did not contain a semantic release tag".into())
+}
+
+fn select_latest_release_tag_from_html(repository: &str, html: &str) -> Option<String> {
+    let marker = format!("/{repository}/releases/tag/");
+    html.match_indices(&marker)
+        .filter_map(|(index, _)| {
+            let tail = &html[index + marker.len()..];
+            let tag = tail
+                .split(['\"', '\'', '?', '#', '<', '/', '&'])
+                .next()?
+                .trim();
+            let version = semantic_release_version(tag)?;
+            let stable = !tag.trim_start_matches('v').contains('-');
+            Some((version, stable, tag))
+        })
+        .max_by_key(|(version, stable, _)| (*version, *stable))
+        .and_then(|(_, _, tag)| normalize_release_tag(tag).ok())
 }
 
 fn select_latest_release_tag(releases: &serde_json::Value) -> Option<String> {
@@ -997,6 +1022,19 @@ mod tests {
         assert_eq!(
             select_latest_release_tag(&releases).as_deref(),
             Some("v0.2.2")
+        );
+    }
+
+    #[test]
+    fn update_latest_can_be_resolved_without_the_github_api() {
+        let html = r#"
+            <a href="/allwright-dev/allwright/releases/tag/v0.2.7">v0.2.7</a>
+            <a href="/allwright-dev/allwright/releases/tag/v0.2.9">v0.2.9</a>
+            <a href="/someone/else/releases/tag/v9.0.0">unrelated</a>
+        "#;
+        assert_eq!(
+            select_latest_release_tag_from_html("allwright-dev/allwright", html).as_deref(),
+            Some("v0.2.9")
         );
     }
 

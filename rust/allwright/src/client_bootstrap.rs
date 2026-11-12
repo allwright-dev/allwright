@@ -22,6 +22,7 @@ use super::types::{Error, Result};
 
 const ALLWRIGHT_AUTO_INSTALL_ENV_VAR: &str = "ALLWRIGHT_AUTO_INSTALL";
 const ALLWRIGHT_CLI_PATH_ENV_VAR: &str = "ALLWRIGHT_CLI_PATH";
+const ALLWRIGHT_GITHUB_TOKEN_ENV_VAR: &str = "ALLWRIGHT_GITHUB_TOKEN";
 const ALLWRIGHT_REPOSITORY_ENV_VAR: &str = "ALLWRIGHT_REPOSITORY";
 const ALLWRIGHT_VERSION_ENV_VAR: &str = "ALLWRIGHT_VERSION";
 const DEFAULT_RELEASE_REPOSITORY: &str = "allwright-dev/allwright";
@@ -369,24 +370,52 @@ fn resolve_release_tag() -> Result<String> {
 fn fetch_latest_release_tag() -> Result<String> {
     let repository = env::var(ALLWRIGHT_REPOSITORY_ENV_VAR)
         .unwrap_or_else(|_| DEFAULT_RELEASE_REPOSITORY.to_string());
-    let url = format!("https://api.github.com/repos/{repository}/releases?per_page=100");
-    let response = release_client()?
+    let client = release_client()?;
+    if let Ok(token) = env::var(ALLWRIGHT_GITHUB_TOKEN_ENV_VAR)
+        && !token.trim().is_empty()
+    {
+        let url = format!("https://api.github.com/repos/{repository}/releases?per_page=100");
+        if let Ok(response) = client
+            .get(url)
+            .bearer_auth(token.trim())
+            .send()
+            .and_then(|response| response.error_for_status())
+            && let Ok(body) = response.text()
+            && let Ok(payload) = serde_json::from_str::<Value>(&body)
+            && let Some(tag) = select_latest_release_tag(&payload)
+        {
+            return Ok(tag);
+        }
+    }
+    let url = format!("https://github.com/{repository}/releases");
+    let html = client
         .get(url)
         .send()
         .and_then(|response| response.error_for_status())
+        .map_err(|error| Error::new(format!("failed to read allwright releases page: {error}")))?
+        .text()
         .map_err(|error| {
-            Error::new(format!(
-                "failed to resolve latest allwright release: {error}"
-            ))
+            Error::new(format!("failed to decode allwright releases page: {error}"))
         })?;
-    let payload: Value = serde_json::from_reader(response).map_err(|error| {
-        Error::new(format!(
-            "failed to decode latest allwright release metadata: {error}"
-        ))
-    })?;
-    select_latest_release_tag(&payload).ok_or_else(|| {
-        Error::new("allwright releases did not include a non-draft semantic version")
-    })
+    select_latest_release_tag_from_html(&repository, &html)
+        .ok_or_else(|| Error::new("allwright releases page did not include a semantic version"))
+}
+
+fn select_latest_release_tag_from_html(repository: &str, html: &str) -> Option<String> {
+    let marker = format!("/{repository}/releases/tag/");
+    html.match_indices(&marker)
+        .filter_map(|(index, _)| {
+            let tail = &html[index + marker.len()..];
+            let tag = tail
+                .split(['\"', '\'', '?', '#', '<', '/', '&'])
+                .next()?
+                .trim();
+            let version = semantic_release_version(tag)?;
+            let stable = !tag.trim_start_matches('v').contains('-');
+            Some((version, stable, tag))
+        })
+        .max_by_key(|(version, stable, _)| (*version, *stable))
+        .map(|(_, _, tag)| normalize_release_tag(tag))
 }
 
 fn select_latest_release_tag(releases: &Value) -> Option<String> {

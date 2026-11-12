@@ -5,6 +5,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$RequestHeaders = @{}
+if ($env:ALLWRIGHT_GITHUB_TOKEN) {
+    $RequestHeaders["Authorization"] = "Bearer $($env:ALLWRIGHT_GITHUB_TOKEN.Trim())"
+}
 
 function Get-DefaultInstallDir {
     # WindowsApps is on the user PATH by default and needs no admin rights.
@@ -12,8 +16,26 @@ function Get-DefaultInstallDir {
 }
 
 if (-not $Version -or $Version.Trim() -eq "" -or $Version.Trim() -eq "latest") {
-    $latest = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases/latest"
-    $Version = $latest.tag_name
+    if ($env:ALLWRIGHT_GITHUB_TOKEN) {
+        $latest = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases/latest" -Headers $RequestHeaders
+        $Version = $latest.tag_name
+    }
+    else {
+        # The public GitHub web redirect is not charged against the shared
+        # unauthenticated REST API quota used by Citrix/NAT users.
+        $latestPage = Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/$Repository/releases/latest"
+        $releaseUri = if ($latestPage.BaseResponse.ResponseUri) {
+            $latestPage.BaseResponse.ResponseUri
+        }
+        else {
+            $latestPage.BaseResponse.RequestMessage.RequestUri
+        }
+        $releasePath = $releaseUri.AbsolutePath.TrimEnd('/')
+        $Version = [System.Uri]::UnescapeDataString(($releasePath -split '/')[-1])
+        if (-not $Version -or $Version -eq "latest") {
+            throw "GitHub did not redirect releases/latest to a release tag"
+        }
+    }
 }
 
 if (-not $InstallDir -or $InstallDir.Trim() -eq "") {
@@ -38,7 +60,7 @@ New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 
 try {
     Write-Host "Downloading $downloadUrl"
-    Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath
+    Invoke-WebRequest -Uri $downloadUrl -Headers $RequestHeaders -OutFile $archivePath
     Expand-Archive -Path $archivePath -DestinationPath $extractPath -Force
     Copy-Item (Join-Path $extractPath "bin\\allwright.exe") (Join-Path $InstallDir "allwright.exe") -Force
 }
