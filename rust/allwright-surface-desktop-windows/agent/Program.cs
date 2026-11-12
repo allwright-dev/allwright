@@ -462,7 +462,7 @@ internal static class Program
             try
             {
                 var root = Root(request);
-                var matches = FindAll(root, selector);
+                var matches = FindAll(root, selector, firstVisible: true);
                 var element = matches
                     .FirstOrDefault(candidate => !candidate.Properties.IsOffscreen.ValueOrDefault);
                 if (element is not null) return operation(element);
@@ -727,19 +727,40 @@ internal static class Program
         return node;
     }
 
-    private static AutomationElement[] FindAll(AutomationElement root, string transport)
+    private static AutomationElement[] FindAll(
+        AutomationElement root,
+        string transport,
+        bool firstVisible = false)
     {
         var segments = ParseSegments(transport);
         var current = new[] { root };
-        foreach (var segment in segments)
-            current = current.SelectMany(parent => FindSegment(parent, segment.Prefix, segment.Value)).ToArray();
+        for (var index = 0; index < segments.Count; index++)
+        {
+            var segment = segments[index];
+            var stopOnFirstVisible = firstVisible && index == segments.Count - 1;
+            current = current.SelectMany(parent =>
+                FindSegment(parent, segment.Prefix, segment.Value, stopOnFirstVisible)).ToArray();
+            if (stopOnFirstVisible)
+            {
+                var visible = current.FirstOrDefault(element =>
+                    !element.Properties.IsOffscreen.ValueOrDefault);
+                return visible is null ? current : [visible];
+            }
+        }
         return current;
     }
 
-    private static AutomationElement[] FindSegment(AutomationElement root, string prefix, string value)
+    private static AutomationElement[] FindSegment(
+        AutomationElement root,
+        string prefix,
+        string value,
+        bool stopOnFirstVisible)
     {
         if (prefix == "xpath") return FindXPath(root, value);
-        if (prefix == "aw") return FindSemantic(root, JsonNode.Parse(value)?.AsObject() ?? new JsonObject());
+        if (prefix == "aw") return FindSemantic(
+            root,
+            JsonNode.Parse(value)?.AsObject() ?? new JsonObject(),
+            stopOnFirstVisible);
         var condition = Condition(prefix, value);
         return root.FindAllDescendants(condition);
     }
@@ -771,7 +792,10 @@ internal static class Program
 
     private static ConditionBase RoleCondition(string role)
     {
-        var type = role.Trim().ToLowerInvariant() switch
+        return Automation.ConditionFactory.ByControlType(RoleType(role));
+    }
+
+    private static ControlType RoleType(string role) => role.Trim().ToLowerInvariant() switch
         {
             "button" => ControlType.Button, "edit" or "textbox" or "input" or "textarea" => ControlType.Edit,
             "checkbox" => ControlType.CheckBox, "radio" or "radiobutton" => ControlType.RadioButton,
@@ -780,27 +804,67 @@ internal static class Program
             "img" or "image" => ControlType.Image, "text" or "heading" => ControlType.Text,
             "window" => ControlType.Window, _ => ControlType.Custom
         };
-        return Automation.ConditionFactory.ByControlType(type);
-    }
 
     private static bool IsRole(string value) => value.Trim().ToLowerInvariant() is
         "button" or "edit" or "textbox" or "input" or "textarea" or "checkbox" or "radio" or
         "radiobutton" or "combobox" or "list" or "listitem" or "link" or "hyperlink" or "a" or "img" or "image" or
         "text" or "heading" or "window";
 
-    private static AutomationElement[] FindSemantic(AutomationElement root, JsonObject spec)
+    private static AutomationElement[] FindSemantic(
+        AutomationElement root,
+        JsonObject spec,
+        bool stopOnFirstVisible)
     {
         var kind = spec["kind"]?.GetValue<string>() ?? "";
         var text = spec[kind == "role" ? "name" : "text"]?.GetValue<string>();
         var exact = spec["exact"]?.GetValue<bool>() ?? false;
-        IEnumerable<AutomationElement> elements = kind switch
+        var role = RoleType(spec["role"]?.GetValue<string>() ?? "");
+        var elements = FindAllByTraversal(root, element => kind switch
         {
-            "role" => root.FindAllDescendants(RoleCondition(spec["role"]?.GetValue<string>() ?? "")),
-            "testId" => root.FindAllDescendants(Automation.ConditionFactory.ByAutomationId(text ?? "")),
-            _ => root.FindAllDescendants()
-        };
-        if (text is not null && kind != "testId") elements = elements.Where(e => exact ? ElementText(e) == text : ElementText(e).Contains(text, StringComparison.OrdinalIgnoreCase));
-        return elements.ToArray();
+            "role" => element.Properties.ControlType.ValueOrDefault == role
+                && (text is null || (exact
+                    ? (element.Properties.Name.ValueOrDefault ?? "") == text
+                    : (element.Properties.Name.ValueOrDefault ?? "").Contains(
+                        text,
+                        StringComparison.OrdinalIgnoreCase))),
+            "testId" => string.Equals(
+                element.Properties.AutomationId.ValueOrDefault,
+                text ?? "",
+                StringComparison.Ordinal),
+            _ => true
+        }, stopOnFirstVisible);
+        if (text is null || kind is "testId" or "role") return elements;
+        return elements.Where(element =>
+        {
+            var actual = ElementText(element);
+            return exact
+                ? actual == text
+                : actual.Contains(text, StringComparison.OrdinalIgnoreCase);
+        }).ToArray();
+    }
+
+    private static AutomationElement[] FindAllByTraversal(
+        AutomationElement root,
+        Func<AutomationElement, bool> matches,
+        bool stopOnFirstVisible)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(8);
+        var remaining = 5_000;
+        var result = new List<AutomationElement>();
+        var pending = new Stack<AutomationElement>();
+        foreach (var child in root.FindAllChildren().Reverse()) pending.Push(child);
+        while (pending.Count > 0 && remaining-- > 0 && DateTime.UtcNow < deadline)
+        {
+            var element = pending.Pop();
+            if (matches(element))
+            {
+                result.Add(element);
+                if (stopOnFirstVisible && !element.Properties.IsOffscreen.ValueOrDefault)
+                    break;
+            }
+            foreach (var child in element.FindAllChildren().Reverse()) pending.Push(child);
+        }
+        return result.ToArray();
     }
 
     private static AutomationElement[] FindXPath(AutomationElement root, string xpath)
