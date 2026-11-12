@@ -14,6 +14,7 @@ from ._types import (
     AccessibilitySnapshotOptions,
     AllwrightError,
     BoundingBox,
+    ClickOptions,
     CommandOptions,
     ElementResult,
     PressOptions,
@@ -300,9 +301,12 @@ class NativeApp:
                     case "error":
                         raise AllwrightError(event.error.message)
 
-    def click(self, selector: str, options: CommandOptions | None = None) -> None:
+    def click(self, selector: str, options: ClickOptions | None = None) -> None:
         from ._runtime import retry_options
 
+        options = options or ClickOptions()
+        button = getattr(options, "button", "left")
+        click_count = getattr(options, "click_count", None) or 1
         with self._lock:
             handle = self._ensure_handle()
             self._ensure_open()
@@ -313,7 +317,9 @@ class NativeApp:
                     context_session_id=self._session_id,
                     click_element=engine_pb2.ClickElementCommand(
                         css_selector=transport_selector,
-                        retry_options=retry_options((options or CommandOptions()).timeout_ms),
+                        retry_options=retry_options(options.timeout_ms),
+                        button=button,
+                        click_count=click_count,
                     ),
                 )
             )
@@ -697,7 +703,7 @@ class NativeLocator:
     def get_by_test_id(self, text: TextMatcher) -> NativeLocator:
         return self.locator(semantic_selector(dict(kind="testId", text=text)))
 
-    def click(self, options: CommandOptions | None = None) -> None:
+    def click(self, options: ClickOptions | None = None) -> None:
         return self.page.click(self.selector, options)
 
     def count(self, options: CommandOptions | None = None) -> int:

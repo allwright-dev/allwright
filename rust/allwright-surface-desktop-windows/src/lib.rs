@@ -74,6 +74,10 @@ struct AgentRequest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     visible: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    button: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    click_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     timeout_ms: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     full_page: Option<bool>,
@@ -110,6 +114,8 @@ impl<'a> AgentRequest<'a> {
             key: None,
             text: None,
             visible: None,
+            button: None,
+            click_count: None,
             timeout_ms: None,
             full_page: None,
             terminate_running: None,
@@ -553,19 +559,24 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
             desktop_session,
             app_session,
             selector,
+            button,
+            click_count,
             timeout_ms,
         } => {
-            agent_action(
-                "click",
-                &desktop_session,
-                &app_session,
-                &selector,
-                None,
-                None,
-                None,
-                None,
-                timeout_ms,
-            )?;
+            let normalized = normalize_selector_for_transport(&selector);
+            let mut request = AgentRequest::new("click");
+            request.session_id = Some(&app_session.app_session_id);
+            request.window_id = app_session.window_id.as_deref();
+            request.selector = Some(&normalized);
+            request.button = Some(match button {
+                0 => "left",
+                1 => "middle",
+                2 => "right",
+                _ => return Err(format!("unsupported desktop mouse button {button}")),
+            });
+            request.click_count = Some(click_count);
+            request.timeout_ms = timeout_ms;
+            invoke_agent(&desktop_session.endpoint, &request, timeout_ms)?;
             Ok(DesktopCommandResult::ClickElement(action_info(
                 selector, "clicked",
             )))

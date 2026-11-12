@@ -252,16 +252,30 @@ internal sealed class AutomationElement
         if (element is not null) UiaCall.Run("focus", () => { element.SetFocus(); return true; });
     }
 
-    public void Click()
+    public void Click(string button = "left", uint clickCount = 1)
     {
-        if (Pattern(Com.UIA_PatternIds.UIA_InvokePatternId) is Com.IUIAutomationInvokePattern invoke)
+        if (clickCount is < 1 or > 3)
+            throw new InvalidOperationException("click_count must be between 1 and 3");
+        if (button == "left" && clickCount == 1
+            && Pattern(Com.UIA_PatternIds.UIA_InvokePatternId) is Com.IUIAutomationInvokePattern invoke)
         {
             UiaCall.Run("invoke", () => { invoke.Invoke(); return true; });
             return;
         }
         var bounds = Properties.BoundingRectangle.ValueOrDefault;
-        NativeMouse.LeftClick(new System.Drawing.Point(
-            (int)Math.Round(bounds.X + bounds.Width / 2), (int)Math.Round(bounds.Y + bounds.Height / 2)));
+        var point = new System.Drawing.Point(
+            (int)Math.Round(bounds.X + bounds.Width / 2), (int)Math.Round(bounds.Y + bounds.Height / 2));
+        for (var index = 0; index < clickCount; index++)
+        {
+            switch (button)
+            {
+                case "left": NativeMouse.LeftClick(point); break;
+                case "middle": NativeMouse.MiddleClick(point); break;
+                case "right": NativeMouse.RightClick(point); break;
+                default: throw new InvalidOperationException($"unsupported mouse button `{button}`; expected left, middle, or right");
+            }
+            if (index + 1 < clickCount) Thread.Sleep(60);
+        }
     }
 
     public NativeWindow AsWindow() => new(this);
@@ -460,6 +474,7 @@ internal enum MouseButton { Left }
 internal static class Mouse
 {
     public static void LeftClick(System.Drawing.Point point) => NativeMouse.LeftClick(point);
+    public static void RightClick(System.Drawing.Point point) => NativeMouse.RightClick(point);
     public static void LeftDoubleClick(System.Drawing.Point point) { LeftClick(point); Thread.Sleep(60); LeftClick(point); }
     public static void MoveTo(System.Drawing.Point point) => SetCursorPos(point.X, point.Y);
     public static void Drag(System.Drawing.Point from, System.Drawing.Point to, MouseButton _) => NativeMouse.Drag(from, to);
@@ -475,6 +490,16 @@ internal static class NativeMouse
     {
         SetCursorPos(point.X, point.Y);
         mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero); mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+    }
+    public static void MiddleClick(System.Drawing.Point point)
+    {
+        SetCursorPos(point.X, point.Y);
+        mouse_event(0x0020, 0, 0, 0, UIntPtr.Zero); mouse_event(0x0040, 0, 0, 0, UIntPtr.Zero);
+    }
+    public static void RightClick(System.Drawing.Point point)
+    {
+        SetCursorPos(point.X, point.Y);
+        mouse_event(0x0008, 0, 0, 0, UIntPtr.Zero); mouse_event(0x0010, 0, 0, 0, UIntPtr.Zero);
     }
     public static void Drag(System.Drawing.Point from, System.Drawing.Point to)
     {

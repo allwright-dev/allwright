@@ -31,6 +31,8 @@ internal sealed record AgentRequest(
     double? DeltaY,
     uint? DurationMs,
     bool? Visible,
+    string? Button,
+    uint? ClickCount,
     uint? TimeoutMs,
     bool? FullPage,
     bool? TerminateRunning);
@@ -274,7 +276,7 @@ internal static class Program
         "wait_window_hook" => WaitForWindowHook(request),
         "close_window" => CloseWindow(request),
         "count" => new { count = FindAll(Root(request), Required(request.Selector, "selector")).Length },
-        "click" => WithElement(request, element => { element.Click(); return new { }; }),
+        "click" => WithElement(request, element => { element.Click(request.Button ?? "left", request.ClickCount ?? 1); return new { }; }),
         "focus" => WithElement(request, element => { element.Focus(); return new { }; }),
         "fill" => WithElement(request, element => { Fill(element, request.Value ?? ""); return new { }; }),
         "press" => WithElement(request, element => { element.Focus(); Press(request.Key ?? "", request.Text); return new { }; }),
@@ -297,6 +299,7 @@ internal static class Program
         switch (request.Key)
         {
             case "tap": Mouse.LeftClick(point); break;
+            case "right_click": Mouse.RightClick(point); break;
             case "double_tap": Mouse.LeftDoubleClick(point); break;
             case "swipe":
                 Mouse.Drag(point, new Point(

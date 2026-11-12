@@ -70,6 +70,7 @@ public class NativeApp implements HookContext {
 
     public void click(String selector) { clickResult(selector); }
     public void click(String selector, CommandOptions options) { clickResult(selector, options); }
+    public void click(String selector, ClickOptions options) { clickResult(selector, options); }
     public int count(String selector) { return countResult(selector).count(); }
     public int count(String selector, CommandOptions options) { return countResult(selector, options).count(); }
     public void focus(String selector) { focusResult(selector); }
@@ -189,11 +190,18 @@ public class NativeApp implements HookContext {
     }
 
     private synchronized ClickResult clickResult(String selector, CommandOptions options) {
+        Integer timeoutMs = options == null ? null : options.timeoutMs();
+        return clickResult(selector, new ClickOptions(timeoutMs));
+    }
+
+    private synchronized ClickResult clickResult(String selector, ClickOptions options) {
         RuntimeSupport.StreamHandle<ContextSessionCommand, ContextSessionEvent> handle = ensureStream();
         ensureOpen();
-        CommandOptions resolvedOptions = options == null ? new CommandOptions() : options;
+        ClickOptions resolvedOptions = options == null ? new ClickOptions() : options;
         ClickElementCommand.Builder click = ClickElementCommand.newBuilder()
-                .setCssSelector(NativeSelectorSupport.normalizeSelectorForTransport(selector));
+                .setCssSelector(NativeSelectorSupport.normalizeSelectorForTransport(selector))
+                .setButton((resolvedOptions.button() == null ? MouseButton.LEFT : resolvedOptions.button()).wireName())
+                .setClickCount(resolvedOptions.clickCount() == null ? 1 : resolvedOptions.clickCount());
         if (CommandSupport.hasTimeout(resolvedOptions.timeoutMs())) {
             click.setRetryOptions(CommandSupport.commandRetryOptions(resolvedOptions.timeoutMs()));
         }

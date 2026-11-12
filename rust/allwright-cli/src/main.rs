@@ -23,29 +23,58 @@ mod inspector;
 const DEFAULT_GITHUB_REPOSITORY: &str = "allwright-dev/allwright";
 
 #[cfg(any(windows, test))]
-const WINDOWS_UPDATE_SCRIPT: &str = r#"param([int]$ParentProcessId, [string]$StagedPath, [string]$TargetPath)
+const WINDOWS_UPDATE_SCRIPT: &str = r#"param([int]$ParentProcessId, [string]$StagedPath, [string]$TargetPath, [string]$ExpectedVersion)
 $ErrorActionPreference = 'Stop'
 $BackupPath = "$TargetPath.old-$ParentProcessId"
 $ErrorLogPath = "$TargetPath.update-error.log"
 Wait-Process -Id $ParentProcessId -ErrorAction SilentlyContinue
+
+function Stop-TargetProcesses {
+    $TargetFullPath = [System.IO.Path]::GetFullPath($TargetPath)
+    foreach ($Process in Get-Process -ErrorAction SilentlyContinue) {
+        if ($Process.Id -eq $PID -or $Process.Id -eq $ParentProcessId) { continue }
+        $ProcessPath = $null
+        try { $ProcessPath = $Process.Path } catch { continue }
+        if (-not $ProcessPath) { continue }
+        if ([System.StringComparer]::OrdinalIgnoreCase.Equals(
+            [System.IO.Path]::GetFullPath($ProcessPath), $TargetFullPath)) {
+            Stop-Process -Id $Process.Id -Force -ErrorAction Stop
+            Wait-Process -Id $Process.Id -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 try {
     $LastUpdateError = $null
     for ($attempt = 0; $attempt -lt 100; $attempt++) {
         $TargetMoved = $false
+        $StageInstalled = $false
         try {
+            # A managed server or inspector launched from this exact executable
+            # keeps the image locked. Updating explicitly authorizes stopping
+            # those stale runtimes; clients will start the new server on demand.
+            Stop-TargetProcesses
             Remove-Item -LiteralPath $BackupPath -Force -ErrorAction SilentlyContinue
             Move-Item -LiteralPath $TargetPath -Destination $BackupPath -Force -ErrorAction Stop
             $TargetMoved = $true
             Move-Item -LiteralPath $StagedPath -Destination $TargetPath -Force -ErrorAction Stop
-            $TargetMoved = $false
+            $StageInstalled = $true
+            $InstalledVersion = (& $TargetPath --version | Out-String).Trim()
+            if ($InstalledVersion -ne "allwright $ExpectedVersion") {
+                throw "installed binary reports '$InstalledVersion'; expected 'allwright $ExpectedVersion'"
+            }
             Remove-Item -LiteralPath $BackupPath -Force -ErrorAction SilentlyContinue
             Remove-Item -LiteralPath $ErrorLogPath -Force -ErrorAction SilentlyContinue
             exit 0
         } catch {
             $LastUpdateError = $_
-            if ($TargetMoved -and !(Test-Path -LiteralPath $TargetPath) -and (Test-Path -LiteralPath $BackupPath)) {
+            if ($StageInstalled -and (Test-Path -LiteralPath $TargetPath)) {
+                Remove-Item -LiteralPath $TargetPath -Force -ErrorAction SilentlyContinue
+            }
+            if ($TargetMoved -and (Test-Path -LiteralPath $BackupPath)) {
                 Move-Item -LiteralPath $BackupPath -Destination $TargetPath -Force -ErrorAction SilentlyContinue
             }
+            if ($StageInstalled) { break }
             Start-Sleep -Milliseconds 200
         }
     }
@@ -127,6 +156,8 @@ enum PluginCommand {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    #[cfg(windows)]
+    report_previous_update_error();
     let args = Args::parse();
 
     match args.command.unwrap_or(CliCommand::Serve {
@@ -204,8 +235,37 @@ fn update_cli(requested_version: Option<&str>) -> Result<(), Box<dyn Error>> {
 
     let current_executable = env::current_exe()?;
     replace_current_executable(&current_executable, &downloaded_binary, target_version)?;
+    #[cfg(not(windows))]
     println!("Restart any running allwright server to use the new version.");
+    #[cfg(windows)]
+    println!(
+        "Wait for the detached updater to finish, then run `allwright --version`. If replacement fails, inspect {}.",
+        update_error_log_path(&current_executable).display()
+    );
     Ok(())
+}
+
+#[cfg(windows)]
+fn update_error_log_path(executable: &Path) -> PathBuf {
+    let mut path = executable.as_os_str().to_os_string();
+    path.push(".update-error.log");
+    PathBuf::from(path)
+}
+
+#[cfg(windows)]
+fn report_previous_update_error() {
+    let Ok(executable) = env::current_exe() else {
+        return;
+    };
+    let error_log = update_error_log_path(&executable);
+    let Ok(message) = fs::read_to_string(&error_log) else {
+        return;
+    };
+    eprintln!(
+        "warning: the previous allwright update did not complete: {}\nDetails: {}",
+        error_log.display(),
+        message.trim()
+    );
 }
 
 fn github_repository() -> String {
@@ -378,6 +438,7 @@ fn replace_current_executable(
         )
         .into());
     }
+    verify_cli_version(current_executable, target_version)?;
     println!(
         "Updated allwright to {target_version} at {}.",
         current_executable.display()
@@ -420,6 +481,8 @@ fn replace_current_executable(
         .arg(&staged)
         .arg("-TargetPath")
         .arg(current_executable)
+        .arg("-ExpectedVersion")
+        .arg(target_version)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -427,7 +490,7 @@ fn replace_current_executable(
         .creation_flags(0x0800_0000 | 0x0000_0200 | 0x0000_0008);
     updater.spawn()?;
     println!(
-        "Downloaded allwright {target_version}; the executable at {} will be replaced when this command exits.",
+        "Downloaded allwright {target_version}; the executable at {} will be replaced and verified when this command exits. Running allwright servers or inspectors from that path will be stopped.",
         current_executable.display()
     );
     Ok(())
@@ -1010,6 +1073,10 @@ mod tests {
                 .contains("Copy-Item -LiteralPath $StagedPath -Destination $TargetPath")
         );
         assert!(WINDOWS_UPDATE_SCRIPT.contains("update-error.log"));
+        assert!(WINDOWS_UPDATE_SCRIPT.contains("Stop-TargetProcesses"));
+        assert!(WINDOWS_UPDATE_SCRIPT.contains("Stop-Process -Id $Process.Id -Force"));
+        assert!(WINDOWS_UPDATE_SCRIPT.contains("& $TargetPath --version"));
+        assert!(WINDOWS_UPDATE_SCRIPT.contains("allwright $ExpectedVersion"));
     }
 
     #[test]

@@ -488,7 +488,7 @@ function createLazyMobileApp(appResource: LazyResource<NativeApp>): NativeApp {
     async navigate(url: string, options?: CommandOptions) {
       return (await appResource.get()).navigate(url, options);
     },
-    async click(selector: string, options?: CommandOptions) {
+    async click(selector: string, options?: Parameters<NativeApp["click"]>[1]) {
       return (await appResource.get()).click(selector, options);
     },
     async count(selector: string, options?: CommandOptions) {
@@ -557,7 +557,7 @@ function createLazyMobileLocator(
     get selector(): string {
       throw new Error("lazy mobile locator selector is not available before the app fixture is initialized");
     },
-    async click(options?: CommandOptions) {
+    async click(options?: Parameters<NativeAppLocator["click"]>[0]) {
       return (await appResource.get()).locator(await selectorFactory()).click(options);
     },
     async count(options?: Parameters<NativeAppLocator["count"]>[0]) {

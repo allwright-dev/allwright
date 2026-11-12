@@ -8,6 +8,7 @@ import type {
   AccessibilitySnapshotOptions,
   BoundingBox,
   CaptureResult,
+  ClickOptions,
   SurfaceSessionEvent,
   SurfaceSessionStream,
   CommandOptions,
@@ -242,7 +243,7 @@ export class NativeAppImpl implements NativeApp {
     }
   }
 
-  async click(selector: string, options: CommandOptions = {}): Promise<void> {
+  async click(selector: string, options: ClickOptions = {}): Promise<void> {
     const handle = await this.#getHandle();
     this.#ensureOpen(handle);
     handle.stream.write({
@@ -251,6 +252,8 @@ export class NativeAppImpl implements NativeApp {
       clickElement: {
         cssSelector: normalizeMobileSelectorForTransport(selector),
         retryOptions: retryOptions(options.timeoutMs),
+        button: options.button ?? "left",
+        clickCount: options.clickCount ?? 1,
       },
     });
 
@@ -662,7 +665,7 @@ class NativeAppLocatorImpl implements NativeAppLocator {
     readonly selector: string,
   ) {}
 
-  async click(options: CommandOptions = {}): Promise<void> {
+  async click(options: ClickOptions = {}): Promise<void> {
     return this.page.click(this.selector, options);
   }
 

@@ -279,6 +279,14 @@ func (p *NativeApp) clickResult(ctx context.Context, selector string, options ..
 
 	commandOptions := firstCommandOptions(options)
 	selector = normalizeMobileSelectorForTransport(selector)
+	button := string(commandOptions.Button)
+	if button == "" {
+		button = string(MouseButtonLeft)
+	}
+	clickCount := commandOptions.ClickCount
+	if clickCount == 0 {
+		clickCount = 1
+	}
 	if err := p.stream.Send(&enginev1.ContextSessionCommand{
 		SurfaceSessionId: p.surfaceSessionID,
 		ContextSessionId: p.sessionID,
@@ -286,6 +294,8 @@ func (p *NativeApp) clickResult(ctx context.Context, selector string, options ..
 			ClickElement: &enginev1.ClickElementCommand{
 				CssSelector:  selector,
 				RetryOptions: retryOptionsProto(commandOptions.Timeout),
+				Button:       &button,
+				ClickCount:   &clickCount,
 			},
 		},
 	}); err != nil {

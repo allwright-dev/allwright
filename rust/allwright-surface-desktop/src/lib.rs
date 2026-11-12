@@ -145,6 +145,8 @@ pub enum DesktopCommand {
         desktop_session: DesktopSessionHandle,
         app_session: DesktopAppSessionHandle,
         selector: String,
+        button: u8,
+        click_count: u32,
         timeout_ms: Option<u32>,
     },
     CountElements {

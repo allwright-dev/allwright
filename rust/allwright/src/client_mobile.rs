@@ -116,8 +116,8 @@ use super::command::command_retry_options;
 use super::runtime::get_runtime;
 use super::types::{
     AccessibilitySnapshotFormat, AccessibilitySnapshotMode, AccessibilitySnapshotOptions,
-    BoundingBox, CommandOptions, Error, PressOptions, Result, RuntimeClient, ScreenshotOptions,
-    TextResult, WaitForSelectorOptions,
+    BoundingBox, ClickOptions, CommandOptions, Error, PressOptions, Result, RuntimeClient,
+    ScreenshotOptions, TextResult, WaitForSelectorOptions,
 };
 use super::web_locators::{RoleOptions, TextMatcher, TextOptions};
 
@@ -1045,6 +1045,10 @@ impl NativeApp {
     }
 
     pub async fn click(&self, selector: &str, options: CommandOptions) -> Result<()> {
+        self.click_with_options(selector, options.into()).await
+    }
+
+    pub async fn click_with_options(&self, selector: &str, options: ClickOptions) -> Result<()> {
         let selector = normalize_mobile_selector_for_transport(selector);
         let mut state = self.inner.state.lock().await;
         let handle = self.ensure_handle(&mut state).await?;
@@ -1058,8 +1062,8 @@ impl NativeApp {
                 command: Some(ContextCommand::ClickElement(ClickElementCommand {
                     css_selector: selector.clone(),
                     retry_options: command_retry_options(options.timeout_ms),
-                    button: None,
-                    click_count: None,
+                    button: Some(options.button.as_str().to_string()),
+                    click_count: options.click_count,
                 })),
             })
             .await
@@ -1942,6 +1946,10 @@ impl NativeLocator {
 
     pub async fn click(&self, options: CommandOptions) -> Result<()> {
         self.page.click(&self.selector, options).await
+    }
+
+    pub async fn click_with_options(&self, options: ClickOptions) -> Result<()> {
+        self.page.click_with_options(&self.selector, options).await
     }
 
     pub async fn count(&self, options: CommandOptions) -> Result<u32> {

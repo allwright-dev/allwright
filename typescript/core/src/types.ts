@@ -229,7 +229,7 @@ export interface MobileAndroidLaunchOptions {
 export interface NativeAppLocator {
   readonly page: NativeApp;
   readonly selector: string;
-  click(options?: CommandOptions): Promise<void>;
+  click(options?: ClickOptions): Promise<void>;
   count(options?: CommandOptions): Promise<number>;
   focus(options?: CommandOptions): Promise<void>;
   fill(value: string, options?: CommandOptions): Promise<void>;
@@ -258,7 +258,7 @@ export interface NativeApp {
   getByText(text: TextMatcher, options?: TextOptions): NativeAppLocator;
   getByLabel(text: TextMatcher, options?: TextOptions): NativeAppLocator;
   getByTestId(text: TextMatcher): NativeAppLocator;
-  click(selector: string, options?: CommandOptions): Promise<void>;
+  click(selector: string, options?: ClickOptions): Promise<void>;
   count(selector: string, options?: CommandOptions): Promise<number>;
   focus(selector: string, options?: CommandOptions): Promise<void>;
   fill(selector: string, value: string, options?: CommandOptions): Promise<void>;

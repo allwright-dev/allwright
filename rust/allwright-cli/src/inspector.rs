@@ -538,6 +538,7 @@ impl InspectorRuntime {
     ) -> Result<Value, Box<dyn Error>> {
         match action {
             "click" => self.click_element(&selector, window_id.as_deref())?,
+            "right_click" => self.right_click_element(&selector, window_id.as_deref())?,
             "double_click" => {
                 self.click_element(&selector, window_id.as_deref())?;
                 std::thread::sleep(std::time::Duration::from_millis(75));
@@ -583,6 +584,8 @@ impl InspectorRuntime {
                         desktop_session: desktop.clone(),
                         app_session: app.clone(),
                         selector: selector.to_string(),
+                        button: 0,
+                        click_count: 1,
                         timeout_ms: Some(10_000),
                     },
                 )?;
@@ -599,6 +602,32 @@ impl InspectorRuntime {
                 )?;
             }
         }
+        Ok(())
+    }
+
+    fn right_click_element(
+        &self,
+        selector: &str,
+        window_id: Option<&str>,
+    ) -> Result<(), Box<dyn Error>> {
+        let InspectorSession::Desktop { desktop, app } = &self.session else {
+            return Err("right-click is only available for desktop inspectors".into());
+        };
+        let (mut app, _, _) = self.desktop_target(app)?;
+        if let Some(window_id) = window_id {
+            app.window_id = Some(window_id.to_string());
+        }
+        invoke_desktop(
+            self.surface.id(),
+            DesktopCommand::ClickElement {
+                desktop_session: desktop.clone(),
+                app_session: app,
+                selector: selector.to_string(),
+                button: 2,
+                click_count: 1,
+                timeout_ms: Some(10_000),
+            },
+        )?;
         Ok(())
     }
 
@@ -819,8 +848,17 @@ fn handle_request(
         }
         ("POST", "/api/input") => {
             let payload: InspectorInputRequest = serde_json::from_slice(&request.body)?;
+            let freeze_after = payload.kind == "pointer"
+                && payload.action.as_deref() == Some("right_click")
+                && matches!(&runtime.session, InspectorSession::Desktop { .. });
             runtime.live_input(payload)?;
-            write_response(stream, "200 OK", "application/json", br#"{"ok":true}"#)?;
+            if freeze_after {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                let body = serde_json::to_vec(&runtime.snapshot_with_window_retry()?)?;
+                write_response(stream, "200 OK", "application/json", &body)?;
+            } else {
+                write_response(stream, "200 OK", "application/json", br#"{"ok":true}"#)?;
+            }
         }
         ("POST", "/api/click") => {
             let payload: Value = serde_json::from_slice(&request.body)?;
@@ -1069,6 +1107,10 @@ mod tests {
         assert!(INDEX_HTML.contains("Element hierarchy"));
         assert!(INDEX_HTML.contains(">Inspect</button>"));
         assert!(INDEX_HTML.contains(">Interact</button>"));
+        assert!(INDEX_HTML.contains("id=\"freeze\""));
+        assert!(INDEX_HTML.contains("freezeSnapshot"));
+        assert!(INDEX_HTML.contains("event.key==='F8'"));
+        assert!(INDEX_HTML.contains("right_click"));
         assert!(INDEX_HTML.contains("double_click"));
         assert!(INDEX_HTML.contains("wheelInteract"));
         assert!(INDEX_HTML.contains("pointerFinish"));

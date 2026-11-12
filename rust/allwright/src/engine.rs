@@ -2356,8 +2356,8 @@ async fn handle_tab_command(
                         mouse_button,
                         click_count,
                     )
-                        .await
-                        .map(|click| (click.css_selector, click.note, click.bidi_session_id)),
+                    .await
+                    .map(|click| (click.css_selector, click.note, click.bidi_session_id)),
                     (
                         EngineBrowserSessionHandle::Mobile(surface_session),
                         EnginePageSessionHandle::Mobile(page_session),
@@ -2374,21 +2374,24 @@ async fn handle_tab_command(
                     (
                         EngineBrowserSessionHandle::Desktop(surface_session),
                         EnginePageSessionHandle::Desktop(page_session),
-                    ) if mouse_button == 0 && click_count == 1 => web_lib::click_desktop_element(
+                    ) => web_lib::click_desktop_element(
                         surface_session,
                         page_session,
                         &css_selector,
+                        mouse_button,
+                        click_count,
                         retry_options
                             .as_ref()
                             .and_then(|options| options.timeout_ms),
                     )
                     .await
                     .map(|click| (click.selector, click.note, String::new())),
-                    (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_))
-                    | (EngineBrowserSessionHandle::Desktop(_), EnginePageSessionHandle::Desktop(_)) => Err(
-                        "mouse button and click-count options are currently available on web pages only"
-                            .to_string(),
-                    ),
+                    (EngineBrowserSessionHandle::Mobile(_), EnginePageSessionHandle::Mobile(_)) => {
+                        Err(
+                            "mouse button and click-count options are not available on mobile apps"
+                                .to_string(),
+                        )
+                    }
                     _ => Err("tab session backend metadata is inconsistent".to_string()),
                 }
             })

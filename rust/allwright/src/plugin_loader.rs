@@ -305,12 +305,28 @@ macro_rules! desktop_operation {
     };
 }
 
-desktop_operation!(
-    click_desktop_element,
-    ClickElement,
-    ClickElement,
-    DesktopActionInfo
-);
+pub async fn click_desktop_element(
+    desktop_session: &DesktopSessionHandle,
+    app_session: &DesktopAppSessionHandle,
+    selector: &str,
+    button: u8,
+    click_count: u32,
+    timeout_ms: Option<u32>,
+) -> Result<DesktopActionInfo, String> {
+    match invoke_desktop_expected(DesktopCommand::ClickElement {
+        desktop_session: desktop_session.clone(),
+        app_session: app_session.clone(),
+        selector: selector.to_string(),
+        button,
+        click_count,
+        timeout_ms,
+    })
+    .await?
+    {
+        DesktopCommandResult::ClickElement(value) => Ok(value),
+        _ => Err("desktop plugin returned an unexpected ClickElement response".to_string()),
+    }
+}
 desktop_operation!(
     count_desktop_elements,
     CountElements,

@@ -244,7 +244,27 @@ final class AllwrightIOSAgent {
 
         case "click":
             let element = try resolvedElement(for: request, requiringActionability: true)
+#if os(macOS)
+            let button = request["button"] as? String ?? "left"
+            let clickCount = (request["click_count"] as? NSNumber)?.intValue ?? 1
+            guard (1...3).contains(clickCount) else {
+                throw AgentError("click_count must be between 1 and 3")
+            }
+            for _ in 0..<clickCount {
+                switch button {
+                case "left": element.click()
+                case "right": element.rightClick()
+                case "middle":
+                    let point = CGPoint(x: element.frame.midX, y: element.frame.midY)
+                    CGEvent(mouseEventSource: nil, mouseType: .otherMouseDown, mouseCursorPosition: point, mouseButton: .center)?.post(tap: .cghidEventTap)
+                    CGEvent(mouseEventSource: nil, mouseType: .otherMouseUp, mouseCursorPosition: point, mouseButton: .center)?.post(tap: .cghidEventTap)
+                default:
+                    throw AgentError("unsupported mouse button `\(button)`; expected left, middle, or right")
+                }
+            }
+#else
             element.tap()
+#endif
             return .success(["performed": true])
 
         case "focus":
@@ -298,6 +318,12 @@ final class AllwrightIOSAgent {
             switch action {
             case "tap": start.tap()
             case "double_tap": start.doubleTap()
+#if os(macOS)
+            case "right_click":
+                let point = CGPoint(x: x, y: y)
+                CGEvent(mouseEventSource: nil, mouseType: .rightMouseDown, mouseCursorPosition: point, mouseButton: .right)?.post(tap: .cghidEventTap)
+                CGEvent(mouseEventSource: nil, mouseType: .rightMouseUp, mouseCursorPosition: point, mouseButton: .right)?.post(tap: .cghidEventTap)
+#endif
             case "swipe", "scroll":
                 let toX = number("to_x", in: request) ?? x - (number("delta_x", in: request) ?? 0)
                 let toY = number("to_y", in: request) ?? y - (number("delta_y", in: request) ?? 0)

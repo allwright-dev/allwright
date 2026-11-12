@@ -45,6 +45,10 @@ public class NativeLocator {
         page.click(selector, options);
     }
 
+    public void click(ClickOptions options) {
+        page.click(selector, options);
+    }
+
     public int count() {
         return page.count(selector);
     }
