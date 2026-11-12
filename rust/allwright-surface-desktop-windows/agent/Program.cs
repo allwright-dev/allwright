@@ -176,6 +176,7 @@ internal static class Program
         // PrintWindow still renders device pixels, displacing inspector
         // highlights and pointer input on scaled or mixed-DPI displays.
         _ = SetProcessDpiAwarenessContext(new IntPtr(-4)); // PER_MONITOR_AWARE_V2
+        LiveInspectMouse.Start();
         var port = 8300;
         var portIndex = Array.IndexOf(args, "--port");
         if (portIndex >= 0 && portIndex + 1 < args.Length) port = int.Parse(args[portIndex + 1]);
@@ -288,8 +289,46 @@ internal static class Program
         "wait" => Wait(request),
         "screenshot" => Screenshot(request),
         "source" => Source(request),
+        "element_from_point" => ElementFromPoint(request),
+        "inspect_event" => InspectEvent(request),
         _ => throw new InvalidOperationException($"unknown command `{request.Command}`")
     };
+
+    private static object InspectEvent(AgentRequest request)
+    {
+        _ = long.TryParse(request.Value, out var lastSequence);
+        var root = Root(request).WindowRoot();
+        var handle = new IntPtr(root.Properties.NativeWindowHandle.ValueOrDefault);
+        LiveInspectMouse.Arm(handle);
+        var click = LiveInspectMouse.Latest;
+        if (click is null || click.Sequence <= lastSequence)
+            return new { sequence = lastSequence };
+        var bounds = root.Properties.BoundingRectangle.ValueOrDefault;
+        if (handle == IntPtr.Zero || click.Window != handle
+            || !bounds.Contains(click.X, click.Y))
+            return new { sequence = click.Sequence };
+        return new { sequence = click.Sequence, x = click.X, y = click.Y };
+    }
+
+    private static object ElementFromPoint(AgentRequest request)
+    {
+        var root = Root(request);
+        root.AsWindow().Activate();
+        var x = request.X ?? throw new InvalidOperationException("element_from_point requires x");
+        var y = request.Y ?? throw new InvalidOperationException("element_from_point requires y");
+        var rootBounds = root.Properties.BoundingRectangle.ValueOrDefault;
+        if (!rootBounds.Contains((int)Math.Round(x), (int)Math.Round(y)))
+            throw new InvalidOperationException("inspection point is outside the selected application window");
+        var remainingNodes = 500;
+        return new
+        {
+            element = SnapshotElement(
+                Automation.FromPoint(x, y),
+                0,
+                DateTime.UtcNow.AddSeconds(4),
+                ref remainingNodes)
+        };
+    }
 
     private static object PointerInput(AgentRequest request)
     {
@@ -833,7 +872,15 @@ internal static class Program
         var text = spec[kind == "role" ? "name" : "text"]?.GetValue<string>();
         var exact = spec["exact"]?.GetValue<bool>() ?? false;
         var role = RoleType(spec["role"]?.GetValue<string>() ?? "");
-        var elements = FindAllByTraversal(root, element => kind switch
+        var candidates = kind switch
+        {
+            "testId" => root.FindAllDescendants(
+                Automation.ConditionFactory.ByAutomationId(text ?? "")),
+            "role" => root.FindAllDescendants(
+                Automation.ConditionFactory.ByControlType(role)),
+            _ => FindAllByTraversal(root, _ => true, stopOnFirstVisible: false)
+        };
+        var elements = candidates.Where(element => kind switch
         {
             "role" => element.Properties.ControlType.ValueOrDefault == role
                 && (text is null || (exact
@@ -846,7 +893,13 @@ internal static class Program
                 text ?? "",
                 StringComparison.Ordinal),
             _ => true
-        }, stopOnFirstVisible);
+        }).ToArray();
+        if (stopOnFirstVisible)
+        {
+            var visible = elements.FirstOrDefault(element =>
+                !element.Properties.IsOffscreen.ValueOrDefault);
+            if (visible is not null) elements = [visible];
+        }
         if (text is null || kind is "testId" or "role") return elements;
         return elements.Where(element =>
         {

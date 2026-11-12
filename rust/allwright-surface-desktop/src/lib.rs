@@ -1,5 +1,5 @@
 use allwright_plugin_sdk::{
-    AccessibilitySnapshotInfo, CaptureInfo, InspectorSnapshot, SurfaceFamily,
+    AccessibilitySnapshotInfo, CaptureInfo, InspectorNode, InspectorSnapshot, SurfaceFamily,
     SurfacePluginDescriptor,
 };
 use serde::{Deserialize, Serialize};
@@ -110,6 +110,12 @@ pub struct DesktopWaitInfo {
 pub struct DesktopScreenshotInfo {
     pub png_data: Vec<u8>,
     pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DesktopInspectorPoint {
+    pub x: f64,
+    pub y: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -236,6 +242,17 @@ pub enum DesktopCommand {
         desktop_session: DesktopSessionHandle,
         app_session: DesktopAppSessionHandle,
     },
+    InspectorElementAtPoint {
+        desktop_session: DesktopSessionHandle,
+        app_session: DesktopAppSessionHandle,
+        x: f64,
+        y: f64,
+    },
+    PollInspectorPoint {
+        desktop_session: DesktopSessionHandle,
+        app_session: DesktopAppSessionHandle,
+        last_sequence: u64,
+    },
     ListWindows {
         desktop_session: DesktopSessionHandle,
         app_session: DesktopAppSessionHandle,
@@ -279,9 +296,18 @@ pub enum DesktopCommandResult {
     Screenshot(DesktopScreenshotInfo),
     AccessibilitySnapshot(AccessibilitySnapshotInfo),
     InspectorSnapshot(InspectorSnapshot),
-    ListWindows { windows: Vec<DesktopWindowInfo> },
+    InspectorElementAtPoint(InspectorNode),
+    PollInspectorPoint {
+        sequence: u64,
+        point: Option<DesktopInspectorPoint>,
+    },
+    ListWindows {
+        windows: Vec<DesktopWindowInfo>,
+    },
     CloseWindow,
-    RegisterWindowHook { hook_id: String },
+    RegisterWindowHook {
+        hook_id: String,
+    },
     WaitForWindowHook(DesktopWindowInfo),
 }
 

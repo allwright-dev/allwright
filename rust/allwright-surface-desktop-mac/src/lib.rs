@@ -1081,6 +1081,13 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
                 raw,
             )?))
         }
+        DesktopCommand::InspectorElementAtPoint { .. } => {
+            Err("native inspector point lookup is not supported by desktop-mac".to_string())
+        }
+        DesktopCommand::PollInspectorPoint { .. } => Ok(DesktopCommandResult::PollInspectorPoint {
+            sequence: 0,
+            point: None,
+        }),
         DesktopCommand::ListWindows {
             desktop_session,
             app_session,

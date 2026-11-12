@@ -62,6 +62,14 @@ internal sealed class NativeAutomation
     public AutomationElement GetDesktop() =>
         new(this, UiaCall.Run("desktop root lookup", () => Client.GetRootElement()));
     public AutomationElement FromHandle(IntPtr handle) => AutomationElement.FromWindow(this, handle);
+    public AutomationElement FromPoint(double x, double y) => new(
+        this,
+        UiaCall.Run("element from point", () =>
+            Client.ElementFromPoint(new Com.tagPOINT
+            {
+                x = (int)Math.Round(x),
+                y = (int)Math.Round(y)
+            })));
 
     internal Com.IUIAutomationCacheRequest CreateElementCache()
     {

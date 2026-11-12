@@ -64,6 +64,7 @@ struct InspectorRuntime {
     surface: InspectorSurface,
     session: InspectorSession,
     selected_desktop_window: Mutex<Option<String>>,
+    last_inspector_point_sequence: Mutex<u64>,
 }
 
 impl Drop for InspectorRuntime {
@@ -244,6 +245,7 @@ impl InspectorRuntime {
             surface,
             session,
             selected_desktop_window: Mutex::new(None),
+            last_inspector_point_sequence: Mutex::new(0),
         })
     }
 
@@ -328,6 +330,72 @@ impl InspectorRuntime {
             // window again instead of leaving the inspector stuck on that HWND.
             std::thread::sleep(std::time::Duration::from_millis(200));
         }
+    }
+
+    fn live_inspect(&self, point: InspectorPointRequest) -> Result<Value, Box<dyn Error>> {
+        let mut snapshot = if self.surface.id() == "desktop-windows" {
+            let InspectorSession::Desktop { desktop, app } = &self.session else {
+                unreachable!("desktop-windows always has a desktop session")
+            };
+            let (target, _, _) = self.desktop_target(app)?;
+            let result = invoke_desktop(
+                self.surface.id(),
+                DesktopCommand::InspectorElementAtPoint {
+                    desktop_session: desktop.clone(),
+                    app_session: target,
+                    x: point.x,
+                    y: point.y,
+                },
+            )?;
+            let DesktopCommandResult::InspectorElementAtPoint(element) = result else {
+                return Err("desktop-windows returned an unexpected point lookup response".into());
+            };
+            let mut snapshot = self.snapshot_with_window_retry()?;
+            snapshot["hit"] = serde_json::to_value(element)?;
+            snapshot
+        } else {
+            self.snapshot_with_window_retry()?
+        };
+        snapshot["inspectionPoint"] = json!({"x": point.x, "y": point.y});
+        Ok(snapshot)
+    }
+
+    fn poll_live_inspect(&self) -> Result<Value, Box<dyn Error>> {
+        if self.surface.id() != "desktop-windows" {
+            return Ok(json!({"event": false}));
+        }
+        let InspectorSession::Desktop { desktop, app } = &self.session else {
+            unreachable!("desktop-windows always has a desktop session")
+        };
+        let (target, _, _) = self.desktop_target(app)?;
+        let last_sequence = *self
+            .last_inspector_point_sequence
+            .lock()
+            .map_err(|_| "live inspector sequence lock is poisoned")?;
+        let result = invoke_desktop(
+            self.surface.id(),
+            DesktopCommand::PollInspectorPoint {
+                desktop_session: desktop.clone(),
+                app_session: target,
+                last_sequence,
+            },
+        )?;
+        let DesktopCommandResult::PollInspectorPoint { sequence, point } = result else {
+            return Err("desktop-windows returned an unexpected inspect event response".into());
+        };
+        *self
+            .last_inspector_point_sequence
+            .lock()
+            .map_err(|_| "live inspector sequence lock is poisoned")? = sequence;
+        let Some(point) = point else {
+            return Ok(json!({"event": false}));
+        };
+        let mut snapshot = self.live_inspect(InspectorPointRequest {
+            x: point.x,
+            y: point.y,
+        })?;
+        snapshot["event"] = Value::Bool(true);
+        Ok(snapshot)
     }
 
     fn select_desktop_window(&self, window_id: Option<String>) -> Result<Value, Box<dyn Error>> {
@@ -829,6 +897,10 @@ fn handle_request(
             let body = serde_json::to_vec(&runtime.snapshot_with_window_retry()?)?;
             write_response(stream, "200 OK", "application/json", &body)?;
         }
+        ("GET", "/api/live-inspect") => {
+            let body = serde_json::to_vec(&runtime.poll_live_inspect()?)?;
+            write_response(stream, "200 OK", "application/json", &body)?;
+        }
         ("GET", "/api/frame") => {
             let (png, window_id) = runtime.frame()?;
             let headers = window_id
@@ -848,17 +920,8 @@ fn handle_request(
         }
         ("POST", "/api/input") => {
             let payload: InspectorInputRequest = serde_json::from_slice(&request.body)?;
-            let freeze_after = payload.kind == "pointer"
-                && payload.action.as_deref() == Some("right_click")
-                && matches!(&runtime.session, InspectorSession::Desktop { .. });
             runtime.live_input(payload)?;
-            if freeze_after {
-                std::thread::sleep(std::time::Duration::from_millis(100));
-                let body = serde_json::to_vec(&runtime.snapshot_with_window_retry()?)?;
-                write_response(stream, "200 OK", "application/json", &body)?;
-            } else {
-                write_response(stream, "200 OK", "application/json", br#"{"ok":true}"#)?;
-            }
+            write_response(stream, "200 OK", "application/json", br#"{"ok":true}"#)?;
         }
         ("POST", "/api/click") => {
             let payload: Value = serde_json::from_slice(&request.body)?;
@@ -920,6 +983,12 @@ struct InspectorActionRequest {
 struct InspectorWindowRequest {
     #[serde(rename = "windowId")]
     window_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct InspectorPointRequest {
+    x: f64,
+    y: f64,
 }
 
 #[derive(Deserialize)]
@@ -1111,6 +1180,10 @@ mod tests {
         assert!(INDEX_HTML.contains("freezeSnapshot"));
         assert!(INDEX_HTML.contains("event.key==='F8'"));
         assert!(INDEX_HTML.contains("right_click"));
+        assert!(INDEX_HTML.contains("event.ctrlKey"));
+        assert!(INDEX_HTML.contains("liveInspect"));
+        assert!(INDEX_HTML.contains("/api/live-inspect"));
+        assert!(INDEX_HTML.contains("attachLiveHit"));
         assert!(INDEX_HTML.contains("double_click"));
         assert!(INDEX_HTML.contains("wheelInteract"));
         assert!(INDEX_HTML.contains("pointerFinish"));

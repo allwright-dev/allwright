@@ -92,6 +92,12 @@ fn invoke_desktop(command: DesktopCommand) -> Result<DesktopCommandResult, Strin
         | DesktopCommand::InspectorSnapshot {
             desktop_session, ..
         }
+        | DesktopCommand::InspectorElementAtPoint {
+            desktop_session, ..
+        }
+        | DesktopCommand::PollInspectorPoint {
+            desktop_session, ..
+        }
         | DesktopCommand::ListWindows {
             desktop_session, ..
         }

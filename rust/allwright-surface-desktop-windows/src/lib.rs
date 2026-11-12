@@ -4,9 +4,10 @@ use allwright_plugin_sdk::{
 };
 use allwright_surface_desktop::{
     ConnectOptions, DesktopActionInfo, DesktopAppInfo, DesktopAppSessionHandle, DesktopCommand,
-    DesktopCommandResult, DesktopConnectInfo, DesktopElementCountInfo, DesktopNavigationInfo,
-    DesktopPlatform, DesktopScreenshotInfo, DesktopSessionHandle, DesktopTextInfo, DesktopWaitInfo,
-    DesktopWindowInfo, LaunchOptions, boot_surface, normalize_selector_for_transport,
+    DesktopCommandResult, DesktopConnectInfo, DesktopElementCountInfo, DesktopInspectorPoint,
+    DesktopNavigationInfo, DesktopPlatform, DesktopScreenshotInfo, DesktopSessionHandle,
+    DesktopTextInfo, DesktopWaitInfo, DesktopWindowInfo, LaunchOptions, boot_surface,
+    normalize_selector_for_transport,
 };
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -898,6 +899,50 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
             Ok(DesktopCommandResult::InspectorSnapshot(inspector_snapshot(
                 raw,
             )?))
+        }
+        DesktopCommand::InspectorElementAtPoint {
+            desktop_session,
+            app_session,
+            x,
+            y,
+        } => {
+            let mut request = AgentRequest::new("element_from_point");
+            request.session_id = Some(&app_session.app_session_id);
+            request.window_id = app_session.window_id.as_deref();
+            request.x = Some(x);
+            request.y = Some(y);
+            request.timeout_ms = Some(8_000);
+            let value = invoke_agent(&desktop_session.endpoint, &request, Some(10_000))?;
+            let element = serde_json::from_value(
+                value
+                    .get("element")
+                    .cloned()
+                    .ok_or_else(|| "Windows agent returned no element at point".to_string())?,
+            )
+            .map_err(|error| format!("Windows agent returned an invalid element: {error}"))?;
+            Ok(DesktopCommandResult::InspectorElementAtPoint(element))
+        }
+        DesktopCommand::PollInspectorPoint {
+            desktop_session,
+            app_session,
+            last_sequence,
+        } => {
+            let mut request = AgentRequest::new("inspect_event");
+            request.session_id = Some(&app_session.app_session_id);
+            request.window_id = app_session.window_id.as_deref();
+            let sequence_text = last_sequence.to_string();
+            request.value = Some(&sequence_text);
+            let value = invoke_agent(&desktop_session.endpoint, &request, Some(3_000))?;
+            let sequence = value
+                .get("sequence")
+                .and_then(Value::as_u64)
+                .unwrap_or(last_sequence);
+            let point = value
+                .get("x")
+                .and_then(Value::as_f64)
+                .zip(value.get("y").and_then(Value::as_f64))
+                .map(|(x, y)| DesktopInspectorPoint { x, y });
+            Ok(DesktopCommandResult::PollInspectorPoint { sequence, point })
         }
         DesktopCommand::ListWindows {
             desktop_session,
