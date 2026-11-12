@@ -24,6 +24,7 @@ internal static class LiveInspectMouse
     private static long armedAt;
     private static long suppressedWindow;
     private static long suppressUntil;
+    private static LiveInspectOverlay? overlay;
 
     public static LiveInspectClick? Latest => Volatile.Read(ref latest);
 
@@ -31,6 +32,9 @@ internal static class LiveInspectMouse
     {
         Interlocked.Exchange(ref armedWindow, window.ToInt64());
         Interlocked.Exchange(ref armedAt, Environment.TickCount64);
+        var picker = Volatile.Read(ref overlay);
+        if (picker is not null && picker.IsHandleCreated)
+            picker.BeginInvoke((Action)(() => picker.Arm(window)));
     }
 
     public static void Start()
@@ -39,6 +43,9 @@ internal static class LiveInspectMouse
         Exception? installationError = null;
         var thread = new Thread(() =>
         {
+            using var picker = new LiveInspectOverlay(Record);
+            _ = picker.Handle;
+            Volatile.Write(ref overlay, picker);
             var hook = SetWindowsHookEx(
                 WhMouseLowLevel,
                 Callback,
@@ -54,7 +61,11 @@ internal static class LiveInspectMouse
             }
             ready.Set();
             try { Application.Run(); }
-            finally { UnhookWindowsHookEx(hook); }
+            finally
+            {
+                Volatile.Write(ref overlay, null);
+                UnhookWindowsHookEx(hook);
+            }
         })
         {
             IsBackground = true,
@@ -85,11 +96,7 @@ internal static class LiveInspectMouse
                 && windowValue != 0
                 && windowValue == Interlocked.Read(ref armedWindow))
             {
-                Volatile.Write(ref latest, new LiveInspectClick(
-                    Interlocked.Increment(ref sequence),
-                    mouse.Point.X,
-                    mouse.Point.Y,
-                    window));
+                Record(window, mouse.Point.X, mouse.Point.Y);
                 Interlocked.Exchange(ref suppressedWindow, windowValue);
                 Interlocked.Exchange(ref suppressUntil, now + SuppressionBurstMs);
                 return new IntPtr(1);
@@ -97,6 +104,10 @@ internal static class LiveInspectMouse
         }
         return CallNextHookEx(IntPtr.Zero, code, message, data);
     }
+
+    private static void Record(IntPtr window, int x, int y) =>
+        Volatile.Write(ref latest, new LiveInspectClick(
+            Interlocked.Increment(ref sequence), x, y, window));
 
     private static bool IsButtonMessage(IntPtr message) =>
         message == new IntPtr(LeftButtonDown)
@@ -140,4 +151,146 @@ internal static class LiveInspectMouse
     private static extern IntPtr GetAncestor(IntPtr window, uint flags);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr GetModuleHandle(string? moduleName);
+}
+
+internal sealed class LiveInspectOverlay : Form
+{
+    private const int ExtendedStyle = -20;
+    private const long ToolWindow = 0x00000080L;
+    private const long NoActivate = 0x08000000L;
+    private const int OwnerWindow = -8;
+    private const uint WindowAbove = 3;
+    private const uint NoActivatePosition = 0x0010;
+    private const int MouseActivate = 0x0021;
+    private const int NoActivateMouse = 3;
+    private readonly Action<IntPtr, int, int> record;
+    private readonly System.Windows.Forms.Timer modifierTimer;
+    private IntPtr target;
+    private long armedAt;
+
+    public LiveInspectOverlay(Action<IntPtr, int, int> record)
+    {
+        this.record = record;
+        FormBorderStyle = FormBorderStyle.None;
+        ShowInTaskbar = false;
+        StartPosition = FormStartPosition.Manual;
+        BackColor = Color.Black;
+        Opacity = 0.01;
+        modifierTimer = new System.Windows.Forms.Timer { Interval = 15 };
+        modifierTimer.Tick += (_, _) => UpdateVisibility();
+        modifierTimer.Start();
+    }
+
+    protected override bool ShowWithoutActivation => true;
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var parameters = base.CreateParams;
+            parameters.ExStyle |= (int)(ToolWindow | NoActivate);
+            return parameters;
+        }
+    }
+
+    public void Arm(IntPtr window)
+    {
+        target = window;
+        armedAt = Environment.TickCount64;
+        SetWindowLongPtr(Handle, OwnerWindow, window);
+        Reposition();
+        UpdateVisibility();
+    }
+
+    protected override void OnMouseDown(MouseEventArgs eventArgs)
+    {
+        if (target != IntPtr.Zero && IsControlPressed())
+        {
+            var point = PointToScreen(eventArgs.Location);
+            record(target, point.X, point.Y);
+        }
+        base.OnMouseDown(eventArgs);
+    }
+
+    protected override void WndProc(ref Message message)
+    {
+        if (message.Msg == MouseActivate)
+        {
+            message.Result = new IntPtr(NoActivateMouse);
+            return;
+        }
+        base.WndProc(ref message);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) modifierTimer.Dispose();
+        base.Dispose(disposing);
+    }
+
+    private void UpdateVisibility()
+    {
+        var shouldShow = target != IntPtr.Zero
+            && Environment.TickCount64 - armedAt < 3_000
+            && IsWindowVisible(target)
+            && !IsIconic(target) && IsControlPressed();
+        if (!shouldShow)
+        {
+            if (Visible) Hide();
+            return;
+        }
+        if (!Visible) Show();
+        Reposition();
+    }
+
+    private void Reposition()
+    {
+        if (target == IntPtr.Zero || !GetWindowRect(target, out var bounds)) return;
+        var aboveTarget = GetWindow(target, WindowAbove);
+        SetWindowPos(
+            Handle,
+            aboveTarget,
+            bounds.Left,
+            bounds.Top,
+            Math.Max(1, bounds.Right - bounds.Left),
+            Math.Max(1, bounds.Bottom - bounds.Top),
+            NoActivatePosition);
+    }
+
+    private static bool IsControlPressed() =>
+        (GetAsyncKeyState(0x11) & 0x8000) != 0;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WindowBounds
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int virtualKey);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr window, out WindowBounds bounds);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsIconic(IntPtr window);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindow(IntPtr window, uint command);
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(
+        IntPtr window,
+        IntPtr insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
 }
