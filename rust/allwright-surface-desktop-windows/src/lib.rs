@@ -170,7 +170,7 @@ fn invoke_agent<T: Serialize>(
 ) -> Result<Value, String> {
     let (host, port, path) = parse_http_endpoint(endpoint)?;
     let timeout =
-        Duration::from_millis(timeout_ms.unwrap_or(10_000).max(1).saturating_add(2_000) as u64);
+        Duration::from_millis(timeout_ms.unwrap_or(10_000).max(1).saturating_add(5_000) as u64);
     let mut stream = TcpStream::connect((host.as_str(), port))
         .map_err(|e| format!("could not connect to Windows agent at {endpoint}: {e}"))?;
     stream

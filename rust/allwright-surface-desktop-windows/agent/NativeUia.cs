@@ -5,25 +5,30 @@ namespace Allwright.WindowsAgent;
 
 internal sealed class UiaProviderTimeoutException : TimeoutException
 {
-    public UiaProviderTimeoutException(string operation)
-        : base($"Windows UI Automation provider timed out during {operation}") { }
+    public UiaProviderTimeoutException(string operation, bool waitingForPreviousCall = false)
+        : base(waitingForPreviousCall
+            ? $"Windows UI Automation provider was still completing an earlier call before {operation}"
+            : $"Windows UI Automation provider timed out during {operation}") { }
 }
 
 internal static class UiaCall
 {
-    private const int DefaultTimeoutMs = 1_500;
-    private static long blockedUntil;
+    private const int DefaultTimeoutMs = 2_500;
+    private static readonly SemaphoreSlim ProviderGate = new(1, 1);
 
     public static T Run<T>(string operation, Func<T> work, int timeoutMs = DefaultTimeoutMs)
     {
-        if (Environment.TickCount64 < Interlocked.Read(ref blockedUntil))
-            throw new UiaProviderTimeoutException(operation);
-        var task = Task.Run(work);
+        if (!ProviderGate.Wait(timeoutMs))
+            throw new UiaProviderTimeoutException(operation, waitingForPreviousCall: true);
+        var task = Task.Run(() =>
+        {
+            try { return work(); }
+            finally { ProviderGate.Release(); }
+        });
         try
         {
             if (!task.Wait(timeoutMs))
             {
-                Interlocked.Exchange(ref blockedUntil, Environment.TickCount64 + 5_000);
                 _ = task.ContinueWith(faulted => _ = faulted.Exception,
                     TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
                 throw new UiaProviderTimeoutException(operation);
@@ -42,9 +47,17 @@ internal static class UiaCall
 
 internal sealed class NativeAutomation
 {
-    private readonly Lazy<Com.IUIAutomation> client = new(CreateClient);
-    public NativeAutomation() { ConditionFactory = new(this); }
-    internal Com.IUIAutomation Client => client.Value;
+    private readonly Com.IUIAutomation client;
+    public NativeAutomation()
+    {
+        // Program.Main is STA for native input compatibility. Create the UIA
+        // client in the process MTA used by bounded provider work so direct,
+        // provider-independent condition construction cannot initialize an
+        // STA-bound COM wrapper and deadlock worker calls.
+        client = Task.Run(CreateClient).GetAwaiter().GetResult();
+        ConditionFactory = new(this);
+    }
+    internal Com.IUIAutomation Client => client;
     public NativeConditionFactory ConditionFactory { get; }
     public AutomationElement GetDesktop() =>
         new(this, UiaCall.Run("desktop root lookup", () => Client.GetRootElement()));
@@ -98,8 +111,11 @@ internal sealed class NativeConditionFactory
     public ConditionBase ByName(string value) => Create(Com.UIA_PropertyIds.UIA_NamePropertyId, value);
     public ConditionBase ByClassName(string value) => Create(Com.UIA_PropertyIds.UIA_ClassNamePropertyId, value);
     public ConditionBase ByControlType(ControlType value) => Create(Com.UIA_PropertyIds.UIA_ControlTypePropertyId, value.ToNative());
+    // Property conditions are constructed inside the UIA client and do not
+    // call the application provider. Keeping this outside the provider gate
+    // prevents a slow SAP query from being misreported as condition creation.
     private ConditionBase Create(int property, object value) => new(
-        UiaCall.Run("condition creation", () => automation.Client.CreatePropertyCondition(property, value)));
+        automation.Client.CreatePropertyCondition(property, value));
 }
 
 internal enum ControlType
@@ -207,7 +223,7 @@ internal sealed class AutomationElement
     {
         var element = TryInner();
         if (element is null) return [];
-        return UiaCall.Or("element enumeration", () =>
+        AutomationElement[] Enumerate()
         {
             var actualCondition = condition?.Inner ?? automation.Client.CreateTrueCondition();
             var useCache = scope == Com.TreeScope.TreeScope_Children && condition is null;
@@ -221,7 +237,13 @@ internal sealed class AutomationElement
                     collection.GetElement(index),
                     cached: useCache);
             return result;
-        }, Array.Empty<AutomationElement>());
+        }
+        // Hierarchy snapshots tolerate a slow child branch and mark/truncate
+        // what they could read. Locator queries must surface the provider
+        // timeout so their outer retry deadline can make another observation.
+        return scope == Com.TreeScope.TreeScope_Children && condition is null
+            ? UiaCall.Or("child enumeration", Enumerate, Array.Empty<AutomationElement>())
+            : UiaCall.Run("element enumeration", Enumerate);
     }
 
     public void Focus()
