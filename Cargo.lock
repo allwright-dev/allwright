@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "allwright"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",
@@ -40,7 +40,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-core"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -62,7 +62,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-plugin-sdk"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "serde",
  "serde_json",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "allwright-plugin-sdk",
  "serde",
@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-linux"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -90,7 +90,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-mac"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -103,7 +103,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-desktop-windows"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-desktop",
@@ -116,7 +116,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "allwright-plugin-sdk",
  "serde",
@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile-android"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
@@ -141,7 +141,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-mobile-ios"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "allwright-plugin-sdk",
  "allwright-surface-mobile",
@@ -156,7 +156,7 @@ dependencies = [
 
 [[package]]
 name = "allwright-surface-web"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "allwright-core",
  "allwright-plugin-sdk",
@@ -539,9 +539,9 @@ checksum = "00d174d5400e5e8fd687ad1049e2f578285fa914201b1af7e8b112a4546bd826"
 
 [[package]]
 name = "errno"
-version = "0.3.14"
+version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
+checksum = "e35d6e78f4cebb90e51d543db8fe41528851d6deeef6ef21ebd4bfdc1e784776"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
