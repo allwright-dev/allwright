@@ -374,21 +374,35 @@ internal static class Program
         }
         if (HoverSnapshots.TryGetValue(handle.ToInt64(), out var previous)
             && Math.Abs(previous.X - point.X) < 2
-            && Math.Abs(previous.Y - point.Y) < 2
-            && DateTime.UtcNow - previous.CapturedAt < TimeSpan.FromMilliseconds(400))
+            && Math.Abs(previous.Y - point.Y) < 2)
         {
+            previous = previous with { CapturedAt = DateTime.UtcNow };
+            HoverSnapshots[handle.ToInt64()] = previous;
             LiveInspectMouse.ShowHover(
                 handle, point.X, point.Y, HoverDetails(previous.Element));
             return;
         }
         try
         {
-            var remainingNodes = 1;
-            var element = SnapshotElement(
-                Automation.FromPoint(point.X, point.Y),
-                0,
-                DateTime.UtcNow.AddSeconds(2),
-                ref remainingNodes);
+            var hovered = NativeAutomation.TryHoverElementFromPoint(point.X, point.Y);
+            if (hovered is null) return;
+            var element = new JsonObject
+            {
+                ["role"] = hovered.Role,
+                ["name"] = hovered.Name,
+                ["automationId"] = hovered.AutomationId,
+                ["className"] = hovered.ClassName,
+                ["enabled"] = hovered.Enabled,
+                ["offscreen"] = hovered.Offscreen,
+                ["bounds"] = new JsonObject
+                {
+                    ["x"] = hovered.Bounds.X,
+                    ["y"] = hovered.Bounds.Y,
+                    ["width"] = hovered.Bounds.Width,
+                    ["height"] = hovered.Bounds.Height
+                },
+                ["children"] = new JsonArray()
+            };
             HoverSnapshots[handle.ToInt64()] = new HoverSnapshot(
                 point.X, point.Y, DateTime.UtcNow, element);
             LiveInspectMouse.ShowHover(handle, point.X, point.Y, HoverDetails(element));
@@ -977,15 +991,7 @@ internal static class Program
         var text = spec[kind == "role" ? "name" : "text"]?.GetValue<string>();
         var exact = spec["exact"]?.GetValue<bool>() ?? false;
         var role = RoleType(spec["role"]?.GetValue<string>() ?? "");
-        var candidates = kind switch
-        {
-            "testId" => root.FindAllDescendants(
-                Automation.ConditionFactory.ByAutomationId(text ?? "")),
-            "role" => root.FindAllDescendants(
-                Automation.ConditionFactory.ByControlType(role)),
-            _ => FindAllByTraversal(root, _ => true, stopOnFirstVisible: false)
-        };
-        var elements = candidates.Where(element => kind switch
+        var elements = FindAllByTraversal(root, element => kind switch
         {
             "role" => element.Properties.ControlType.ValueOrDefault == role
                 && (text is null || (exact
@@ -998,13 +1004,7 @@ internal static class Program
                 text ?? "",
                 StringComparison.Ordinal),
             _ => true
-        }).ToArray();
-        if (stopOnFirstVisible)
-        {
-            var visible = elements.FirstOrDefault(element =>
-                !element.Properties.IsOffscreen.ValueOrDefault);
-            if (visible is not null) elements = [visible];
-        }
+        }, stopOnFirstVisible);
         if (text is null || kind is "testId" or "role") return elements;
         return elements.Where(element =>
         {

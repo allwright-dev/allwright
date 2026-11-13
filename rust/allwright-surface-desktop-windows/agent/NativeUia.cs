@@ -45,6 +45,15 @@ internal static class UiaCall
     }
 }
 
+internal sealed record HoverElementSnapshot(
+    string Role,
+    string Name,
+    string AutomationId,
+    string ClassName,
+    bool Enabled,
+    bool Offscreen,
+    System.Drawing.RectangleF Bounds);
+
 internal sealed class NativeAutomation
 {
     private readonly Com.IUIAutomation client;
@@ -54,7 +63,7 @@ internal sealed class NativeAutomation
         // client in the process MTA used by bounded provider work so direct,
         // provider-independent condition construction cannot initialize an
         // STA-bound COM wrapper and deadlock worker calls.
-        client = Task.Run(CreateClient).GetAwaiter().GetResult();
+        client = Task.Run(() => CreateClient()).GetAwaiter().GetResult();
         ConditionFactory = new(this);
     }
     internal Com.IUIAutomation Client => client;
@@ -70,6 +79,44 @@ internal sealed class NativeAutomation
                 x = (int)Math.Round(x),
                 y = (int)Math.Round(y)
             })));
+
+    public static HoverElementSnapshot? TryHoverElementFromPoint(
+        double x,
+        double y,
+        int timeoutMs = 300)
+    {
+        var task = Task.Run(() =>
+        {
+            var hoverClient = CreateClient(150, 200);
+            var element = hoverClient.ElementFromPoint(new Com.tagPOINT
+            {
+                x = (int)Math.Round(x),
+                y = (int)Math.Round(y)
+            });
+            var rectangle = element.CurrentBoundingRectangle;
+            return new HoverElementSnapshot(
+                ControlTypeExtensions.FromNative(element.CurrentControlType)
+                    .ToString().ToLowerInvariant(),
+                element.CurrentName ?? "",
+                element.CurrentAutomationId ?? "",
+                element.CurrentClassName ?? "",
+                element.CurrentIsEnabled != 0,
+                element.CurrentIsOffscreen != 0,
+                new System.Drawing.RectangleF(
+                    rectangle.left,
+                    rectangle.top,
+                    rectangle.right - rectangle.left,
+                    rectangle.bottom - rectangle.top));
+        });
+        try
+        {
+            if (task.Wait(timeoutMs)) return task.Result;
+            _ = task.ContinueWith(faulted => _ = faulted.Exception,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+        }
+        catch { }
+        return null;
+    }
 
     internal Com.IUIAutomationCacheRequest CreateElementCache()
     {
@@ -93,13 +140,15 @@ internal sealed class NativeAutomation
         return cache;
     }
 
-    private static Com.IUIAutomation CreateClient()
+    private static Com.IUIAutomation CreateClient(
+        int connectionTimeoutMs = 1_000,
+        int transactionTimeoutMs = 1_500)
     {
         var automation = new Com.CUIAutomation8Class();
         if (automation is Com.IUIAutomation2 bounded)
         {
-            bounded.ConnectionTimeout = 1_000;
-            bounded.TransactionTimeout = 1_500;
+            bounded.ConnectionTimeout = (uint)connectionTimeoutMs;
+            bounded.TransactionTimeout = (uint)transactionTimeoutMs;
         }
         return automation;
     }
@@ -226,7 +275,6 @@ internal sealed class AutomationElement
 
     public AutomationElement[] FindAllDescendants(ConditionBase? condition = null) => Find(Com.TreeScope.TreeScope_Descendants, condition);
     public AutomationElement[] FindAllChildren(ConditionBase? condition = null) => Find(Com.TreeScope.TreeScope_Children, condition);
-
     private AutomationElement[] Find(Com.TreeScope scope, ConditionBase? condition)
     {
         var element = TryInner();
