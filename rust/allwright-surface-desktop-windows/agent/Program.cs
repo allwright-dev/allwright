@@ -316,33 +316,47 @@ internal static class Program
     private static object InspectEvent(AgentRequest request)
     {
         _ = long.TryParse(request.Value, out var lastSequence);
-        var root = Root(request).WindowRoot();
-        var handle = new IntPtr(root.Properties.NativeWindowHandle.ValueOrDefault);
-        LiveInspectMouse.Arm(handle);
+        var session = Session(request);
+        var windows = ResolveWindows(session);
         var click = LiveInspectMouse.Latest;
-        if (click is null || click.Sequence <= lastSequence)
+        if (click is not null && click.Sequence > lastSequence)
         {
-            CacheHoveredElement(handle);
-            return new { sequence = lastSequence };
+            HoverSnapshots.TryGetValue(click.Window.ToInt64(), out var clickedHover);
+            var cached = clickedHover is not null
+                && DateTime.UtcNow - clickedHover.CapturedAt < TimeSpan.FromSeconds(5)
+                && Math.Abs(clickedHover.X - click.X) <= 32
+                && Math.Abs(clickedHover.Y - click.Y) <= 32
+                ? clickedHover.Element
+                : null;
+            return new
+            {
+                sequence = click.Sequence,
+                x = click.X,
+                y = click.Y,
+                element = cached
+            };
         }
-        var bounds = root.Properties.BoundingRectangle.ValueOrDefault;
-        if (handle == IntPtr.Zero || click.Window != handle
-            || !bounds.Contains(click.X, click.Y))
-            return new { sequence = click.Sequence };
-        HoverSnapshots.TryGetValue(handle.ToInt64(), out var hover);
-        var cached = hover is not null
-            && DateTime.UtcNow - hover.CapturedAt < TimeSpan.FromSeconds(5)
-            && Math.Abs(hover.X - click.X) <= 32
-            && Math.Abs(hover.Y - click.Y) <= 32
-            ? hover.Element
-            : null;
-        return new
+
+        IntPtr hoverWindow = IntPtr.Zero;
+        if (GetCursorPos(out var point))
         {
-            sequence = click.Sequence,
-            x = click.X,
-            y = click.Y,
-            element = cached
-        };
+            var windowAtPoint = GetAncestor(WindowFromPoint(point), RootAncestor);
+            if (windows.Any(window => window.Id == WindowId(windowAtPoint)))
+                hoverWindow = windowAtPoint;
+        }
+        if (hoverWindow == IntPtr.Zero)
+        {
+            var selected = !string.IsNullOrWhiteSpace(request.WindowId)
+                ? windows.FirstOrDefault(window => window.Id == request.WindowId)
+                : windows.FirstOrDefault(window => window.Id == session.MainWindowId);
+            hoverWindow = selected is null
+                ? IntPtr.Zero
+                : new IntPtr(selected.Root.Properties.NativeWindowHandle.ValueOrDefault);
+            LiveInspectMouse.HideHover();
+        }
+        LiveInspectMouse.Arm(hoverWindow);
+        CacheHoveredElement(hoverWindow);
+        return new { sequence = lastSequence };
     }
 
     private static void CacheHoveredElement(IntPtr handle)
