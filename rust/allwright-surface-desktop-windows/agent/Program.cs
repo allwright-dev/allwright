@@ -347,14 +347,26 @@ internal static class Program
 
     private static void CacheHoveredElement(IntPtr handle)
     {
-        if (handle == IntPtr.Zero || !GetCursorPos(out var point)) return;
+        if (handle == IntPtr.Zero || !GetCursorPos(out var point))
+        {
+            LiveInspectMouse.HideHover();
+            return;
+        }
         var pointWindow = GetAncestor(WindowFromPoint(point), RootAncestor);
-        if (pointWindow != handle) return;
+        if (pointWindow != handle)
+        {
+            LiveInspectMouse.HideHover();
+            return;
+        }
         if (HoverSnapshots.TryGetValue(handle.ToInt64(), out var previous)
             && Math.Abs(previous.X - point.X) < 2
             && Math.Abs(previous.Y - point.Y) < 2
             && DateTime.UtcNow - previous.CapturedAt < TimeSpan.FromMilliseconds(400))
+        {
+            LiveInspectMouse.ShowHover(
+                handle, point.X, point.Y, HoverDetails(previous.Element));
             return;
+        }
         try
         {
             var remainingNodes = 1;
@@ -365,12 +377,28 @@ internal static class Program
                 ref remainingNodes);
             HoverSnapshots[handle.ToInt64()] = new HoverSnapshot(
                 point.X, point.Y, DateTime.UtcNow, element);
+            LiveInspectMouse.ShowHover(handle, point.X, point.Y, HoverDetails(element));
         }
         catch
         {
             // Hover sampling is best effort. Preserve the last good element so
             // a transient SAP provider timeout cannot erase the click target.
         }
+    }
+
+    private static string HoverDetails(JsonObject element)
+    {
+        var bounds = element["bounds"]?.AsObject();
+        return string.Join(Environment.NewLine, new[]
+        {
+            $"role: {element["role"]?.GetValue<string>() ?? ""}",
+            $"name: {element["name"]?.GetValue<string>() ?? ""}",
+            $"automationId: {element["automationId"]?.GetValue<string>() ?? ""}",
+            $"className: {element["className"]?.GetValue<string>() ?? ""}",
+            $"enabled: {element["enabled"]?.ToJsonString() ?? "false"}",
+            $"offscreen: {element["offscreen"]?.ToJsonString() ?? "false"}",
+            $"bounds: x={bounds?["x"]}, y={bounds?["y"]}, width={bounds?["width"]}, height={bounds?["height"]}"
+        });
     }
 
     private static object ElementFromPoint(AgentRequest request)

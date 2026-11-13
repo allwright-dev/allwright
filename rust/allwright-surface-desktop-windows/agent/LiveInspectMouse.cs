@@ -25,6 +25,7 @@ internal static class LiveInspectMouse
     private static long suppressedWindow;
     private static long suppressUntil;
     private static LiveInspectOverlay? overlay;
+    private static LiveInspectHoverPopup? hoverPopup;
 
     public static LiveInspectClick? Latest => Volatile.Read(ref latest);
 
@@ -37,6 +38,20 @@ internal static class LiveInspectMouse
             picker.BeginInvoke((Action)(() => picker.Arm(window)));
     }
 
+    public static void ShowHover(IntPtr window, int x, int y, string details)
+    {
+        var popup = Volatile.Read(ref hoverPopup);
+        if (popup is not null && popup.IsHandleCreated)
+            popup.BeginInvoke((Action)(() => popup.ShowDetails(window, x, y, details)));
+    }
+
+    public static void HideHover()
+    {
+        var popup = Volatile.Read(ref hoverPopup);
+        if (popup is not null && popup.IsHandleCreated)
+            popup.BeginInvoke((Action)popup.HideDetails);
+    }
+
     public static void Start()
     {
         using var ready = new ManualResetEventSlim();
@@ -44,8 +59,11 @@ internal static class LiveInspectMouse
         var thread = new Thread(() =>
         {
             using var picker = new LiveInspectOverlay(Record);
+            using var popup = new LiveInspectHoverPopup();
             _ = picker.Handle;
+            _ = popup.Handle;
             Volatile.Write(ref overlay, picker);
+            Volatile.Write(ref hoverPopup, popup);
             var hook = SetWindowsHookEx(
                 WhMouseLowLevel,
                 Callback,
@@ -64,6 +82,7 @@ internal static class LiveInspectMouse
             finally
             {
                 Volatile.Write(ref overlay, null);
+                Volatile.Write(ref hoverPopup, null);
                 UnhookWindowsHookEx(hook);
             }
         })
@@ -151,6 +170,107 @@ internal static class LiveInspectMouse
     private static extern IntPtr GetAncestor(IntPtr window, uint flags);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr GetModuleHandle(string? moduleName);
+}
+
+internal sealed class LiveInspectHoverPopup : Form
+{
+    private const int OwnerWindow = -8;
+    private const long ToolWindow = 0x00000080L;
+    private const long TransparentInput = 0x00000020L;
+    private const long NoActivate = 0x08000000L;
+    private const uint NoActivatePosition = 0x0010;
+    private static readonly IntPtr TopMostHandle = new(-1);
+    private readonly Label details;
+    private readonly System.Windows.Forms.Timer expiryTimer;
+    private long updatedAt;
+
+    public LiveInspectHoverPopup()
+    {
+        FormBorderStyle = FormBorderStyle.None;
+        ShowInTaskbar = false;
+        StartPosition = FormStartPosition.Manual;
+        AutoSize = true;
+        AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        BackColor = Color.FromArgb(17, 24, 39);
+        ForeColor = Color.White;
+        Padding = new Padding(10, 8, 10, 8);
+        details = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(520, 0),
+            Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+            ForeColor = Color.White,
+            BackColor = Color.Transparent
+        };
+        Controls.Add(details);
+        expiryTimer = new System.Windows.Forms.Timer { Interval = 100 };
+        expiryTimer.Tick += (_, _) =>
+        {
+            if (Visible && Environment.TickCount64 - updatedAt > 900) Hide();
+        };
+        expiryTimer.Start();
+    }
+
+    protected override bool ShowWithoutActivation => true;
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var parameters = base.CreateParams;
+            parameters.ExStyle |= (int)(ToolWindow | TransparentInput | NoActivate);
+            return parameters;
+        }
+    }
+
+    public void ShowDetails(IntPtr owner, int x, int y, string value)
+    {
+        updatedAt = Environment.TickCount64;
+        SetWindowLongPtr(Handle, OwnerWindow, owner);
+        if (details.Text != value) details.Text = value;
+        if (!Visible) Show();
+        var preferred = PreferredSize;
+        var workingArea = Screen.FromPoint(new Point(x, y)).WorkingArea;
+        var left = Math.Min(x + 20, workingArea.Right - preferred.Width - 8);
+        var top = Math.Min(y + 24, workingArea.Bottom - preferred.Height - 8);
+        left = Math.Max(workingArea.Left + 8, left);
+        top = Math.Max(workingArea.Top + 8, top);
+        SetWindowPos(
+            Handle,
+            TopMostHandle,
+            left,
+            top,
+            preferred.Width,
+            preferred.Height,
+            NoActivatePosition);
+    }
+
+    public void HideDetails()
+    {
+        if (Visible) Hide();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            expiryTimer.Dispose();
+            details.Dispose();
+        }
+        base.Dispose(disposing);
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr value);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(
+        IntPtr window,
+        IntPtr insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
 }
 
 internal sealed class LiveInspectOverlay : Form

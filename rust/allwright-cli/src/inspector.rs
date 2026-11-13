@@ -1157,6 +1157,7 @@ mod tests {
         assert!(INDEX_HTML.contains("liveInspect"));
         assert!(INDEX_HTML.contains("/api/live-inspect"));
         assert!(INDEX_HTML.contains("attachLiveHit"));
+        assert!(INDEX_HTML.contains("Frozen from actual application"));
         assert!(INDEX_HTML.contains("double_click"));
         assert!(INDEX_HTML.contains("wheelInteract"));
         assert!(INDEX_HTML.contains("pointerFinish"));
