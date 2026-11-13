@@ -32,7 +32,7 @@ const (
 	allwrightRepositoryEnvVar  = "ALLWRIGHT_REPOSITORY"
 	allwrightVersionEnvVar     = "ALLWRIGHT_VERSION"
 	defaultReleaseRepository   = "allwright-dev/allwright"
-	defaultReleaseVersion      = "0.2.19"
+	defaultReleaseVersion      = "0.2.20"
 )
 
 var bootstrapState struct {
