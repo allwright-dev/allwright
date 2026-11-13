@@ -300,6 +300,7 @@ pub enum DesktopCommandResult {
     PollInspectorPoint {
         sequence: u64,
         point: Option<DesktopInspectorPoint>,
+        element: Option<InspectorNode>,
     },
     ListWindows {
         windows: Vec<DesktopWindowInfo>,

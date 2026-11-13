@@ -332,34 +332,6 @@ impl InspectorRuntime {
         }
     }
 
-    fn live_inspect(&self, point: InspectorPointRequest) -> Result<Value, Box<dyn Error>> {
-        let mut snapshot = if self.surface.id() == "desktop-windows" {
-            let InspectorSession::Desktop { desktop, app } = &self.session else {
-                unreachable!("desktop-windows always has a desktop session")
-            };
-            let (target, _, _) = self.desktop_target(app)?;
-            let result = invoke_desktop(
-                self.surface.id(),
-                DesktopCommand::InspectorElementAtPoint {
-                    desktop_session: desktop.clone(),
-                    app_session: target,
-                    x: point.x,
-                    y: point.y,
-                },
-            )?;
-            let DesktopCommandResult::InspectorElementAtPoint(element) = result else {
-                return Err("desktop-windows returned an unexpected point lookup response".into());
-            };
-            let mut snapshot = self.snapshot_with_window_retry()?;
-            snapshot["hit"] = serde_json::to_value(element)?;
-            snapshot
-        } else {
-            self.snapshot_with_window_retry()?
-        };
-        snapshot["inspectionPoint"] = json!({"x": point.x, "y": point.y});
-        Ok(snapshot)
-    }
-
     fn poll_live_inspect(&self) -> Result<Value, Box<dyn Error>> {
         if self.surface.id() != "desktop-windows" {
             return Ok(json!({"event": false}));
@@ -380,7 +352,12 @@ impl InspectorRuntime {
                 last_sequence,
             },
         )?;
-        let DesktopCommandResult::PollInspectorPoint { sequence, point } = result else {
+        let DesktopCommandResult::PollInspectorPoint {
+            sequence,
+            point,
+            element,
+        } = result
+        else {
             return Err("desktop-windows returned an unexpected inspect event response".into());
         };
         *self
@@ -390,10 +367,12 @@ impl InspectorRuntime {
         let Some(point) = point else {
             return Ok(json!({"event": false}));
         };
-        let mut snapshot = self.live_inspect(InspectorPointRequest {
-            x: point.x,
-            y: point.y,
-        })?;
+        let element = element.ok_or(
+            "no cached hover element matched the Ctrl+click point; hover the control briefly and try again",
+        )?;
+        let mut snapshot = self.snapshot_with_window_retry()?;
+        snapshot["hit"] = serde_json::to_value(element)?;
+        snapshot["inspectionPoint"] = json!({"x": point.x, "y": point.y});
         snapshot["event"] = Value::Bool(true);
         Ok(snapshot)
     }
@@ -983,12 +962,6 @@ struct InspectorActionRequest {
 struct InspectorWindowRequest {
     #[serde(rename = "windowId")]
     window_id: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct InspectorPointRequest {
-    x: f64,
-    y: f64,
 }
 
 #[derive(Deserialize)]

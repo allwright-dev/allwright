@@ -1087,6 +1087,7 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
         DesktopCommand::PollInspectorPoint { .. } => Ok(DesktopCommandResult::PollInspectorPoint {
             sequence: 0,
             point: None,
+            element: None,
         }),
         DesktopCommand::ListWindows {
             desktop_session,

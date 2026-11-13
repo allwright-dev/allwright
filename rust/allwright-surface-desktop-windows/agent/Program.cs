@@ -87,6 +87,7 @@ internal sealed record WindowCandidate(
     AutomationElement Root,
     double Area);
 internal sealed record WindowHook(string SessionId, HashSet<string> KnownWindowIds);
+internal sealed record HoverSnapshot(int X, int Y, DateTime CapturedAt, JsonObject Element);
 
 internal static class Program
 {
@@ -97,9 +98,19 @@ internal static class Program
     private static readonly NativeAutomation Automation = new();
     private static readonly Dictionary<string, AppSession> Sessions = new();
     private static readonly Dictionary<string, WindowHook> WindowHooks = new();
+    private static readonly Dictionary<long, HoverSnapshot> HoverSnapshots = new();
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out ScreenPoint point);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(ScreenPoint point);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr window, uint flags);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -142,6 +153,14 @@ internal static class Program
     private const uint SnapshotProcesses = 0x00000002;
     private const uint SynchronizeProcess = 0x00100000;
     private const uint InfiniteWait = 0xffffffff;
+    private const uint RootAncestor = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ScreenPoint
+    {
+        public int X;
+        public int Y;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct WindowRect
@@ -302,12 +321,56 @@ internal static class Program
         LiveInspectMouse.Arm(handle);
         var click = LiveInspectMouse.Latest;
         if (click is null || click.Sequence <= lastSequence)
+        {
+            CacheHoveredElement(handle);
             return new { sequence = lastSequence };
+        }
         var bounds = root.Properties.BoundingRectangle.ValueOrDefault;
         if (handle == IntPtr.Zero || click.Window != handle
             || !bounds.Contains(click.X, click.Y))
             return new { sequence = click.Sequence };
-        return new { sequence = click.Sequence, x = click.X, y = click.Y };
+        HoverSnapshots.TryGetValue(handle.ToInt64(), out var hover);
+        var cached = hover is not null
+            && DateTime.UtcNow - hover.CapturedAt < TimeSpan.FromSeconds(5)
+            && Math.Abs(hover.X - click.X) <= 32
+            && Math.Abs(hover.Y - click.Y) <= 32
+            ? hover.Element
+            : null;
+        return new
+        {
+            sequence = click.Sequence,
+            x = click.X,
+            y = click.Y,
+            element = cached
+        };
+    }
+
+    private static void CacheHoveredElement(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero || !GetCursorPos(out var point)) return;
+        var pointWindow = GetAncestor(WindowFromPoint(point), RootAncestor);
+        if (pointWindow != handle) return;
+        if (HoverSnapshots.TryGetValue(handle.ToInt64(), out var previous)
+            && Math.Abs(previous.X - point.X) < 2
+            && Math.Abs(previous.Y - point.Y) < 2
+            && DateTime.UtcNow - previous.CapturedAt < TimeSpan.FromMilliseconds(400))
+            return;
+        try
+        {
+            var remainingNodes = 1;
+            var element = SnapshotElement(
+                Automation.FromPoint(point.X, point.Y),
+                0,
+                DateTime.UtcNow.AddSeconds(2),
+                ref remainingNodes);
+            HoverSnapshots[handle.ToInt64()] = new HoverSnapshot(
+                point.X, point.Y, DateTime.UtcNow, element);
+        }
+        catch
+        {
+            // Hover sampling is best effort. Preserve the last good element so
+            // a transient SAP provider timeout cannot erase the click target.
+        }
     }
 
     private static object ElementFromPoint(AgentRequest request)

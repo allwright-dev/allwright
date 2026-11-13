@@ -942,7 +942,20 @@ fn handle_plugin_command(command: DesktopCommand) -> Result<DesktopCommandResult
                 .and_then(Value::as_f64)
                 .zip(value.get("y").and_then(Value::as_f64))
                 .map(|(x, y)| DesktopInspectorPoint { x, y });
-            Ok(DesktopCommandResult::PollInspectorPoint { sequence, point })
+            let element = value
+                .get("element")
+                .filter(|element| !element.is_null())
+                .cloned()
+                .map(serde_json::from_value)
+                .transpose()
+                .map_err(|error| {
+                    format!("Windows agent returned an invalid cached hover element: {error}")
+                })?;
+            Ok(DesktopCommandResult::PollInspectorPoint {
+                sequence,
+                point,
+                element,
+            })
         }
         DesktopCommand::ListWindows {
             desktop_session,
