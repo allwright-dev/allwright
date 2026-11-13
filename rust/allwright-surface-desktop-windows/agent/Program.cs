@@ -991,7 +991,7 @@ internal static class Program
         var text = spec[kind == "role" ? "name" : "text"]?.GetValue<string>();
         var exact = spec["exact"]?.GetValue<bool>() ?? false;
         var role = RoleType(spec["role"]?.GetValue<string>() ?? "");
-        var elements = FindAllByTraversal(root, element => kind switch
+        bool Matches(AutomationElement element) => kind switch
         {
             "role" => element.Properties.ControlType.ValueOrDefault == role
                 && (text is null || (exact
@@ -1004,7 +1004,29 @@ internal static class Program
                 text ?? "",
                 StringComparison.Ordinal),
             _ => true
-        }, stopOnFirstVisible);
+        };
+        var elements = FindAllByTraversal(root, Matches, stopOnFirstVisible);
+        if (elements.Length == 0 && kind == "role")
+        {
+            // Native popup menus can expose their items in UIA's descendant
+            // view while omitting them from the control-view child walk. Try
+            // the exact accessible name first to keep the provider query
+            // narrow, then preserve substring semantics if necessary.
+            var condition = text is not null
+                ? Automation.ConditionFactory.ByName(text)
+                : Automation.ConditionFactory.ByControlType(role);
+            elements = root.FindAllDescendants(condition).Where(Matches).ToArray();
+            if (elements.Length == 0 && text is not null && !exact)
+                elements = root.FindAllDescendants(
+                    Automation.ConditionFactory.ByControlType(role))
+                    .Where(Matches).ToArray();
+            if (stopOnFirstVisible)
+            {
+                var visible = elements.FirstOrDefault(element =>
+                    !element.Properties.IsOffscreen.ValueOrDefault);
+                if (visible is not null) elements = [visible];
+            }
+        }
         if (text is null || kind is "testId" or "role") return elements;
         return elements.Where(element =>
         {
